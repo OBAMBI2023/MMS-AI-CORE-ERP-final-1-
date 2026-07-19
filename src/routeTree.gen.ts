@@ -13,12 +13,14 @@ import { Route as VentesRouteImport } from './routes/ventes'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RapportsRouteImport } from './routes/rapports'
 import { Route as ParametresRouteImport } from './routes/parametres'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as FournisseursRouteImport } from './routes/fournisseurs'
 import { Route as DevisRouteImport } from './routes/devis'
 import { Route as DepensesRouteImport } from './routes/depenses'
 import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AchatsRouteImport } from './routes/achats'
+import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
 
 const VentesRoute = VentesRouteImport.update({
@@ -39,6 +41,11 @@ const RapportsRoute = RapportsRouteImport.update({
 const ParametresRoute = ParametresRouteImport.update({
   id: '/parametres',
   path: '/parametres',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FournisseursRoute = FournisseursRouteImport.update({
@@ -71,6 +78,11 @@ const AchatsRoute = AchatsRouteImport.update({
   path: '/achats',
   getParentRoute: () => rootRouteImport,
 } as any)
+const R403Route = R403RouteImport.update({
+  id: '/403',
+  path: '/403',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -79,12 +91,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/403': typeof R403Route
   '/achats': typeof AchatsRoute
   '/assistant': typeof AssistantRoute
   '/clients': typeof ClientsRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
@@ -92,12 +106,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/403': typeof R403Route
   '/achats': typeof AchatsRoute
   '/assistant': typeof AssistantRoute
   '/clients': typeof ClientsRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
@@ -106,12 +122,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/403': typeof R403Route
   '/achats': typeof AchatsRoute
   '/assistant': typeof AssistantRoute
   '/clients': typeof ClientsRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
@@ -121,12 +139,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/403'
     | '/achats'
     | '/assistant'
     | '/clients'
     | '/depenses'
     | '/devis'
     | '/fournisseurs'
+    | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
@@ -134,12 +154,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/403'
     | '/achats'
     | '/assistant'
     | '/clients'
     | '/depenses'
     | '/devis'
     | '/fournisseurs'
+    | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
@@ -147,12 +169,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/403'
     | '/achats'
     | '/assistant'
     | '/clients'
     | '/depenses'
     | '/devis'
     | '/fournisseurs'
+    | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
@@ -161,12 +185,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  R403Route: typeof R403Route
   AchatsRoute: typeof AchatsRoute
   AssistantRoute: typeof AssistantRoute
   ClientsRoute: typeof ClientsRoute
   DepensesRoute: typeof DepensesRoute
   DevisRoute: typeof DevisRoute
   FournisseursRoute: typeof FournisseursRoute
+  LoginRoute: typeof LoginRoute
   ParametresRoute: typeof ParametresRoute
   RapportsRoute: typeof RapportsRoute
   ServicesRoute: typeof ServicesRoute
@@ -201,6 +227,13 @@ declare module '@tanstack/react-router' {
       path: '/parametres'
       fullPath: '/parametres'
       preLoaderRoute: typeof ParametresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/fournisseurs': {
@@ -245,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AchatsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/403': {
+      id: '/403'
+      path: '/403'
+      fullPath: '/403'
+      preLoaderRoute: typeof R403RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -257,12 +297,14 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  R403Route: R403Route,
   AchatsRoute: AchatsRoute,
   AssistantRoute: AssistantRoute,
   ClientsRoute: ClientsRoute,
   DepensesRoute: DepensesRoute,
   DevisRoute: DevisRoute,
   FournisseursRoute: FournisseursRoute,
+  LoginRoute: LoginRoute,
   ParametresRoute: ParametresRoute,
   RapportsRoute: RapportsRoute,
   ServicesRoute: ServicesRoute,
