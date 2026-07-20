@@ -558,6 +558,7 @@ export function PosPage() {
           <ReceiptModal
             ticket={checkout}
             settings={settings}
+            logoUrl={logoUrl}
             onClose={() => {
               setCheckout(null);
               clearCart();
@@ -585,10 +586,12 @@ type Ticket = {
 function ReceiptModal({
   ticket,
   settings,
+  logoUrl,
   onClose,
 }: {
   ticket: Ticket;
   settings: Tables<"parametres"> | null | undefined;
+  logoUrl: string | null | undefined;
   onClose: () => void;
 }) {
   const printRef = useRef<HTMLDivElement>(null);

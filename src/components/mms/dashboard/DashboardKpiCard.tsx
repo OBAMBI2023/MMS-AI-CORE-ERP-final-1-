@@ -102,23 +102,20 @@ export function DashboardKpiCard({
           </div>
 
           <div className="relative mt-3 flex items-center justify-between gap-2">
-            {trend !== null ? (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-0.5 text-xs font-semibold",
-                  trendUp && "text-emerald-600 dark:text-emerald-400",
-                  trendDown && "text-rose-600 dark:text-rose-400",
-                  !trendUp && !trendDown && "text-muted-foreground",
-                )}
-              >
-                {trendUp && <ArrowUpRight className="h-3 w-3" />}
-                {trendDown && <ArrowDownRight className="h-3 w-3" />}
-                {!trendUp && !trendDown && <Minus className="h-3 w-3" />}
-                {Math.abs(trend).toFixed(0)}%
-              </span>
-            ) : (
-              <span />
-            )}
+            <span
+              className={cn(
+                "inline-flex items-center gap-0.5 text-xs font-semibold",
+                trend !== null && trendUp && "text-emerald-600 dark:text-emerald-400",
+                trend !== null && trendDown && "text-rose-600 dark:text-rose-400",
+                trend !== null && !trendUp && !trendDown && "text-muted-foreground",
+                trend === null && "text-muted-foreground",
+              )}
+            >
+              {trend !== null && trendUp && <ArrowUpRight className="h-3 w-3" />}
+              {trend !== null && trendDown && <ArrowDownRight className="h-3 w-3" />}
+              {trend !== null && !trendUp && !trendDown && <Minus className="h-3 w-3" />}
+              {trend === null ? "—" : `${Math.abs(trend).toFixed(0)}%`}
+            </span>
             {spark && spark.some((p) => p.value > 0) && (
               <div className="h-8 w-20 opacity-80">
                 <ResponsiveContainer width="100%" height="100%">

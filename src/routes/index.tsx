@@ -77,12 +77,7 @@ function Dashboard() {
 
   const userName = useMemo(() => {
     if (!data?.session) return "Utilisateur";
-    const fullName = data.session.full_name;
-    if (fullName) {
-      const parts = fullName.split(" ");
-      return parts[0];
-    }
-    return "Utilisateur";
+    return data.session.full_name || "Utilisateur";
   }, [data?.session]);
 
   const today = useMemo(
