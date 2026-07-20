@@ -47,7 +47,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { DashboardKpiCard } from "@/components/mms/dashboard/DashboardKpiCard";
 import { DashboardEmptyState } from "@/components/mms/dashboard/DashboardEmptyState";
-import { GlobalSearchDialog } from "@/components/mms/dashboard/GlobalSearchDialog";
+// TODO: Réactiver la recherche globale plus tard
+// import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatFCFA, formatDate, formatDateTime } from "@/lib/mms/format";
 
@@ -55,18 +56,19 @@ const PIE_COLORS = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b
 
 function Dashboard() {
   const { data, isLoading, error } = useDashboardData();
-  const [searchOpen, setSearchOpen] = useState(false);
+  // TODO: Réactiver la recherche globale plus tard
+  // const [searchOpen, setSearchOpen] = useState(false);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setSearchOpen((o) => !o);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  // useEffect(() => {
+  //   const handler = (e: KeyboardEvent) => {
+  //     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+  //       e.preventDefault();
+  //       setSearchOpen((o) => !o);
+  //     }
+  //   };
+  //   window.addEventListener("keydown", handler);
+  //   return () => window.removeEventListener("keydown", handler);
+  // }, []);
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -127,22 +129,9 @@ function Dashboard() {
   return (
     <AppShell
       title="Dashboard"
-      actions={
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2 text-muted-foreground"
-          onClick={() => setSearchOpen(true)}
-        >
-          <Search className="h-4 w-4" />
-          <span className="hidden sm:inline">Rechercher</span>
-          <kbd className="hidden sm:inline rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono">
-            ⌘K
-          </kbd>
-        </Button>
-      }
     >
-      <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      {/* TODO: Réactiver la recherche globale plus tard */}
+      {/* <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} /> */}
 
       <motion.div
         initial={{ opacity: 0 }}
@@ -269,7 +258,8 @@ function Dashboard() {
                 </Link>
               </motion.div>
             ))}
-            <motion.button
+            {/* TODO: Réactiver la recherche globale plus tard */}
+            {/* <motion.button
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: quickActions.length * 0.02 }}
@@ -280,7 +270,7 @@ function Dashboard() {
                 <Search className="h-5 w-5" />
               </div>
               <span className="text-xs font-medium text-center">Recherche globale</span>
-            </motion.button>
+            </motion.button> */}
           </div>
         </div>
 
