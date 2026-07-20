@@ -313,25 +313,23 @@ export function PosPage() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent
-                  side="left"
-                  className="w-[300px] p-0 bg-sidebar text-sidebar-foreground"
+                side="left"
+                className="w-[300px] p-0 bg-sidebar text-sidebar-foreground"
                 >
-                  <SheetTitle className="sr-only">Navigation</SheetTitle>
-                  <div className="flex flex-col h-full p-4 gap-2">
-                    <div className="flex items-center gap-2 px-2 py-4">
-                      <div className="grid place-items-center h-10 w-10 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-lg shadow-primary/30">
-                        <Sparkles className="h-5 w-5 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold tracking-tight">MMS ERP</div>
-                        <div className="text-xs text-sidebar-foreground/60">
-                          Maguy Multi Services
-                        </div>
-                      </div>
+                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <div className="flex flex-col h-full p-4 gap-2">
+                  <div className="flex items-center gap-2 px-2 py-4">
+                    <div className="grid place-items-center h-10 w-10 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-lg shadow-primary/30">
+                      <Sparkles className="h-5 w-5 text-white" />
                     </div>
-                    <SidebarContent onItemClick={() => setMobileMenuOpen(false)} />
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold tracking-tight">{settings?.company_name ?? "Mon Entreprise"}</div>
+                    </div>
                   </div>
+                  <SidebarContent onItemClick={() => setMobileMenuOpen(false)} />
+                </div>
                 </SheetContent>
+
               </Sheet>
             </div>
             <div className="flex items-baseline justify-between mb-3">

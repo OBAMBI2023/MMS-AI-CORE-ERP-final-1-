@@ -6,6 +6,7 @@ import { Menu, Sparkles, Search } from "lucide-react";
 import { SidebarContent } from "./SidebarContent";
 import { useState, createContext, useContext, useEffect } from "react";
 import { UserMenu } from "./UserMenu";
+import { useCompanySettings } from "@/hooks/use-company-settings";
 
 interface SearchContextType {
   searchQuery: string;
@@ -48,6 +49,8 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const { settings } = useCompanySettings();
+  const companyName = settings?.company_name ?? "Mon Entreprise";
   const [searchQuery, setSearchQuery] = useState("");
   const [placeholder, setPlaceholder] = useState("Rechercher...");
   const [searchVisible, setSearchVisible] = useState(false);
@@ -89,8 +92,7 @@ export function AppShell({
                         <Sparkles className="h-5 w-5 text-white" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-bold tracking-tight">MMS ERP</div>
-                        <div className="text-xs text-sidebar-foreground/60">Maguy Multi Services</div>
+                        <div className="text-sm font-bold tracking-tight">{companyName}</div>
                       </div>
                     </div>
                     <SidebarContent onItemClick={() => setOpen(false)} />

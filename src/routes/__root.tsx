@@ -143,11 +143,14 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+import { DynamicFavicon } from "@/components/mms/DynamicFavicon";
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
+      <DynamicFavicon />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster richColors position="top-right" />

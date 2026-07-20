@@ -5,6 +5,7 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 
 export function Sidebar() {
   const { logoUrl, settings } = useCompanySettings();
+  const companyName = settings?.company_name ?? "Mon Entreprise";
 
   return (
     <aside className="hidden md:flex h-full w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border overflow-hidden">
@@ -18,8 +19,7 @@ export function Sidebar() {
             )}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-bold tracking-tight">MMS ERP</div>
-            <div className="text-xs text-sidebar-foreground/60">Maguy Multi Services</div>
+            <div className="text-sm font-bold tracking-tight">{companyName}</div>
           </div>
         </div>
       </div>
