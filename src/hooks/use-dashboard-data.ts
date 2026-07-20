@@ -412,6 +412,7 @@ export function useDashboardData() {
         session: session
           ? {
               email: session.user?.email ?? "Utilisateur",
+              full_name: session.user?.user_metadata?.full_name ?? null,
               lastSignInAt: session.user?.last_sign_in_at ?? null,
             }
           : null,

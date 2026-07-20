@@ -206,9 +206,9 @@ function ParametresPage() {
                 <TabTrig value="security" icon={<Shield className="h-4 w-4" />}>
                   Sécurité
                 </TabTrig>
-                <TabTrig value="ai" icon={<Sparkles className="h-4 w-4" />}>
+                {/* <TabTrig value="ai" icon={<Sparkles className="h-4 w-4" />}>
                   Assistant IA
-                </TabTrig>
+                </TabTrig> */}
               </TabsList>
 
               <TabsContent value="general">
@@ -234,9 +234,9 @@ function ParametresPage() {
               <TabsContent value="security">
                 <SecurityTab />
               </TabsContent>
-              <TabsContent value="ai">
+              {/* <TabsContent value="ai">
                 <AiTab form={form} update={update} />
-              </TabsContent>
+              </TabsContent> */}
             </Tabs>
           </div>
 

@@ -16,7 +16,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/" },
-  { icon: Bot, label: "Assistant IA", to: "/assistant" },
+  // { icon: Bot, label: "Assistant IA", to: "/assistant" },
   { icon: Wallet, label: "Ventes (POS)", to: "/ventes" },
   { icon: FileText, label: "Devis", to: "/devis" },
   { icon: Users, label: "Clients", to: "/clients" },

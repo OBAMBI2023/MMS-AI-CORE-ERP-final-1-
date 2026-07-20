@@ -75,6 +75,16 @@ function Dashboard() {
     return "Bonsoir";
   }, []);
 
+  const userName = useMemo(() => {
+    if (!data?.session) return "Utilisateur";
+    const fullName = data.session.full_name;
+    if (fullName) {
+      const parts = fullName.split(" ");
+      return parts[0];
+    }
+    return "Utilisateur";
+  }, [data?.session]);
+
   const today = useMemo(
     () =>
       new Date().toLocaleDateString("fr-FR", {
@@ -96,7 +106,7 @@ function Dashboard() {
     { title: "Nouveau service", icon: Wrench, route: "/services" },
     { title: "Rapports", icon: BarChart3, route: "/rapports" },
     { title: "Paramètres", icon: Settings, route: "/parametres" },
-    { title: "Assistant IA", icon: Bot, route: "/assistant" },
+    // { title: "Assistant IA", icon: Bot, route: "/assistant" },
   ] as const;
 
   if (error) {
@@ -146,7 +156,7 @@ function Dashboard() {
         className="space-y-8 pb-4"
       >
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{greeting} 👋</h1>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{greeting}, {userName} 👋</h1>
           <p className="text-sm text-muted-foreground capitalize mt-1">{today}</p>
         </div>
 
@@ -724,7 +734,7 @@ function Dashboard() {
                   )}
                 </Card>
 
-                <Card className="p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
+                {/* <Card className="p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
                   <h3 className="font-bold mb-2 flex items-center gap-2">
                     <Bot className="h-4 w-4 text-primary" /> Assistant IA
                   </h3>
@@ -737,7 +747,7 @@ function Dashboard() {
                   >
                     <Plus className="h-4 w-4" /> Interroger l'IA
                   </Link>
-                </Card>
+                </Card> */}
               </div>
             </div>
           </>
