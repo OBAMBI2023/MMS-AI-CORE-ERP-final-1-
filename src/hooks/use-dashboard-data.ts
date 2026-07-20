@@ -27,7 +27,7 @@ export type ActivityItem = {
 };
 
 function pctChange(curr: number, prev: number): number | null {
-  if (prev === 0) return curr === 0 ? 0 : 100;
+  if (prev === 0) return 0;
   return ((curr - prev) / Math.abs(prev)) * 100;
 }
 
