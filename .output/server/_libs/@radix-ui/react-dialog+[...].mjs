@@ -1,8 +1,8 @@
 import { a as __toESM } from "../../_runtime.mjs";
 import { l as require_react_dom, u as require_react } from "../@floating-ui/react-dom+[...].mjs";
-import { a as createSlot, c as require_jsx_runtime, n as Primitive, r as dispatchDiscreteCustomEvent, s as useComposedRefs } from "./react-arrow+[...].mjs";
+import { a as createSlot, n as Primitive, o as useComposedRefs, r as dispatchDiscreteCustomEvent, s as require_jsx_runtime } from "./react-arrow+[...].mjs";
 import { t as composeEventHandlers } from "../radix-ui__primitive.mjs";
-import { n as createContextScope } from "./react-collection+[...].mjs";
+import { a as useLayoutEffect2, i as useCallbackRef$1, o as createContextScope } from "./react-avatar+[...].mjs";
 //#region node_modules/tslib/tslib.es6.mjs
 var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
 var __assign = function() {
@@ -59,9 +59,6 @@ function __spreadArray(to, from, pack) {
 	}
 	return to.concat(ar || Array.prototype.slice.call(from));
 }
-//#endregion
-//#region node_modules/@radix-ui/react-use-layout-effect/dist/index.mjs
-var useLayoutEffect2 = globalThis?.document ? import_react.useLayoutEffect : () => {};
 //#endregion
 //#region node_modules/@radix-ui/react-id/dist/index.mjs
 var useReactId = import_react[" useId ".trim().toString()] || (() => void 0);
@@ -124,15 +121,6 @@ function useUncontrolledState({ defaultProp, onChange }) {
 }
 function isFunction(value) {
 	return typeof value === "function";
-}
-//#endregion
-//#region node_modules/@radix-ui/react-use-callback-ref/dist/index.mjs
-function useCallbackRef$1(callback) {
-	const callbackRef = import_react.useRef(callback);
-	import_react.useEffect(() => {
-		callbackRef.current = callback;
-	});
-	return import_react.useMemo(() => ((...args) => callbackRef.current?.(...args)), []);
 }
 //#endregion
 //#region node_modules/@radix-ui/react-dismissable-layer/dist/index.mjs
@@ -1800,4 +1788,4 @@ function getState(open) {
 	return open ? "open" : "closed";
 }
 //#endregion
-export { useControllableState as _, DialogOverlay as a, __awaiter as b, DialogTrigger as c, useFocusGuards as d, Presence as f, useCallbackRef$1 as g, DismissableLayer as h, DialogDescription as i, hideOthers as l, FocusScope as m, DialogClose as n, DialogPortal as o, Portal as p, DialogContent as r, DialogTitle as s, Dialog as t, ReactRemoveScroll as u, useId as v, __rest as x, useLayoutEffect2 as y };
+export { useId as _, DialogOverlay as a, DialogTrigger as c, useFocusGuards as d, Presence as f, useControllableState as g, DismissableLayer as h, DialogDescription as i, hideOthers as l, FocusScope as m, DialogClose as n, DialogPortal as o, Portal as p, DialogContent as r, DialogTitle as s, Dialog as t, ReactRemoveScroll as u, __awaiter as v, __rest as y };

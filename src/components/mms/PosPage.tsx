@@ -313,23 +313,24 @@ export function PosPage() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent
-                side="left"
-                className="w-[300px] p-0 bg-sidebar text-sidebar-foreground"
+                  side="left"
+                  className="w-[300px] p-0 bg-sidebar text-sidebar-foreground"
                 >
-                <SheetTitle className="sr-only">Navigation</SheetTitle>
-                <div className="flex flex-col h-full p-4 gap-2">
-                  <div className="flex items-center gap-2 px-2 py-4">
-                    <div className="grid place-items-center h-10 w-10 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-lg shadow-primary/30">
-                      <Sparkles className="h-5 w-5 text-white" />
+                  <SheetTitle className="sr-only">Navigation</SheetTitle>
+                  <div className="flex flex-col h-full p-4 gap-2">
+                    <div className="flex items-center gap-2 px-2 py-4">
+                      <div className="grid place-items-center h-10 w-10 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-lg shadow-primary/30">
+                        <Sparkles className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold tracking-tight">
+                          {settings?.company_name ?? "Mon Entreprise"}
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-bold tracking-tight">{settings?.company_name ?? "Mon Entreprise"}</div>
-                    </div>
+                    <SidebarContent onItemClick={() => setMobileMenuOpen(false)} />
                   </div>
-                  <SidebarContent onItemClick={() => setMobileMenuOpen(false)} />
-                </div>
                 </SheetContent>
-
               </Sheet>
             </div>
             <div className="flex items-baseline justify-between mb-3">
@@ -656,11 +657,7 @@ function ReceiptModal({
           >
             <div className="center">
               {logoUrl && (
-                <img
-                  src={logoUrl}
-                  alt="Logo"
-                  style={{ maxWidth: "60px", margin: "0 auto 5px" }}
-                />
+                <img src={logoUrl} alt="Logo" style={{ maxWidth: "60px", margin: "0 auto 5px" }} />
               )}
               <h1 style={{ fontSize: 14, margin: "2px 0", fontWeight: 700 }}>
                 {settings?.company_name || "MAGUY MULTI SERVICES"}

@@ -6,11 +6,7 @@ export function useCompanySettings() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ["parametres"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("parametres")
-        .select("*")
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase.from("parametres").select("*").limit(1).maybeSingle();
       if (error) throw error;
       return data;
     },

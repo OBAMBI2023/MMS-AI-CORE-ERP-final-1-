@@ -1,9 +1,10 @@
 import { a as __toESM } from "../../_runtime.mjs";
 import { a as offset, c as useFloating, i as limitShift, n as flip, o as shift, r as hide, s as size, t as arrow, u as require_react } from "../@floating-ui/react-dom+[...].mjs";
-import { a as createSlot, c as require_jsx_runtime, n as Primitive, r as dispatchDiscreteCustomEvent, s as useComposedRefs, t as Root$1 } from "./react-arrow+[...].mjs";
-import { _ as useControllableState, d as useFocusGuards, f as Presence, g as useCallbackRef, h as DismissableLayer, l as hideOthers, m as FocusScope, p as Portal$1, u as ReactRemoveScroll, v as useId, y as useLayoutEffect2 } from "./react-dialog+[...].mjs";
+import { a as createSlot, n as Primitive, o as useComposedRefs, r as dispatchDiscreteCustomEvent, s as require_jsx_runtime, t as Root$1 } from "./react-arrow+[...].mjs";
+import { _ as useId, d as useFocusGuards, f as Presence, g as useControllableState, h as DismissableLayer, l as hideOthers, m as FocusScope, p as Portal$1, u as ReactRemoveScroll } from "./react-dialog+[...].mjs";
 import { t as composeEventHandlers } from "../radix-ui__primitive.mjs";
-import { n as createContextScope, t as createCollection } from "./react-collection+[...].mjs";
+import { a as useLayoutEffect2, i as useCallbackRef, o as createContextScope } from "./react-avatar+[...].mjs";
+import { t as createCollection } from "../radix-ui__react-collection.mjs";
 import { t as useDirection } from "../radix-ui__react-direction.mjs";
 import { n as autoUpdate } from "../@floating-ui/dom+[...].mjs";
 //#region node_modules/@radix-ui/react-use-size/dist/index.mjs

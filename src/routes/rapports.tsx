@@ -1,11 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, ShoppingCart, FileText, Users, Wallet, Calendar } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  ShoppingCart,
+  FileText,
+  Users,
+  Wallet,
+  Calendar,
+} from "lucide-react";
 import { useState, useMemo } from "react";
 import { AppShell } from "@/components/mms/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { formatFCFA } from "@/lib/mms/format";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/rapports")({
   component: RapportsPage,
@@ -49,11 +63,30 @@ function RapportsPage() {
 
     const getStats = (m: number, y: number) => {
       const filtered = {
-        ventes: data.ventes.filter(v => new Date(v.created_at).getMonth() + 1 === m && new Date(v.created_at).getFullYear() === y),
-        depenses: data.depenses.filter(d => new Date(d.paid_at).getMonth() + 1 === m && new Date(d.paid_at).getFullYear() === y),
-        achats: data.achats.filter(a => new Date(a.created_at).getMonth() + 1 === m && new Date(a.created_at).getFullYear() === y),
-        devis: data.devis.filter(d => new Date(d.created_at).getMonth() + 1 === m && new Date(d.created_at).getFullYear() === y),
-        clients: data.clients.filter(c => new Date(c.created_at).getMonth() + 1 === m && new Date(c.created_at).getFullYear() === y),
+        ventes: data.ventes.filter(
+          (v) =>
+            new Date(v.created_at).getMonth() + 1 === m &&
+            new Date(v.created_at).getFullYear() === y,
+        ),
+        depenses: data.depenses.filter(
+          (d) =>
+            new Date(d.paid_at).getMonth() + 1 === m && new Date(d.paid_at).getFullYear() === y,
+        ),
+        achats: data.achats.filter(
+          (a) =>
+            new Date(a.created_at).getMonth() + 1 === m &&
+            new Date(a.created_at).getFullYear() === y,
+        ),
+        devis: data.devis.filter(
+          (d) =>
+            new Date(d.created_at).getMonth() + 1 === m &&
+            new Date(d.created_at).getFullYear() === y,
+        ),
+        clients: data.clients.filter(
+          (c) =>
+            new Date(c.created_at).getMonth() + 1 === m &&
+            new Date(c.created_at).getFullYear() === y,
+        ),
       };
 
       const sumV = filtered.ventes.reduce((s, r) => s + Number(r.total), 0);
@@ -93,7 +126,7 @@ function RapportsPage() {
       },
       vsPrevYear: {
         ventes: compare(target.ventes, prevYearSameMonth.ventes),
-      }
+      },
     };
   }, [data, month, year]);
 
@@ -105,8 +138,10 @@ function RapportsPage() {
             <SelectValue placeholder="Mois" />
           </SelectTrigger>
           <SelectContent>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-              <SelectItem key={m} value={String(m)}>{new Date(0, m - 1).toLocaleString('fr-FR', { month: 'long' })}</SelectItem>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <SelectItem key={m} value={String(m)}>
+                {new Date(0, m - 1).toLocaleString("fr-FR", { month: "long" })}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -115,9 +150,13 @@ function RapportsPage() {
             <SelectValue placeholder="Année" />
           </SelectTrigger>
           <SelectContent>
-            {[...Array(5)].map((_, i) => new Date().getFullYear() - i).map(y => (
-              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-            ))}
+            {[...Array(5)]
+              .map((_, i) => new Date().getFullYear() - i)
+              .map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
@@ -129,13 +168,37 @@ function RapportsPage() {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Chiffre d'affaires" value={stats.target.ventes} compare={stats.vsPrev.ventes} />
-            <StatCard label="Nombre de ventes" value={stats.target.ventesCount} compare={stats.vsPrev.ventesCount} />
-            <StatCard label="Nombre de devis" value={stats.target.devisCount} compare={stats.vsPrev.devisCount} />
-            <StatCard label="Dépenses" value={stats.target.depenses} compare={stats.vsPrev.depenses} />
+            <StatCard
+              label="Chiffre d'affaires"
+              value={stats.target.ventes}
+              compare={stats.vsPrev.ventes}
+            />
+            <StatCard
+              label="Nombre de ventes"
+              value={stats.target.ventesCount}
+              compare={stats.vsPrev.ventesCount}
+            />
+            <StatCard
+              label="Nombre de devis"
+              value={stats.target.devisCount}
+              compare={stats.vsPrev.devisCount}
+            />
+            <StatCard
+              label="Dépenses"
+              value={stats.target.depenses}
+              compare={stats.vsPrev.depenses}
+            />
             <StatCard label="Achats" value={stats.target.achats} compare={stats.vsPrev.achats} />
-            <StatCard label="Bénéfice" value={stats.target.benefice} compare={stats.vsPrev.benefice} />
-            <StatCard label="Nouveaux clients" value={stats.target.clientsCount} compare={stats.vsPrev.clientsCount} />
+            <StatCard
+              label="Bénéfice"
+              value={stats.target.benefice}
+              compare={stats.vsPrev.benefice}
+            />
+            <StatCard
+              label="Nouveaux clients"
+              value={stats.target.clientsCount}
+              compare={stats.vsPrev.clientsCount}
+            />
           </div>
         </div>
       )}
@@ -143,18 +206,35 @@ function RapportsPage() {
   );
 }
 
-function StatCard({ label, value, compare }: { label: string; value: number; compare: { diff: number; pct: number } }) {
+function StatCard({
+  label,
+  value,
+  compare,
+}: {
+  label: string;
+  value: number;
+  compare: { diff: number; pct: number };
+}) {
   const isCurrency = ["Chiffre d'affaires", "Dépenses", "Achats", "Bénéfice"].includes(label);
   const formattedValue = isCurrency ? formatFCFA(value) : value;
   const formattedDiff = isCurrency ? formatFCFA(Math.abs(compare.diff)) : Math.abs(compare.diff);
-  
+
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
       <div className="text-sm text-muted-foreground">{label}</div>
       <div className="text-2xl font-bold mt-1">{formattedValue}</div>
-      <div className={`text-sm mt-2 flex items-center gap-1 ${compare.diff >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-        {compare.diff >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-        <span>{compare.diff >= 0 ? "+" : ""}{formattedDiff} ({compare.pct.toFixed(1)}%)</span>
+      <div
+        className={`text-sm mt-2 flex items-center gap-1 ${compare.diff >= 0 ? "text-emerald-600" : "text-destructive"}`}
+      >
+        {compare.diff >= 0 ? (
+          <TrendingUp className="h-4 w-4" />
+        ) : (
+          <TrendingDown className="h-4 w-4" />
+        )}
+        <span>
+          {compare.diff >= 0 ? "+" : ""}
+          {formattedDiff} ({compare.pct.toFixed(1)}%)
+        </span>
       </div>
     </div>
   );

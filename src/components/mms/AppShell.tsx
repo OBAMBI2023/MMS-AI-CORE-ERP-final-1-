@@ -20,7 +20,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const { settings } = useCompanySettings();
+  const { settings, logoUrl } = useCompanySettings();
   const companyName = settings?.company_name ?? "Mon Entreprise";
 
   return (
@@ -42,8 +42,12 @@ export function AppShell({
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <div className="flex flex-col h-full p-4 gap-2">
                   <div className="flex items-center gap-2 px-2 py-4">
-                    <div className="grid place-items-center h-10 w-10 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-lg shadow-primary/30">
-                      <Sparkles className="h-5 w-5 text-white" />
+                    <div className="grid place-items-center h-10 w-10 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-lg shadow-primary/30 overflow-hidden">
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="logo" className="h-full w-full object-cover rounded-2xl" />
+                      ) : (
+                        <Sparkles className="h-5 w-5 text-white" />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-bold tracking-tight">{companyName}</div>
@@ -60,7 +64,7 @@ export function AppShell({
               )}
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
             {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
             <UserMenu />

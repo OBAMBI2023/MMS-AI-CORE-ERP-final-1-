@@ -9,18 +9,21 @@ export const globalSearchService = {
     if (searchErrorCount >= MAX_SEARCH_ERRORS) return [];
     if (!query) return [];
 
-    console.log('Global search initiated with query:', query);
-    console.log('RPC arguments:', { search_query: query });
+    console.log("Global search initiated with query:", query);
+    console.log("RPC arguments:", { search_query: query });
 
-    const { data, error } = await supabase
-      .rpc('global_search', { search_query: query }, { schema: 'public' });
+    const { data, error } = await supabase.rpc(
+      "global_search",
+      { search_query: query },
+      { schema: "public" },
+    );
 
-    console.log('RPC result:', { data, error });
-    console.log('RPC data length:', data?.length);
+    console.log("RPC result:", { data, error });
+    console.log("RPC data length:", data?.length);
 
     if (error) {
       searchErrorCount++;
-      console.error('Error searching:', {
+      console.error("Error searching:", {
         message: error.message,
         details: error.details,
         hint: error.hint,
@@ -29,8 +32,8 @@ export const globalSearchService = {
       return [];
     }
 
-    console.log('Search results received:', data);
+    console.log("Search results received:", data);
     searchErrorCount = 0;
     return data as SearchResult[];
-  }
+  },
 };

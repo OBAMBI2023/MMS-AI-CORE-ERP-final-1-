@@ -1,9 +1,10 @@
 import { a as __toESM } from "../../_runtime.mjs";
 import { l as require_react_dom, u as require_react } from "../@floating-ui/react-dom+[...].mjs";
-import { a as createSlot, c as require_jsx_runtime, n as Primitive, s as useComposedRefs } from "./react-arrow+[...].mjs";
-import { _ as useControllableState, d as useFocusGuards, f as Presence, g as useCallbackRef, h as DismissableLayer, l as hideOthers, m as FocusScope, p as Portal, u as ReactRemoveScroll, v as useId, y as useLayoutEffect2 } from "./react-dialog+[...].mjs";
+import { a as createSlot, n as Primitive, o as useComposedRefs, s as require_jsx_runtime } from "./react-arrow+[...].mjs";
+import { _ as useId, d as useFocusGuards, f as Presence, g as useControllableState, h as DismissableLayer, l as hideOthers, m as FocusScope, p as Portal, u as ReactRemoveScroll } from "./react-dialog+[...].mjs";
 import { t as composeEventHandlers } from "../radix-ui__primitive.mjs";
-import { n as createContextScope, t as createCollection } from "./react-collection+[...].mjs";
+import { a as useLayoutEffect2, i as useCallbackRef, o as createContextScope } from "./react-avatar+[...].mjs";
+import { t as createCollection } from "../radix-ui__react-collection.mjs";
 import { t as useDirection } from "../radix-ui__react-direction.mjs";
 import { _ as Arrow, b as createPopperScope, g as Anchor, v as Content, y as Root2 } from "./react-dropdown-menu+[...].mjs";
 import { t as clamp } from "../radix-ui__number.mjs";

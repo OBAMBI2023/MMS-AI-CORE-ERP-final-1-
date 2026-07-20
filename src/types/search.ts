@@ -1,12 +1,12 @@
-export type SearchModule = 
-  | 'Clients' 
-  | 'Ventes' 
-  | 'Fournisseurs' 
-  | 'Services' 
-  | 'Achats' 
-  | 'Charges' 
-  | 'Devis' 
-  | 'Paramètres';
+export type SearchModule =
+  | "Clients"
+  | "Ventes"
+  | "Fournisseurs"
+  | "Services"
+  | "Achats"
+  | "Charges"
+  | "Devis"
+  | "Paramètres";
 
 export interface SearchResult {
   id: string;

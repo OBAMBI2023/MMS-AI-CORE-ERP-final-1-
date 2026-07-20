@@ -10,7 +10,8 @@ export function ForbiddenPage() {
         </div>
         <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground">Accès refusé</h1>
         <p className="mt-4 text-muted-foreground">
-          Vous n'avez pas les permissions nécessaires pour accéder à cette page. Veuillez contacter votre administrateur si vous pensez qu'il s'agit d'une erreur.
+          Vous n'avez pas les permissions nécessaires pour accéder à cette page. Veuillez contacter
+          votre administrateur si vous pensez qu'il s'agit d'une erreur.
         </p>
         <div className="mt-8">
           <Link

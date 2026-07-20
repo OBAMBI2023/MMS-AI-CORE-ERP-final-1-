@@ -220,4 +220,4 @@ var Arrow = import_react.forwardRef((props, forwardedRef) => {
 Arrow.displayName = NAME;
 var Root = Arrow;
 //#endregion
-export { createSlot as a, require_jsx_runtime as c, Slot as i, Primitive as n, composeRefs as o, dispatchDiscreteCustomEvent as r, useComposedRefs as s, Root as t };
+export { createSlot as a, Slot as i, Primitive as n, useComposedRefs as o, dispatchDiscreteCustomEvent as r, require_jsx_runtime as s, Root as t };

@@ -127,9 +127,7 @@ function Dashboard() {
     data.counts.services === 0;
 
   return (
-    <AppShell
-      title="Dashboard"
-    >
+    <AppShell title="Dashboard">
       {/* TODO: Réactiver la recherche globale plus tard */}
       {/* <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} /> */}
 
@@ -140,7 +138,9 @@ function Dashboard() {
         className="space-y-8 pb-4"
       >
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{greeting}, {userName} 👋</h1>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+            {greeting}, {userName} 👋
+          </h1>
           <p className="text-sm text-muted-foreground capitalize mt-1">{today}</p>
         </div>
 

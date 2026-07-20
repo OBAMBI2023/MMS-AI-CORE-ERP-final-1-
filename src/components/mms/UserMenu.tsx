@@ -8,8 +8,24 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronDown, User, Settings, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 
 export function UserMenu() {
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate({ to: "/login" });
+    } catch (err: any) {
+      toast.error("Erreur lors de la déconnexion");
+      console.error(err);
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -31,12 +47,12 @@ export function UserMenu() {
           <User className="mr-2 h-4 w-4" />
           <span>Mon profil</span>
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate({ to: "/parametres" })}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Paramètres</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive">
+        <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Déconnexion</span>
         </DropdownMenuItem>

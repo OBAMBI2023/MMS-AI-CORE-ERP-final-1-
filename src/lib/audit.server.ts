@@ -5,7 +5,7 @@ export async function logAction(
   roleId: string | null,
   action: string,
   module: string,
-  metadata: Record<string, any> = {}
+  metadata: Record<string, any> = {},
 ) {
   try {
     await supabase.from("audit_logs").insert({
