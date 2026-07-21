@@ -95,7 +95,7 @@ export function GlobalSearch({
         )}
 
         {Object.entries(groupedResults).map(([module, items]) => (
-          <CommandGroup key={module} heading={module}>
+          <CommandGroup key={module} heading={module === "Services" ? "Produits & Services" : module}>
             {items.map((item) => (
               <CommandItem key={item.id} onSelect={() => go(item.url)}>
                 {iconMap[module as SearchModule] || <Users className="h-4 w-4" />}

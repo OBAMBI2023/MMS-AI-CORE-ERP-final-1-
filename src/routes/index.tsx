@@ -225,7 +225,7 @@ function Dashboard() {
             />
             <DashboardKpiCard
               index={7}
-              title="Services"
+              title="Produits & Services"
               value={String(data.kpis.services.value)}
               icon={Wrench}
               route="/services"

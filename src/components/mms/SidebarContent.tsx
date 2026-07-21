@@ -20,7 +20,7 @@ const items = [
   { icon: Wallet, label: "Ventes (POS)", to: "/ventes" },
   { icon: FileText, label: "Devis", to: "/devis" },
   { icon: Users, label: "Clients", to: "/clients" },
-  { icon: Briefcase, label: "Services", to: "/services" },
+  { icon: Briefcase, label: "Produits & Services", to: "/services" },
   { icon: ShoppingCart, label: "Achats", to: "/achats" },
   { icon: Handshake, label: "Fournisseurs", to: "/fournisseurs" },
   { icon: Receipt, label: "Dépenses", to: "/depenses" },

@@ -44,7 +44,7 @@ export const Route = createFileRoute("/services")({
   component: ServicesPage,
   head: () => ({
     meta: [
-      { title: "Services — MMS AI CORE" },
+      { title: "Produits & Services — MMS AI CORE" },
       { name: "description", content: "Catalogue des services et produits." },
     ],
   }),
@@ -52,11 +52,11 @@ export const Route = createFileRoute("/services")({
 
 function ServicesPage() {
   return (
-    <AppShell title="Services" subtitle="Catalogue des prestations proposées au comptoir">
+    <AppShell title="Produits & Services" subtitle="Catalogue des prestations proposées au comptoir">
       <ResourceTable<Service>
         table="services"
         singular="Service"
-        plural="Services"
+        plural="Produits & Services"
         fields={fields}
         columns={columns}
         searchFields={["name", "category"]}
