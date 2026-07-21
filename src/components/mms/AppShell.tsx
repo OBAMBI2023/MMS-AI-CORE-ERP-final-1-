@@ -44,7 +44,11 @@ export function AppShell({
                   <div className="flex items-center gap-2 px-2 py-4">
                     <div className="grid place-items-center h-10 w-10 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-lg shadow-primary/30 overflow-hidden">
                       {logoUrl ? (
-                        <img src={logoUrl} alt="logo" className="h-full w-full object-cover rounded-2xl" />
+                        <img
+                          src={logoUrl}
+                          alt="logo"
+                          className="h-full w-full object-cover rounded-2xl"
+                        />
                       ) : (
                         <Sparkles className="h-5 w-5 text-white" />
                       )}

@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock, Eye, EyeOff, Loader2, BarChart3, ShieldCheck, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCompanySettings } from "@/hooks/use-company-settings";
-import { Checkbox } from "@/components/ui/checkbox";
 
 const loginSchema = z.object({
   email: z.string().email("Adresse e-mail invalide"),
@@ -64,67 +63,104 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC] text-[#0F172A]">
-      {/* Left Panel: Gradient Blue */}
-      <div className="hidden lg:flex w-[45%] bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] text-white p-16 flex-col justify-between relative overflow-hidden">
+    <div className="grid grid-cols-1 md:grid-cols-2 h-[100dvh] w-full bg-slate-50">
+      {/* Left Panel: Marketing */}
+      <div className="hidden md:flex flex-col justify-between p-12 bg-gradient-to-br from-blue-900 to-indigo-900 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-600/20 via-transparent to-transparent" />
+
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-24">
-            {logoUrl && (
-              <img
-                src={logoUrl}
-                alt={companyName}
-                className="h-12 w-12 object-contain bg-white rounded-2xl p-1"
-              />
-            )}
-            <span className="text-2xl font-bold tracking-tight">{companyName || "ERP Premium"}</span>
-          </div>
-          <h1 className="text-5xl font-extrabold mb-8 leading-tight">
-            Pilotez votre entreprise <br /> <span className="text-[#60A5FA]">avec précision</span>.
+          <h1 className="text-4xl font-bold tracking-tight mb-6">
+            Gérez votre activité avec
+            <br />
+            <span className="text-blue-400">l'excellence opérationnelle</span>
           </h1>
-          <p className="text-blue-50 text-lg mb-16 max-w-md">
-            Centralisez vos opérations, optimisez vos ressources et prenez de meilleures décisions grâce à votre ERP.
+          <p className="text-blue-100 text-lg mb-12 max-w-md">
+            Une solution ERP complète pour piloter vos achats, ventes, fournisseurs et services avec
+            une intelligence intégrée.
           </p>
 
-          <div className="space-y-6">
-            {[
-              { icon: Zap, title: "Tableau de bord intelligent" },
-              { icon: ShieldCheck, title: "Données sécurisées" },
-              { icon: BarChart3, title: "Performance optimale" },
-            ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <div className="p-3 bg-white/10 rounded-xl backdrop-blur-md">
-                  <feature.icon className="w-6 h-6 text-[#60A5FA]" />
-                </div>
-                <span className="text-lg font-medium">{feature.title}</span>
+          <div className="space-y-8">
+            <div className="flex gap-4">
+              <div className="p-3 bg-white/10 rounded-xl">
+                <BarChart3 className="h-6 w-6 text-blue-300" />
               </div>
-            ))}
+              <div>
+                <h3 className="font-semibold">Rapports en temps réel</h3>
+                <p className="text-sm text-blue-200">
+                  Prenez des décisions basées sur des données précises.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div className="p-3 bg-white/10 rounded-xl">
+                <ShieldCheck className="h-6 w-6 text-blue-300" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Sécurité robuste</h3>
+                <p className="text-sm text-blue-200">Protection avancée de vos données métier.</p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div className="p-3 bg-white/10 rounded-xl">
+                <Zap className="h-6 w-6 text-blue-300" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Flux optimisés</h3>
+                <p className="text-sm text-blue-200">
+                  Automatisez vos processus pour gagner en productivité.
+                </p>
+              </div>
+            </div>
           </div>
+        </div>
+
+        <div className="relative z-10 text-sm text-blue-300/60">
+          © {new Date().getFullYear()} {companyName || "ERP Premium"}. Tous droits réservés.
         </div>
       </div>
 
-      {/* Right Panel: Login Form */}
-      <div className="flex-1 flex items-center justify-center p-6">
+      {/* Right Panel: Login Card */}
+      <div className="flex-1 flex items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="w-full max-w-md bg-white p-10 rounded-[24px] shadow-2xl border border-slate-100"
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="w-full max-w-[420px] bg-white p-10 rounded-[32px] shadow-xl border border-slate-100"
         >
+          {/* Logo & Branding */}
           <div className="flex flex-col items-center mb-10">
-            {logoUrl && <img src={logoUrl} alt={companyName} className="h-16 w-16 mb-6" />}
-            <h2 className="text-3xl font-bold text-slate-950 mb-2">Bienvenue</h2>
-            <p className="text-slate-500 text-center">Connectez-vous à votre espace ERP</p>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={companyName}
+                className="max-w-[220px] h-auto mb-4 object-contain"
+              />
+            ) : (
+              <div className="h-20 w-20 mb-4 bg-blue-600 rounded-3xl flex items-center justify-center text-white font-bold text-3xl shadow-lg">
+                {companyName?.charAt(0) || "E"}
+              </div>
+            )}
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+              {companyName || "ERP Premium"}
+            </h2>
+            <p className="text-slate-500 text-sm mt-1">Connectez-vous à votre espace</p>
           </div>
 
-          <form onSubmit={handleSubmit(handleLogin)} className="space-y-6">
+          <form onSubmit={handleSubmit(handleLogin)} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email">Adresse e-mail</Label>
+              <Label
+                htmlFor="email"
+                className="text-xs font-semibold uppercase text-slate-500 tracking-wider"
+              >
+                Adresse e-mail
+              </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+                <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
                 <Input
                   {...register("email")}
                   id="email"
                   type="email"
-                  className="pl-10 h-12 rounded-xl"
+                  className="pl-9 h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-blue-500 transition-colors"
                   placeholder="nom@entreprise.com"
                 />
               </div>
@@ -133,16 +169,23 @@ function LoginPage() {
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <Label htmlFor="password">Mot de passe</Label>
-                <a href="#" className="text-sm text-[#2563EB] hover:underline">Mot de passe oublié ?</a>
+                <Label
+                  htmlFor="password"
+                  className="text-xs font-semibold uppercase text-slate-500 tracking-wider"
+                >
+                  Mot de passe
+                </Label>
+                <a href="#" className="text-xs text-blue-600 hover:underline font-medium">
+                  Oublié ?
+                </a>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+                <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
                 <Input
                   {...register("password")}
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className="pl-10 pr-10 h-12 rounded-xl"
+                  className="pl-9 pr-10 h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-blue-500 transition-colors"
                   placeholder="••••••••"
                 />
                 <button
@@ -150,20 +193,15 @@ function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
             </div>
 
-            <div className="flex items-center gap-2">
-              <Checkbox id="remember" />
-              <Label htmlFor="remember" className="cursor-pointer">Se souvenir de moi</Label>
-            </div>
-
             <Button
               type="submit"
-              className="w-full h-12 rounded-xl text-white font-semibold shadow-lg bg-gradient-to-r from-[#2563EB] to-[#60A5FA] hover:from-[#1E3A8A] hover:to-[#2563EB]"
+              className="w-full h-12 rounded-xl text-white font-semibold shadow-md shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 transition-all duration-200 mt-2"
               disabled={loading}
             >
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Se connecter"}
