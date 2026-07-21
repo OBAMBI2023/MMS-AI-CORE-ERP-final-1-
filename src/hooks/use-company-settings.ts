@@ -13,14 +13,18 @@ export function useCompanySettings() {
   });
 
   const logoUrl = useSignedUrl(settings?.logo_url ?? null);
+  const signatureUrl = useSignedUrl(settings?.signature_url ?? null);
+  const cachetUrl = useSignedUrl(settings?.cachet_url ?? null);
 
   return {
     settings,
     logoUrl,
+    signatureUrl,
+    cachetUrl,
     isLoading,
-    companyName: settings?.company_name ?? "Maguy Multi Services",
-    address: settings?.address ?? "",
-    phone: settings?.phone ?? "",
+    companyName: settings?.nomCommercial ?? "Maguy Multi Services",
+    address: settings?.adresse ?? "",
+    phone: settings?.telephone ?? "",
     email: settings?.email ?? "",
   };
 }

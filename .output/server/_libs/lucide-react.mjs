@@ -346,16 +346,6 @@ var Clock = createLucideIcon("clock", [["circle", {
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
-var Cloud = createLucideIcon("cloud", [["path", {
-	d: "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z",
-	key: "p7xjir"
-}]]);
-/**
-* @license lucide-react v0.575.0 - ISC
-*
-* This source code is licensed under the ISC license.
-* See the LICENSE file in the root directory of this source tree.
-*/
 var Copy = createLucideIcon("copy", [["rect", {
 	width: "14",
 	height: "14",
@@ -441,6 +431,69 @@ var Download = createLucideIcon("download", [
 	["path", {
 		d: "m7 10 5 5 5-5",
 		key: "brsn70"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var EyeOff = createLucideIcon("eye-off", [
+	["path", {
+		d: "M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49",
+		key: "ct8e1f"
+	}],
+	["path", {
+		d: "M14.084 14.158a3 3 0 0 1-4.242-4.242",
+		key: "151rxh"
+	}],
+	["path", {
+		d: "M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143",
+		key: "13bj9a"
+	}],
+	["path", {
+		d: "m2 2 20 20",
+		key: "1ooewy"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Eye = createLucideIcon("eye", [["path", {
+	d: "M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0",
+	key: "1nclc0"
+}], ["circle", {
+	cx: "12",
+	cy: "12",
+	r: "3",
+	key: "1v7zrd"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var FileDown = createLucideIcon("file-down", [
+	["path", {
+		d: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z",
+		key: "1oefj6"
+	}],
+	["path", {
+		d: "M14 2v5a1 1 0 0 0 1 1h5",
+		key: "wfsgrz"
+	}],
+	["path", {
+		d: "M12 18v-6",
+		key: "17g6i2"
+	}],
+	["path", {
+		d: "m9 15 3 3 3-3",
+		key: "1npd3o"
 	}]
 ]);
 /**
@@ -619,46 +672,6 @@ var Layers = createLucideIcon("layers", [
 	["path", {
 		d: "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17",
 		key: "kqbvx6"
-	}]
-]);
-/**
-* @license lucide-react v0.575.0 - ISC
-*
-* This source code is licensed under the ISC license.
-* See the LICENSE file in the root directory of this source tree.
-*/
-var LayoutDashboard = createLucideIcon("layout-dashboard", [
-	["rect", {
-		width: "7",
-		height: "9",
-		x: "3",
-		y: "3",
-		rx: "1",
-		key: "10lvy0"
-	}],
-	["rect", {
-		width: "7",
-		height: "5",
-		x: "14",
-		y: "3",
-		rx: "1",
-		key: "16une8"
-	}],
-	["rect", {
-		width: "7",
-		height: "9",
-		x: "14",
-		y: "12",
-		rx: "1",
-		key: "1hutg5"
-	}],
-	["rect", {
-		width: "7",
-		height: "5",
-		x: "3",
-		y: "16",
-		rx: "1",
-		key: "ldoo1y"
 	}]
 ]);
 /**
@@ -1433,5 +1446,15 @@ var X = createLucideIcon("x", [["path", {
 	d: "m6 6 12 12",
 	key: "d8bk6v"
 }]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Zap = createLucideIcon("zap", [["path", {
+	d: "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z",
+	key: "1xq2db"
+}]]);
 //#endregion
-export { CreditCard as $, Pencil as A, Lock as B, Save as C, Plus as D, Printer as E, Menu as F, Image as G, LayoutDashboard as H, MapPin as I, Globe as J, House as K, Mail as L, Package as M, Minus as N, Phone as O, MessageCircle as P, DatabaseBackup as Q, LogOut as R, Scissors as S, Receipt as T, Layers as U, LoaderCircle as V, KeyRound as W, FilePenLine as X, FileText as Y, Download as Z, Shield as _, User as a, CircleAlert as at, Settings as b, Truck as c, ChevronDown as ct, Trash2 as d, Building2 as dt, Copy as et, Stamp as f, Briefcase as ft, ShoppingBag as g, ShoppingCart as h, ArrowDownRight as ht, Users as i, CircleCheck as it, Palette as j, Percent as k, TrendingUp as l, Check as lt, Smartphone as m, ArrowUpRight as mt, Wrench as n, Clock as nt, UserPlus as o, ChevronUp as ot, Sparkles as p, Banknote as pt, Handshake as q, Wallet as r, Circle as rt, Upload as s, ChevronRight as st, X as t, Cloud as tt, TrendingDown as u, ChartColumn as ut, ShieldCheck as v, RotateCcw as w, Search as x, ShieldAlert as y, LogIn as z };
+export { EyeOff as $, Percent as A, LogIn as B, Scissors as C, Printer as D, Receipt as E, MessageCircle as F, Image as G, LoaderCircle as H, Menu as I, Globe as J, House as K, MapPin as L, Palette as M, Package as N, Plus as O, Minus as P, Eye as Q, Mail as R, Search as S, RotateCcw as T, Layers as U, Lock as V, KeyRound as W, FilePenLine as X, FileText as Y, FileDown as Z, ShoppingBag as _, ArrowDownRight as _t, Users as a, Circle as at, ShieldAlert as b, Upload as c, ChevronUp as ct, TrendingDown as d, Check as dt, Download as et, Trash2 as f, ChartColumn as ft, ShoppingCart as g, ArrowUpRight as gt, Smartphone as h, Banknote as ht, Wallet as i, Clock as it, Pencil as j, Phone as k, Truck as l, ChevronRight as lt, Sparkles as m, Briefcase as mt, X as n, CreditCard as nt, User as o, CircleCheck as ot, Stamp as p, Building2 as pt, Handshake as q, Wrench as r, Copy as rt, UserPlus as s, CircleAlert as st, Zap as t, DatabaseBackup as tt, TrendingUp as u, ChevronDown as ut, Shield as v, Save as w, Settings as x, ShieldCheck as y, LogOut as z };

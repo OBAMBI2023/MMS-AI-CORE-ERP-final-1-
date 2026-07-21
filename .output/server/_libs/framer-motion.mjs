@@ -1,9 +1,10 @@
 import { a as __toESM, i as __toCommonJS, n as __esmMin, r as __exportAll } from "../_runtime.mjs";
-import { r as performance_default } from "./@hookform/resolvers+[...].mjs";
+import { i as performance_default, r as init_performance } from "./@hookform/resolvers+[...].mjs";
 import { u as require_react } from "./@floating-ui/react-dom+[...].mjs";
 import { s as require_jsx_runtime } from "./@radix-ui/react-arrow+[...].mjs";
 
 //#region node_modules/framer-motion/dist/es/context/LayoutGroupContext.mjs
+init_performance();
 var import_jsx_runtime = require_jsx_runtime();
 var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
 var LayoutGroupContext = (0, import_react.createContext)({});
@@ -379,6 +380,7 @@ function createRenderBatcher(scheduleNextBatch, allowKeepAlive) {
 var { schedule: frame, cancel: cancelFrame, state: frameData, steps: frameSteps } = /* @__PURE__ */ createRenderBatcher(typeof requestAnimationFrame !== "undefined" ? requestAnimationFrame : noop, true);
 //#endregion
 //#region node_modules/motion-dom/dist/es/frameloop/sync-time.mjs
+init_performance();
 var now;
 function clearTime() {
 	now = void 0;

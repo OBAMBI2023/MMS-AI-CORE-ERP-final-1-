@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PosPage } from "@/components/mms/PosPage";
 
+// Testing replacement
 export const Route = createFileRoute("/ventes")({
   component: PosPage,
   head: () => ({
