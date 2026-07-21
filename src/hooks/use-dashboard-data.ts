@@ -150,6 +150,7 @@ export function useDashboardData() {
         clientsRes,
         fournisseursRes,
         servicesRes,
+        devisRes,
         sessionRes,
       ] = await Promise.all([
         supabase
@@ -176,6 +177,10 @@ export function useDashboardData() {
           .from("services")
           .select("id, name, active, created_at")
           .order("created_at", { ascending: false }),
+        supabase
+          .from("devis")
+          .select("id, status, total, created_at")
+          .order("created_at", { ascending: false }),
         supabase.auth.getSession(),
       ]);
 
@@ -185,12 +190,16 @@ export function useDashboardData() {
       const clients = clientsRes.data ?? [];
       const fournisseurs = fournisseursRes.data ?? [];
       const services = servicesRes.data ?? [];
+      const devis = (devisRes.data ?? []).filter(d => d.status === 'accepté');
 
       const now = new Date();
       const monthStart = startOfMonth(now);
       const prevMonthStart = startOfMonth(subMonths(now, 1));
 
-      const revenue = ventes.reduce((s, v) => s + (Number(v.total) || 0), 0);
+      const revenueFromVentes = ventes.reduce((s, v) => s + (Number(v.total) || 0), 0);
+      const revenueFromDevis = devis.reduce((s, d) => s + (Number(d.total) || 0), 0);
+      const revenue = revenueFromVentes + revenueFromDevis;
+      
       const totalDepenses = depenses.reduce((s, d) => s + (Number(d.amount) || 0), 0);
       const totalAchats = achats.reduce((s, a) => s + (Number(a.total) || 0), 0);
       const benefice = revenue - totalDepenses - totalAchats;
@@ -201,11 +210,23 @@ export function useDashboardData() {
         (v) => Number(v.total) || 0,
         monthStart,
         now,
+      ) + sumInMonth(
+        devis,
+        (d) => d.created_at,
+        (d) => Number(d.total) || 0,
+        monthStart,
+        now,
       );
       const revenuePrevMonth = sumInMonth(
         ventes,
         (v) => v.created_at,
         (v) => Number(v.total) || 0,
+        prevMonthStart,
+        monthStart,
+      ) + sumInMonth(
+        devis,
+        (d) => d.created_at,
+        (d) => Number(d.total) || 0,
         prevMonthStart,
         monthStart,
       );
@@ -269,9 +290,9 @@ export function useDashboardData() {
           value: revenue,
           trend: pctChange(revenueMonth, revenuePrevMonth),
           spark: buildWeeklySpark(
-            ventes,
-            (v) => v.created_at,
-            (v) => Number(v.total) || 0,
+            [...ventes.map(v => ({ total: Number(v.total) || 0, created_at: v.created_at })), ...devis.map(d => ({ total: Number(d.total) || 0, created_at: d.created_at }))],
+            (r) => r.created_at,
+            (r) => Number(r.total) || 0,
           ),
         },
         depenses: {
@@ -324,7 +345,10 @@ export function useDashboardData() {
       };
 
       const monthlySeries = buildMonthlySeries(
-        ventes.map((v) => ({ total: Number(v.total) || 0, created_at: v.created_at })),
+        [
+          ...ventes.map((v) => ({ total: Number(v.total) || 0, created_at: v.created_at })),
+          ...devis.map((d) => ({ total: Number(d.total) || 0, created_at: d.created_at }))
+        ],
         depenses.map((d) => ({ amount: Number(d.amount) || 0, paid_at: d.paid_at })),
         achats.map((a) => ({ total: Number(a.total) || 0, created_at: a.created_at })),
       );
