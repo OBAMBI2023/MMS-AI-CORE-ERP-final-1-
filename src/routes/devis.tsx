@@ -19,6 +19,8 @@ interface Devis {
   client_name: string | null;
   status: string;
   due_date: string | null;
+  subtotal: number;
+  discount: number;
   total: number;
   created_at: string;
 }
@@ -80,10 +82,10 @@ function DevisPage() {
         montant: i.price * i.qty 
       })),
       totals: {
-        sousTotal: devis.total_ht ?? 0,
-        remise: 0,
-        tva: (devis.total_ttc ?? 0) - (devis.total_ht ?? 0),
-        totalTTC: devis.total_ttc ?? 0
+        sousTotal: devis.subtotal ?? 0,
+        remise: devis.discount ?? 0,
+        tva: (devis.total ?? 0) - (devis.subtotal ?? 0),
+        totalTTC: devis.total ?? 0
       },
       conditionsPaiement: "À réception",
     }, settings, { logo: logoUrl, signature: signatureUrl, cachet: cachetUrl });

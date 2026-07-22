@@ -1,23 +1,26 @@
 export interface CompanySettings {
-  logo?: string | null;
-  nomCommercial: string;
-  raisonSociale: string;
-  activite: string;
-  adresse: string;
-  ville: string;
-  pays: string;
-  telephone: string;
-  whatsapp?: string;
-  email: string;
-  siteWeb: string;
-  rccm: string;
-  cc: string;
-  ifu: string;
-  devise: string;
-  cachet?: string | null;
-  signature?: string | null;
-  responsable: string;
-  fonction: string;
+  logo_url?: string | null;
+  signature_url?: string | null;
+  stamp_url?: string | null;
+  company_name: string;
+  trade_name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  website?: string | null;
+  rccm?: string | null;
+  tax_number?: string | null;
+  tax_regime?: string | null;
+  vat_rate?: number | null;
+  currency: string;
+  quote_prefix: string;
+  invoice_prefix: string;
+  receipt_prefix: string;
+  decimals: number;
+  date_format: string;
 }
 
 export interface DocumentItem {

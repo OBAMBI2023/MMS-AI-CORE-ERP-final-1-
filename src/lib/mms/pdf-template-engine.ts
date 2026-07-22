@@ -45,18 +45,28 @@ export async function renderSignatureAndStamp(doc: jsPDF, signatureUrl: string, 
 }
 
 export function renderHeader(doc: jsPDF, settings: CompanySettings, startY: number = 10) {
-  doc.setFontSize(20);
-  doc.setTextColor(37, 99, 235); // Primary color
-  doc.text(String(settings.nomCommercial ?? ""), 70, startY);
+  // Set primary color
+  doc.setTextColor(37, 99, 235);
 
+  // Company Name (Right Aligned)
+  doc.setFontSize(22);
+  doc.setFont(undefined, 'bold');
+  doc.text(String(settings.company_name ?? "").toUpperCase(), 200, startY + 10, { align: "right" });
+
+  // Company Info (Right Aligned)
   doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139); // Secondary color
-  doc.text(String(settings.activite ?? ""), 70, startY + 6);
-  doc.text(`${String(settings.adresse ?? "")}, ${String(settings.ville ?? "")}, ${String(settings.pays ?? "")}`, 70, startY + 11);
-  doc.text(`Tél: ${String(settings.telephone ?? "")} | Email: ${String(settings.email ?? "")}`, 70, startY + 16);
-  doc.text(`RCCM: ${String(settings.rccm ?? "")} | CC: ${String(settings.cc ?? "")} | IFU: ${String(settings.ifu ?? "")}`, 70, startY + 21);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(50, 50, 50);
+  doc.text(String(settings.trade_name ?? ""), 200, startY + 16, { align: "right" });
+  doc.text(`${String(settings.address ?? "")}, ${String(settings.city ?? "")}`, 200, startY + 22, { align: "right" });
+  doc.text(`Tél: ${String(settings.phone ?? "")} | Email: ${String(settings.email ?? "")}`, 200, startY + 28, { align: "right" });
 
-  return startY + 30;
+  // Horizontal Line
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.5);
+  doc.line(10, startY + 32, 200, startY + 32);
+
+  return startY + 40;
 }
 
 export function renderFooter(doc: jsPDF, settings: CompanySettings) {
@@ -66,7 +76,7 @@ export function renderFooter(doc: jsPDF, settings: CompanySettings) {
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
     doc.text(
-      `Page ${i} de ${pageCount} - ${settings.nomCommercial}`,
+      `Page ${i} de ${pageCount} - ${settings.company_name}`,
       doc.internal.pageSize.width / 2,
       doc.internal.pageSize.height - 10,
       { align: "center" }
@@ -86,20 +96,39 @@ export function renderTable(doc: jsPDF, items: DocumentItem[], startY: number) {
       item.tva.toString(),
       item.montant.toString()
     ]),
-    theme: 'striped',
-    headStyles: { fillColor: [37, 99, 235] },
+    theme: 'plain', // Use 'plain' for cleaner look
+    headStyles: {
+        fillColor: [240, 240, 240], // Light grey background
+        textColor: [50, 50, 50],
+        fontStyle: 'bold',
+        lineWidth: 0.1,
+        lineColor: [200, 200, 200]
+    },
+    bodyStyles: {
+        lineWidth: 0.1,
+        lineColor: [220, 220, 220]
+    },
+    margin: { left: 10, right: 10 }
   });
 }
 
 export function renderTotals(doc: jsPDF, totals: DocumentTotals, startY: number) {
-  const rightMargin = 190;
+  const rightMargin = 200;
+  
+  // Background box
+  doc.setFillColor(245, 245, 245);
+  doc.rect(130, startY - 5, 75, 25, 'F'); // x, y, width, height, 'F'ill
+
   doc.setFontSize(10);
-  doc.text(`Sous-total: ${totals.sousTotal}`, rightMargin, startY, { align: "right" });
-  doc.text(`Remise: ${totals.remise}`, rightMargin, startY + 5, { align: "right" });
-  doc.text(`TVA: ${totals.tva}`, rightMargin, startY + 10, { align: "right" });
+  doc.setTextColor(50, 50, 50);
+  doc.text(`Sous-total: ${totals.sousTotal}`, rightMargin - 5, startY, { align: "right" });
+  doc.text(`Remise: ${totals.remise}`, rightMargin - 5, startY + 5, { align: "right" });
+  doc.text(`TVA: ${totals.tva}`, rightMargin - 5, startY + 10, { align: "right" });
   
   doc.setFontSize(12);
   doc.setFont(undefined, 'bold');
-  doc.text(`Total TTC: ${totals.totalTTC}`, rightMargin, startY + 15, { align: "right" });
+  doc.setTextColor(37, 99, 235); // Primary color
+  doc.text(`Total TTC: ${totals.totalTTC}`, rightMargin - 5, startY + 18, { align: "right" });
   doc.setFont(undefined, 'normal');
+  doc.setTextColor(50, 50, 50);
 }
