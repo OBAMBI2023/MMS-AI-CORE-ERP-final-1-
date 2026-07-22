@@ -27,7 +27,7 @@ export function UserManagement() {
     queryKey: ["users"],
     queryFn: async () => {
       const { data, error } = await supabase.from("profiles").select(`
-          id, username, full_name, phone, status, last_login_at, created_at,
+          id, username, full_name, email, phone, status, last_login_at, created_at,
           roles(id, name)
         `);
       if (error) throw error;
@@ -104,7 +104,7 @@ export function UserManagement() {
             {users?.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.full_name}</TableCell>
-                <TableCell>{user.username}</TableCell>
+                <TableCell>{user.email}</TableCell>
                 <TableCell>{(user.roles as any)?.name}</TableCell>
                 <TableCell className="capitalize">{user.status}</TableCell>
                 <TableCell>

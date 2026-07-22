@@ -35,32 +35,40 @@ export const createUser = createServerFn({ method: "POST" })
     const { user: admin } = await getAuth();
     if (!admin) throw new Error("Unauthorized");
 
+    console.log("DEBUG: Appel Supabase - création Auth");
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: data.email,
       password: data.password,
       email_confirm: true,
       user_metadata: { full_name: data.full_name, username: data.username },
     });
-    if (authError) throw authError;
+    if (authError) {
+      console.log("DEBUG: Erreur création Auth:", authError);
+      throw authError;
+    }
 
+    console.log("DEBUG: Appel Supabase - insertion base (profiles)");
     const { error: profileError } = await supabase
       .from("profiles")
       .update({
         role_id: data.role_id,
         full_name: data.full_name,
         username: data.username,
+        email: data.email,
         phone: data.phone,
         status: data.status,
       })
       .eq("id", authData.user.id);
 
     if (profileError) {
+      console.log("DEBUG: Erreur insertion base:", profileError);
       await supabase.auth.admin.deleteUser(authData.user.id);
       throw profileError;
     }
 
     await logActivity(admin.id, authData.user.id, "Création d'utilisateur", null, data);
 
+    console.log("DEBUG: Retour réussi de createUser pour:", authData.user.id);
     return { id: authData.user.id };
   });
 

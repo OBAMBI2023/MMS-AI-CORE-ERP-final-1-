@@ -127,7 +127,7 @@ export function UserFormDialog({ user }: { user?: any }) {
         phone: formData.phone,
         status: formData.status as any,
       };
-      createMutation.mutate(payload);
+      createMutation.mutate({ data: payload });
     }
   };
 
