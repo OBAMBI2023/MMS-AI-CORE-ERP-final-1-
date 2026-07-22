@@ -654,20 +654,41 @@ function ConnectionLogsTab() {
   );
 }
 
+import { changePassword } from "@/lib/security.server";
+// ... (rest of imports)
+
+// ... (ParametresPage component remains unchanged, assuming I only change SecurityTab)
+
 function SecurityTab() {
-  const [pwd, setPwd] = useState("");
-  const [pwd2, setPwd2] = useState("");
+  const [currentPwd, setCurrentPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  
   const changing = useMutation({
     mutationFn: async () => {
-      if (pwd.length < 8) throw new Error("Minimum 8 caractères");
-      if (pwd !== pwd2) throw new Error("Les mots de passe ne correspondent pas");
-      const { error } = await supabase.auth.updateUser({ password: pwd });
-      if (error) throw error;
+      // Validation
+      if (!currentPwd) throw new Error("Mot de passe actuel requis");
+      if (newPwd.length < 8) throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+      if (newPwd !== confirmPwd) throw new Error("La confirmation ne correspond pas au nouveau mot de passe.");
+      
+      // Verify current password
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.email) throw new Error("Utilisateur non authentifié.");
+      
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPwd,
+      });
+      if (signInError) throw new Error("Mot de passe actuel incorrect.");
+      
+      // Update password using server function
+      await changePassword({ data: { newPassword: newPwd } });
     },
     onSuccess: () => {
-      toast.success("Mot de passe mis à jour");
-      setPwd("");
-      setPwd2("");
+      toast.success("Votre mot de passe a été modifié avec succès.");
+      setCurrentPwd("");
+      setNewPwd("");
+      setConfirmPwd("");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -676,20 +697,25 @@ function SecurityTab() {
     <div className="space-y-6">
       <Card title="Mot de passe" icon={<KeyRound className="h-4 w-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Nouveau mot de passe">
-            <Input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} />
+          <Field label="Mot de passe actuel" required>
+            <Input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} />
           </Field>
-          <Field label="Confirmer">
-            <Input type="password" value={pwd2} onChange={(e) => setPwd2(e.target.value)} />
+          <div /> {/* Spacer */}
+          <Field label="Nouveau mot de passe" required>
+            <Input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+          </Field>
+          <Field label="Confirmer le nouveau mot de passe" required>
+            <Input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
           </Field>
         </div>
         <div className="mt-4">
-          <Button onClick={() => changing.mutate()} disabled={changing.isPending || !pwd}>
+          <Button onClick={() => changing.mutate()} disabled={changing.isPending || !currentPwd || !newPwd || !confirmPwd}>
             {changing.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Changer le mot de passe
           </Button>
         </div>
       </Card>
+      {/* ... rest of the component */}
 
       <Card title="Sécurité & Journal" icon={<Shield className="h-4 w-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
