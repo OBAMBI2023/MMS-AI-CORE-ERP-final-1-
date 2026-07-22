@@ -25,9 +25,9 @@ export async function getUserPermissions(
   if (error || !data) return [];
 
   // Mode de récupération : Si l'utilisateur est Administrateur, il a tous les droits.
-  if (data.roles?.name === 'Administrateur') {
-    const { data: allPerms } = await supabase.from('permissions').select('code');
-    return allPerms?.map(p => p.code) || [];
+  if (data.roles?.name === "Administrateur") {
+    const { data: allPerms } = await supabase.from("permissions").select("code");
+    return allPerms?.map((p) => p.code) || [];
   }
 
   // Flatten the nested structure

@@ -50,45 +50,58 @@ function DevisPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const downloadPDF = async (devis: Devis) => {
-    const { data: items, error } = await supabase.from("devis_items").select("*").eq("devis_id", devis.id);
-    if (error) { toast.error("Erreur chargement items"); return; }
-    
-    if (!settings) { toast.error("Paramètres entreprise manquants"); return; }
+    const { data: items, error } = await supabase
+      .from("devis_items")
+      .select("*")
+      .eq("devis_id", devis.id);
+    if (error) {
+      toast.error("Erreur chargement items");
+      return;
+    }
+
+    if (!settings) {
+      toast.error("Paramètres entreprise manquants");
+      return;
+    }
 
     const getUrl = async (path?: string | null) => {
-        if (!path) return null;
-        const { data } = await supabase.storage.from("company-assets").createSignedUrl(path, 60 * 60);
-        return data?.signedUrl ?? null;
+      if (!path) return null;
+      const { data } = await supabase.storage.from("company-assets").createSignedUrl(path, 60 * 60);
+      return data?.signedUrl ?? null;
     };
 
     const logoUrl = await getUrl(settings.logo_url);
     const signatureUrl = await getUrl(settings.signature_url);
     const cachetUrl = await getUrl(settings.cachet_url);
 
-    await generateDevisPDF({
-      numero: devis.number,
-      date: new Date(devis.created_at).toLocaleDateString(),
-      dateExpiration: devis.due_date ? new Date(devis.due_date).toLocaleDateString() : "",
-      statut: devis.status,
-      client: {
-        nom: devis.client_name ?? "Client inconnu"
+    await generateDevisPDF(
+      {
+        numero: devis.number,
+        date: new Date(devis.created_at).toLocaleDateString(),
+        dateExpiration: devis.due_date ? new Date(devis.due_date).toLocaleDateString() : "",
+        statut: devis.status,
+        client: {
+          nom: devis.client_name ?? "Client inconnu",
+        },
+        items: (items ?? []).map((i) => ({
+          description: i.name,
+          quantite: i.qty,
+          prixUnitaire: i.price,
+          remise: 0,
+          tva: 0,
+          montant: i.price * i.qty,
+        })),
+        totals: {
+          sousTotal: devis.subtotal ?? 0,
+          remise: devis.discount ?? 0,
+          tva: (devis.total ?? 0) - (devis.subtotal ?? 0),
+          totalTTC: devis.total ?? 0,
+        },
+        conditionsPaiement: "À réception",
       },
-      items: (items ?? []).map(i => ({ 
-        description: i.name, 
-        quantite: i.qty, 
-        prixUnitaire: i.price, 
-        remise: 0, 
-        tva: 0, 
-        montant: i.price * i.qty 
-      })),
-      totals: {
-        sousTotal: devis.subtotal ?? 0,
-        remise: devis.discount ?? 0,
-        tva: (devis.total ?? 0) - (devis.subtotal ?? 0),
-        totalTTC: devis.total ?? 0
-      },
-      conditionsPaiement: "À réception",
-    }, settings, { logo: logoUrl, signature: signatureUrl, cachet: cachetUrl });
+      settings,
+      { logo: logoUrl, signature: signatureUrl, cachet: cachetUrl },
+    );
   };
 
   const { data = [], isLoading } = useQuery({

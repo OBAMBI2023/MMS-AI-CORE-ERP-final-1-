@@ -96,9 +96,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           .single();
 
         const roleName = profile?.roles?.name;
-        const permissions = profile?.roles?.role_permissions?.map((rp: any) => rp.permissions?.code) || [];
-        
-        const isAuthorized = roleName === 'Administrateur' || permissions.includes(requiredPermission);
+        const permissions =
+          profile?.roles?.role_permissions?.map((rp: any) => rp.permissions?.code) || [];
+
+        const isAuthorized =
+          roleName === "Administrateur" || permissions.includes(requiredPermission);
 
         if (!isAuthorized) {
           throw redirect({ to: "/403" });

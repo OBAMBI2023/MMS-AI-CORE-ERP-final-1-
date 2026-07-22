@@ -7,8 +7,11 @@ export async function getAuth() {
   if (!authHeader) throw new Error("Unauthorized");
 
   const token = authHeader.replace("Bearer ", "");
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-  
+  const {
+    data: { user },
+    error,
+  } = await supabaseAdmin.auth.getUser(token);
+
   if (error || !user) throw new Error("Unauthorized");
 
   return { user };

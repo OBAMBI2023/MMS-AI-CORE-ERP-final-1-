@@ -34,7 +34,7 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data: permissions = [], isLoading } = usePermissions();
 
-  const filteredItems = items.filter(it => {
+  const filteredItems = items.filter((it) => {
     const requiredPermission = routePermissions[it.to];
     if (!requiredPermission) return true;
     return permissions.includes(requiredPermission);

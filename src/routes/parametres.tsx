@@ -80,8 +80,12 @@ export const Route = createFileRoute("/parametres")({
 });
 
 // Mock helpers for missing imports in the provided file
-async function getAiSettings() { return {}; }
-async function saveAiSettings(_: { data: Partial<AiSettings> }) { return {}; }
+async function getAiSettings() {
+  return {};
+}
+async function saveAiSettings(_: { data: Partial<AiSettings> }) {
+  return {};
+}
 
 function ParametresPage() {
   const qc = useQueryClient();
@@ -593,7 +597,11 @@ function UsersTab() {
 }
 
 function ConnectionLogsTab() {
-  const { data: logs, isLoading, refetch } = useQuery({
+  const {
+    data: logs,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["connection-logs"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -967,7 +975,18 @@ function QuickActions({
       const aiPatch: Record<string, unknown> = {};
       const paramPatch: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(clean)) {
-        if (["openai_key", "gemini_key", "claude_key", "ai_model", "ai_temperature", "ai_max_tokens", "ai_enabled"].includes(key)) aiPatch[key] = value;
+        if (
+          [
+            "openai_key",
+            "gemini_key",
+            "claude_key",
+            "ai_model",
+            "ai_temperature",
+            "ai_max_tokens",
+            "ai_enabled",
+          ].includes(key)
+        )
+          aiPatch[key] = value;
         else paramPatch[key] = value;
       }
       if (Object.keys(paramPatch).length > 0) {

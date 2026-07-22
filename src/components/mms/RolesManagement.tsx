@@ -60,7 +60,10 @@ export function RolesManagement() {
       </div>
       <div className="grid gap-3">
         {roles?.map((role) => (
-          <div key={role.id} className="p-4 border border-border rounded-xl bg-card flex items-center justify-between shadow-sm">
+          <div
+            key={role.id}
+            className="p-4 border border-border rounded-xl bg-card flex items-center justify-between shadow-sm"
+          >
             <div>
               <h3 className="font-semibold text-base">{role.name}</h3>
               <p className="text-sm text-muted-foreground">{role.description}</p>
@@ -72,7 +75,7 @@ export function RolesManagement() {
                 size="sm"
                 className="text-destructive hover:text-destructive/90"
                 onClick={() => {
-                  if(confirm("Supprimer ce rôle ?")) deleteRole.mutate(role.id)
+                  if (confirm("Supprimer ce rôle ?")) deleteRole.mutate(role.id);
                 }}
               >
                 <Trash2 className="h-4 w-4" />
@@ -91,13 +94,13 @@ function RoleDialog({ role, permissions }: { role?: any; permissions: any[] }) {
   const [name, setName] = useState(role?.name || "");
   const [description, setDescription] = useState(role?.description || "");
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
-    role?.role_permissions?.map((rp: any) => rp.permission_id) || []
+    role?.role_permissions?.map((rp: any) => rp.permission_id) || [],
   );
 
   const modules = useMemo(() => {
     const m: Record<string, typeof permissions> = {};
-    permissions.forEach(p => {
-      const mod = p.code.split('.')[0];
+    permissions.forEach((p) => {
+      const mod = p.code.split(".")[0];
       if (!m[mod]) m[mod] = [];
       m[mod].push(p);
     });
@@ -112,12 +115,12 @@ function RoleDialog({ role, permissions }: { role?: any; permissions: any[] }) {
           .update({ name, description })
           .eq("id", role.id);
         if (roleError) throw roleError;
-        
+
         await supabase.from("role_permissions").delete().eq("role_id", role.id);
         if (selectedPermissions.length > 0) {
-          const { error } = await supabase.from("role_permissions").insert(
-            selectedPermissions.map((pid) => ({ role_id: role.id, permission_id: pid }))
-          );
+          const { error } = await supabase
+            .from("role_permissions")
+            .insert(selectedPermissions.map((pid) => ({ role_id: role.id, permission_id: pid })));
           if (error) throw error;
         }
       } else {
@@ -127,11 +130,13 @@ function RoleDialog({ role, permissions }: { role?: any; permissions: any[] }) {
           .select()
           .single();
         if (roleError) throw roleError;
-        
+
         if (selectedPermissions.length > 0) {
-          const { error } = await supabase.from("role_permissions").insert(
-            selectedPermissions.map((pid) => ({ role_id: newRole.id, permission_id: pid }))
-          );
+          const { error } = await supabase
+            .from("role_permissions")
+            .insert(
+              selectedPermissions.map((pid) => ({ role_id: newRole.id, permission_id: pid })),
+            );
           if (error) throw error;
         }
       }
@@ -144,7 +149,7 @@ function RoleDialog({ role, permissions }: { role?: any; permissions: any[] }) {
   });
 
   const toggleAll = (checked: boolean) => {
-    if (checked) setSelectedPermissions(permissions.map(p => p.id));
+    if (checked) setSelectedPermissions(permissions.map((p) => p.id));
     else setSelectedPermissions([]);
   };
 
@@ -152,14 +157,22 @@ function RoleDialog({ role, permissions }: { role?: any; permissions: any[] }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant={role ? "outline" : "default"} size={role ? "icon" : "default"}>
-          {role ? <Pencil className="h-4 w-4" /> : <><Plus className="h-4 w-4 mr-2" /> Créer</>}
+          {role ? (
+            <Pencil className="h-4 w-4" />
+          ) : (
+            <>
+              <Plus className="h-4 w-4 mr-2" /> Créer
+            </>
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">{role ? "Modifier le rôle" : "Créer un rôle"}</DialogTitle>
+          <DialogTitle className="text-xl">
+            {role ? "Modifier le rôle" : "Créer un rôle"}
+          </DialogTitle>
         </DialogHeader>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -168,34 +181,55 @@ function RoleDialog({ role, permissions }: { role?: any; permissions: any[] }) {
             </div>
             <div className="space-y-1.5">
               <Label>Description</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+              />
             </div>
           </div>
-          
+
           <div className="border rounded-xl p-4 bg-muted/30">
             <div className="flex items-center justify-between mb-4">
               <Label className="text-base">Permissions</Label>
               <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => toggleAll(true)} className="text-xs">Tout cocher</Button>
-                <Button variant="ghost" size="sm" onClick={() => toggleAll(false)} className="text-xs">Tout décocher</Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleAll(true)}
+                  className="text-xs"
+                >
+                  Tout cocher
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleAll(false)}
+                  className="text-xs"
+                >
+                  Tout décocher
+                </Button>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {Object.entries(modules).map(([mod, perms]) => (
                 <div key={mod} className="space-y-2">
                   <h4 className="font-semibold text-sm capitalize text-muted-foreground">{mod}</h4>
                   {perms.map((p) => (
                     <div key={p.id} className="flex items-center space-x-2">
-                      <Checkbox 
+                      <Checkbox
                         id={p.id}
                         checked={selectedPermissions.includes(p.id)}
                         onCheckedChange={(checked) => {
                           if (checked) setSelectedPermissions([...selectedPermissions, p.id]);
-                          else setSelectedPermissions(selectedPermissions.filter((id) => id !== p.id));
+                          else
+                            setSelectedPermissions(selectedPermissions.filter((id) => id !== p.id));
                         }}
                       />
-                      <label htmlFor={p.id} className="text-sm cursor-pointer">{p.code.split('.')[1]}</label>
+                      <label htmlFor={p.id} className="text-sm cursor-pointer">
+                        {p.code.split(".")[1]}
+                      </label>
                     </div>
                   ))}
                 </div>
@@ -205,7 +239,9 @@ function RoleDialog({ role, permissions }: { role?: any; permissions: any[] }) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Annuler
+          </Button>
           <Button onClick={() => saveRole.mutate()} disabled={saveRole.isPending}>
             {saveRole.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Enregistrer

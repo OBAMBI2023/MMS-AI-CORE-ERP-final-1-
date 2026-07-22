@@ -69,7 +69,7 @@ export const updateUser = createServerFn({ method: "POST" })
     z.object({
       id: z.string().uuid(),
       role_id: z.string().uuid().optional(),
-      status: z.string().optional(),
+      status: z.enum(["actif", "suspendu", "archivé"]).optional(),
       full_name: z.string().optional(),
       username: z.string().optional(),
       phone: z.string().optional(),
@@ -78,25 +78,73 @@ export const updateUser = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { user: admin } = await getAuth();
     if (!admin) throw new Error("Unauthorized");
-    
+
     // Security: Self-protection
     if (admin.id === data.id) throw new Error("Action non autorisée sur son propre compte");
 
-    const { data: oldProfile } = await supabase.from("profiles").select("*").eq("id", data.id).single();
+    // Security: Prevent disabling last admin
+    if (data.status === "suspendu") {
+      const { count, error: countError } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "actif")
+        .neq("id", data.id);
+
+      if (countError) throw countError;
+      if (count === 0) throw new Error("Impossible de désactiver le dernier administrateur actif.");
+    }
+
+    const { data: oldProfile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+
+    const updateData: any = {};
+    if (data.role_id) updateData.role_id = data.role_id;
+    if (data.status) updateData.status = data.status;
+    if (data.full_name) updateData.full_name = data.full_name;
+    if (data.username) updateData.username = data.username;
+    if (data.phone) updateData.phone = data.phone;
 
     const { error } = await supabase
       .from("profiles")
-      .update({
-        role_id: data.role_id,
-        status: data.status,
-        full_name: data.full_name,
-        username: data.username,
-        phone: data.phone,
-      })
+      .update(updateData)
       .eq("id", data.id);
     if (error) throw error;
 
     await logActivity(admin.id, data.id, "Mise à jour d'utilisateur", oldProfile, data);
+
+    return { success: true };
+  });
+
+export const toggleStatus = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string().uuid(), status: z.enum(["actif", "suspendu"]) }))
+  .handler(async ({ data }) => {
+    const { user: admin } = await getAuth();
+    if (!admin) throw new Error("Unauthorized");
+
+    if (admin.id === data.id) throw new Error("Action non autorisée sur son propre compte");
+
+    // Security: Prevent disabling last admin
+    if (data.status === "suspendu") {
+      const { count, error: countError } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "actif")
+        .neq("id", data.id);
+
+      if (countError) throw countError;
+      if (count === 0) throw new Error("Impossible de désactiver le dernier administrateur actif.");
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: data.status })
+      .eq("id", data.id);
+    if (error) throw error;
+
+    await logActivity(admin.id, data.id, "Changement de statut", null, data.status);
 
     return { success: true };
   });
@@ -106,9 +154,19 @@ export const deleteUser = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { user: admin } = await getAuth();
     if (!admin) throw new Error("Unauthorized");
-    
+
     // Security: Self-protection
     if (admin.id === data.id) throw new Error("Action non autorisée sur son propre compte");
+
+    // Security: Prevent deleting last admin
+    const { count, error: countError } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "actif")
+      .neq("id", data.id);
+
+    if (countError) throw countError;
+    if (count === 0) throw new Error("Impossible de supprimer le dernier administrateur actif.");
 
     const { error } = await supabase.auth.admin.deleteUser(data.id);
     if (error) throw error;
@@ -117,6 +175,7 @@ export const deleteUser = createServerFn({ method: "POST" })
 
     return { success: true };
   });
+
 
 export const resetUserPassword = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().uuid(), password: z.string().min(8) }))
@@ -128,7 +187,7 @@ export const resetUserPassword = createServerFn({ method: "POST" })
       password: data.password,
     });
     if (error) throw error;
-    
+
     await logActivity(admin.id, data.id, "Réinitialisation de mot de passe", null, null);
 
     return { success: true };

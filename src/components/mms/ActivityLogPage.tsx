@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
 
 export function ActivityLogPage() {
@@ -9,11 +16,13 @@ export function ActivityLogPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("activity_logs")
-        .select(`
+        .select(
+          `
           *,
           admin:profiles!activity_logs_admin_id_fkey(full_name),
           affected_user:profiles!activity_logs_affected_user_id_fkey(full_name)
-        `)
+        `,
+        )
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;

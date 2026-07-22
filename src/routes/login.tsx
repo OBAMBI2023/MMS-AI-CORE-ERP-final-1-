@@ -61,7 +61,7 @@ function LoginPage() {
         });
         throw error;
       }
-      
+
       // Log success
       await supabase.rpc("log_connection_attempt", {
         p_email: values.email,

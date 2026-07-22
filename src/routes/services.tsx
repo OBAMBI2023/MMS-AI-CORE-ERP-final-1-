@@ -52,7 +52,10 @@ export const Route = createFileRoute("/services")({
 
 function ServicesPage() {
   return (
-    <AppShell title="Produits & Services" subtitle="Catalogue des prestations proposées au comptoir">
+    <AppShell
+      title="Produits & Services"
+      subtitle="Catalogue des prestations proposées au comptoir"
+    >
       <ResourceTable<Service>
         table="services"
         singular="Service"
