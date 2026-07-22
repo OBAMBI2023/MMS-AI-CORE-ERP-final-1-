@@ -30,8 +30,6 @@ import {
   KeyRound,
   Percent,
 } from "lucide-react";
-import { RolesManagement } from "@/components/mms/RolesManagement";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { AppShell } from "@/components/mms/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -686,17 +684,7 @@ function SecurityTab() {
       </Card>
 
       <Card title="Sécurité & Journal" icon={<Shield className="h-4 w-4" />}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="justify-start gap-2">
-                <Users className="h-4 w-4" /> Gestion des rôles
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl">
-              <RolesManagement />
-            </DialogContent>
-          </Dialog>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Button variant="outline" className="justify-start gap-2">
             <FileText className="h-4 w-4" /> Journal des connexions
           </Button>
