@@ -439,6 +439,32 @@ var Download = createLucideIcon("download", [
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var Ellipsis = createLucideIcon("ellipsis", [
+	["circle", {
+		cx: "12",
+		cy: "12",
+		r: "1",
+		key: "41hilf"
+	}],
+	["circle", {
+		cx: "19",
+		cy: "12",
+		r: "1",
+		key: "1wjl8i"
+	}],
+	["circle", {
+		cx: "5",
+		cy: "12",
+		r: "1",
+		key: "1pcz8c"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var EyeOff = createLucideIcon("eye-off", [
 	["path", {
 		d: "M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49",
@@ -1237,6 +1263,52 @@ var Stamp = createLucideIcon("stamp", [
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var Sun = createLucideIcon("sun", [
+	["circle", {
+		cx: "12",
+		cy: "12",
+		r: "4",
+		key: "4exip2"
+	}],
+	["path", {
+		d: "M12 2v2",
+		key: "tus03m"
+	}],
+	["path", {
+		d: "M12 20v2",
+		key: "1lh1kg"
+	}],
+	["path", {
+		d: "m4.93 4.93 1.41 1.41",
+		key: "149t6j"
+	}],
+	["path", {
+		d: "m17.66 17.66 1.41 1.41",
+		key: "ptbguv"
+	}],
+	["path", {
+		d: "M2 12h2",
+		key: "1t8f8n"
+	}],
+	["path", {
+		d: "M20 12h2",
+		key: "1q8mjw"
+	}],
+	["path", {
+		d: "m6.34 17.66-1.41 1.41",
+		key: "1m8zz5"
+	}],
+	["path", {
+		d: "m19.07 4.93-1.41 1.41",
+		key: "1shlcs"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var Trash2 = createLucideIcon("trash-2", [
 	["path", {
 		d: "M10 11v6",
@@ -1259,19 +1331,6 @@ var Trash2 = createLucideIcon("trash-2", [
 		key: "e791ji"
 	}]
 ]);
-/**
-* @license lucide-react v0.575.0 - ISC
-*
-* This source code is licensed under the ISC license.
-* See the LICENSE file in the root directory of this source tree.
-*/
-var TrendingDown = createLucideIcon("trending-down", [["path", {
-	d: "M16 17h6v-6",
-	key: "t6n2it"
-}], ["path", {
-	d: "m22 17-8.5-8.5-5 5L2 7",
-	key: "x473p"
-}]]);
 /**
 * @license lucide-react v0.575.0 - ISC
 *
@@ -1457,4 +1516,4 @@ var Zap = createLucideIcon("zap", [["path", {
 	key: "1xq2db"
 }]]);
 //#endregion
-export { EyeOff as $, Percent as A, LogIn as B, Scissors as C, Printer as D, Receipt as E, MessageCircle as F, Image as G, LoaderCircle as H, Menu as I, Globe as J, House as K, MapPin as L, Palette as M, Package as N, Plus as O, Minus as P, Eye as Q, Mail as R, Search as S, RotateCcw as T, Layers as U, Lock as V, KeyRound as W, FilePenLine as X, FileText as Y, FileDown as Z, ShoppingBag as _, ArrowDownRight as _t, Users as a, Circle as at, ShieldAlert as b, Upload as c, ChevronUp as ct, TrendingDown as d, Check as dt, Download as et, Trash2 as f, ChartColumn as ft, ShoppingCart as g, ArrowUpRight as gt, Smartphone as h, Banknote as ht, Wallet as i, Clock as it, Pencil as j, Phone as k, Truck as l, ChevronRight as lt, Sparkles as m, Briefcase as mt, X as n, CreditCard as nt, User as o, CircleCheck as ot, Stamp as p, Building2 as pt, Handshake as q, Wrench as r, Copy as rt, UserPlus as s, CircleAlert as st, Zap as t, DatabaseBackup as tt, TrendingUp as u, ChevronDown as ut, Shield as v, Save as w, Settings as x, ShieldCheck as y, LogOut as z };
+export { EyeOff as $, Percent as A, LogIn as B, Scissors as C, Printer as D, Receipt as E, MessageCircle as F, Image as G, LoaderCircle as H, Menu as I, Globe as J, House as K, MapPin as L, Palette as M, Package as N, Plus as O, Minus as P, Eye as Q, Mail as R, Search as S, RotateCcw as T, Layers as U, Lock as V, KeyRound as W, FilePenLine as X, FileText as Y, FileDown as Z, ShoppingBag as _, ArrowUpRight as _t, Users as a, Clock as at, ShieldAlert as b, Upload as c, CircleAlert as ct, Trash2 as d, ChevronDown as dt, Ellipsis as et, Sun as f, Check as ft, ShoppingCart as g, Banknote as gt, Smartphone as h, Briefcase as ht, Wallet as i, Copy as it, Pencil as j, Phone as k, Truck as l, ChevronUp as lt, Sparkles as m, Building2 as mt, X as n, DatabaseBackup as nt, User as o, Circle as ot, Stamp as p, ChartColumn as pt, Handshake as q, Wrench as r, CreditCard as rt, UserPlus as s, CircleCheck as st, Zap as t, Download as tt, TrendingUp as u, ChevronRight as ut, Shield as v, ArrowDownRight as vt, Save as w, Settings as x, ShieldCheck as y, LogOut as z };

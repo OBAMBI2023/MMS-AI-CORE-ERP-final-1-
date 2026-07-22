@@ -13,6 +13,8 @@ import {
   Settings,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { usePermissions } from "@/hooks/use-permissions";
+import { routePermissions } from "@/lib/route-permissions";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/" },
@@ -30,10 +32,19 @@ const items = [
 
 export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { data: permissions = [], isLoading } = usePermissions();
+
+  const filteredItems = items.filter(it => {
+    const requiredPermission = routePermissions[it.to];
+    if (!requiredPermission) return true;
+    return permissions.includes(requiredPermission);
+  });
+
+  if (isLoading) return null;
 
   return (
     <nav className="flex-1 flex flex-col gap-1 mt-2">
-      {items.map((it, idx) => {
+      {filteredItems.map((it, idx) => {
         const isActive = pathname === it.to && !(it.to === "/" && idx === 0 && pathname === "/");
         const active =
           it.to === "/ventes"

@@ -10,10 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VentesRouteImport } from './routes/ventes'
+import { Route as UtilisateursRouteImport } from './routes/utilisateurs'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RapportsRouteImport } from './routes/rapports'
 import { Route as ParametresRouteImport } from './routes/parametres'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as JournalRouteImport } from './routes/journal'
 import { Route as FournisseursRouteImport } from './routes/fournisseurs'
 import { Route as DevisRouteImport } from './routes/devis'
 import { Route as DepensesRouteImport } from './routes/depenses'
@@ -26,6 +28,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const VentesRoute = VentesRouteImport.update({
   id: '/ventes',
   path: '/ventes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UtilisateursRoute = UtilisateursRouteImport.update({
+  id: '/utilisateurs',
+  path: '/utilisateurs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ServicesRoute = ServicesRouteImport.update({
@@ -46,6 +53,11 @@ const ParametresRoute = ParametresRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JournalRoute = JournalRouteImport.update({
+  id: '/journal',
+  path: '/journal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FournisseursRoute = FournisseursRouteImport.update({
@@ -98,10 +110,12 @@ export interface FileRoutesByFullPath {
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/journal': typeof JournalRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
 }
 export interface FileRoutesByTo {
@@ -113,10 +127,12 @@ export interface FileRoutesByTo {
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/journal': typeof JournalRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
 }
 export interface FileRoutesById {
@@ -129,10 +145,12 @@ export interface FileRoutesById {
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/journal': typeof JournalRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
 }
 export interface FileRouteTypes {
@@ -146,10 +164,12 @@ export interface FileRouteTypes {
     | '/depenses'
     | '/devis'
     | '/fournisseurs'
+    | '/journal'
     | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/utilisateurs'
     | '/ventes'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -161,10 +181,12 @@ export interface FileRouteTypes {
     | '/depenses'
     | '/devis'
     | '/fournisseurs'
+    | '/journal'
     | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/utilisateurs'
     | '/ventes'
   id:
     | '__root__'
@@ -176,10 +198,12 @@ export interface FileRouteTypes {
     | '/depenses'
     | '/devis'
     | '/fournisseurs'
+    | '/journal'
     | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/utilisateurs'
     | '/ventes'
   fileRoutesById: FileRoutesById
 }
@@ -192,10 +216,12 @@ export interface RootRouteChildren {
   DepensesRoute: typeof DepensesRoute
   DevisRoute: typeof DevisRoute
   FournisseursRoute: typeof FournisseursRoute
+  JournalRoute: typeof JournalRoute
   LoginRoute: typeof LoginRoute
   ParametresRoute: typeof ParametresRoute
   RapportsRoute: typeof RapportsRoute
   ServicesRoute: typeof ServicesRoute
+  UtilisateursRoute: typeof UtilisateursRoute
   VentesRoute: typeof VentesRoute
 }
 
@@ -206,6 +232,13 @@ declare module '@tanstack/react-router' {
       path: '/ventes'
       fullPath: '/ventes'
       preLoaderRoute: typeof VentesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/utilisateurs': {
+      id: '/utilisateurs'
+      path: '/utilisateurs'
+      fullPath: '/utilisateurs'
+      preLoaderRoute: typeof UtilisateursRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/services': {
@@ -234,6 +267,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/journal': {
+      id: '/journal'
+      path: '/journal'
+      fullPath: '/journal'
+      preLoaderRoute: typeof JournalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/fournisseurs': {
@@ -304,10 +344,12 @@ const rootRouteChildren: RootRouteChildren = {
   DepensesRoute: DepensesRoute,
   DevisRoute: DevisRoute,
   FournisseursRoute: FournisseursRoute,
+  JournalRoute: JournalRoute,
   LoginRoute: LoginRoute,
   ParametresRoute: ParametresRoute,
   RapportsRoute: RapportsRoute,
   ServicesRoute: ServicesRoute,
+  UtilisateursRoute: UtilisateursRoute,
   VentesRoute: VentesRoute,
 }
 export const routeTree = rootRouteImport

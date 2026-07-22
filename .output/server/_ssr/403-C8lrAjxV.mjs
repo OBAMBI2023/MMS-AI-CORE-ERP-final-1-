@@ -1,5 +1,5 @@
 import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
-import { s as require_jsx_runtime } from "../_libs/@radix-ui/react-arrow+[...].mjs";
+import { c as require_jsx_runtime } from "../_libs/@radix-ui/react-arrow+[...].mjs";
 import { b as ShieldAlert } from "../_libs/lucide-react.mjs";
 //#region node_modules/.nitro/vite/services/ssr/assets/403-C8lrAjxV.js
 var import_jsx_runtime = require_jsx_runtime();

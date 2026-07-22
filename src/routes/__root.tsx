@@ -6,9 +6,12 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  redirect,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { routePermissions } from "@/lib/route-permissions";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -74,6 +77,35 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  beforeLoad: async ({ location }) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session && location.pathname !== "/login") {
+      throw redirect({ to: "/login" });
+    }
+
+    if (session && location.pathname !== "/login") {
+      const requiredPermission = routePermissions[location.pathname];
+      if (requiredPermission) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("roles(name, role_permissions(permissions(code)))")
+          .eq("id", session.user.id)
+          .single();
+
+        const roleName = profile?.roles?.name;
+        const permissions = profile?.roles?.role_permissions?.map((rp: any) => rp.permissions?.code) || [];
+        
+        const isAuthorized = roleName === 'Administrateur' || permissions.includes(requiredPermission);
+
+        if (!isAuthorized) {
+          throw redirect({ to: "/403" });
+        }
+      }
+    }
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },

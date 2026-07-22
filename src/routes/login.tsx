@@ -48,12 +48,27 @@ function LoginPage() {
   const handleLogin = async (values: LoginValues) => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: values.email,
         password: values.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Log failure
+        await supabase.rpc("log_connection_attempt", {
+          p_email: values.email,
+          p_status: "failure",
+        });
+        throw error;
+      }
+      
+      // Log success
+      await supabase.rpc("log_connection_attempt", {
+        p_email: values.email,
+        p_status: "success",
+        p_user_id: data.user.id,
+      });
+
       navigate({ to: "/" });
     } catch (err: any) {
       toast.error(err.message || "Une erreur est survenue");

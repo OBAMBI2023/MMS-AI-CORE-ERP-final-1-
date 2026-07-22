@@ -104,6 +104,13 @@ function createSlot(ownerName) {
 }
 var Slot = /* @__PURE__ */ createSlot("Slot");
 var SLOTTABLE_IDENTIFIER = Symbol.for("radix.slottable");
+// @__NO_SIDE_EFFECTS__
+function createSlottable(ownerName) {
+	const Slottable2 = (props) => "child" in props ? props.children(props.child) : props.children;
+	Slottable2.displayName = `${ownerName}.Slottable`;
+	Slottable2.__radixId = SLOTTABLE_IDENTIFIER;
+	return Slottable2;
+}
 var getSlottableElementFromSlottable = (slottable, child) => {
 	if ("child" in slottable.props) {
 		const child2 = slottable.props.child;
@@ -220,4 +227,4 @@ var Arrow = import_react.forwardRef((props, forwardedRef) => {
 Arrow.displayName = NAME;
 var Root = Arrow;
 //#endregion
-export { createSlot as a, Slot as i, Primitive as n, useComposedRefs as o, dispatchDiscreteCustomEvent as r, require_jsx_runtime as s, Root as t };
+export { createSlot as a, require_jsx_runtime as c, Slot as i, Primitive as n, createSlottable as o, dispatchDiscreteCustomEvent as r, useComposedRefs as s, Root as t };
