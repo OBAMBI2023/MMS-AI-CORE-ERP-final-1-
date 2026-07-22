@@ -186,17 +186,19 @@ export const deleteUser = createServerFn({ method: "POST" })
 
 
 export const resetUserPassword = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string().uuid(), password: z.string().min(8) }))
+  .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     const { user: admin } = await getAuth();
     if (!admin) throw new Error("Unauthorized");
 
-    const { error } = await supabase.auth.admin.updateUserById(data.id, {
-      password: data.password,
-    });
+    // Fetch user email
+    const { data: user, error: userError } = await supabase.auth.admin.getUserById(data.id);
+    if (userError || !user) throw new Error("Utilisateur non trouvé");
+
+    const { error } = await supabase.auth.resetPasswordForEmail(user.user.email!);
     if (error) throw error;
 
-    await logActivity(admin.id, data.id, "Réinitialisation de mot de passe", null, null);
+    await logActivity(admin.id, data.id, "Demande de réinitialisation de mot de passe", null, null);
 
     return { success: true };
   });

@@ -20,9 +20,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function UserManagement() {
   const qc = useQueryClient();
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+
   const { data: users, isLoading } = useQuery({
     queryKey: ["users"],
     queryFn: async () => {
@@ -40,6 +53,7 @@ export function UserManagement() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["users"] });
       toast.success("Utilisateur supprimé");
+      setUserToDelete(null);
     },
     onError: (error: any) => {
       toast.error(error.message || "Erreur lors de la suppression");
@@ -60,7 +74,7 @@ export function UserManagement() {
   const passwordMutation = useMutation({
     mutationFn: resetUserPassword,
     onSuccess: () => {
-      toast.success("Mot de passe réinitialisé");
+      toast.success("Un email de réinitialisation a été envoyé.");
     },
     onError: (error: any) => {
       toast.error(error.message || "Erreur lors de la réinitialisation");
@@ -73,14 +87,6 @@ export function UserManagement() {
         <Loader2 className="animate-spin h-8 w-8" />
       </div>
     );
-
-  const handleDelete = (id: string) => {
-    if (
-      confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.")
-    ) {
-      deleteMutation.mutate({ id });
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -106,12 +112,12 @@ export function UserManagement() {
                 <TableCell>{user.full_name}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{(user.roles as any)?.name}</TableCell>
-                <TableCell className="capitalize">{user.status}</TableCell>
+                <TableCell className="capitalize">{user.status === 'suspendu' ? 'Inactif' : user.status}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" disabled={toggleMutation.isPending || passwordMutation.isPending || deleteMutation.isPending}>
+                        {toggleMutation.isPending || passwordMutation.isPending || deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -119,8 +125,9 @@ export function UserManagement() {
                       <DropdownMenuItem
                         onClick={() =>
                           passwordMutation.mutate({
-                            id: user.id,
-                            password: "TemporaryPassword123!",
+                            data: {
+                              id: user.id,
+                            },
                           })
                         }
                       >
@@ -129,8 +136,10 @@ export function UserManagement() {
                       <DropdownMenuItem
                         onClick={() =>
                           toggleMutation.mutate({
-                            id: user.id,
-                            status: user.status === "actif" ? "suspendu" : "actif",
+                            data: {
+                              id: user.id,
+                              status: user.status === "actif" ? "suspendu" : "actif",
+                            },
                           })
                         }
                       >
@@ -143,7 +152,7 @@ export function UserManagement() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => setUserToDelete(user.id)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" /> Supprimer
                       </DropdownMenuItem>
@@ -155,6 +164,27 @@ export function UserManagement() {
           </TableBody>
         </Table>
       </div>
+      
+      <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. L'utilisateur sera supprimé de l'authentification et de la base de données.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+            className="bg-destructive hover:bg-destructive/90"
+            onClick={() => userToDelete && deleteMutation.mutate({ data: { id: userToDelete } })}
+            >
+
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
