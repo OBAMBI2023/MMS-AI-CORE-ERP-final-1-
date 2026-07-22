@@ -78,9 +78,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
     const {
       data: { session },
     } = await supabase.auth.getSession();
+    
+    console.log("DEBUG: beforeLoad session check:", { path: location.pathname, session: !!session });
 
     if (!session && location.pathname !== "/login") {
       throw redirect({ to: "/login" });

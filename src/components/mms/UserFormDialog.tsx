@@ -102,6 +102,8 @@ export function UserFormDialog({ user }: { user?: any }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (mutation.isPending) return;
+
     if (!isEdit && formData.password !== formData.confirmPassword) {
       toast.error("Les mots de passe ne correspondent pas");
       return;

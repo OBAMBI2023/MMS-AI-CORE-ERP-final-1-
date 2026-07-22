@@ -58,7 +58,7 @@ export const createUser = createServerFn({ method: "POST" })
 
     if (authError) throw authError;
 
-    const { error: profileError } = await (supabaseAdmin as any).from("profiles").insert({
+    const { error: profileError } = await (supabaseAdmin as any).from("profiles").upsert({
       id: authData.user.id,
       email: data.email,
       full_name: data.full_name,
