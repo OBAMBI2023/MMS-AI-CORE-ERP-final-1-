@@ -233,9 +233,6 @@ function ParametresPage() {
               </TabsContent>
               <TabsContent value="security">
                 <SecurityTab />
-                <div className="mt-6">
-                  <ConnectionLogsTab />
-                </div>
               </TabsContent>
             </Tabs>
           </div>
@@ -592,66 +589,9 @@ function DocumentsTab({
   );
 }
 
+
 function UsersTab() {
   return <UserManagement />;
-}
-
-function ConnectionLogsTab() {
-  const {
-    data: logs,
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ["connection-logs"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("connection_logs")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  return (
-    <Card title="Journal des connexions" icon={<FileText className="h-4 w-4" />}>
-      {isLoading ? (
-        <div className="flex items-center justify-center p-4">
-          <Loader2 className="animate-spin h-5 w-5" />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <Button onClick={() => refetch()} variant="outline" size="sm">
-            Actualiser
-          </Button>
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="p-3 text-left">Date</th>
-                  <th className="p-3 text-left">Email</th>
-                  <th className="p-3 text-left">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs?.map((log) => (
-                  <tr key={log.id} className="border-t">
-                    <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
-                    <td className="p-3">{log.email}</td>
-                    <td className="p-3">
-                      <Badge variant={log.status === "success" ? "default" : "destructive"}>
-                        {log.status === "success" ? "Succès" : "Échec"}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </Card>
-  );
 }
 
 import { changePassword } from "@/lib/security.server";
@@ -716,17 +656,6 @@ function SecurityTab() {
         </div>
       </Card>
       {/* ... rest of the component */}
-
-      <Card title="Sécurité & Journal" icon={<Shield className="h-4 w-4" />}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Button variant="outline" className="justify-start gap-2">
-            <FileText className="h-4 w-4" /> Journal des connexions
-          </Button>
-          <Button variant="outline" className="justify-start gap-2">
-            <DatabaseBackup className="h-4 w-4" /> Sauvegarde
-          </Button>
-        </div>
-      </Card>
     </div>
   );
 }
