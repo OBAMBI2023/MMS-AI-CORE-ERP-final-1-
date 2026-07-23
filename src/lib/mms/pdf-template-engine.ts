@@ -107,11 +107,7 @@ export async function renderDepensesHeader(
   return startY + 25;
 }
 
-export function renderDepensesTable(
-  doc: jsPDF,
-  data: any[],
-  startY: number,
-) {
+export function renderDepensesTable(doc: jsPDF, data: any[], startY: number) {
   autoTable(doc, {
     startY: startY,
     head: [["Date", "Catégorie", "Description", "Mode de paiement", "Montant"]],
@@ -134,11 +130,11 @@ export function renderDepensesTable(
 
 export function renderDepensesTotals(doc: jsPDF, total: string, startY: number) {
   const finalY = (doc as any).lastAutoTable.finalY + 10;
-  
+
   // Background box
   doc.setFillColor(240, 240, 240);
   doc.rect(10, finalY, 190, 10, "F");
-  
+
   doc.setFontSize(12);
   doc.setFont(undefined, "bold");
   doc.text(`TOTAL DES DÉPENSES : ${total}`, 15, finalY + 7);
@@ -182,7 +178,7 @@ export function renderFooter(doc: jsPDF, settings: CompanySettings) {
       `Page ${i} de ${pageCount} - ${settings.company_name}`,
       doc.internal.pageSize.width / 2,
       doc.internal.pageSize.height - 10,
-      { align: "center" }
+      { align: "center" },
     );
   }
 }

@@ -20,10 +20,10 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as 'light' | 'dark';
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark";
     if (savedTheme) {
       setTheme(savedTheme);
     }
@@ -40,7 +40,7 @@ export function AppShell({
     }
   }, [theme]);
 
-  const toggleTheme = () => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  const toggleTheme = () => setTheme((prev) => (prev === "light" ? "dark" : "light"));
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
@@ -91,7 +91,7 @@ export function AppShell({
           <div className="flex items-center gap-4">
             {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
             </Button>
             <UserMenu />
           </div>

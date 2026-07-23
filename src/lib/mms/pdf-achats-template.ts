@@ -37,20 +37,11 @@ export async function renderAchatsHeader(
   return startY + 45;
 }
 
-export function renderAchatsTable(
-  doc: jsPDF,
-  data: any[],
-  startY: number,
-) {
+export function renderAchatsTable(doc: jsPDF, data: any[], startY: number) {
   autoTable(doc, {
     startY: startY,
     head: [["Date", "Référence", "Fournisseur", "Montant"]],
-    body: data.map((d) => [
-      d.date,
-      d.reference,
-      d.fournisseur,
-      d.amount,
-    ]),
+    body: data.map((d) => [d.date, d.reference, d.fournisseur, d.amount]),
     theme: "striped",
     headStyles: {
       fillColor: [240, 240, 240],
@@ -63,11 +54,11 @@ export function renderAchatsTable(
 
 export function renderAchatsTotals(doc: jsPDF, total: string) {
   const finalY = (doc as any).lastAutoTable.finalY + 10;
-  
+
   // Background box
   doc.setFillColor(240, 240, 240);
   doc.rect(10, finalY, 190, 10, "F");
-  
+
   doc.setFontSize(12);
   doc.setFont(undefined, "bold");
   doc.text(`TOTAL DES ACHATS : ${total}`, 15, finalY + 7);

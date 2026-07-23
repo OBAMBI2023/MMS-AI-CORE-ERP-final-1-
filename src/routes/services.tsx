@@ -36,7 +36,9 @@ const columns: ColumnDef<Service>[] = [
   { header: "Unité", cell: (r) => r.unit },
   {
     header: "Prix",
-    cell: (r) => <span className="font-semibold text-primary">{formatCurrency(Number(r.price))}</span>,
+    cell: (r) => (
+      <span className="font-semibold text-primary">{formatCurrency(Number(r.price))}</span>
+    ),
   },
 ];
 

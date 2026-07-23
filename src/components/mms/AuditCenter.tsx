@@ -31,7 +31,11 @@ type AuditLog = {
 };
 
 export function AuditCenter() {
-  const { data: logs, isLoading, refetch } = useQuery({
+  const {
+    data: logs,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["audit-logs"],
     queryFn: async () => {
       const { data, error } = await supabase

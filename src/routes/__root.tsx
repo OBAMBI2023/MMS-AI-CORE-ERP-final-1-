@@ -85,8 +85,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    
-    console.log("DEBUG: beforeLoad session check:", { path: location.pathname, session: !!session });
+
+    console.log("DEBUG: beforeLoad session check:", {
+      path: location.pathname,
+      session: !!session,
+    });
 
     if (!session && location.pathname !== "/login") {
       throw redirect({ to: "/login" });
@@ -106,7 +109,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           profile?.roles?.role_permissions?.map((rp: any) => rp.permissions?.code) || [];
 
         const isAuthorized =
-          roleName === "Administrateur" || (Array.isArray(permissions) && permissions.includes(requiredPermission));
+          roleName === "Administrateur" ||
+          (Array.isArray(permissions) && permissions.includes(requiredPermission));
 
         if (!isAuthorized) {
           throw redirect({ to: "/403" });

@@ -112,12 +112,28 @@ export function UserManagement() {
                 <TableCell>{user.full_name}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{(user.roles as any)?.name}</TableCell>
-                <TableCell className="capitalize">{user.status === 'suspendu' ? 'Inactif' : user.status}</TableCell>
+                <TableCell className="capitalize">
+                  {user.status === "suspendu" ? "Inactif" : user.status}
+                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={toggleMutation.isPending || passwordMutation.isPending || deleteMutation.isPending}>
-                        {toggleMutation.isPending || passwordMutation.isPending || deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={
+                          toggleMutation.isPending ||
+                          passwordMutation.isPending ||
+                          deleteMutation.isPending
+                        }
+                      >
+                        {toggleMutation.isPending ||
+                        passwordMutation.isPending ||
+                        deleteMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <MoreHorizontal className="h-4 w-4" />
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -164,22 +180,22 @@ export function UserManagement() {
           </TableBody>
         </Table>
       </div>
-      
+
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. L'utilisateur sera supprimé de l'authentification et de la base de données.
+              Cette action est irréversible. L'utilisateur sera supprimé de l'authentification et de
+              la base de données.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
-            className="bg-destructive hover:bg-destructive/90"
-            onClick={() => userToDelete && deleteMutation.mutate({ data: { id: userToDelete } })}
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => userToDelete && deleteMutation.mutate({ data: { id: userToDelete } })}
             >
-
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>

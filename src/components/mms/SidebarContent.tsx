@@ -35,7 +35,7 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const { data, isLoading } = usePermissions();
   const permissions = data?.permissions || [];
 
-  // Si on est en chargement, on affiche tout par précaution pour éviter un menu vide, 
+  // Si on est en chargement, on affiche tout par précaution pour éviter un menu vide,
   // ou on pourrait afficher un squelette. Ici, on affiche tout pour ne pas bloquer l'UX.
   const filteredItems = items.filter((it) => {
     const requiredPermission = routePermissions[it.to];

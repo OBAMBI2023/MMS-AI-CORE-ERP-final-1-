@@ -21,7 +21,8 @@ export function AssistantIAERP() {
           <div>
             <h2 className="text-xl font-semibold">Assistant IA ERP</h2>
             <p className="text-sm text-muted-foreground">
-              Posez une question sur votre entreprise. L'assistant analyse vos données et vous répond instantanément.
+              Posez une question sur votre entreprise. L'assistant analyse vos données et vous
+              répond instantanément.
             </p>
           </div>
         </div>

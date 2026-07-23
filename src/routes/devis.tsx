@@ -17,7 +17,7 @@ interface Devis {
   id: string;
   number: string;
   client_name: string | null;
-  status: string;
+  status: string | null;
   due_date: string | null;
   subtotal: number;
   discount: number;
@@ -129,7 +129,7 @@ function DevisPage() {
   });
 
   const setStatus = useMutation({
-    mutationFn: async (v: { id: string; status: string }) => {
+    mutationFn: async (v: { id: string; status: string | null }) => {
       const { error } = await supabase.from("devis").update({ status: v.status }).eq("id", v.id);
       if (error) throw error;
     },
@@ -199,10 +199,11 @@ function DevisPage() {
                       <td className="px-4 py-3 text-muted-foreground">{formatDate(d.due_date)}</td>
                       <td className="px-4 py-3">
                         <select
-                          value={d.status}
-                          onChange={(e) => setStatus.mutate({ id: d.id, status: e.target.value })}
-                          className={`text-xs px-2 py-1 rounded-full font-medium border-0 outline-none cursor-pointer ${statusColor[d.status] ?? ""}`}
+                          value={d.status ?? ""}
+                          onChange={(e) => setStatus.mutate({ id: d.id, status: e.target.value || null })}
+                          className={`text-xs px-2 py-1 rounded-full font-medium border-0 outline-none cursor-pointer ${statusColor[d.status ?? ""] ?? "bg-muted text-muted-foreground"}`}
                         >
+                          <option value="">— Aucun —</option>
                           {STATUSES.map((s) => (
                             <option key={s} value={s}>
                               {s}

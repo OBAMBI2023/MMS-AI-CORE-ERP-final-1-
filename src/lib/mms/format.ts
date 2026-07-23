@@ -1,5 +1,5 @@
 export function formatCurrency(amount: number): string {
-  // Use a regular space instead of the non-breaking space (U+202F or U+00A0) 
+  // Use a regular space instead of the non-breaking space (U+202F or U+00A0)
   // to ensure compatibility with the PDF generator, which can struggle with these characters.
   return (
     new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 })

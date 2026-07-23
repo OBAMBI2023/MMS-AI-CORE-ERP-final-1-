@@ -39,7 +39,17 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 import { Button } from "@/components/ui/button";
+import { useCompanySettings } from "@/hooks/use-company-settings";
 
 export const Route = createFileRoute("/rapports")({
   component: RapportsPage,
@@ -167,6 +177,147 @@ function RapportsPage() {
   ];
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
 
+  const { settings, logoUrl, companyName } = useCompanySettings();
+
+  const exportPDF = async () => {
+    if (!data || !stats) return;
+
+    const doc = new jsPDF();
+
+    // Add Company Logo if available
+    if (logoUrl) {
+      try {
+        doc.addImage(logoUrl, "PNG", 14, 10, 30, 30);
+      } catch (e) {
+        console.error("Error adding logo", e);
+      }
+    }
+
+    doc.setFontSize(18);
+    doc.text(companyName || "Entreprise", 50, 20);
+    doc.setFontSize(12);
+    doc.text(
+      `Rapport du mois de ${new Date(year, month - 1).toLocaleString("fr-FR", { month: "long" })} ${year}`,
+      50,
+      30,
+    );
+
+    // Summary Table
+    const summaryData = [
+      ["Chiffre d'affaires", formatCurrency(stats.target.ventes)],
+      ["Nombre de devis", stats.target.devisCount.toString()],
+      ["Achats", formatCurrency(stats.target.achats)],
+      ["Dépenses", formatCurrency(stats.target.depenses)],
+      ["Bénéfice", formatCurrency(stats.target.benefice)],
+      ["Nouveaux clients", stats.target.clientsCount.toString()],
+    ];
+
+    (doc as any).autoTable({
+      startY: 45,
+      head: [["Indicateur", "Valeur"]],
+      body: summaryData,
+    });
+
+    // Detailed Table
+    let detailedBody: any[] = [];
+
+    const filtered = {
+      ventes: data.ventes.filter(
+        (v) =>
+          new Date(v.created_at).getMonth() + 1 === month &&
+          new Date(v.created_at).getFullYear() === year,
+      ),
+      depenses: data.depenses.filter(
+        (d) =>
+          new Date(d.paid_at).getMonth() + 1 === month && new Date(d.paid_at).getFullYear() === year,
+      ),
+      achats: data.achats.filter(
+        (a) =>
+          new Date(a.created_at).getMonth() + 1 === month &&
+          new Date(a.created_at).getFullYear() === year,
+      ),
+      devis: data.devis.filter(
+        (d) =>
+          new Date(d.created_at).getMonth() + 1 === month &&
+          new Date(d.created_at).getFullYear() === year,
+      ),
+      clients: data.clients.filter(
+        (c) =>
+          new Date(c.created_at).getMonth() + 1 === month &&
+          new Date(c.created_at).getFullYear() === year,
+      ),
+    };
+
+    filtered.ventes.forEach((v) =>
+      detailedBody.push([
+        "Vente",
+        new Date(v.created_at).toLocaleDateString("fr-FR"),
+        formatCurrency(Number(v.total)),
+      ]),
+    );
+    filtered.achats.forEach((a) =>
+      detailedBody.push([
+        "Achat",
+        new Date(a.created_at).toLocaleDateString("fr-FR"),
+        formatCurrency(Number(a.total)),
+      ]),
+    );
+    filtered.depenses.forEach((d) =>
+      detailedBody.push([
+        "Dépense",
+        new Date(d.paid_at).toLocaleDateString("fr-FR"),
+        formatCurrency(Number(d.amount)),
+      ]),
+    );
+    filtered.devis.forEach((d) =>
+        detailedBody.push([
+            "Devis",
+            new Date(d.created_at).toLocaleDateString("fr-FR"),
+            formatCurrency(Number(d.total))
+        ])
+    );
+    filtered.clients.forEach((c) =>
+        detailedBody.push([
+            "Client",
+            new Date(c.created_at).toLocaleDateString("fr-FR"),
+            "Nouveau client",
+        ])
+    );
+
+    (doc as any).autoTable({
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      head: [["Type", "Date", "Détails/Montant"]],
+      body: detailedBody,
+    });
+
+    doc.save(`Rapport_${companyName || "Entreprise"}_${month}_${year}.pdf`);
+    toast.success("Export PDF terminé.");
+  };
+
+  const exportExcel = async () => {
+    // Basic CSV for Excel
+    const csvContent =
+      "KPI;Valeur\n" +
+      `Chiffre d'affaires;${stats?.target.ventes}\n` +
+      `Dépenses;${stats?.target.depenses}\n` +
+      `Achats;${stats?.target.achats}\n` +
+      `Bénéfice;${stats?.target.benefice}`;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Rapport_${month}_${year}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Export Excel terminé.");
+  };
+
+  const exportCSV = async () => {
+    exportExcel(); // Reusing the same CSV function
+    toast.success("Export CSV terminé.");
+  };
+
   return (
     <AppShell title="Rapports" subtitle="Vue d'ensemble de l'activité">
       <div className="flex items-center justify-between mb-8">
@@ -202,9 +353,18 @@ function RapportsPage() {
           <Button variant="outline" size="icon" className="rounded-xl">
             <Sun className="h-4 w-4" />
           </Button>
-          <Button className="rounded-xl gap-2">
-            <Download className="h-4 w-4" /> Exporter
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="rounded-xl gap-2">
+                <Download className="h-4 w-4" /> Exporter
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportPDF()}>PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportExcel()}>Excel (.xlsx)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCSV()}>CSV</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -328,7 +488,9 @@ function StatCard({
 }) {
   const isCurrency = ["Chiffre d'affaires", "Dépenses", "Achats", "Bénéfice"].includes(label);
   const formattedValue = isCurrency ? formatCurrency(value) : value;
-  const formattedDiff = isCurrency ? formatCurrency(Math.abs(compare.diff)) : Math.abs(compare.diff);
+  const formattedDiff = isCurrency
+    ? formatCurrency(Math.abs(compare.diff))
+    : Math.abs(compare.diff);
 
   return (
     <motion.div

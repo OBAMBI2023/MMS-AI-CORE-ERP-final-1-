@@ -533,7 +533,9 @@ export function PosPage() {
             </div>
             <div className="flex items-center justify-between pt-1.5 md:pt-2 border-t border-border">
               <span className="text-xs md:text-sm font-medium">Total</span>
-              <span className="text-lg md:text-xl font-bold text-primary">{formatCurrency(total)}</span>
+              <span className="text-lg md:text-xl font-bold text-primary">
+                {formatCurrency(total)}
+              </span>
             </div>
 
             <div className="grid grid-cols-4 gap-1 pt-0.5 md:pt-1">
@@ -582,20 +584,27 @@ export function PosPage() {
           />
         )}
       </AnimatePresence>
-      <SalesHistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} onEdit={(id) => setSaleToEdit(id)} />
+      <SalesHistoryModal
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        onEdit={(id) => setSaleToEdit(id)}
+      />
       {!!saleToEdit && (
-        <LineItemsDialog 
-            headerTable="ventes"
-            itemsTable="vente_items"
-            fkColumn="vente_id"
-            partnerTable="clients"
-            partnerLabel="Client"
-            numberPrefix="V"
-            singular="Vente"
-            initialId={saleToEdit}
-            onClose={() => { setSaleToEdit(null); queryClient.invalidateQueries({ queryKey: ["ventes", "history"] }); }}
+        <LineItemsDialog
+          headerTable="ventes"
+          itemsTable="vente_items"
+          fkColumn="vente_id"
+          partnerTable="clients"
+          partnerLabel="Client"
+          numberPrefix="V"
+          singular="Vente"
+          initialId={saleToEdit}
+          onClose={() => {
+            setSaleToEdit(null);
+            queryClient.invalidateQueries({ queryKey: ["ventes", "history"] });
+          }}
         />
-    )}
+      )}
     </div>
   );
 }

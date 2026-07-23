@@ -71,7 +71,7 @@ function AchatsPage() {
       settings,
       logoUrl,
       data.length,
-      formatCurrency(total)
+      formatCurrency(total),
     );
 
     renderAchatsTable(

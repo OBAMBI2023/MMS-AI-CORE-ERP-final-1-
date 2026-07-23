@@ -589,7 +589,6 @@ function DocumentsTab({
   );
 }
 
-
 function UsersTab() {
   return <UserManagement />;
 }
@@ -603,24 +602,28 @@ function SecurityTab() {
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
-  
+
   const changing = useMutation({
     mutationFn: async () => {
       // Validation
       if (!currentPwd) throw new Error("Mot de passe actuel requis");
-      if (newPwd.length < 8) throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
-      if (newPwd !== confirmPwd) throw new Error("La confirmation ne correspond pas au nouveau mot de passe.");
-      
+      if (newPwd.length < 8)
+        throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+      if (newPwd !== confirmPwd)
+        throw new Error("La confirmation ne correspond pas au nouveau mot de passe.");
+
       // Verify current password
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user || !user.email) throw new Error("Utilisateur non authentifié.");
-      
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPwd,
       });
       if (signInError) throw new Error("Mot de passe actuel incorrect.");
-      
+
       // Update password using server function
       await changePassword({ data: { newPassword: newPwd } });
     },
@@ -638,18 +641,29 @@ function SecurityTab() {
       <Card title="Mot de passe" icon={<KeyRound className="h-4 w-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Mot de passe actuel" required>
-            <Input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} />
+            <Input
+              type="password"
+              value={currentPwd}
+              onChange={(e) => setCurrentPwd(e.target.value)}
+            />
           </Field>
           <div /> {/* Spacer */}
           <Field label="Nouveau mot de passe" required>
             <Input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
           </Field>
           <Field label="Confirmer le nouveau mot de passe" required>
-            <Input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
+            <Input
+              type="password"
+              value={confirmPwd}
+              onChange={(e) => setConfirmPwd(e.target.value)}
+            />
           </Field>
         </div>
         <div className="mt-4">
-          <Button onClick={() => changing.mutate()} disabled={changing.isPending || !currentPwd || !newPwd || !confirmPwd}>
+          <Button
+            onClick={() => changing.mutate()}
+            disabled={changing.isPending || !currentPwd || !newPwd || !confirmPwd}
+          >
             {changing.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Changer le mot de passe
           </Button>

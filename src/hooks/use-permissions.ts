@@ -32,15 +32,15 @@ export function usePermissions() {
       // Mode de récupération côté client : Si Administrateur, accorder toutes les permissions
       if (roleName === "Administrateur") {
         const { data: allPerms } = await supabase.from("permissions").select("code");
-        return { 
+        return {
           permissions: allPerms?.map((p) => p.code) || [],
-          role: roleName 
+          role: roleName,
         };
       }
 
-      return { 
+      return {
         permissions: data.roles?.role_permissions?.map((rp) => rp.permissions?.code) || [],
-        role: roleName 
+        role: roleName,
       };
     },
   });
