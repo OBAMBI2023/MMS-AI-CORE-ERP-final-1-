@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useRef, useState } from "react";
+import { useActionPermission } from "@/hooks/use-action-permission";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import type { Tables } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -561,7 +562,7 @@ export function PosPage() {
             </div>
 
             <button
-              disabled={cart.length === 0 || saving}
+              disabled={cart.length === 0 || saving || !canProcessSale}
               onClick={validate}
               className="w-full mt-1.5 md:mt-2 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-gradient-to-br from-primary to-primary-glow text-white font-semibold shadow-lg shadow-primary/30 disabled:opacity-40 disabled:shadow-none hover:scale-[1.01] transition text-sm md:text-base"
             >

@@ -57,6 +57,7 @@ function DevisPage() {
   const { roleId } = permissionsQuery.data || { roleId: null };
   const userId = userData?.data?.user?.id;
   const canDeleteDevis = useActionPermission("devis.delete");
+  const canCreateDevis = useActionPermission("devis.create");
 
   const downloadPDF = async (devis: Devis) => {
     const { data: items, error } = await supabase
@@ -171,12 +172,14 @@ function DevisPage() {
                 className="w-full rounded-xl bg-muted/60 border border-border pl-10 pr-4 py-2 text-sm outline-none focus:border-primary/40"
               />
             </div>
-            <button
-              onClick={() => setCreating(true)}
-              className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-            >
-              <Plus className="h-4 w-4" /> Nouveau devis
-            </button>
+            {canCreateDevis && (
+                <button
+                onClick={() => setCreating(true)}
+                className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+                >
+                <Plus className="h-4 w-4" /> Nouveau devis
+                </button>
+            )}
           </div>
 
           <div className="rounded-2xl border border-border bg-card overflow-x-auto w-full">

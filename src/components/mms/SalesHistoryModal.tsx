@@ -23,7 +23,7 @@ import { formatCurrency } from "@/lib/mms/format";
 import {
   History,
   Search,
-  RefreshCcw,
+  FileText,
   Printer,
   Pencil,
   Trash2,
@@ -32,10 +32,12 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 interface SalesHistoryModalProps {
   isOpen: boolean;
@@ -47,6 +49,8 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
   const [search, setSearch] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const permissionsQuery = usePermissions();
   const queryClient = useQueryClient();
 
@@ -67,7 +71,70 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
   });
 
   const { role, roleId } = permissionsQuery.data || { permissions: [], role: null, roleId: null };
+  const { settings, logoUrl, companyName, address, phone, email } = useCompanySettings();
   const canDeleteSale = useActionPermission("ventes.delete");
+
+  const filteredSales = useMemo(() => {
+    if (!sales) return [];
+    return sales.filter(
+      (s) =>
+        s.number.toLowerCase().includes(search.toLowerCase()) ||
+        s.client_name?.toLowerCase().includes(search.toLowerCase()),
+    );
+  }, [sales, search]);
+
+  const paginatedSales = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredSales.slice(start, start + itemsPerPage);
+  }, [filteredSales, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 10;
+
+    // Header
+    doc.setFontSize(18);
+    doc.text("Historique des ventes", pageWidth / 2, y, { align: "center" });
+    y += 10;
+    
+    doc.setFontSize(10);
+    doc.text(`${companyName}`, 10, y);
+    doc.text(`Email: ${email}`, 10, y + 5);
+    doc.text(`Tél: ${phone}`, 10, y + 10);
+    doc.text(`Adresse: ${address}`, 10, y + 15);
+    y += 25;
+
+    // Sales Table
+    const tableData = filteredSales.map((s) => [
+      s.number,
+      new Date(s.created_at).toLocaleDateString(),
+      s.client_name || "-",
+      formatCurrency(s.total),
+      s.payment_method,
+      "Validée",
+    ]);
+
+    (doc as any).autoTable({
+      head: [["Référence", "Date", "Client", "Montant", "Paiement", "Statut"]],
+      body: tableData,
+      startY: y,
+      didDrawPage: (data: any) => {
+        // Footer with page number
+        doc.text(
+          `Page ${data.pageNumber} / ${data.pageCount}`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: "center" }
+        );
+      },
+    });
+
+    doc.save("historique-ventes.pdf");
+    toast.success("PDF généré");
+  };
 
   const canPrint = (sale: any) => {
     if (role === "Administrateur" || role === "Gérant") return true;
@@ -107,15 +174,6 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     }
   };
 
-  const filteredSales = useMemo(() => {
-    if (!sales) return [];
-    return sales.filter(
-      (s) =>
-        s.number.toLowerCase().includes(search.toLowerCase()) ||
-        s.client_name?.toLowerCase().includes(search.toLowerCase()),
-    );
-  }, [sales, search]);
-
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -144,13 +202,22 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
                 className="pl-10"
               />
             </div>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["ventes", "history"] })}
-            >
-              <RefreshCcw className="h-4 w-4" /> Réinitialiser
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={handleExportPDF}
+              >
+                <FileText className="h-4 w-4" /> Exporter PDF
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-4 w-4" /> Imprimer
+              </Button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-auto border rounded-xl">
@@ -173,14 +240,14 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
                       Chargement...
                     </TableCell>
                   </TableRow>
-                ) : filteredSales.length === 0 ? (
+                ) : paginatedSales.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center">
                       Aucune vente trouvée
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSales.map((s) => (
+                  paginatedSales.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.number}</TableCell>
                       <TableCell>{new Date(s.created_at).toLocaleDateString()}</TableCell>
@@ -228,6 +295,30 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          <div className="flex items-center justify-between p-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              Affichage {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredSales.length)} sur {filteredSales.length} ventes
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>{"<<"}</Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>{"<"}</Button>
+              <span className="text-sm">{currentPage} / {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>{">"}</Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>{">>"}</Button>
+              
+              <select 
+                className="ml-4 border rounded p-1 text-sm"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                {[10, 25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+              </select>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

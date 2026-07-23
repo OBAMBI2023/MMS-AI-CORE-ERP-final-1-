@@ -83,6 +83,8 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
   const { roleId } = permissionsQuery.data || { roleId: null };
   const userId = userData?.data?.user?.id;
   const canDelete = deletePermission ? useActionPermission(deletePermission) : true;
+  const canCreate = entityName ? useActionPermission(`${entityName}.create`) : true;
+  const canEdit = entityName ? useActionPermission(`${entityName}.edit`) : true;
 
   const { data = [], isLoading } = useQuery({
     queryKey: [table],
@@ -138,12 +140,14 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
         </div>
         <div className="flex items-center gap-3">
           {renderActions && renderActions(filtered)}
-          <button
-            onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" /> Nouveau {singular.toLowerCase()}
-          </button>
+          {canCreate && (
+              <button
+                onClick={() => setCreating(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" /> Nouveau {singular.toLowerCase()}
+              </button>
+          )}
         </div>
       </div>
 
@@ -191,13 +195,15 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
                   ))}
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setEditing(row)}
-                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
-                        aria-label="Modifier"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => setEditing(row)}
+                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+                          aria-label="Modifier"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
                       {canDelete && (
                         <button
                           onClick={() => {

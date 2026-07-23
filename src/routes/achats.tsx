@@ -48,6 +48,8 @@ function AchatsPage() {
   const { roleId } = permissionsQuery.data || { roleId: null };
   const userId = userData?.data?.user?.id;
   const canDeleteAchat = useActionPermission("achats.delete");
+  const canCreateAchat = useActionPermission("achats.create");
+  const canExportAchat = useActionPermission("achats.export");
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["achats"],
@@ -136,18 +138,22 @@ function AchatsPage() {
             />
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            <button
-              onClick={() => exportPDF(filtered)}
-              className="inline-flex items-center gap-2 rounded-xl bg-white border border-gray-300 text-gray-700 px-4 py-2 text-sm font-medium hover:text-blue-600 hover:border-blue-600 transition-colors"
-            >
-              <FileText className="h-4 w-4" /> Exporter PDF
-            </button>
-            <button
-              onClick={() => setCreating(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-            >
-              <Plus className="h-4 w-4" /> Nouvel achat
-            </button>
+            {canExportAchat && (
+                <button
+                onClick={() => exportPDF(filtered)}
+                className="inline-flex items-center gap-2 rounded-xl bg-white border border-gray-300 text-gray-700 px-4 py-2 text-sm font-medium hover:text-blue-600 hover:border-blue-600 transition-colors"
+                >
+                <FileText className="h-4 w-4" /> Exporter PDF
+                </button>
+            )}
+            {canCreateAchat && (
+                <button
+                onClick={() => setCreating(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+                >
+                <Plus className="h-4 w-4" /> Nouvel achat
+                </button>
+            )}
           </div>
         </div>
 

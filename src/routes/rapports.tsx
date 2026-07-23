@@ -353,18 +353,20 @@ function RapportsPage() {
           <Button variant="outline" size="icon" className="rounded-xl">
             <Sun className="h-4 w-4" />
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="rounded-xl gap-2">
-                <Download className="h-4 w-4" /> Exporter
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportPDF()}>PDF</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportExcel()}>Excel (.xlsx)</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportCSV()}>CSV</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canExport && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="rounded-xl gap-2">
+                  <Download className="h-4 w-4" /> Exporter
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportPDF()}>PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportExcel()}>Excel (.xlsx)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportCSV()}>CSV</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

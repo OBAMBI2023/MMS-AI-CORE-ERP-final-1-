@@ -11,6 +11,7 @@ import {
 import { FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { useActionPermission } from "@/hooks/use-action-permission";
 
 interface Depense {
   id: string;
@@ -76,6 +77,7 @@ export const Route = createFileRoute("/depenses")({
 function DepensesPage() {
   const today = new Date().toISOString().slice(0, 10);
   const { settings, logoUrl } = useCompanySettings();
+  const canExport = useActionPermission("depenses.export");
 
   const exportPDF = async (data: Depense[]) => {
     if (data.length === 0) {
@@ -126,12 +128,14 @@ function DepensesPage() {
         deletePermission="depenses.delete"
         entityName="depenses"
         renderActions={(data) => (
-          <button
-            onClick={() => exportPDF(data)}
-            className="inline-flex items-center gap-2 rounded-xl bg-white border border-gray-300 text-gray-700 px-4 py-2 text-sm font-medium hover:text-blue-600 hover:border-blue-600 transition-colors"
-          >
-            <FileText className="h-4 w-4" /> Exporter PDF
-          </button>
+          canExport && (
+            <button
+              onClick={() => exportPDF(data)}
+              className="inline-flex items-center gap-2 rounded-xl bg-white border border-gray-300 text-gray-700 px-4 py-2 text-sm font-medium hover:text-blue-600 hover:border-blue-600 transition-colors"
+            >
+              <FileText className="h-4 w-4" /> Exporter PDF
+            </button>
+          )
         )}
       />
     </AppShell>
