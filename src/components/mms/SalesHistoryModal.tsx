@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useActionPermission } from "@/hooks/use-action-permission";
+import { logAction } from "@/lib/audit.server";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 
@@ -64,15 +66,14 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     },
   });
 
-  const { role } = permissionsQuery.data || { permissions: [], role: null };
+  const { role, roleId } = permissionsQuery.data || { permissions: [], role: null, roleId: null };
+  const canDeleteSale = useActionPermission("ventes.delete");
 
   const canPrint = (sale: any) => {
     if (role === "Administrateur" || role === "Gérant") return true;
     if (role === "Caissier" && sale.user_id === userId) return true;
     return false;
   };
-
-  const canEditOrDelete = role === "Administrateur";
 
   const handlePrint = (sale: any) => {
     const doc = new jsPDF({ format: "a7", unit: "mm" });
@@ -94,11 +95,12 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
   };
 
   const handleDelete = async () => {
-    if (!saleToDelete) return;
+    if (!saleToDelete || !userId) return;
     const { error } = await supabase.from("ventes").delete().eq("id", saleToDelete.id);
     if (error) {
       toast.error("Erreur lors de la suppression");
     } else {
+      await logAction(userId, roleId, "delete", "ventes", { sale_number: saleToDelete.number });
       toast.success("Vente supprimée");
       queryClient.invalidateQueries({ queryKey: ["ventes", "history"] });
       setSaleToDelete(null);
@@ -198,7 +200,7 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
                             <Printer className="h-4 w-4" />
                           </Button>
                         )}
-                        {canEditOrDelete && (
+                        {canDeleteSale && (
                           <>
                             <Button
                               variant="ghost"

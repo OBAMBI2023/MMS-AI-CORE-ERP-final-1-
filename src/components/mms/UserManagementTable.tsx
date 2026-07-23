@@ -31,10 +31,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useActionPermission } from "@/hooks/use-action-permission";
+import { logAction } from "@/lib/audit.server";
 
 export function UserManagement() {
   const qc = useQueryClient();
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [userToDeleteName, setUserToDeleteName] = useState<string | null>(null);
+  const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
+  const permissionsQuery = usePermissions();
+  const { roleId } = permissionsQuery.data || { roleId: null };
+  const userId = userData?.data?.user?.id;
+  const canDeleteUser = useActionPermission("users.delete");
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["users"],
@@ -50,10 +59,14 @@ export function UserManagement() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
+      if (userId && userToDeleteName) {
+        await logAction(userId, roleId, "delete", "users", { user_name: userToDeleteName });
+      }
       qc.invalidateQueries({ queryKey: ["users"] });
       toast.success("Utilisateur supprimé");
       setUserToDelete(null);
+      setUserToDeleteName(null);
     },
     onError: (error: any) => {
       toast.error(error.message || "Erreur lors de la suppression");
@@ -166,12 +179,17 @@ export function UserManagement() {
                         )}
                         {user.status === "actif" ? "Désactiver" : "Activer"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => setUserToDelete(user.id)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" /> Supprimer
-                      </DropdownMenuItem>
+                      {canDeleteUser && (
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => {
+                                setUserToDelete(user.id);
+                                setUserToDeleteName(user.full_name);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Supprimer
+                          </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -181,7 +199,7 @@ export function UserManagement() {
         </Table>
       </div>
 
-      <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+      <AlertDialog open={!!userToDelete} onOpenChange={() => {setUserToDelete(null); setUserToDeleteName(null);}}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>

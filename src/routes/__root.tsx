@@ -113,7 +113,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           (Array.isArray(permissions) && permissions.includes(requiredPermission));
 
         if (!isAuthorized) {
-          throw redirect({ to: "/403" });
+          throw redirect({ to: "/" });
         }
       }
     }

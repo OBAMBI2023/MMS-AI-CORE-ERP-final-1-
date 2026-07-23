@@ -53,6 +53,8 @@ function ClientsPage() {
         columns={columns}
         searchFields={["name", "phone", "email"]}
         orderBy={{ column: "created_at", ascending: false }}
+        deletePermission="clients.delete"
+        entityName="clients"
       />
     </AppShell>
   );

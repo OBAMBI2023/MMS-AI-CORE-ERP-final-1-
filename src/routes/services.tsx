@@ -67,6 +67,8 @@ function ServicesPage() {
         searchFields={["name", "category"]}
         orderBy={{ column: "created_at", ascending: false }}
         defaultValues={{ category: "Impression", unit: "unité", active: true } as Partial<Service>}
+        deletePermission="services.delete"
+        entityName="services"
       />
     </AppShell>
   );

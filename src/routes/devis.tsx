@@ -12,6 +12,9 @@ import { generateDevisPDF } from "@/lib/mms/pdf-generator";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useActionPermission } from "@/hooks/use-action-permission";
+import { logAction } from "@/lib/audit.server";
 
 interface Devis {
   id: string;
@@ -49,6 +52,12 @@ function DevisPage() {
   const [q, setQ] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
+  const permissionsQuery = usePermissions();
+  const { roleId } = permissionsQuery.data || { roleId: null };
+  const userId = userData?.data?.user?.id;
+  const canDeleteDevis = useActionPermission("devis.delete");
+
   const downloadPDF = async (devis: Devis) => {
     const { data: items, error } = await supabase
       .from("devis_items")
@@ -117,11 +126,15 @@ function DevisPage() {
   });
 
   const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("devis").delete().eq("id", id);
+    mutationFn: async (devis: Devis) => {
+      const { error } = await supabase.from("devis").delete().eq("id", devis.id);
       if (error) throw error;
+      return devis;
     },
-    onSuccess: () => {
+    onSuccess: async (devis) => {
+      if (userId) {
+        await logAction(userId, roleId, "delete", "devis", { devis_number: devis.number });
+      }
       toast.success("Devis supprimé");
       qc.invalidateQueries({ queryKey: ["devis"] });
     },
@@ -235,12 +248,14 @@ function DevisPage() {
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={() => confirm("Supprimer ce devis ?") && del.mutate(d.id)}
-                            className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {canDeleteDevis && (
+                            <button
+                                onClick={() => confirm("Supprimer ce devis ?") && del.mutate(d)}
+                                className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

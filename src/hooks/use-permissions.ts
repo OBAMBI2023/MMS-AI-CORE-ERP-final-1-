@@ -15,6 +15,7 @@ export function usePermissions() {
         .select(
           `
           roles(
+            id,
             name,
             role_permissions(
               permissions(code)
@@ -28,6 +29,7 @@ export function usePermissions() {
       if (error || !data) return { permissions: [], role: null };
 
       const roleName = data.roles?.name || null;
+      const roleId = data.roles?.id || null;
 
       // Mode de récupération côté client : Si Administrateur, accorder toutes les permissions
       if (roleName === "Administrateur") {
@@ -35,12 +37,14 @@ export function usePermissions() {
         return {
           permissions: allPerms?.map((p) => p.code) || [],
           role: roleName,
+          roleId: roleId,
         };
       }
 
       return {
         permissions: data.roles?.role_permissions?.map((rp) => rp.permissions?.code) || [],
         role: roleName,
+        roleId: roleId,
       };
     },
   });

@@ -15,6 +15,9 @@ import {
   renderAchatsTotals,
 } from "@/lib/mms/pdf-achats-template";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useActionPermission } from "@/hooks/use-action-permission";
+import { logAction } from "@/lib/audit.server";
 
 interface Achat {
   id: string;
@@ -40,6 +43,11 @@ function AchatsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const { settings, logoUrl } = useCompanySettings();
+  const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
+  const permissionsQuery = usePermissions();
+  const { roleId } = permissionsQuery.data || { roleId: null };
+  const userId = userData?.data?.user?.id;
+  const canDeleteAchat = useActionPermission("achats.delete");
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["achats"],
@@ -92,11 +100,15 @@ function AchatsPage() {
   };
 
   const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("achats").delete().eq("id", id);
+    mutationFn: async (achat: Achat) => {
+      const { error } = await supabase.from("achats").delete().eq("id", achat.id);
       if (error) throw error;
+      return achat;
     },
-    onSuccess: () => {
+    onSuccess: async (achat) => {
+      if (userId) {
+        await logAction(userId, roleId, "delete", "achats", { achat_number: achat.number });
+      }
       toast.success("Achat supprimé");
       qc.invalidateQueries({ queryKey: ["achats"] });
     },
@@ -182,12 +194,14 @@ function AchatsPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => confirm("Supprimer cet achat ?") && del.mutate(d.id)}
-                          className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canDeleteAchat && (
+                            <button
+                                onClick={() => confirm("Supprimer cet achat ?") && del.mutate(d)}
+                                className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        )}
                       </div>
                     </td>
                   </tr>

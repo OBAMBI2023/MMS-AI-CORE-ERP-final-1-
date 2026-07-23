@@ -16,9 +16,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useActionPermission } from "@/hooks/use-action-permission";
+import { logAction } from "@/lib/audit.server";
 
 export function RolesManagement() {
   const qc = useQueryClient();
+  const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
+  const permissionsQuery = usePermissions();
+  const { roleId } = permissionsQuery.data || { roleId: null };
+  const userId = userData?.data?.user?.id;
+  const canDeleteRole = useActionPermission("roles.delete");
+
   const { data: roles, isLoading } = useQuery({
     queryKey: ["roles"],
     queryFn: async () => {
@@ -40,11 +49,15 @@ export function RolesManagement() {
   });
 
   const deleteRole = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("roles").delete().eq("id", id);
+    mutationFn: async (role: any) => {
+      const { error } = await supabase.from("roles").delete().eq("id", role.id);
       if (error) throw error;
+      return role;
     },
-    onSuccess: () => {
+    onSuccess: async (role) => {
+      if (userId) {
+        await logAction(userId, roleId, "delete", "roles", { role_name: role.name });
+      }
       toast.success("Rôle supprimé");
       qc.invalidateQueries({ queryKey: ["roles"] });
     },
@@ -70,16 +83,18 @@ export function RolesManagement() {
             </div>
             <div className="flex gap-1">
               <RoleDialog role={role} permissions={allPermissions || []} />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive/90"
-                onClick={() => {
-                  if (confirm("Supprimer ce rôle ?")) deleteRole.mutate(role.id);
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {canDeleteRole && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive/90"
+                    onClick={() => {
+                    if (confirm("Supprimer ce rôle ?")) deleteRole.mutate(role);
+                    }}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         ))}

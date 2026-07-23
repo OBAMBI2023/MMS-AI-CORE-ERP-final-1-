@@ -4,6 +4,9 @@ import { Plus, Search, Pencil, Trash2, X, Loader2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useActionPermission } from "@/hooks/use-action-permission";
+import { logAction } from "@/lib/audit.server";
 
 // Dynamic table access — cast client so table names typed as string are accepted.
 const db = supabase as unknown as {
@@ -51,6 +54,8 @@ export interface ResourceTableProps<T extends { id: string }> {
   orderBy?: { column: string; ascending?: boolean };
   defaultValues?: Partial<T>;
   renderActions?: (data: T[]) => ReactNode;
+  deletePermission?: string;
+  entityName?: string;
 }
 
 export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
@@ -66,11 +71,18 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
     orderBy,
     defaultValues = {},
     renderActions,
+    deletePermission,
+    entityName,
   } = props;
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<T | null>(null);
   const [creating, setCreating] = useState(false);
+  const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
+  const permissionsQuery = usePermissions();
+  const { roleId } = permissionsQuery.data || { roleId: null };
+  const userId = userData?.data?.user?.id;
+  const canDelete = deletePermission ? useActionPermission(deletePermission) : true;
 
   const { data = [], isLoading } = useQuery({
     queryKey: [table],
@@ -97,11 +109,15 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
   }, [data, q, searchFields]);
 
   const delMut = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await db.from(table).delete().eq("id", id);
+    mutationFn: async (row: T) => {
+      const { error } = await db.from(table).delete().eq("id", row.id);
       if (error) throw error;
+      return row;
     },
-    onSuccess: () => {
+    onSuccess: async (row) => {
+      if (userId && entityName) {
+        await logAction(userId, roleId, "delete", entityName, { id: row.id });
+      }
       toast.success(`${singular} supprimé`);
       qc.invalidateQueries({ queryKey: [table] });
     },
@@ -182,16 +198,18 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Supprimer ce ${singular.toLowerCase()} ?`))
-                            delMut.mutate(row.id);
-                        }}
-                        className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                        aria-label="Supprimer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Supprimer ce ${singular.toLowerCase()} ?`))
+                              delMut.mutate(row);
+                          }}
+                          className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                          aria-label="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

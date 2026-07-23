@@ -123,6 +123,8 @@ function DepensesPage() {
         defaultValues={
           { category: "Général", paid_at: today, payment_method: "Espèces" } as Partial<Depense>
         }
+        deletePermission="depenses.delete"
+        entityName="depenses"
         renderActions={(data) => (
           <button
             onClick={() => exportPDF(data)}
