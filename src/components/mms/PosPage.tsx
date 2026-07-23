@@ -4,7 +4,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { makeNumber } from "@/lib/mms/format";
+import { makeNumber, formatCurrency, formatNumber } from "@/lib/mms/format";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -390,7 +390,7 @@ export function PosPage() {
                   <div className="font-medium text-xs md:text-sm leading-tight">{s.name}</div>
                   <div className="mt-1 md:mt-2 flex items-baseline justify-between">
                     <span className="text-primary font-semibold text-xs md:text-sm">
-                      {formatFCFA(s.price)}
+                      {formatCurrency(s.price)}
                     </span>
                     <span className="text-[9px] md:text-[10px] uppercase tracking-wide text-muted-foreground">
                       / {s.unit}
@@ -455,7 +455,7 @@ export function PosPage() {
                         <div className="min-w-0">
                           <div className="text-xs md:text-sm font-medium truncate">{i.name}</div>
                           <div className="text-[10px] md:text-xs text-muted-foreground">
-                            {formatFCFA(i.price)} / {i.unit}
+                            {formatCurrency(i.price)} / {i.unit}
                           </div>
                         </div>
                         <button
@@ -488,7 +488,7 @@ export function PosPage() {
                           </button>
                         </div>
                         <div className="text-xs md:text-sm font-semibold text-primary">
-                          {formatFCFA(i.qty * i.price)}
+                          {formatCurrency(i.qty * i.price)}
                         </div>
                       </div>
                     </motion.li>
@@ -501,7 +501,7 @@ export function PosPage() {
           <div className="border-t border-border px-4 md:px-5 py-3 md:py-4 space-y-2 md:space-y-3 shrink-0">
             <div className="flex items-center justify-between text-xs md:text-sm">
               <span className="text-muted-foreground">Sous-total</span>
-              <span className="font-medium">{formatFCFA(subTotal)}</span>
+              <span className="font-medium">{formatCurrency(subTotal)}</span>
             </div>
             <div className="flex items-center justify-between text-xs md:text-sm">
               <span className="text-muted-foreground">Remise</span>
@@ -516,7 +516,7 @@ export function PosPage() {
             </div>
             <div className="flex items-center justify-between pt-1.5 md:pt-2 border-t border-border">
               <span className="text-xs md:text-sm font-medium">Total</span>
-              <span className="text-lg md:text-xl font-bold text-primary">{formatFCFA(total)}</span>
+              <span className="text-lg md:text-xl font-bold text-primary">{formatCurrency(total)}</span>
             </div>
 
             <div className="grid grid-cols-4 gap-1 pt-0.5 md:pt-1">
@@ -546,7 +546,7 @@ export function PosPage() {
               onClick={validate}
               className="w-full mt-1.5 md:mt-2 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-gradient-to-br from-primary to-primary-glow text-white font-semibold shadow-lg shadow-primary/30 disabled:opacity-40 disabled:shadow-none hover:scale-[1.01] transition text-sm md:text-base"
             >
-              {saving ? "Enregistrement..." : `Encaisser ${formatFCFA(total)}`}
+              {saving ? "Enregistrement..." : `Encaisser ${formatCurrency(total)}`}
             </button>
           </div>
         </aside>
@@ -705,9 +705,9 @@ function ReceiptModal({
                     </tr>
                     <tr>
                       <td style={{ paddingLeft: 8 }}>
-                        {i.qty} x {formatNum(i.price)}
+                        {i.qty} x {formatNumber(i.price)}
                       </td>
-                      <td style={{ textAlign: "right" }}>{formatNum(i.qty * i.price)}</td>
+                      <td style={{ textAlign: "right" }}>{formatNumber(i.qty * i.price)}</td>
                     </tr>
                   </Fragment>
                 ))}
@@ -716,12 +716,12 @@ function ReceiptModal({
             <div className="sep" style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
             <div className="row" style={{ display: "flex", justifyContent: "space-between" }}>
               <span>Sous-total</span>
-              <span>{formatNum(ticket.subTotal)}</span>
+              <span>{formatNumber(ticket.subTotal)}</span>
             </div>
             {ticket.discount > 0 && (
               <div className="row" style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>Remise</span>
-                <span>-{formatNum(ticket.discount)}</span>
+                <span>-{formatNumber(ticket.discount)}</span>
               </div>
             )}
             <div
@@ -735,7 +735,7 @@ function ReceiptModal({
               }}
             >
               <span>TOTAL FCFA</span>
-              <span>{formatNum(ticket.total)}</span>
+              <span>{formatNumber(ticket.total)}</span>
             </div>
             <div
               className="row"
@@ -774,12 +774,4 @@ function ReceiptModal({
       </motion.div>
     </motion.div>
   );
-}
-
-// ---------------- Utils ----------------
-function formatNum(n: number) {
-  return n.toLocaleString("fr-FR");
-}
-function formatFCFA(n: number) {
-  return formatNum(n) + " FCFA";
 }

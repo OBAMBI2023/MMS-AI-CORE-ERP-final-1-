@@ -50,6 +50,7 @@ export interface ResourceTableProps<T extends { id: string }> {
   searchFields?: string[];
   orderBy?: { column: string; ascending?: boolean };
   defaultValues?: Partial<T>;
+  renderActions?: (data: T[]) => ReactNode;
 }
 
 export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
@@ -64,6 +65,7 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
     searchFields = [],
     orderBy,
     defaultValues = {},
+    renderActions,
   } = props;
   const qc = useQueryClient();
   const [q, setQ] = useState("");
@@ -108,8 +110,8 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={q}
@@ -118,12 +120,15 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
             className="w-full rounded-xl bg-muted/60 border border-border pl-10 pr-4 py-2 text-sm outline-none focus:border-primary/40"
           />
         </div>
-        <button
-          onClick={() => setCreating(true)}
-          className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" /> Nouveau {singular.toLowerCase()}
-        </button>
+        <div className="flex items-center gap-3">
+          {renderActions && renderActions(filtered)}
+          <button
+            onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" /> Nouveau {singular.toLowerCase()}
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border bg-card overflow-x-auto w-full">

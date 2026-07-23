@@ -17,7 +17,7 @@ import {
 import { useState, useMemo } from "react";
 import { AppShell } from "@/components/mms/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA } from "@/lib/mms/format";
+import { formatCurrency } from "@/lib/mms/format";
 import {
   Select,
   SelectContent,
@@ -327,8 +327,8 @@ function StatCard({
   color: string;
 }) {
   const isCurrency = ["Chiffre d'affaires", "Dépenses", "Achats", "Bénéfice"].includes(label);
-  const formattedValue = isCurrency ? formatFCFA(value) : value;
-  const formattedDiff = isCurrency ? formatFCFA(Math.abs(compare.diff)) : Math.abs(compare.diff);
+  const formattedValue = isCurrency ? formatCurrency(value) : value;
+  const formattedDiff = isCurrency ? formatCurrency(Math.abs(compare.diff)) : Math.abs(compare.diff);
 
   return (
     <motion.div

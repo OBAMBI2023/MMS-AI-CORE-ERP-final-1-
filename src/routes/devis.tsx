@@ -7,7 +7,7 @@ import { Plus, Pencil, Trash2, Loader2, Search, FileDown } from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, formatDate } from "@/lib/mms/format";
+import { formatCurrency, formatDate } from "@/lib/mms/format";
 import { generateDevisPDF } from "@/lib/mms/pdf-generator";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { Button } from "@/components/ui/button";
@@ -211,7 +211,7 @@ function DevisPage() {
                         </select>
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-primary">
-                        {formatFCFA(Number(d.total))}
+                        {formatCurrency(Number(d.total))}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">

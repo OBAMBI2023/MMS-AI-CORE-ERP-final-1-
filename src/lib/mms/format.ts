@@ -1,8 +1,15 @@
-export function formatFCFA(n: number): string {
+export function formatCurrency(amount: number): string {
+  // Use a regular space instead of the non-breaking space (U+202F or U+00A0) 
+  // to ensure compatibility with the PDF generator, which can struggle with these characters.
   return (
-    new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Math.round(n || 0)) +
-    " FCFA"
+    new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 })
+      .format(Math.round(amount || 0))
+      .replace(/\u202F|\u00A0/g, " ") + " FCFA"
   );
+}
+
+export function formatNumber(n: number): string {
+  return n.toLocaleString("fr-FR");
 }
 
 export function formatDate(d: string | Date | null | undefined): string {

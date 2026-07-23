@@ -4,7 +4,7 @@ import { X, Plus, Trash2, Loader2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, makeNumber } from "@/lib/mms/format";
+import { formatCurrency, makeNumber } from "@/lib/mms/format";
 
 export interface LineItem {
   id?: string;
@@ -357,7 +357,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                     className="col-span-2 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40"
                   />
                   <div className="col-span-1 text-right text-sm font-medium">
-                    {formatFCFA(Number(it.qty || 0) * Number(it.price || 0))}
+                    {formatCurrency(Number(it.qty || 0) * Number(it.price || 0))}
                   </div>
                   <div className="col-span-1 text-right">
                     <button
@@ -391,7 +391,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
             <div className="rounded-xl bg-muted/40 p-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Sous-total</span>
-                <span>{formatFCFA(subtotal)}</span>
+                <span>{formatCurrency(subtotal)}</span>
               </div>
               {headerTable === "devis" && (
                 <div className="flex justify-between items-center">
@@ -407,7 +407,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
               )}
               <div className="flex justify-between pt-2 border-t border-border font-semibold text-base">
                 <span>Total</span>
-                <span className="text-primary">{formatFCFA(total)}</span>
+                <span className="text-primary">{formatCurrency(total)}</span>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/mms/AppShell";
 import { ResourceTable, type FieldDef, type ColumnDef } from "@/components/mms/ResourceTable";
-import { formatFCFA } from "@/lib/mms/format";
+import { formatCurrency } from "@/lib/mms/format";
 
 interface Service {
   id: string;
@@ -36,7 +36,7 @@ const columns: ColumnDef<Service>[] = [
   { header: "Unité", cell: (r) => r.unit },
   {
     header: "Prix",
-    cell: (r) => <span className="font-semibold text-primary">{formatFCFA(Number(r.price))}</span>,
+    cell: (r) => <span className="font-semibold text-primary">{formatCurrency(Number(r.price))}</span>,
   },
 ];
 

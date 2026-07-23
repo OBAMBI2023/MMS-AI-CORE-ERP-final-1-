@@ -50,7 +50,7 @@ import { DashboardEmptyState } from "@/components/mms/dashboard/DashboardEmptySt
 // TODO: Réactiver la recherche globale plus tard
 // import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
-import { formatFCFA, formatDate, formatDateTime } from "@/lib/mms/format";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/mms/format";
 
 const PIE_COLORS = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4", "#6366f1"];
 
@@ -156,7 +156,7 @@ function Dashboard() {
             <DashboardKpiCard
               index={0}
               title="Chiffre d'affaires"
-              value={formatFCFA(data.kpis.revenue.value)}
+              value={formatCurrency(data.kpis.revenue.value)}
               icon={Wallet}
               route="/ventes"
               trend={data.kpis.revenue.trend}
@@ -166,7 +166,7 @@ function Dashboard() {
             <DashboardKpiCard
               index={1}
               title="Dépenses"
-              value={formatFCFA(data.kpis.depenses.value)}
+              value={formatCurrency(data.kpis.depenses.value)}
               icon={Receipt}
               route="/depenses"
               trend={data.kpis.depenses.trend}
@@ -176,7 +176,7 @@ function Dashboard() {
             <DashboardKpiCard
               index={2}
               title="Achats"
-              value={formatFCFA(data.kpis.achats.value)}
+              value={formatCurrency(data.kpis.achats.value)}
               icon={Package}
               route="/achats"
               trend={data.kpis.achats.trend}
@@ -186,7 +186,7 @@ function Dashboard() {
             <DashboardKpiCard
               index={3}
               title="Bénéfice"
-              value={formatFCFA(data.kpis.benefice.value)}
+              value={formatCurrency(data.kpis.benefice.value)}
               icon={TrendingUp}
               route="/rapports"
               trend={data.kpis.benefice.trend}
@@ -315,7 +315,7 @@ function Dashboard() {
                           tickLine={false}
                           tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                         />
-                        <Tooltip formatter={(v: number) => formatFCFA(v)} />
+                        <Tooltip formatter={(v: number) => formatCurrency(v)} />
                         <Line
                           type="monotone"
                           dataKey="ca"
@@ -356,7 +356,7 @@ function Dashboard() {
                             <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v: number) => formatFCFA(v)} />
+                        <Tooltip formatter={(v: number) => formatCurrency(v)} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>
@@ -385,7 +385,7 @@ function Dashboard() {
                           tickLine={false}
                           tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                         />
-                        <Tooltip formatter={(v: number) => formatFCFA(v)} />
+                        <Tooltip formatter={(v: number) => formatCurrency(v)} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         <Bar dataKey="ca" name="Revenus" fill="#2563eb" radius={[4, 4, 0, 0]} />
                         <Bar
@@ -426,7 +426,7 @@ function Dashboard() {
                             <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v: number) => formatFCFA(v)} />
+                        <Tooltip formatter={(v: number) => formatCurrency(v)} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>
@@ -446,7 +446,7 @@ function Dashboard() {
                         tickLine={false}
                         tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                       />
-                      <Tooltip formatter={(v: number) => formatFCFA(v)} />
+                      <Tooltip formatter={(v: number) => formatCurrency(v)} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Area
                         type="monotone"
@@ -519,7 +519,7 @@ function Dashboard() {
                               </div>
                               {item.amount !== undefined && (
                                 <span className="shrink-0 font-semibold text-sm">
-                                  {formatFCFA(item.amount)}
+                                  {formatCurrency(item.amount)}
                                 </span>
                               )}
                             </a>
@@ -555,7 +555,7 @@ function Dashboard() {
                                 </p>
                               </div>
                               <span className="shrink-0 font-semibold text-sm">
-                                {formatFCFA(Number(v.total))}
+                                {formatCurrency(Number(v.total))}
                               </span>
                             </Link>
                           </li>
@@ -590,7 +590,7 @@ function Dashboard() {
                                 </p>
                               </div>
                               <span className="shrink-0 font-semibold text-sm">
-                                {formatFCFA(Number(a.total))}
+                                {formatCurrency(Number(a.total))}
                               </span>
                             </Link>
                           </li>
@@ -625,7 +625,7 @@ function Dashboard() {
                                 </p>
                               </div>
                               <span className="shrink-0 font-semibold text-sm">
-                                {formatFCFA(Number(d.amount))}
+                                {formatCurrency(Number(d.amount))}
                               </span>
                             </Link>
                           </li>

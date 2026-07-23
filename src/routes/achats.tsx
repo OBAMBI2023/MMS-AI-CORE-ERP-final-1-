@@ -3,11 +3,18 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Search, FileText } from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, formatDateTime } from "@/lib/mms/format";
+import { formatCurrency, formatDateTime } from "@/lib/mms/format";
+import { jsPDF } from "jspdf";
+import {
+  renderAchatsHeader,
+  renderAchatsTable,
+  renderAchatsTotals,
+} from "@/lib/mms/pdf-achats-template";
+import { useCompanySettings } from "@/hooks/use-company-settings";
 
 interface Achat {
   id: string;
@@ -32,6 +39,7 @@ function AchatsPage() {
   const [q, setQ] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const { settings, logoUrl } = useCompanySettings();
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["achats"],
@@ -44,6 +52,44 @@ function AchatsPage() {
       return (data ?? []) as Achat[];
     },
   });
+
+  const exportPDF = async (data: Achat[]) => {
+    if (data.length === 0) {
+      toast.error("Aucun achat à exporter.");
+      return;
+    }
+    if (!settings) {
+      toast.error("Paramètres de l'entreprise non chargés.");
+      return;
+    }
+
+    const doc = new jsPDF();
+    const total = data.reduce((acc, d) => acc + Number(d.total), 0);
+
+    const startY = await renderAchatsHeader(
+      doc,
+      settings,
+      logoUrl,
+      data.length,
+      formatCurrency(total)
+    );
+
+    renderAchatsTable(
+      doc,
+      data.map((d) => ({
+        date: formatDateTime(d.created_at),
+        reference: d.number,
+        fournisseur: d.fournisseur_name ?? "-",
+        amount: formatCurrency(Number(d.total)),
+      })),
+      startY + 5,
+    );
+
+    renderAchatsTotals(doc, formatCurrency(total));
+
+    doc.save(`Achats_${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("PDF généré.");
+  };
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -77,12 +123,20 @@ function AchatsPage() {
               className="w-full rounded-xl bg-muted/60 border border-border pl-10 pr-4 py-2 text-sm outline-none focus:border-primary/40"
             />
           </div>
-          <button
-            onClick={() => setCreating(true)}
-            className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" /> Nouvel achat
-          </button>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={() => exportPDF(filtered)}
+              className="inline-flex items-center gap-2 rounded-xl bg-white border border-gray-300 text-gray-700 px-4 py-2 text-sm font-medium hover:text-blue-600 hover:border-blue-600 transition-colors"
+            >
+              <FileText className="h-4 w-4" /> Exporter PDF
+            </button>
+            <button
+              onClick={() => setCreating(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> Nouvel achat
+            </button>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-border bg-card overflow-x-auto w-full">
@@ -118,7 +172,7 @@ function AchatsPage() {
                       {formatDateTime(d.created_at)}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-primary">
-                      {formatFCFA(Number(d.total))}
+                      {formatCurrency(Number(d.total))}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
