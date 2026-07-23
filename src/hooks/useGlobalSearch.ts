@@ -9,9 +9,11 @@ export const useGlobalSearch = () => {
   const [history, setHistory] = useState<string[]>([]);
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem("search-history");
-    if (savedHistory) {
-      setHistory(JSON.parse(savedHistory));
+    if (typeof window !== "undefined") {
+      const savedHistory = localStorage.getItem("search-history");
+      if (savedHistory) {
+        setHistory(JSON.parse(savedHistory));
+      }
     }
   }, []);
 
@@ -29,7 +31,9 @@ export const useGlobalSearch = () => {
       // Add to history
       const newHistory = [searchQuery, ...history.filter((h) => h !== searchQuery)].slice(0, 5);
       setHistory(newHistory);
-      localStorage.setItem("search-history", JSON.stringify(newHistory));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("search-history", JSON.stringify(newHistory));
+      }
 
       try {
         console.log("Calling globalSearchService.search...");
@@ -49,7 +53,9 @@ export const useGlobalSearch = () => {
 
   const clearHistory = () => {
     setHistory([]);
-    localStorage.removeItem("search-history");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("search-history");
+    }
   };
 
   useEffect(() => {
