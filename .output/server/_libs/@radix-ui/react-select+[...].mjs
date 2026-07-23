@@ -1,10 +1,7 @@
 import { a as __toESM } from "../../_runtime.mjs";
 import { l as require_react_dom, u as require_react } from "../@floating-ui/react-dom+[...].mjs";
-import { a as createSlot, c as require_jsx_runtime, n as Primitive, s as useComposedRefs } from "./react-arrow+[...].mjs";
-import { d as useFocusGuards, f as Portal, h as useId, l as hideOthers, m as DismissableLayer, p as FocusScope, u as ReactRemoveScroll } from "./react-dialog+[...].mjs";
+import { A as useControllableState, C as DismissableLayer, L as require_jsx_runtime, M as useLayoutEffect2, N as createContextScope, O as createSlot, P as useComposedRefs, S as FocusScope, T as Primitive, _ as hideOthers, b as Presence, j as useId, v as ReactRemoveScroll, w as useCallbackRef, x as Portal, y as useFocusGuards } from "./react-alert-dialog+[...].mjs";
 import { t as composeEventHandlers } from "../radix-ui__primitive.mjs";
-import { a as useLayoutEffect2, i as useCallbackRef, o as createContextScope } from "./react-avatar+[...].mjs";
-import { a as Presence, o as useControllableState, r as usePrevious } from "./react-checkbox+[...].mjs";
 import { t as createCollection } from "../radix-ui__react-collection.mjs";
 import { t as useDirection } from "../radix-ui__react-direction.mjs";
 import { _ as Arrow, b as createPopperScope, g as Anchor, v as Content, y as Root2 } from "./react-dropdown-menu+[...].mjs";
@@ -38,6 +35,21 @@ var VisuallyHidden = import_react.forwardRef((props, forwardedRef) => {
 });
 VisuallyHidden.displayName = NAME;
 var Root = VisuallyHidden;
+//#endregion
+//#region node_modules/@radix-ui/react-use-previous/dist/index.mjs
+function usePrevious(value) {
+	const ref = import_react.useRef({
+		value,
+		previous: value
+	});
+	return import_react.useMemo(() => {
+		if (ref.current.value !== value) {
+			ref.current.previous = ref.current.value;
+			ref.current.value = value;
+		}
+		return ref.current.previous;
+	}, [value]);
+}
 //#endregion
 //#region node_modules/@radix-ui/react-select/dist/index.mjs
 var OPEN_KEYS = [

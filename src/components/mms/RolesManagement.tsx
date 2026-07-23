@@ -220,7 +220,7 @@ function RoleDialog({ role, permissions }: { role?: any; permissions: any[] }) {
                     <div key={p.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={p.id}
-                        checked={selectedPermissions.includes(p.id)}
+                        checked={Array.isArray(selectedPermissions) && selectedPermissions.includes(p.id)}
                         onCheckedChange={(checked) => {
                           if (checked) setSelectedPermissions([...selectedPermissions, p.id]);
                           else

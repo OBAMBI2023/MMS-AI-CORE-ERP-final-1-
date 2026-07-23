@@ -8,7 +8,7 @@ export function usePermissions() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return [];
+      if (!user) return { permissions: [], role: null };
 
       const { data, error } = await supabase
         .from("profiles")
@@ -25,15 +25,23 @@ export function usePermissions() {
         .eq("id", user.id)
         .single();
 
-      if (error || !data) return [];
+      if (error || !data) return { permissions: [], role: null };
+
+      const roleName = data.roles?.name || null;
 
       // Mode de récupération côté client : Si Administrateur, accorder toutes les permissions
-      if (data.roles?.name === "Administrateur") {
+      if (roleName === "Administrateur") {
         const { data: allPerms } = await supabase.from("permissions").select("code");
-        return allPerms?.map((p) => p.code) || [];
+        return { 
+          permissions: allPerms?.map((p) => p.code) || [],
+          role: roleName 
+        };
       }
 
-      return data.roles?.role_permissions?.map((rp) => rp.permissions?.code) || [];
+      return { 
+        permissions: data.roles?.role_permissions?.map((rp) => rp.permissions?.code) || [],
+        role: roleName 
+      };
     },
   });
 }

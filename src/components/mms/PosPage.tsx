@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useRef, useState } from "react";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import type { Tables } from "@/integrations/supabase/types";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { makeNumber, formatCurrency, formatNumber } from "@/lib/mms/format";
@@ -33,7 +33,10 @@ import {
 import { Sidebar } from "@/components/mms/Sidebar";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { SidebarContent } from "./SidebarContent";
+import { SidebarContent } from "@/components/mms/SidebarContent";
+import { SalesHistoryModal } from "@/components/mms/SalesHistoryModal";
+import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
+import { History } from "lucide-react";
 
 // ---------------- Types & catalogue ----------------
 type Category = "Impression" | "Copie" | "Reliure" | "Finition" | "Numérique";
@@ -182,8 +185,11 @@ export function PosPage() {
   const [discount, setDiscount] = useState(0);
   const [payment, setPayment] = useState<PayMethod>("Espèces");
   const [checkout, setCheckout] = useState<null | Ticket>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [saleToEdit, setSaleToEdit] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   // Load catalog from database — fallback to hardcoded CATALOG if empty.
   const { data: dbServices } = useQuery({
@@ -274,6 +280,7 @@ export function PosPage() {
       }));
       const { error: e2 } = await supabase.from("vente_items").insert(rows);
       if (e2) throw e2;
+      queryClient.invalidateQueries({ queryKey: ["ventes", "history"] });
       toast.success(`Vente enregistrée (${dbNumber})`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur d'enregistrement";
@@ -340,12 +347,22 @@ export function PosPage() {
                   Imprimerie — services & articles
                 </p>
               </div>
-              <div className="text-[10px] md:text-xs text-muted-foreground">
-                {new Date().toLocaleDateString("fr-FR", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
+              <div className="flex items-center gap-4">
+                <div className="text-[10px] md:text-xs text-muted-foreground">
+                  {new Date().toLocaleDateString("fr-FR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 h-7 md:h-8 text-[10px] md:text-xs"
+                  onClick={() => setShowHistory(true)}
+                >
+                  <History className="h-3.5 w-3.5" /> Historique
+                </Button>
               </div>
             </div>
             <div className="relative">
@@ -565,6 +582,20 @@ export function PosPage() {
           />
         )}
       </AnimatePresence>
+      <SalesHistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} onEdit={(id) => setSaleToEdit(id)} />
+      {!!saleToEdit && (
+        <LineItemsDialog 
+            headerTable="ventes"
+            itemsTable="vente_items"
+            fkColumn="vente_id"
+            partnerTable="clients"
+            partnerLabel="Client"
+            numberPrefix="V"
+            singular="Vente"
+            initialId={saleToEdit}
+            onClose={() => { setSaleToEdit(null); queryClient.invalidateQueries({ queryKey: ["ventes", "history"] }); }}
+        />
+    )}
     </div>
   );
 }

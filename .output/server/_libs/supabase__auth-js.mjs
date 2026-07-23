@@ -1,4 +1,4 @@
-import { _ as __rest } from "./@radix-ui/react-dialog+[...].mjs";
+import { I as __rest } from "./@radix-ui/react-alert-dialog+[...].mjs";
 //#region node_modules/@supabase/auth-js/dist/module/lib/version.js
 var version = "2.110.6";
 //#endregion

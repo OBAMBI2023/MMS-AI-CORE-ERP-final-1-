@@ -1,15 +1,49 @@
 import { a as __toESM } from "../../_runtime.mjs";
 import { a as offset, c as useFloating, i as limitShift, n as flip, o as shift, r as hide, s as size, t as arrow, u as require_react } from "../@floating-ui/react-dom+[...].mjs";
-import { a as createSlot, c as require_jsx_runtime, n as Primitive, r as dispatchDiscreteCustomEvent, s as useComposedRefs, t as Root$1 } from "./react-arrow+[...].mjs";
-import { d as useFocusGuards, f as Portal$1, h as useId, l as hideOthers, m as DismissableLayer, p as FocusScope, u as ReactRemoveScroll } from "./react-dialog+[...].mjs";
+import { A as useControllableState, C as DismissableLayer, E as dispatchDiscreteCustomEvent, L as require_jsx_runtime, M as useLayoutEffect2, N as createContextScope, O as createSlot, P as useComposedRefs, S as FocusScope, T as Primitive, _ as hideOthers, b as Presence, j as useId, v as ReactRemoveScroll, w as useCallbackRef, x as Portal$1, y as useFocusGuards } from "./react-alert-dialog+[...].mjs";
 import { t as composeEventHandlers } from "../radix-ui__primitive.mjs";
-import { a as useLayoutEffect2, i as useCallbackRef, o as createContextScope } from "./react-avatar+[...].mjs";
-import { a as Presence, i as useSize, o as useControllableState } from "./react-checkbox+[...].mjs";
 import { t as createCollection } from "../radix-ui__react-collection.mjs";
 import { t as useDirection } from "../radix-ui__react-direction.mjs";
 import { n as autoUpdate } from "../@floating-ui/dom+[...].mjs";
-//#region node_modules/@radix-ui/react-popper/dist/index.mjs
+import { t as Root$1 } from "../radix-ui__react-arrow.mjs";
+//#region node_modules/@radix-ui/react-use-size/dist/index.mjs
 var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
+function useSize(element) {
+	const [size, setSize] = import_react.useState(void 0);
+	useLayoutEffect2(() => {
+		if (element) {
+			setSize({
+				width: element.offsetWidth,
+				height: element.offsetHeight
+			});
+			const resizeObserver = new ResizeObserver((entries) => {
+				if (!Array.isArray(entries)) return;
+				if (!entries.length) return;
+				const entry = entries[0];
+				let width;
+				let height;
+				if ("borderBoxSize" in entry) {
+					const borderSizeEntry = entry["borderBoxSize"];
+					const borderSize = Array.isArray(borderSizeEntry) ? borderSizeEntry[0] : borderSizeEntry;
+					width = borderSize["inlineSize"];
+					height = borderSize["blockSize"];
+				} else {
+					width = element.offsetWidth;
+					height = element.offsetHeight;
+				}
+				setSize({
+					width,
+					height
+				});
+			});
+			resizeObserver.observe(element, { box: "border-box" });
+			return () => resizeObserver.unobserve(element);
+		} else setSize(void 0);
+	}, [element]);
+	return size;
+}
+//#endregion
+//#region node_modules/@radix-ui/react-popper/dist/index.mjs
 var import_jsx_runtime = require_jsx_runtime();
 var POPPER_NAME = "Popper";
 var [createPopperContext, createPopperScope] = createContextScope(POPPER_NAME);

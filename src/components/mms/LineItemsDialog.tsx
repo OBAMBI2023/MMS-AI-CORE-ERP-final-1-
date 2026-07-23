@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { X, Plus, Trash2, Loader2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, makeNumber } from "@/lib/mms/format";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export interface LineItem {
   id?: string;
@@ -173,10 +173,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
         await db.from(itemsTable).delete().eq(fkColumn, headerId);
       } else {
         payload.number = makeNumber(numberPrefix);
-        console.log("Payload Achats :", payload);
         const ins = await db.from(headerTable).insert(payload).select("id").single();
-        console.log("Insert Data :", ins.data);
-        console.log("Insert Error :", ins.error);
         if (ins.error || !ins.data) throw ins.error ?? new Error("Création échouée");
         headerId = ins.data.id;
       }
@@ -204,33 +201,21 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm grid place-items-center p-4"
-      onClick={onClose}
-    >
-      <motion.form
-        initial={{ scale: 0.95, y: 12 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 12 }}
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          saveMut.mutate();
-        }}
-        className="w-full max-w-3xl rounded-2xl bg-card border border-border shadow-xl"
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h3 className="font-semibold">
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="w-full max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>
             {isEdit ? `Modifier ${singular.toLowerCase()}` : `Nouveau ${singular.toLowerCase()}`}
-          </h3>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-muted">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="p-6 max-h-[75vh] overflow-y-auto space-y-5">
+          </DialogTitle>
+        </DialogHeader>
+        <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveMut.mutate();
+            }}
+            className="space-y-5"
+        >
+        <div className="max-h-[60vh] overflow-y-auto space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">{partnerLabel}</span>
@@ -412,7 +397,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border bg-muted/20">
+        <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
           <button
             type="button"
             onClick={onClose}
@@ -429,7 +414,8 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
             {isEdit ? "Enregistrer" : "Créer"}
           </button>
         </div>
-      </motion.form>
-    </motion.div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
