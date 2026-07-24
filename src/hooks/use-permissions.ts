@@ -12,38 +12,27 @@ export function usePermissions() {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select(
-          `
-          roles(
-            id,
-            name,
-            role_permissions(
-              permissions(code)
-            )
-          )
-        `,
-        )
+        .select("role_id")
         .eq("id", user.id)
         .single();
 
       if (error || !data) return { permissions: [], role: null };
 
-      const roleName = data.roles?.name || null;
-      const roleId = data.roles?.id || null;
+      const roleId = data.role_id;
 
-      // Mode de récupération côté client : Si Administrateur, accorder toutes les permissions
-      if (roleName === "Administrateur") {
-        const { data: allPerms } = await supabase.from("permissions").select("code");
-        return {
-          permissions: allPerms?.map((p) => p.code) || [],
-          role: roleName,
-          roleId: roleId,
-        };
-      }
+      // Get all permissions associated with this user's role
+      const { data: rolePermissions, error: permsError } = await supabase
+        .from("role_permissions")
+        .select(`permissions(code)`)
+        .eq("role_id", roleId);
+
+      if (permsError) return { permissions: [], role: null };
+      
+      const permissions = rolePermissions.map(rp => (rp.permissions as any).code);
 
       return {
-        permissions: data.roles?.role_permissions?.map((rp) => rp.permissions?.code) || [],
-        role: roleName,
+        permissions: permissions,
+        role: null, // role name is no longer directly fetched here, may need adjustment
         roleId: roleId,
       };
     },

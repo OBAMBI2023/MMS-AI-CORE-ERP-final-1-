@@ -3,7 +3,7 @@ import { u as require_react } from "./@floating-ui/react-dom+[...].mjs";
 import { A as useControllableState, C as DismissableLayer, L as require_jsx_runtime, N as createContextScope, P as useComposedRefs, T as Primitive, b as Presence, j as useId, k as createSlottable, x as Portal$1 } from "./@radix-ui/react-alert-dialog+[...].mjs";
 import { t as composeEventHandlers } from "./radix-ui__primitive.mjs";
 import { _ as Arrow, b as createPopperScope, g as Anchor, v as Content, y as Root2 } from "./@radix-ui/react-dropdown-menu+[...].mjs";
-import { h as Root } from "./@radix-ui/react-select+[...].mjs";
+import { g as Root } from "./@radix-ui/react-select+[...].mjs";
 //#region node_modules/@radix-ui/react-tooltip/dist/index.mjs
 var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
 var import_jsx_runtime = require_jsx_runtime();

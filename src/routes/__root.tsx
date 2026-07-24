@@ -11,6 +11,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { hasPermission } from "@/lib/auth";
 import { routePermissions } from "@/lib/route-permissions";
 
 import appCss from "../styles.css?url";
@@ -100,19 +101,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       if (requiredPermission) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("roles(name, role_permissions(permissions(code)))")
+          .select("roles(name)")
           .eq("id", session.user.id)
           .single();
 
         const roleName = profile?.roles?.name;
-        const permissions =
-          profile?.roles?.role_permissions?.map((rp: any) => rp.permissions?.code) || [];
 
-        const isAuthorized =
-          roleName === "Administrateur" ||
-          (Array.isArray(permissions) && permissions.includes(requiredPermission));
+        // Logic fix:
+        // Use the new permission-based check to verify if the user has the required permission.
+        // Admins are always authorized.
+        let isAuthorized = roleName === "Administrateur";
+        if (!isAuthorized) {
+          isAuthorized = await hasPermission(session.user.id, requiredPermission);
+        }
 
         if (!isAuthorized) {
+          console.log("DEBUG: Access denied for", {
+            role: roleName,
+            path: location.pathname,
+            requiredPermission,
+          });
           throw redirect({ to: "/" });
         }
       }

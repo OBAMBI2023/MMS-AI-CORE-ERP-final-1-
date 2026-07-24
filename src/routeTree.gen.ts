@@ -20,7 +20,6 @@ import { Route as FournisseursRouteImport } from './routes/fournisseurs'
 import { Route as DevisRouteImport } from './routes/devis'
 import { Route as DepensesRouteImport } from './routes/depenses'
 import { Route as ClientsRouteImport } from './routes/clients'
-import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AchatsRouteImport } from './routes/achats'
 import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
@@ -80,11 +79,6 @@ const ClientsRoute = ClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AssistantRoute = AssistantRouteImport.update({
-  id: '/assistant',
-  path: '/assistant',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AchatsRoute = AchatsRouteImport.update({
   id: '/achats',
   path: '/achats',
@@ -105,7 +99,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
-  '/assistant': typeof AssistantRoute
   '/clients': typeof ClientsRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
@@ -122,7 +115,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
-  '/assistant': typeof AssistantRoute
   '/clients': typeof ClientsRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
@@ -140,7 +132,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
-  '/assistant': typeof AssistantRoute
   '/clients': typeof ClientsRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
@@ -159,7 +150,6 @@ export interface FileRouteTypes {
     | '/'
     | '/403'
     | '/achats'
-    | '/assistant'
     | '/clients'
     | '/depenses'
     | '/devis'
@@ -176,7 +166,6 @@ export interface FileRouteTypes {
     | '/'
     | '/403'
     | '/achats'
-    | '/assistant'
     | '/clients'
     | '/depenses'
     | '/devis'
@@ -193,7 +182,6 @@ export interface FileRouteTypes {
     | '/'
     | '/403'
     | '/achats'
-    | '/assistant'
     | '/clients'
     | '/depenses'
     | '/devis'
@@ -211,7 +199,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R403Route: typeof R403Route
   AchatsRoute: typeof AchatsRoute
-  AssistantRoute: typeof AssistantRoute
   ClientsRoute: typeof ClientsRoute
   DepensesRoute: typeof DepensesRoute
   DevisRoute: typeof DevisRoute
@@ -304,13 +291,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/assistant': {
-      id: '/assistant'
-      path: '/assistant'
-      fullPath: '/assistant'
-      preLoaderRoute: typeof AssistantRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/achats': {
       id: '/achats'
       path: '/achats'
@@ -339,7 +319,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R403Route: R403Route,
   AchatsRoute: AchatsRoute,
-  AssistantRoute: AssistantRoute,
   ClientsRoute: ClientsRoute,
   DepensesRoute: DepensesRoute,
   DevisRoute: DevisRoute,

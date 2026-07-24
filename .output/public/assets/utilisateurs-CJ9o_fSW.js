@@ -1,1 +1,0 @@
-import{t as e}from"./UserManagementTable-C0ACOze1.js";import{t}from"./jsx-runtime-DiK4U9sA.js";var n=t();function r(){return(0,n.jsx)(`div`,{className:`p-6`,children:(0,n.jsx)(e,{})})}export{r as component};

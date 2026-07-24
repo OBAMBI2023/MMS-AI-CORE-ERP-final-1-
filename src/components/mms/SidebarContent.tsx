@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import {
   Home,
-  Bot,
   Wallet,
   FileText,
   Users,
@@ -18,7 +17,6 @@ import { routePermissions } from "@/lib/route-permissions";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/" },
-  // { icon: Bot, label: "Assistant IA", to: "/assistant" },
   { icon: Wallet, label: "Ventes (POS)", to: "/ventes" },
   { icon: FileText, label: "Devis", to: "/devis" },
   { icon: Users, label: "Clients", to: "/clients" },
@@ -34,13 +32,14 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data, isLoading } = usePermissions();
   const permissions = data?.permissions || [];
+  const role = data?.role;
 
-  // Si on est en chargement, on affiche tout par précaution pour éviter un menu vide,
-  // ou on pourrait afficher un squelette. Ici, on affiche tout pour ne pas bloquer l'UX.
   const filteredItems = items.filter((it) => {
-    const requiredPermission = routePermissions[it.to];
-    if (!requiredPermission || isLoading) return true;
-    return permissions.includes(requiredPermission);
+    if (it.to === "/parametres") {
+      if (isLoading) return false;
+      return role === "Administrateur";
+    }
+    return true;
   });
 
   return (

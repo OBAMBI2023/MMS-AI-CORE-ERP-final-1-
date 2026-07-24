@@ -1069,30 +1069,6 @@ var Receipt = createLucideIcon("receipt", [
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
-var RefreshCcw = createLucideIcon("refresh-ccw", [
-	["path", {
-		d: "M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",
-		key: "14sxne"
-	}],
-	["path", {
-		d: "M3 3v5h5",
-		key: "1xhq8a"
-	}],
-	["path", {
-		d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16",
-		key: "1hlbsb"
-	}],
-	["path", {
-		d: "M16 16h5v5",
-		key: "ccwih5"
-	}]
-]);
-/**
-* @license lucide-react v0.575.0 - ISC
-*
-* This source code is licensed under the ISC license.
-* See the LICENSE file in the root directory of this source tree.
-*/
 var RotateCcw = createLucideIcon("rotate-ccw", [["path", {
 	d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",
 	key: "1357e3"
@@ -1464,6 +1440,26 @@ var TrendingUp = createLucideIcon("trending-up", [["path", {
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var TriangleAlert = createLucideIcon("triangle-alert", [
+	["path", {
+		d: "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",
+		key: "wmoenq"
+	}],
+	["path", {
+		d: "M12 9v4",
+		key: "juzpu7"
+	}],
+	["path", {
+		d: "M12 17h.01",
+		key: "p32p05"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var Truck = createLucideIcon("truck", [
 	["path", {
 		d: "M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2",
@@ -1630,4 +1626,4 @@ var Zap = createLucideIcon("zap", [["path", {
 	key: "1xq2db"
 }]]);
 //#endregion
-export { Handshake as $, Printer as A, Menu as B, Settings as C, ArrowUpRight as Ct, RotateCcw as D, Save as E, Palette as F, Lock as G, Mail as H, Package as I, Key as J, LoaderCircle as K, Moon as L, Phone as M, Percent as N, RefreshCcw as O, Pencil as P, History as Q, Minus as R, ShieldAlert as S, Banknote as St, Scissors as T, LogOut as U, MapPin as V, LogIn as W, Image as X, KeyRound as Y, House as Z, Smartphone as _, ChevronDown as _t, Users as a, EyeOff as at, Shield as b, Building2 as bt, Upload as c, DatabaseBackup as ct, Trash2 as d, Clock as dt, Globe as et, ToggleRight as f, Circle as ft, Sparkles as g, ChevronRight as gt, Stamp as h, ChevronUp as ht, Wallet as i, Eye as it, Plus as j, Receipt as k, Truck as l, CreditCard as lt, Sun as m, CircleAlert as mt, X as n, FilePenLine as nt, User as o, Ellipsis as ot, ToggleLeft as p, CircleCheck as pt, Layers as q, Wrench as r, FileDown as rt, UserPlus as s, Download as st, Zap as t, FileText as tt, TrendingUp as u, Copy as ut, ShoppingCart as v, Check as vt, Search as w, ArrowDownRight as wt, ShieldCheck as x, Briefcase as xt, ShoppingBag as y, ChartColumn as yt, MessageCircle as z };
+export { Handshake as $, Printer as A, Menu as B, ShieldAlert as C, ArrowUpRight as Ct, Save as D, Scissors as E, Palette as F, Lock as G, Mail as H, Package as I, Key as J, LoaderCircle as K, Moon as L, Phone as M, Percent as N, RotateCcw as O, Pencil as P, History as Q, Minus as R, ShieldCheck as S, Banknote as St, Search as T, LogOut as U, MapPin as V, LogIn as W, Image as X, KeyRound as Y, House as Z, Sparkles as _, ChevronDown as _t, Users as a, EyeOff as at, ShoppingBag as b, Building2 as bt, Upload as c, DatabaseBackup as ct, TrendingUp as d, Clock as dt, Globe as et, Trash2 as f, Circle as ft, Stamp as g, ChevronRight as gt, Sun as h, ChevronUp as ht, Wallet as i, Eye as it, Plus as j, Receipt as k, Truck as l, CreditCard as lt, ToggleLeft as m, CircleAlert as mt, X as n, FilePenLine as nt, User as o, Ellipsis as ot, ToggleRight as p, CircleCheck as pt, Layers as q, Wrench as r, FileDown as rt, UserPlus as s, Download as st, Zap as t, FileText as tt, TriangleAlert as u, Copy as ut, Smartphone as v, Check as vt, Settings as w, ArrowDownRight as wt, Shield as x, Briefcase as xt, ShoppingCart as y, ChartColumn as yt, MessageCircle as z };

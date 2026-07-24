@@ -207,6 +207,7 @@ export function PosPage() {
   });
 
   const { settings, logoUrl } = useCompanySettings();
+  const canProcessSale = useActionPermission("ventes.create");
 
   const catalog: Service[] = useMemo(() => {
     if (dbServices && dbServices.length > 0) {

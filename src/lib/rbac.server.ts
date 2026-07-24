@@ -11,12 +11,7 @@ export async function getUserPermissions(
     .from("profiles")
     .select(
       `
-            roles(
-                name,
-                role_permissions(
-                    permissions(code)
-                )
-            )
+            role_id
         `,
     )
     .eq("id", userId)
@@ -24,12 +19,13 @@ export async function getUserPermissions(
 
   if (error || !data) return [];
 
-  // Mode de récupération : Si l'utilisateur est Administrateur, il a tous les droits.
-  if (data.roles?.name === "Administrateur") {
-    const { data: allPerms } = await supabase.from("permissions").select("code");
-    return allPerms?.map((p) => p.code) || [];
-  }
+  // Get all permissions associated with this user's role
+  const { data: rolePermissions, error: permsError } = await supabase
+    .from("role_permissions")
+    .select(`permissions(code)`)
+    .eq("role_id", data.role_id);
 
-  // Flatten the nested structure
-  return data.roles?.role_permissions?.map((rp) => rp.permissions?.code) || [];
+  if (permsError) return [];
+  
+  return rolePermissions.map(rp => (rp.permissions as any).code);
 }

@@ -267,28 +267,30 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
                             <Printer className="h-4 w-4" />
                           </Button>
                         )}
-                        {canDeleteSale && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                onClose();
-                                onEdit(s.id);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive"
-                              onClick={() => setSaleToDelete(s)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            onClose();
+                            onEdit(s.id);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={() => {
+                            if (canDeleteSale) {
+                              setSaleToDelete(s);
+                            } else {
+                              toast.error("Vous n'avez pas l'autorisation de supprimer une vente.");
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
