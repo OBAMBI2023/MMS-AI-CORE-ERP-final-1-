@@ -1,1 +1,0 @@
-import{C as e}from"./dist-CETYiUmh.js";function t(t){let{data:n,isLoading:r}=e();return r||!n?!1:n.role===`Administrateur`||n.permissions.includes(t)}export{t};
