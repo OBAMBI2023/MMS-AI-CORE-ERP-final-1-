@@ -48,7 +48,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Tables } from "@/integrations/supabase/types";
 import { UserManagement } from "@/components/mms/UserManagementTable";
-import { PermissionsTab } from "@/components/mms/PermissionsTab";
+// import { PermissionsTab } from "@/components/mms/PermissionsTab";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 
 // Assuming AiSettings is available in the scope or imported.
@@ -207,9 +207,9 @@ function ParametresPage() {
                 <TabTrig value="users" icon={<Users className="h-4 w-4" />}>
                   Utilisateurs
                 </TabTrig>
-                <TabTrig value="permissions" icon={<KeyRound className="h-4 w-4" />}>
+                {/* <TabTrig value="permissions" icon={<KeyRound className="h-4 w-4" />}>
                   Permissions
-                </TabTrig>
+                </TabTrig> */}
                 <TabTrig value="security" icon={<Shield className="h-4 w-4" />}>
                   Sécurité
                 </TabTrig>
@@ -235,9 +235,9 @@ function ParametresPage() {
               <TabsContent value="users">
                 <UsersTab />
               </TabsContent>
-              <TabsContent value="permissions">
+              {/* <TabsContent value="permissions">
                 <PermissionsTab />
-              </TabsContent>
+              </TabsContent> */}
               <TabsContent value="security">
                 <SecurityTab />
               </TabsContent>
