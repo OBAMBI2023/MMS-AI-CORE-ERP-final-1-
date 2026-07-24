@@ -7,6 +7,5 @@ export const routePermissions: Record<string, string> = {
   "/achats": "achats.view",
   "/fournisseurs": "achats.view",
   "/depenses": "ventes.view",
-  "/rapports": "ventes.view",
   "/parametres": "settings.manage",
 };

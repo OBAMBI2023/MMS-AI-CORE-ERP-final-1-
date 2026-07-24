@@ -35,9 +35,10 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const role = data?.role;
 
   const filteredItems = items.filter((it) => {
-    if (it.to === "/parametres") {
-      if (isLoading) return false;
-      return role === "Administrateur";
+    if (isLoading) return false;
+    const requiredPermission = routePermissions[it.to];
+    if (requiredPermission) {
+      return permissions.includes(requiredPermission);
     }
     return true;
   });

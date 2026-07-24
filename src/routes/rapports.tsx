@@ -50,6 +50,7 @@ import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { Button } from "@/components/ui/button";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { useActionPermission } from "@/hooks/use-action-permission";
 
 export const Route = createFileRoute("/rapports")({
   component: RapportsPage,
@@ -178,6 +179,7 @@ function RapportsPage() {
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
 
   const { settings, logoUrl, companyName } = useCompanySettings();
+  const canExport = useActionPermission("reports.export");
 
   const exportPDF = async () => {
     if (!data || !stats) return;

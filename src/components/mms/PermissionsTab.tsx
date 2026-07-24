@@ -16,7 +16,6 @@ const MODULE_MAP: Record<string, string> = {
   "Achats": "achats.view",
   "Fournisseurs": "achats.view",
   "Dépenses": "ventes.view",
-  "Rapports": "ventes.view",
   "Assistant IA": "assistant.use",
   "Paramètres": "settings.manage"
 };
