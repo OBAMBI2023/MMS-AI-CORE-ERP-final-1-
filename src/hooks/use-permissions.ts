@@ -12,13 +12,14 @@ export function usePermissions() {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("role_id")
+        .select("role_id, roles(name)")
         .eq("id", user.id)
         .single();
 
       if (error || !data) return { permissions: [], role: null };
 
       const roleId = data.role_id;
+      const roleName = (data.roles as any)?.name;
 
       // Get all permissions associated with this user's role
       const { data: rolePermissions, error: permsError } = await supabase
@@ -32,7 +33,7 @@ export function usePermissions() {
 
       return {
         permissions: permissions,
-        role: null, // role name is no longer directly fetched here, may need adjustment
+        role: roleName,
         roleId: roleId,
       };
     },
