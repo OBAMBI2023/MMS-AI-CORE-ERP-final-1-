@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useRef, useState } from "react";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import type { Tables } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -208,6 +209,8 @@ export function PosPage() {
 
   const { settings, logoUrl } = useCompanySettings();
   const canProcessSale = useActionPermission("ventes.create");
+  const permissionsQuery = usePermissions();
+  const canManageSales = permissionsQuery.data?.role === "Administrateur";
 
   const catalog: Service[] = useMemo(() => {
     if (dbServices && dbServices.length > 0) {
@@ -589,9 +592,15 @@ export function PosPage() {
       <SalesHistoryModal
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}
-        onEdit={(id) => setSaleToEdit(id)}
+        onEdit={(id) => {
+          if (!canManageSales) {
+            toast.error("Accès refusé");
+            return;
+          }
+          setSaleToEdit(id);
+        }}
       />
-      {!!saleToEdit && (
+      {!!saleToEdit && canManageSales && (
         <LineItemsDialog
           headerTable="ventes"
           itemsTable="vente_items"

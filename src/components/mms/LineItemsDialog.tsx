@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Loader2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, makeNumber } from "@/lib/mms/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -79,6 +80,8 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   } = props;
   const qc = useQueryClient();
   const isEdit = Boolean(initialId);
+  const permissionsQuery = usePermissions();
+  const canManageSales = permissionsQuery.data?.role === "Administrateur";
 
   const [partnerId, setPartnerId] = useState<string>("");
   const [partnerName, setPartnerName] = useState<string>("");
@@ -151,6 +154,10 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
 
   const saveMut = useMutation({
     mutationFn: async () => {
+      if (headerTable === "ventes" && isEdit && !canManageSales) {
+        throw new Error("Accès refusé");
+      }
+
       const validItems = items.filter((i) => i.name && Number(i.qty) > 0);
       if (validItems.length === 0) throw new Error("Ajoutez au moins une ligne");
       const partnerFk = partnerTable === "clients" ? "client_id" : "fournisseur_id";

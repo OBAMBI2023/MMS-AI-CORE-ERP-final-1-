@@ -33,7 +33,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useCompanySettings } from "@/hooks/use-company-settings";
-import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
@@ -72,7 +71,9 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
 
   const { role, roleId } = permissionsQuery.data || { permissions: [], role: null, roleId: null };
   const { settings, logoUrl, companyName, address, phone, email } = useCompanySettings();
-  const canDeleteSale = useActionPermission("ventes.delete");
+  // La gestion d'une vente est volontairement plus stricte qu'une permission
+  // configurable : seul le rôle Administrateur peut la modifier ou la supprimer.
+  const canManageSales = role === "Administrateur";
 
   const filteredSales = useMemo(() => {
     if (!sales) return [];
@@ -136,11 +137,7 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     toast.success("PDF généré");
   };
 
-  const canPrint = (sale: any) => {
-    if (role === "Administrateur" || role === "Gérant") return true;
-    if (role === "Caissier" && sale.user_id === userId) return true;
-    return false;
-  };
+  const canPrint = (_sale: any) => true;
 
   const handlePrint = (sale: any) => {
     const doc = new jsPDF({ format: "a7", unit: "mm" });
@@ -162,6 +159,12 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
   };
 
   const handleDelete = async () => {
+    if (!canManageSales) {
+      toast.error("Accès refusé");
+      setSaleToDelete(null);
+      return;
+    }
+
     if (!saleToDelete || !userId) return;
     const { error } = await supabase.from("ventes").delete().eq("id", saleToDelete.id);
     if (error) {
@@ -267,30 +270,40 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
                             <Printer className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            onClose();
-                            onEdit(s.id);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          onClick={() => {
-                            if (canDeleteSale) {
-                              setSaleToDelete(s);
-                            } else {
-                              toast.error("Vous n'avez pas l'autorisation de supprimer une vente.");
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canManageSales && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Modifier la vente"
+                              onClick={() => {
+                                if (!canManageSales) {
+                                  toast.error("Accès refusé");
+                                  return;
+                                }
+                                onClose();
+                                onEdit(s.id);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              aria-label="Supprimer la vente"
+                              onClick={() => {
+                                if (!canManageSales) {
+                                  toast.error("Accès refusé");
+                                  return;
+                                }
+                                setSaleToDelete(s);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  useNavigate,
   useRouter,
   HeadContent,
   Scripts,
@@ -13,6 +14,7 @@ import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { hasPermission } from "@/lib/auth";
 import { routePermissions } from "@/lib/route-permissions";
+import { ThemeProvider } from "@/components/theme-provider";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -121,7 +123,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
             path: location.pathname,
             requiredPermission,
           });
-          throw redirect({ to: "/" });
+          // Ne pas renvoyer vers le Dashboard : un rôle sans dashboard.view
+          // y serait immédiatement refusé et provoquerait une boucle.
+          throw redirect({ to: "/403" });
         }
       }
     }
@@ -199,13 +203,30 @@ import { DynamicFavicon } from "@/components/mms/DynamicFavicon";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      // Le garde beforeLoad couvre les navigations. Cet écouteur couvre aussi
+      // une déconnexion depuis un autre onglet ou une expiration de session.
+      if (event === "SIGNED_OUT" && window.location.pathname !== "/login") {
+        navigate({ to: "/login", replace: true });
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <DynamicFavicon />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster richColors position="top-right" />
+      <ThemeProvider>
+        <DynamicFavicon />
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <Toaster richColors position="top-right" />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

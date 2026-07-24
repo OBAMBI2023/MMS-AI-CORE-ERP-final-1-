@@ -1552,4 +1552,4 @@ var Separator2 = DropdownMenuSeparator;
 var SubTrigger2 = DropdownMenuSubTrigger;
 var SubContent2 = DropdownMenuSubContent;
 //#endregion
-export { Arrow as _, Label2 as a, createPopperScope as b, Root2 as c, SubTrigger2 as d, Trigger as f, Anchor as g, createRovingFocusGroupScope as h, ItemIndicator2 as i, Separator2 as l, Root as m, Content2 as n, Portal2 as o, Item as p, Item2 as r, RadioItem2 as s, CheckboxItem2 as t, SubContent2 as u, Content as v, useSize as x, Root2$1 as y };
+export { Arrow as _, Label2 as a, createPopperScope as b, Root2 as c, SubTrigger2 as d, Trigger as f, Anchor as g, createRovingFocusGroupScope as h, ItemIndicator2 as i, Separator2 as l, Root as m, Content2 as n, Portal2 as o, Item as p, Item2 as r, RadioItem2 as s, CheckboxItem2 as t, SubContent2 as u, Content as v, Root2$1 as y };

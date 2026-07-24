@@ -9,8 +9,6 @@ import {
   Wallet,
   Calendar,
   Download,
-  Moon,
-  Sun,
   PieChart as PieChartIcon,
   BarChart3,
 } from "lucide-react";
@@ -352,9 +350,6 @@ function RapportsPage() {
           </Select>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="rounded-xl">
-            <Sun className="h-4 w-4" />
-          </Button>
           {canExport && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

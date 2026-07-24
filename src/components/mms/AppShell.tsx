@@ -4,9 +4,10 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { Button } from "@/components/ui/button";
 import { Menu, Sparkles, Sun, Moon } from "lucide-react";
 import { SidebarContent } from "./SidebarContent";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { UserMenu } from "./UserMenu";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { useTheme } from "@/components/theme-provider";
 
 export function AppShell({
   title,
@@ -20,27 +21,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark";
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
-  }, []);
+  const { theme, toggleTheme } = useTheme();
   const { settings, logoUrl } = useCompanySettings();
   const companyName = settings?.company_name ?? "Mon Entreprise";
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(theme);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("theme", theme);
-    }
-  }, [theme]);
-
-  const toggleTheme = () => setTheme((prev) => (prev === "light" ? "dark" : "light"));
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
@@ -90,7 +73,13 @@ export function AppShell({
 
           <div className="flex items-center gap-4">
             {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
+              title={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
+            >
               {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
             </Button>
             <UserMenu />

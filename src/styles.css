@@ -160,6 +160,31 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+
+  /* Keep native and custom form fields readable in the dark theme. */
+  .dark :is(input, select, textarea) {
+    color: var(--foreground);
+    background-color: var(--muted);
+    border-color: var(--border);
+    color-scheme: dark;
+  }
+
+  .dark :is(input, textarea)::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  .dark select option {
+    color: var(--foreground);
+    background-color: var(--popover);
+  }
+
+  .dark input:-webkit-autofill,
+  .dark input:-webkit-autofill:hover,
+  .dark input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--foreground);
+    box-shadow: 0 0 0 1000px var(--muted) inset;
+  }
 }
 
 @utility scrollbar-thin {
