@@ -39,6 +39,7 @@ import { SidebarContent } from "@/components/mms/SidebarContent";
 import { SalesHistoryModal } from "@/components/mms/SalesHistoryModal";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { History } from "lucide-react";
+import { useTenant } from "@/providers/TenantProvider";
 
 // ---------------- Types & catalogue ----------------
 type Category = "Impression" | "Copie" | "Reliure" | "Finition" | "Numérique";
@@ -192,6 +193,7 @@ export function PosPage() {
   const [saving, setSaving] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { profile } = useTenant();
 
   // Load catalog from database — fallback to hardcoded CATALOG if empty.
   const { data: dbServices } = useQuery({
@@ -256,6 +258,10 @@ export function PosPage() {
 
   const validate = async () => {
     if (cart.length === 0) return;
+    if (!profile?.tenant_id) {
+      toast.error("Impossible de créer la vente : aucun tenant courant n'est disponible.");
+      return;
+    }
     setSaving(true);
     const number = "T-" + Math.floor(Math.random() * 900000 + 100000);
     const dbNumber = makeNumber("VTE");
@@ -270,7 +276,8 @@ export function PosPage() {
           total,
           payment_method: payment,
           cashier: "Bamba",
-        })
+          tenant_id: profile.tenant_id,
+        } as any)
         .select("id")
         .single();
       if (e1 || !venteRow) throw e1 ?? new Error("Insertion échouée");

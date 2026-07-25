@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
+import { useTenant } from "@/providers/TenantProvider";
 
 // Dynamic table access — cast client so table names typed as string are accepted.
 const db = supabase as unknown as {
@@ -257,6 +258,7 @@ function ResourceFormDialog<T extends { id: string }>({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const { profile } = useTenant();
   const isEdit = Boolean((initial as T).id);
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     const base: Record<string, unknown> = {};
@@ -280,6 +282,9 @@ function ResourceFormDialog<T extends { id: string }>({
           .eq("id", (initial as T).id);
         if (error) throw error;
       } else {
+        if (profile?.tenant_id) {
+            payload.tenant_id = profile.tenant_id;
+        }
         const { error } = await db.from(table).insert(payload);
         if (error) throw error;
       }

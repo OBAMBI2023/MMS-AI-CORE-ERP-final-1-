@@ -50,6 +50,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { UserManagement } from "@/components/mms/UserManagementTable";
 // import { PermissionsTab } from "@/components/mms/PermissionsTab";
 import { useSignedUrl } from "@/hooks/use-signed-url";
+import { useTenant } from "@/providers/TenantProvider";
 
 // Assuming AiSettings is available in the scope or imported.
 // Since the original file didn't import it, I'll assume it's part of the type definition context
@@ -88,8 +89,22 @@ async function saveAiSettings(_: { data: Partial<AiSettings> }) {
   return {};
 }
 
+function formatSupabaseError(error: unknown): string {
+  const e = error as { code?: string; message?: string; details?: string; hint?: string };
+  return [
+    e.code && `code: ${e.code}`,
+    e.message && `message: ${e.message}`,
+    e.details && `details: ${e.details}`,
+    e.hint && `hint: ${e.hint}`,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
 function ParametresPage() {
   const qc = useQueryClient();
+  const { profile, loading: tenantLoading } = useTenant();
+  const tenantId = profile?.tenant_id;
   const AI_FIELD_NAMES = [
     "openai_key",
     "gemini_key",
@@ -113,17 +128,42 @@ function ParametresPage() {
     return { aiPatch, paramPatch };
   }
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["parametres"],
+  const { data, isLoading, error: queryError } = useQuery({
+    queryKey: ["parametres", tenantId],
     queryFn: async () => {
-      const [{ data: params, error }, aiSettings] = await Promise.all([
-        supabase.from("parametres").select("*").limit(1).maybeSingle(),
-        getAiSettings(),
-      ]);
+      if (!tenantId) throw new Error("Locataire introuvable");
+      let { data: params, error } = await (supabase.from("parametres") as any)
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
-      if (!params) return null;
+
+      if (!params) {
+        // No settings exist, create default
+        const { data: newParams, error: insertError } = await (supabase.from(
+          "parametres",
+        ) as any)
+          .insert({
+            tenant_id: tenantId,
+            company_name: "Nouvelle Entreprise",
+            currency: "FCFA",
+            quote_prefix: "DEV-",
+            invoice_prefix: "FAC-",
+            receipt_prefix: "REC-",
+            date_format: "dd/MM/yyyy",
+            decimals: 0,
+          })
+          .select()
+          .single();
+        if (insertError) throw insertError;
+        params = newParams;
+      }
+
+      const aiSettings = await getAiSettings();
       return { ...params, ...aiSettings } as Parametres;
     },
+    enabled: !tenantLoading && Boolean(tenantId),
   });
 
   const [form, setForm] = useState<Partial<Parametres>>({});
@@ -141,15 +181,17 @@ function ParametresPage() {
   const save = useMutation({
     mutationFn: async (patch: Partial<Parametres>) => {
       if (!data?.id) throw new Error("Enregistrement introuvable");
+      if (!tenantId) throw new Error("Locataire introuvable");
       const { aiPatch, paramPatch } = splitPatch(patch);
       const tasks: Promise<unknown>[] = [];
       if (Object.keys(paramPatch).length > 0) {
         tasks.push(
-          supabase
+          (supabase
             .from("parametres")
-            .update(paramPatch)
+            .update(paramPatch) as any)
             .eq("id", data.id)
-            .then(({ error }) => {
+            .eq("tenant_id", tenantId)
+            .then(({ error }: { error: Error | null }) => {
               if (error) throw error;
             }),
         );
@@ -163,7 +205,10 @@ function ParametresPage() {
       toast.success("Paramètres enregistrés");
       qc.invalidateQueries({ queryKey: ["parametres"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error: unknown) => {
+      console.error("Échec de l'enregistrement des paramètres", error);
+      toast.error(formatSupabaseError(error) || "Erreur Supabase inconnue");
+    },
   });
 
   const saveAll = () => save.mutate(form);
@@ -183,10 +228,18 @@ function ParametresPage() {
         </Button>
       }
     >
-      {isLoading || !data ? (
+      {tenantLoading || isLoading ? (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
         </div>
+      ) : queryError || !tenantId ? (
+        <div className="text-sm text-destructive">
+          {queryError
+            ? formatSupabaseError(queryError)
+            : "Aucun locataire associé à ce compte."}
+        </div>
+      ) : !data ? (
+        <div className="text-sm text-destructive">Paramètres introuvables.</div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
           <div className="min-w-0">
@@ -250,6 +303,7 @@ function ParametresPage() {
             <QuickActions
               form={form}
               settingsId={data.id}
+              tenantId={tenantId}
               refetch={() => qc.invalidateQueries({ queryKey: ["parametres"] })}
             />
           </aside>
@@ -717,7 +771,7 @@ function FileUploader({
         onChange(path);
         toast.success("Fichier téléversé");
       } catch (e) {
-        toast.error((e as Error).message);
+        toast.error(formatSupabaseError(e) || "Erreur Supabase inconnue");
       } finally {
         setBusy(false);
       }
@@ -921,10 +975,12 @@ function ConfigStatus({ form }: { form: Partial<Parametres> }) {
 function QuickActions({
   form,
   settingsId,
+  tenantId,
   refetch,
 }: {
   form: Partial<Parametres>;
   settingsId: string;
+  tenantId: string;
   refetch: () => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
@@ -966,7 +1022,9 @@ function QuickActions({
         else paramPatch[key] = value;
       }
       if (Object.keys(paramPatch).length > 0) {
-        const { error } = await supabase.from("parametres").update(paramPatch).eq("id", settingsId);
+        const { error } = await ((supabase.from("parametres") as any).update(paramPatch) as any)
+          .eq("id", settingsId)
+          .eq("tenant_id", tenantId);
         if (error) throw error;
       }
       if (Object.keys(aiPatch).length > 0) {
@@ -975,13 +1033,13 @@ function QuickActions({
       refetch();
       toast.success("Configuration importée");
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(formatSupabaseError(e) || "Erreur Supabase inconnue");
     }
   };
 
   const reset = async () => {
     if (!confirm("Réinitialiser tous les paramètres aux valeurs par défaut ?")) return;
-    const { error } = await supabase
+    const { error } = await (supabase
       .from("parametres")
       .update({
         trade_name: null,
@@ -1005,15 +1063,16 @@ function QuickActions({
         logo_url: null,
         signature_url: null,
         stamp_url: null,
-      })
-      .eq("id", settingsId);
-    if (error) return toast.error(error.message);
+      }) as any)
+      .eq("id", settingsId)
+      .eq("tenant_id", tenantId);
+    if (error) return toast.error(formatSupabaseError(error));
     try {
       await saveAiSettings({
         data: { openai_key: null, gemini_key: null, claude_key: null, ai_model: null },
       });
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(formatSupabaseError(e) || "Erreur Supabase inconnue");
     }
     refetch();
     toast.success("Paramètres réinitialisés");

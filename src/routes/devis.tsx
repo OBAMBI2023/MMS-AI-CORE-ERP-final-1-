@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
+import { useTenant } from "@/providers/TenantProvider";
 
 interface Devis {
   id: string;
@@ -47,7 +48,9 @@ export const Route = createFileRoute("/devis")({
 });
 
 function DevisPage() {
-  const { settings } = useCompanySettings();
+  const { profile, loading: tenantLoading } = useTenant();
+  const tenantId = profile?.tenant_id;
+  const { settings } = useCompanySettings(tenantLoading ? null : tenantId);
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
@@ -60,6 +63,10 @@ function DevisPage() {
   const canCreateDevis = useActionPermission("devis.create");
 
   const downloadPDF = async (devis: Devis) => {
+    if (!tenantId) {
+      toast.error("Locataire introuvable");
+      return;
+    }
     const { data: items, error } = await supabase
       .from("devis_items")
       .select("*")
@@ -115,20 +122,28 @@ function DevisPage() {
   };
 
   const { data = [], isLoading } = useQuery({
-    queryKey: ["devis"],
+    queryKey: ["devis", tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!tenantId) throw new Error("Locataire introuvable");
+      const { data, error } = await (supabase
         .from("devis")
-        .select("*")
+        .select("*") as any)
+        .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Devis[];
     },
+    enabled: !tenantLoading && Boolean(tenantId),
   });
 
   const del = useMutation({
     mutationFn: async (devis: Devis) => {
-      const { error } = await supabase.from("devis").delete().eq("id", devis.id);
+      if (!tenantId) throw new Error("Locataire introuvable");
+      const { error } = await (supabase
+        .from("devis")
+        .delete() as any)
+        .eq("id", devis.id)
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       return devis;
     },
@@ -144,7 +159,12 @@ function DevisPage() {
 
   const setStatus = useMutation({
     mutationFn: async (v: { id: string; status: string | null }) => {
-      const { error } = await supabase.from("devis").update({ status: v.status }).eq("id", v.id);
+      if (!tenantId) throw new Error("Locataire introuvable");
+      const { error } = await (supabase
+        .from("devis")
+        .update({ status: v.status }) as any)
+        .eq("id", v.id)
+        .eq("tenant_id", tenantId);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["devis"] }),
@@ -278,7 +298,8 @@ function DevisPage() {
               partnerTable="clients"
               partnerLabel="Client"
               numberPrefix="DEV"
-              singular="Devis"
+            singular="Devis"
+            tenantId={tenantId}
               extraFields={[
                 { name: "status", label: "Statut", type: "select", options: [...STATUSES] },
                 { name: "due_date", label: "Échéance", type: "date" },

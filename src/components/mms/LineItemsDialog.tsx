@@ -30,6 +30,7 @@ export interface LineItemsDialogProps {
     options?: string[];
   }[];
   initialId?: string | null;
+  tenantId?: string;
   onClose: () => void;
 }
 
@@ -65,6 +66,18 @@ const db = supabase as unknown as {
   };
 };
 
+function formatSupabaseError(error: unknown): string {
+  const e = error as { code?: string; message?: string; details?: string; hint?: string };
+  return [
+    e.code && `code: ${e.code}`,
+    e.message && `message: ${e.message}`,
+    e.details && `details: ${e.details}`,
+    e.hint && `hint: ${e.hint}`,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
 export function LineItemsDialog(props: LineItemsDialogProps) {
   const {
     headerTable,
@@ -76,6 +89,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
     singular,
     extraFields = [],
     initialId,
+    tenantId,
     onClose,
   } = props;
   const qc = useQueryClient();
@@ -91,25 +105,27 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   const [discount, setDiscount] = useState(0);
 
   const { data: partners = [] } = useQuery({
-    queryKey: [partnerTable ?? "no-partner"],
+    queryKey: [partnerTable ?? "no-partner", tenantId],
     queryFn: async () => {
       if (!partnerTable) return [] as { id: string; name: string }[];
-      const { data, error } = await db
+      let query = (db
         .from(partnerTable)
-        .select("id, name")
-        .order("name", { ascending: true });
+        .select("id, name") as any);
+      if (tenantId) query = query.eq("tenant_id", tenantId);
+      const { data, error } = await query.order("name", { ascending: true });
       if (error) throw error;
       return (data as { id: string; name: string }[]) ?? [];
     },
   });
 
   const { data: services = [] } = useQuery({
-    queryKey: ["services", "active"],
+    queryKey: ["services", "active", tenantId],
     queryFn: async () => {
-      const { data, error } = await db
+      let query = (db
         .from("services")
-        .select("id, name, unit, price")
-        .order("name", { ascending: true });
+        .select("id, name, unit, price") as any);
+      if (tenantId) query = query.eq("tenant_id", tenantId);
+      const { data, error } = await query.order("name", { ascending: true });
       if (error) throw error;
       return (data as { id: string; name: string; unit: string; price: number }[]) ?? [];
     },
@@ -118,11 +134,12 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   useEffect(() => {
     if (!isEdit || !initialId) return;
     (async () => {
-      const { data: head, error: e1 } = await db
+      let headQuery = (db
         .from(headerTable)
         .select("*")
-        .eq("id", initialId)
-        .maybeSingle();
+        .eq("id", initialId) as any);
+      if (tenantId) headQuery = headQuery.eq("tenant_id", tenantId);
+      const { data: head, error: e1 } = await headQuery.maybeSingle();
       if (e1 || !head) return;
       const h = head as Record<string, unknown>;
       setPartnerId(
@@ -157,6 +174,10 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       if (headerTable === "ventes" && isEdit && !canManageSales) {
         throw new Error("Accès refusé");
       }
+      const isTenantScopedDocument = headerTable === "achats" || headerTable === "devis";
+      if (isTenantScopedDocument && !tenantId) {
+        throw new Error("Création bloquée : aucun tenant associé au compte.");
+      }
 
       const validItems = items.filter((i) => i.name && Number(i.qty) > 0);
       if (validItems.length === 0) throw new Error("Ajoutez au moins une ligne");
@@ -170,6 +191,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
         notes: notes || null,
         discount: headerTable === "devis" ? Number(discount || 0) : 0,
       };
+      if (isTenantScopedDocument) payload.tenant_id = tenantId;
 
       for (const f of extraFields) payload[f.name] = extra[f.name] || null;
 
@@ -186,6 +208,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       }
       const rows = validItems.map((i) => ({
         [fkColumn]: headerId,
+        ...(isTenantScopedDocument ? { tenant_id: tenantId } : {}),
         name: i.name,
         unit: i.unit || null,
         qty: Number(i.qty),
@@ -200,7 +223,11 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       qc.invalidateQueries({ queryKey: [headerTable] });
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error: unknown) => {
+      const message = formatSupabaseError(error) || "Erreur Supabase inconnue";
+      console.error("Échec de l'enregistrement du document", error);
+      toast.error(message);
+    },
   });
 
   const updateItem = (idx: number, patch: Partial<LineItem>) => {

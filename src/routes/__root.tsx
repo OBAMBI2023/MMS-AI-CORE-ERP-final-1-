@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { hasPermission } from "@/lib/auth";
 import { routePermissions } from "@/lib/route-permissions";
 import { ThemeProvider } from "@/components/theme-provider";
-
+import { TenantProvider } from "@/providers/TenantProvider";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -209,8 +209,6 @@ function RootComponent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      // Le garde beforeLoad couvre les navigations. Cet écouteur couvre aussi
-      // une déconnexion depuis un autre onglet ou une expiration de session.
       if (event === "SIGNED_OUT" && window.location.pathname !== "/login") {
         navigate({ to: "/login", replace: true });
       }
@@ -222,10 +220,11 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <DynamicFavicon />
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-        <Toaster richColors position="top-right" />
+        <TenantProvider>
+          <DynamicFavicon />
+          <Outlet />
+          <Toaster richColors position="top-right" />
+        </TenantProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

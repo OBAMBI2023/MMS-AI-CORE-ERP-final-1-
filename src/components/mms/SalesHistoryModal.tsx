@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ import { logAction } from "@/lib/audit.server";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
+import { useTenant } from "@/providers/TenantProvider";
 
 interface SalesHistoryModalProps {
   isOpen: boolean;
@@ -52,21 +54,27 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const permissionsQuery = usePermissions();
   const queryClient = useQueryClient();
+  const { profile, loading: tenantLoading } = useTenant();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
 
   const { data: sales, isLoading } = useQuery({
-    queryKey: ["ventes", "history"],
+    queryKey: ["ventes", "history", profile?.tenant_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ventes")
+      if (!profile?.tenant_id) {
+        throw new Error("Impossible de charger les ventes : aucun tenant courant n'est disponible.");
+      }
+      const { data, error } = await (supabase
+        .from("ventes") as any)
         .select("*, vente_items(*)")
+        .eq("tenant_id", profile.tenant_id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data || [];
+      return (data || []) as Array<Tables<"ventes"> & { vente_items: Tables<"vente_items">[] }>;
     },
+    enabled: isOpen && !tenantLoading && Boolean(profile?.tenant_id),
   });
 
   const { role, roleId } = permissionsQuery.data || { permissions: [], role: null, roleId: null };

@@ -18,6 +18,7 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
+import { useTenant } from "@/providers/TenantProvider";
 
 interface Achat {
   id: string;
@@ -38,11 +39,13 @@ export const Route = createFileRoute("/achats")({
 });
 
 function AchatsPage() {
+  const { profile, loading: tenantLoading } = useTenant();
+  const tenantId = profile?.tenant_id;
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const { settings, logoUrl } = useCompanySettings();
+  const { settings, logoUrl } = useCompanySettings(tenantLoading ? null : tenantId);
   const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
   const permissionsQuery = usePermissions();
   const { roleId } = permissionsQuery.data || { roleId: null };
@@ -52,15 +55,18 @@ function AchatsPage() {
   const canExportAchat = useActionPermission("achats.export");
 
   const { data = [], isLoading } = useQuery({
-    queryKey: ["achats"],
+    queryKey: ["achats", tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!tenantId) throw new Error("Locataire introuvable");
+      const { data, error } = await (supabase
         .from("achats")
-        .select("*")
+        .select("*") as any)
+        .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Achat[];
     },
+    enabled: !tenantLoading && Boolean(tenantId),
   });
 
   const exportPDF = async (data: Achat[]) => {
@@ -103,7 +109,12 @@ function AchatsPage() {
 
   const del = useMutation({
     mutationFn: async (achat: Achat) => {
-      const { error } = await supabase.from("achats").delete().eq("id", achat.id);
+      if (!tenantId) throw new Error("Locataire introuvable");
+      const { error } = await (supabase
+        .from("achats")
+        .delete() as any)
+        .eq("id", achat.id)
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       return achat;
     },
@@ -228,6 +239,7 @@ function AchatsPage() {
             partnerLabel="Fournisseur"
             numberPrefix="ACH"
             singular="Achat"
+            tenantId={tenantId}
             initialId={editId}
             onClose={() => {
               setEditId(null);
