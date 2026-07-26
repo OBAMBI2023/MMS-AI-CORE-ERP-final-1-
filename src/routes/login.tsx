@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock, Eye, EyeOff, Loader2, BarChart3, ShieldCheck, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { getPlatformAdminAccess } from "@/lib/super-admin.server";
 
 const loginSchema = z.object({
   email: z.string().email("Adresse e-mail invalide"),
@@ -19,6 +20,31 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
+async function getAuthenticatedHome(): Promise<"/app" | "/super-admin"> {
+  const { isPlatformAdmin } = await getPlatformAdminAccess();
+  return isPlatformAdmin ? "/super-admin" : "/app";
+}
+
+async function logConnectionAttempt(
+  email: string,
+  status: "success" | "failure",
+  userId?: string,
+) {
+  try {
+    const { error } = await supabase.rpc("log_connection_attempt", {
+      p_email: email,
+      p_status: status,
+      ...(userId ? { p_user_id: userId } : {}),
+    });
+
+    if (error) {
+      console.error("Impossible de journaliser la tentative de connexion :", error);
+    }
+  } catch (error) {
+    console.error("Impossible de journaliser la tentative de connexion :", error);
+  }
+}
+
 export const Route = createFileRoute("/login")({
   component: LoginPage,
   beforeLoad: async () => {
@@ -26,7 +52,7 @@ export const Route = createFileRoute("/login")({
       data: { session },
     } = await supabase.auth.getSession();
     if (session) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: await getAuthenticatedHome() });
     }
   },
 });
@@ -54,24 +80,16 @@ function LoginPage() {
       });
 
       if (error) {
-        // Log failure
-        await supabase.rpc("log_connection_attempt", {
-          p_email: values.email,
-          p_status: "failure",
-        });
+        void logConnectionAttempt(values.email, "failure");
         throw error;
       }
 
-      // Log success
-      await supabase.rpc("log_connection_attempt", {
-        p_email: values.email,
-        p_status: "success",
-        p_user_id: data.user.id,
-      });
+      // La journalisation ne doit jamais bloquer l'accès d'un compte authentifié.
+      void logConnectionAttempt(values.email, "success", data.user.id);
 
-      navigate({ to: "/" });
-    } catch (err: any) {
-      toast.error(err.message || "Une erreur est survenue");
+      await navigate({ to: await getAuthenticatedHome(), replace: true });
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Une erreur est survenue");
     } finally {
       setLoading(false);
     }

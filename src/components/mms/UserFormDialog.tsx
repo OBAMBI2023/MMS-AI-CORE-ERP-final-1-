@@ -22,8 +22,12 @@ import {
 import { toast } from "sonner";
 import { Loader2, Plus, User, Mail, Phone, Shield, Lock, Eye, EyeOff, Pencil } from "lucide-react";
 import { createUser, updateUser } from "@/lib/user-management.server";
+import { useTenant } from "@/providers/TenantProvider";
+import { formatSupabaseError } from "@/lib/supabase-error";
 
 export function UserFormDialog({ user }: { user?: any }) {
+  const { profile, loading: tenantLoading } = useTenant();
+  const tenantId = profile?.tenant_id;
   const [open, setOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const isEdit = !!user;
@@ -56,12 +60,17 @@ export function UserFormDialog({ user }: { user?: any }) {
 
   const qc = useQueryClient();
   const { data: roles } = useQuery({
-    queryKey: ["roles"],
+    queryKey: ["roles", tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("roles").select("id, name");
+      if (!tenantId) return [];
+      const { data, error } = await supabase
+        .from("roles")
+        .select("id, name")
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       return data;
     },
+    enabled: !tenantLoading && Boolean(tenantId),
   });
 
   const createMutation = useMutation({
@@ -69,7 +78,7 @@ export function UserFormDialog({ user }: { user?: any }) {
     onSuccess: () => {
       toast.success("Utilisateur créé");
       setOpen(false);
-      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["users", tenantId] });
       setFormData({
         email: "",
         password: "",
@@ -82,7 +91,7 @@ export function UserFormDialog({ user }: { user?: any }) {
       });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Une erreur est survenue");
+      toast.error(formatSupabaseError(error));
     },
   });
 
@@ -91,10 +100,10 @@ export function UserFormDialog({ user }: { user?: any }) {
     onSuccess: () => {
       toast.success("Utilisateur mis à jour");
       setOpen(false);
-      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["users", tenantId] });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Une erreur est survenue");
+      toast.error(formatSupabaseError(error));
     },
   });
 

@@ -11,13 +11,20 @@ export async function getUserPermissions(
     .from("profiles")
     .select(
       `
-            role_id
+            role_id,
+            tenant_id,
+            roles(tenant_id)
         `,
     )
     .eq("id", userId)
     .single();
 
-  if (error || !data) return [];
+  if (
+    error ||
+    !data ||
+    !data.role_id ||
+    (data.roles as { tenant_id?: string } | null)?.tenant_id !== data.tenant_id
+  ) return [];
 
   // Get all permissions associated with this user's role
   const { data: rolePermissions, error: permsError } = await supabase

@@ -16,7 +16,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { routePermissions } from "@/lib/route-permissions";
 
 const items = [
-  { icon: Home, label: "Dashboard", to: "/" },
+  { icon: Home, label: "Dashboard", to: "/app" },
   { icon: Wallet, label: "Ventes (POS)", to: "/ventes" },
   { icon: FileText, label: "Devis", to: "/devis" },
   { icon: Users, label: "Clients", to: "/clients" },
@@ -46,13 +46,10 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   return (
     <nav className="flex-1 flex flex-col gap-1 mt-2">
       {filteredItems.map((it, idx) => {
-        const isActive = pathname === it.to && !(it.to === "/" && idx === 0 && pathname === "/");
         const active =
           it.to === "/ventes"
             ? pathname.startsWith("/ventes")
-            : pathname === it.to && idx !== 0
-              ? true
-              : isActive;
+            : pathname === it.to;
 
         return (
           <Link

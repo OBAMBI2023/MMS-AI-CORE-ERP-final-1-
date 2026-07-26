@@ -34,6 +34,8 @@ import {
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
+import { useTenant } from "@/providers/TenantProvider";
+import { formatSupabaseError } from "@/lib/supabase-error";
 
 export function UserManagement() {
   const qc = useQueryClient();
@@ -44,17 +46,21 @@ export function UserManagement() {
   const { roleId } = permissionsQuery.data || { roleId: null };
   const userId = userData?.data?.user?.id;
   const canDeleteUser = useActionPermission("users.delete");
+  const { profile, loading: tenantLoading } = useTenant();
+  const tenantId = profile?.tenant_id;
 
   const { data: users, isLoading } = useQuery({
-    queryKey: ["users"],
+    queryKey: ["users", tenantId],
     queryFn: async () => {
+      if (!tenantId) return [];
       const { data, error } = await supabase.from("profiles").select(`
           id, username, full_name, email, phone, status, last_login_at, created_at,
           roles(id, name)
-        `);
+        `).eq("tenant_id", tenantId);
       if (error) throw error;
       return data;
     },
+    enabled: !tenantLoading && Boolean(tenantId),
   });
 
   const deleteMutation = useMutation({
@@ -63,24 +69,24 @@ export function UserManagement() {
       if (userId && userToDeleteName) {
         await logAction(userId, roleId, "delete", "users", { user_name: userToDeleteName });
       }
-      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["users", tenantId] });
       toast.success("Utilisateur supprimé");
       setUserToDelete(null);
       setUserToDeleteName(null);
     },
     onError: (error: any) => {
-      toast.error(error.message || "Erreur lors de la suppression");
+      toast.error(formatSupabaseError(error));
     },
   });
 
   const toggleMutation = useMutation({
     mutationFn: toggleStatus,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["users", tenantId] });
       toast.success("Statut mis à jour");
     },
     onError: (error: any) => {
-      toast.error(error.message || "Erreur lors de la mise à jour");
+      toast.error(formatSupabaseError(error));
     },
   });
 
@@ -90,7 +96,7 @@ export function UserManagement() {
       toast.success("Un email de réinitialisation a été envoyé.");
     },
     onError: (error: any) => {
-      toast.error(error.message || "Erreur lors de la réinitialisation");
+      toast.error(formatSupabaseError(error));
     },
   });
 

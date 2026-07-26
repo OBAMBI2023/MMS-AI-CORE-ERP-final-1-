@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,8 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Loader2, Save } from "lucide-react";
+import { useTenant } from "@/providers/TenantProvider";
+import { formatSupabaseError } from "@/lib/supabase-error";
 
 const MODULE_MAP: Record<string, string> = {
   "Dashboard": "dashboard.view",
@@ -32,14 +34,21 @@ const ACTION_MAP: Record<string, string> = {
 
 export function PermissionsTab() {
   const qc = useQueryClient();
+  const { profile, loading: tenantLoading } = useTenant();
+  const tenantId = profile?.tenant_id;
   
   const { data: roles, isLoading: rolesLoading } = useQuery({
-    queryKey: ["roles"],
+    queryKey: ["roles", tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("roles").select("*, role_permissions(permission_id, permissions(code))");
+      if (!tenantId) return [];
+      const { data, error } = await supabase
+        .from("roles")
+        .select("*, role_permissions(permission_id, permissions(code))")
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       return data;
     },
+    enabled: !tenantLoading && Boolean(tenantId),
   });
 
   const { data: allPermissions, isLoading: permsLoading } = useQuery({
@@ -56,7 +65,7 @@ export function PermissionsTab() {
   const [permissionsState, setPermissionsState] = useState<Record<string, Record<string, boolean>>>({});
   const [initialized, setInitialized] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     if (roles && safePermissions.length > 0 && !initialized) {
       const newState: Record<string, Record<string, boolean>> = {};
       roles.forEach(role => {
@@ -70,13 +79,21 @@ export function PermissionsTab() {
     }
   }, [roles, safePermissions, initialized]);
 
+  useEffect(() => {
+    setInitialized(false);
+    setPermissionsState({});
+  }, [tenantId]);
+
   const savePermissions = useMutation({
     mutationFn: async () => {
+      if (!tenantId) throw new Error("Aucun tenant actif.");
       // Calculate diff and apply
       for (const roleId in permissionsState) {
+        const ownedRole = roles?.find(r => r.id === roleId && r.tenant_id === tenantId);
+        if (!ownedRole) throw new Error(`Le rôle ${roleId} n'appartient pas au tenant actif.`);
         for (const permId in permissionsState[roleId]) {
           const isEnabled = permissionsState[roleId][permId];
-          const role = roles?.find(r => r.id === roleId);
+          const role = ownedRole;
           const currentEnabled = role?.role_permissions.some(rp => rp.permission_id === permId);
 
           if (isEnabled && !currentEnabled) {
@@ -93,9 +110,9 @@ export function PermissionsTab() {
     },
     onSuccess: () => {
       toast.success("Permissions enregistrées avec succès.");
-      qc.invalidateQueries({ queryKey: ["roles"] });
+      qc.invalidateQueries({ queryKey: ["roles", tenantId] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error) => toast.error(formatSupabaseError(error)),
   });
 
   if (rolesLoading || permsLoading) return <Loader2 className="animate-spin h-8 w-8 mx-auto my-10" />;

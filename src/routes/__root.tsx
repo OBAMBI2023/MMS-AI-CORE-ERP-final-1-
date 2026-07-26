@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  useLocation,
   useNavigate,
   useRouter,
   HeadContent,
@@ -18,6 +19,28 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { TenantProvider } from "@/providers/TenantProvider";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { getPlatformAdminAccess } from "@/lib/super-admin.server";
+
+function isPlatformRoute(pathname: string) {
+  return pathname === "/super-admin" || pathname.startsWith("/super-admin/");
+}
+
+function isLicenseRoute(pathname: string) {
+  return pathname === "/licence";
+}
+
+const publicRoutes = new Set([
+  "/",
+  "/fonctionnalites",
+  "/tarifs",
+  "/demo",
+  "/essai-gratuit",
+  "/login",
+]);
+
+function isPublicRoute(pathname: string) {
+  return publicRoutes.has(pathname);
+}
 
 function NotFoundComponent() {
   return (
@@ -94,11 +117,52 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       session: !!session,
     });
 
-    if (!session && location.pathname !== "/login") {
+    if (isPublicRoute(location.pathname)) {
+      return;
+    }
+
+    if (!session) {
       throw redirect({ to: "/login" });
     }
 
-    if (session && location.pathname !== "/login") {
+    if (session) {
+      // La qualité de compte plateforme est vérifiée côté serveur avant toute
+      // lecture de profil, de tenant ou de permission RBAC.
+      const { isPlatformAdmin } = await getPlatformAdminAccess();
+      if (isPlatformAdmin) {
+        if (!isPlatformRoute(location.pathname)) {
+          throw redirect({ to: "/super-admin" });
+        }
+        return;
+      }
+
+      if (isLicenseRoute(location.pathname)) {
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("tenant_id")
+        .eq("id", session.user.id)
+        .single();
+
+      if (profileError || !profile?.tenant_id) {
+        throw redirect({ to: "/licence" });
+      }
+
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from("subscriptions")
+        .select("status")
+        .eq("tenant_id", profile.tenant_id)
+        .maybeSingle();
+
+      const subscriptionStatus = subscription ? String(subscription.status) : null;
+      const hasValidLicense = subscriptionStatus === "active" || subscriptionStatus === "trial";
+
+      if (subscriptionError || !hasValidLicense) {
+        throw redirect({ to: "/licence" });
+      }
+
       const requiredPermission = routePermissions[location.pathname];
       if (requiredPermission) {
         const { data: profile } = await supabase
@@ -187,7 +251,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <head>
         <HeadContent />
       </head>
@@ -204,12 +268,18 @@ import { DynamicFavicon } from "@/components/mms/DynamicFavicon";
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
+  const isPlatformArea = useLocation({
+    select: (location) => isPlatformRoute(location.pathname),
+  });
+  const isPublicArea = useLocation({
+    select: (location) => isPublicRoute(location.pathname),
+  });
 
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT" && window.location.pathname !== "/login") {
+      if (event === "SIGNED_OUT" && !isPublicRoute(window.location.pathname)) {
         navigate({ to: "/login", replace: true });
       }
     });
@@ -220,11 +290,19 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TenantProvider>
-          <DynamicFavicon />
-          <Outlet />
-          <Toaster richColors position="top-right" />
-        </TenantProvider>
+        {isPlatformArea || isPublicArea ? (
+          <>
+            <DynamicFavicon />
+            <Outlet />
+            <Toaster richColors position="top-right" />
+          </>
+        ) : (
+          <TenantProvider>
+            <DynamicFavicon />
+            <Outlet />
+            <Toaster richColors position="top-right" />
+          </TenantProvider>
+        )}
       </ThemeProvider>
     </QueryClientProvider>
   );

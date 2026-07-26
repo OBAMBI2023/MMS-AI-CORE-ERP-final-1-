@@ -8,6 +8,48 @@ export type Database = {
   };
   public: {
     Tables: {
+      subscriptions: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          trial_started_at: string | null;
+          trial_ends_at: string | null;
+          starts_at: string | null;
+          ends_at: string | null;
+          amount: number;
+          billing_cycle: Database["public"]["Enums"]["subscription_billing_cycle"];
+          status: Database["public"]["Enums"]["subscription_status"];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          trial_started_at?: string | null;
+          trial_ends_at?: string | null;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          amount?: number;
+          billing_cycle?: Database["public"]["Enums"]["subscription_billing_cycle"];
+          status?: Database["public"]["Enums"]["subscription_status"];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          trial_started_at?: string | null;
+          trial_ends_at?: string | null;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          amount?: number;
+          billing_cycle?: Database["public"]["Enums"]["subscription_billing_cycle"];
+          status?: Database["public"]["Enums"]["subscription_status"];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       achat_items: {
         Row: {
           achat_id: string;
@@ -48,6 +90,7 @@ export type Database = {
       };
       achats: {
         Row: {
+          tenant_id: string;
           created_at: string;
           discount: number;
           fournisseur_id: string | null;
@@ -98,6 +141,7 @@ export type Database = {
       };
       clients: {
         Row: {
+          tenant_id: string;
           address: string | null;
           created_at: string;
           email: string | null;
@@ -131,6 +175,7 @@ export type Database = {
       };
       depenses: {
         Row: {
+          tenant_id: string;
           amount: number;
           category: string;
           created_at: string;
@@ -164,6 +209,7 @@ export type Database = {
       };
       devis: {
         Row: {
+          tenant_id: string;
           client_id: string | null;
           client_name: string | null;
           created_at: string;
@@ -265,6 +311,7 @@ export type Database = {
       };
       fournisseurs: {
         Row: {
+          tenant_id: string;
           address: string | null;
           created_at: string;
           email: string | null;
@@ -427,6 +474,7 @@ export type Database = {
       };
       services: {
         Row: {
+          tenant_id: string;
           active: boolean;
           category: string;
           created_at: string;
@@ -508,6 +556,7 @@ export type Database = {
       };
       ventes: {
         Row: {
+          tenant_id: string;
           cashier: string | null;
           client_id: string | null;
           client_name: string | null;
@@ -561,10 +610,39 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      create_trial_workspace: {
+        Args: {
+          p_user_id: string;
+          p_company_name: string;
+          p_full_name: string;
+          p_email: string;
+          p_phone: string;
+        };
+        Returns: string;
+      };
+      rollback_trial_workspace: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: boolean;
+      };
+      consume_trial_signup_attempt: {
+        Args: {
+          p_ip_address: string;
+          p_email: string;
+          p_max_attempts?: number;
+          p_window?: string;
+        };
+        Returns: boolean;
+      };
+      expire_due_subscriptions: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
     };
     Enums: {
-      [_ in never]: never;
+      subscription_billing_cycle: "monthly" | "quarterly" | "yearly";
+      subscription_status: "trial" | "active" | "expired" | "suspended";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -685,6 +763,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      subscription_billing_cycle: ["monthly", "quarterly", "yearly"],
+      subscription_status: ["trial", "active", "expired", "suspended"],
+    },
   },
 } as const;

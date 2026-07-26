@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { DemoPage } from "@/marketing/pages/DemoPage";
 import { MarketingLayout } from "@/marketing/layouts/MarketingLayout";
-import { HomePage } from "@/marketing/pages/HomePage";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/demo")({
   component: () => (
     <MarketingLayout>
-      <HomePage />
+      <DemoPage />
     </MarketingLayout>
   ),
 });

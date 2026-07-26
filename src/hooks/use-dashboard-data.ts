@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/providers/TenantProvider";
 import {
   startOfMonth,
   subMonths,
@@ -140,9 +141,18 @@ function groupSum<T>(
 }
 
 export function useDashboardData() {
+  const { profile, loading: tenantLoading } = useTenant();
+  const tenantId = profile?.tenant_id;
+
   return useQuery({
-    queryKey: ["dashboard-data-v2"],
+    // The tenant belongs in the cache key as well as in every database query:
+    // otherwise data cached for one tenant can be rendered after an account switch.
+    queryKey: ["dashboard-data-v2", tenantId],
     queryFn: async () => {
+      if (!tenantId) {
+        throw new Error("Locataire introuvable");
+      }
+
       const [
         ventesRes,
         achatsRes,
@@ -156,33 +166,52 @@ export function useDashboardData() {
         supabase
           .from("ventes")
           .select("id, client_name, total, payment_method, created_at")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
         supabase
           .from("achats")
           .select("id, fournisseur_name, total, created_at")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
         supabase
           .from("depenses")
           .select("id, description, category, amount, paid_at, created_at")
+          .eq("tenant_id", tenantId)
           .order("paid_at", { ascending: false }),
         supabase
           .from("clients")
           .select("id, name, created_at")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
         supabase
           .from("fournisseurs")
           .select("id, name, created_at")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
         supabase
           .from("services")
           .select("id, name, active, created_at")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
         supabase
           .from("devis")
           .select("id, status, total, created_at")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
         supabase.auth.getSession(),
       ]);
+
+      const queryError = [
+        ventesRes.error,
+        achatsRes.error,
+        depensesRes.error,
+        clientsRes.error,
+        fournisseursRes.error,
+        servicesRes.error,
+        devisRes.error,
+        sessionRes.error,
+      ].find(Boolean);
+      if (queryError) throw queryError;
 
       const ventes = ventesRes.data ?? [];
       const achats = achatsRes.data ?? [];
@@ -449,6 +478,7 @@ export function useDashboardData() {
           : null,
       };
     },
+    enabled: !tenantLoading && Boolean(tenantId),
     staleTime: 30_000,
   });
 }

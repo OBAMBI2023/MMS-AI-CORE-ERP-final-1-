@@ -11,18 +11,26 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VentesRouteImport } from './routes/ventes'
 import { Route as UtilisateursRouteImport } from './routes/utilisateurs'
+import { Route as TarifsRouteImport } from './routes/tarifs'
+import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RapportsRouteImport } from './routes/rapports'
 import { Route as ParametresRouteImport } from './routes/parametres'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LicenceRouteImport } from './routes/licence'
 import { Route as JournalRouteImport } from './routes/journal'
 import { Route as FournisseursRouteImport } from './routes/fournisseurs'
+import { Route as FonctionnalitesRouteImport } from './routes/fonctionnalites'
+import { Route as EssaiGratuitRouteImport } from './routes/essai-gratuit'
 import { Route as DevisRouteImport } from './routes/devis'
 import { Route as DepensesRouteImport } from './routes/depenses'
+import { Route as DemoRouteImport } from './routes/demo'
 import { Route as ClientsRouteImport } from './routes/clients'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as AchatsRouteImport } from './routes/achats'
 import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppSplatRouteImport } from './routes/app.$'
 
 const VentesRoute = VentesRouteImport.update({
   id: '/ventes',
@@ -32,6 +40,16 @@ const VentesRoute = VentesRouteImport.update({
 const UtilisateursRoute = UtilisateursRouteImport.update({
   id: '/utilisateurs',
   path: '/utilisateurs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TarifsRoute = TarifsRouteImport.update({
+  id: '/tarifs',
+  path: '/tarifs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminRoute = SuperAdminRouteImport.update({
+  id: '/super-admin',
+  path: '/super-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ServicesRoute = ServicesRouteImport.update({
@@ -54,6 +72,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LicenceRoute = LicenceRouteImport.update({
+  id: '/licence',
+  path: '/licence',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JournalRoute = JournalRouteImport.update({
   id: '/journal',
   path: '/journal',
@@ -62,6 +85,16 @@ const JournalRoute = JournalRouteImport.update({
 const FournisseursRoute = FournisseursRouteImport.update({
   id: '/fournisseurs',
   path: '/fournisseurs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FonctionnalitesRoute = FonctionnalitesRouteImport.update({
+  id: '/fonctionnalites',
+  path: '/fonctionnalites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EssaiGratuitRoute = EssaiGratuitRouteImport.update({
+  id: '/essai-gratuit',
+  path: '/essai-gratuit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevisRoute = DevisRouteImport.update({
@@ -74,9 +107,19 @@ const DepensesRoute = DepensesRouteImport.update({
   path: '/depenses',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DemoRoute = DemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClientsRoute = ClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AchatsRoute = AchatsRouteImport.update({
@@ -94,55 +137,84 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppSplatRoute = AppSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
+  '/app': typeof AppRouteWithChildren
   '/clients': typeof ClientsRoute
+  '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
+  '/essai-gratuit': typeof EssaiGratuitRoute
+  '/fonctionnalites': typeof FonctionnalitesRoute
   '/fournisseurs': typeof FournisseursRoute
   '/journal': typeof JournalRoute
+  '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/super-admin': typeof SuperAdminRoute
+  '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
+  '/app/$': typeof AppSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
+  '/app': typeof AppRouteWithChildren
   '/clients': typeof ClientsRoute
+  '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
+  '/essai-gratuit': typeof EssaiGratuitRoute
+  '/fonctionnalites': typeof FonctionnalitesRoute
   '/fournisseurs': typeof FournisseursRoute
   '/journal': typeof JournalRoute
+  '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/super-admin': typeof SuperAdminRoute
+  '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
+  '/app/$': typeof AppSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
+  '/app': typeof AppRouteWithChildren
   '/clients': typeof ClientsRoute
+  '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
+  '/essai-gratuit': typeof EssaiGratuitRoute
+  '/fonctionnalites': typeof FonctionnalitesRoute
   '/fournisseurs': typeof FournisseursRoute
   '/journal': typeof JournalRoute
+  '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/super-admin': typeof SuperAdminRoute
+  '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
+  '/app/$': typeof AppSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,64 +222,95 @@ export interface FileRouteTypes {
     | '/'
     | '/403'
     | '/achats'
+    | '/app'
     | '/clients'
+    | '/demo'
     | '/depenses'
     | '/devis'
+    | '/essai-gratuit'
+    | '/fonctionnalites'
     | '/fournisseurs'
     | '/journal'
+    | '/licence'
     | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/super-admin'
+    | '/tarifs'
     | '/utilisateurs'
     | '/ventes'
+    | '/app/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/403'
     | '/achats'
+    | '/app'
     | '/clients'
+    | '/demo'
     | '/depenses'
     | '/devis'
+    | '/essai-gratuit'
+    | '/fonctionnalites'
     | '/fournisseurs'
     | '/journal'
+    | '/licence'
     | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/super-admin'
+    | '/tarifs'
     | '/utilisateurs'
     | '/ventes'
+    | '/app/$'
   id:
     | '__root__'
     | '/'
     | '/403'
     | '/achats'
+    | '/app'
     | '/clients'
+    | '/demo'
     | '/depenses'
     | '/devis'
+    | '/essai-gratuit'
+    | '/fonctionnalites'
     | '/fournisseurs'
     | '/journal'
+    | '/licence'
     | '/login'
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/super-admin'
+    | '/tarifs'
     | '/utilisateurs'
     | '/ventes'
+    | '/app/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R403Route: typeof R403Route
   AchatsRoute: typeof AchatsRoute
+  AppRoute: typeof AppRouteWithChildren
   ClientsRoute: typeof ClientsRoute
+  DemoRoute: typeof DemoRoute
   DepensesRoute: typeof DepensesRoute
   DevisRoute: typeof DevisRoute
+  EssaiGratuitRoute: typeof EssaiGratuitRoute
+  FonctionnalitesRoute: typeof FonctionnalitesRoute
   FournisseursRoute: typeof FournisseursRoute
   JournalRoute: typeof JournalRoute
+  LicenceRoute: typeof LicenceRoute
   LoginRoute: typeof LoginRoute
   ParametresRoute: typeof ParametresRoute
   RapportsRoute: typeof RapportsRoute
   ServicesRoute: typeof ServicesRoute
+  SuperAdminRoute: typeof SuperAdminRoute
+  TarifsRoute: typeof TarifsRoute
   UtilisateursRoute: typeof UtilisateursRoute
   VentesRoute: typeof VentesRoute
 }
@@ -226,6 +329,20 @@ declare module '@tanstack/react-router' {
       path: '/utilisateurs'
       fullPath: '/utilisateurs'
       preLoaderRoute: typeof UtilisateursRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tarifs': {
+      id: '/tarifs'
+      path: '/tarifs'
+      fullPath: '/tarifs'
+      preLoaderRoute: typeof TarifsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin': {
+      id: '/super-admin'
+      path: '/super-admin'
+      fullPath: '/super-admin'
+      preLoaderRoute: typeof SuperAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/services': {
@@ -256,6 +373,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/licence': {
+      id: '/licence'
+      path: '/licence'
+      fullPath: '/licence'
+      preLoaderRoute: typeof LicenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/journal': {
       id: '/journal'
       path: '/journal'
@@ -268,6 +392,20 @@ declare module '@tanstack/react-router' {
       path: '/fournisseurs'
       fullPath: '/fournisseurs'
       preLoaderRoute: typeof FournisseursRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fonctionnalites': {
+      id: '/fonctionnalites'
+      path: '/fonctionnalites'
+      fullPath: '/fonctionnalites'
+      preLoaderRoute: typeof FonctionnalitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/essai-gratuit': {
+      id: '/essai-gratuit'
+      path: '/essai-gratuit'
+      fullPath: '/essai-gratuit'
+      preLoaderRoute: typeof EssaiGratuitRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/devis': {
@@ -284,11 +422,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DepensesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/demo': {
+      id: '/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clients': {
       id: '/clients'
       path: '/clients'
       fullPath: '/clients'
       preLoaderRoute: typeof ClientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/achats': {
@@ -312,22 +464,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/$': {
+      id: '/app/$'
+      path: '/$'
+      fullPath: '/app/$'
+      preLoaderRoute: typeof AppSplatRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
+
+interface AppRouteChildren {
+  AppSplatRoute: typeof AppSplatRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppSplatRoute: AppSplatRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R403Route: R403Route,
   AchatsRoute: AchatsRoute,
+  AppRoute: AppRouteWithChildren,
   ClientsRoute: ClientsRoute,
+  DemoRoute: DemoRoute,
   DepensesRoute: DepensesRoute,
   DevisRoute: DevisRoute,
+  EssaiGratuitRoute: EssaiGratuitRoute,
+  FonctionnalitesRoute: FonctionnalitesRoute,
   FournisseursRoute: FournisseursRoute,
   JournalRoute: JournalRoute,
+  LicenceRoute: LicenceRoute,
   LoginRoute: LoginRoute,
   ParametresRoute: ParametresRoute,
   RapportsRoute: RapportsRoute,
   ServicesRoute: ServicesRoute,
+  SuperAdminRoute: SuperAdminRoute,
+  TarifsRoute: TarifsRoute,
   UtilisateursRoute: UtilisateursRoute,
   VentesRoute: VentesRoute,
 }
