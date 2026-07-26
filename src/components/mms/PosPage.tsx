@@ -22,13 +22,7 @@ import {
   X,
   Check,
   Receipt as ReceiptIcon,
-  Copy,
-  FileText,
-  Layers,
   Image as ImageIcon,
-  Scissors,
-  Stamp,
-  Palette,
   Menu,
   Sparkles,
 } from "lucide-react";
@@ -42,139 +36,17 @@ import { History } from "lucide-react";
 import { useTenant } from "@/providers/TenantProvider";
 
 // ---------------- Types & catalogue ----------------
-type Category = "Impression" | "Copie" | "Reliure" | "Finition" | "Numérique";
+type Category = string;
 type Service = {
   id: string;
   name: string;
-  price: number; // FCFA
+  price: number;
   unit: string;
   category: Category;
-  icon: React.ComponentType<{ className?: string }>;
+  type: "product" | "service";
+  photoUrl: string | null;
+  stock: number | null;
 };
-
-const CATALOG: Service[] = [
-  {
-    id: "imp-n-a4",
-    name: "Impression N&B A4",
-    price: 100,
-    unit: "page",
-    category: "Impression",
-    icon: FileText,
-  },
-  {
-    id: "imp-c-a4",
-    name: "Impression Couleur A4",
-    price: 300,
-    unit: "page",
-    category: "Impression",
-    icon: Palette,
-  },
-  {
-    id: "imp-n-a3",
-    name: "Impression N&B A3",
-    price: 250,
-    unit: "page",
-    category: "Impression",
-    icon: FileText,
-  },
-  {
-    id: "imp-c-a3",
-    name: "Impression Couleur A3",
-    price: 600,
-    unit: "page",
-    category: "Impression",
-    icon: Palette,
-  },
-  {
-    id: "photo",
-    name: "Photo d'identité",
-    price: 1500,
-    unit: "planche",
-    category: "Impression",
-    icon: ImageIcon,
-  },
-  {
-    id: "cop-n-a4",
-    name: "Photocopie N&B A4",
-    price: 50,
-    unit: "page",
-    category: "Copie",
-    icon: Copy,
-  },
-  {
-    id: "cop-c-a4",
-    name: "Photocopie Couleur A4",
-    price: 200,
-    unit: "page",
-    category: "Copie",
-    icon: Copy,
-  },
-  {
-    id: "scan",
-    name: "Scan document",
-    price: 200,
-    unit: "page",
-    category: "Numérique",
-    icon: Layers,
-  },
-  {
-    id: "grav-cd",
-    name: "Gravure CD/DVD",
-    price: 1000,
-    unit: "unité",
-    category: "Numérique",
-    icon: Layers,
-  },
-  {
-    id: "rel-spir",
-    name: "Reliure spirale",
-    price: 1500,
-    unit: "unité",
-    category: "Reliure",
-    icon: Layers,
-  },
-  {
-    id: "rel-therm",
-    name: "Reliure thermique",
-    price: 2500,
-    unit: "unité",
-    category: "Reliure",
-    icon: Layers,
-  },
-  {
-    id: "plast-a4",
-    name: "Plastification A4",
-    price: 500,
-    unit: "unité",
-    category: "Finition",
-    icon: Stamp,
-  },
-  {
-    id: "plast-a3",
-    name: "Plastification A3",
-    price: 1000,
-    unit: "unité",
-    category: "Finition",
-    icon: Stamp,
-  },
-  {
-    id: "decoupe",
-    name: "Découpe / Massicot",
-    price: 300,
-    unit: "lot",
-    category: "Finition",
-    icon: Scissors,
-  },
-];
-
-const CATEGORIES: (Category | "Tous")[] = [
-  "Tous",
-  "Impression",
-  "Copie",
-  "Reliure",
-  "Finition",
-  "Numérique",
-];
 
 type CartItem = Service & { qty: number };
 type PayMethod = "Espèces" | "Wave" | "Orange Money" | "Carte";
@@ -195,13 +67,13 @@ export function PosPage() {
   const queryClient = useQueryClient();
   const { profile } = useTenant();
 
-  // Load catalog from database — fallback to hardcoded CATALOG if empty.
-  const { data: dbServices } = useQuery({
-    queryKey: ["services", "catalog"],
+  // RLS is the security boundary: the client does not select a tenant.
+  const { data: dbServices = [], isLoading: catalogLoading } = useQuery({
+    queryKey: ["services", "pos-catalog"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("services")
-        .select("id, name, category, unit, price")
+        .select("id, name, category, unit, price, type, photo_url, stock")
         .eq("active", true)
         .order("name");
       if (error) throw error;
@@ -214,19 +86,42 @@ export function PosPage() {
   const permissionsQuery = usePermissions();
   const canManageSales = permissionsQuery.data?.role === "Administrateur";
 
+  const photoPaths = useMemo(
+    () => dbServices.flatMap((service) => (service.photo_url ? [service.photo_url] : [])),
+    [dbServices],
+  );
+  const { data: catalogPhotoUrls = {} } = useQuery({
+    queryKey: ["catalog-images", photoPaths],
+    enabled: photoPaths.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.storage
+        .from("catalog-images")
+        .createSignedUrls(photoPaths, 60 * 60);
+      if (error) throw error;
+      return Object.fromEntries(
+        (data ?? []).map((entry) => [entry.path, entry.signedUrl]).filter((entry) => entry[1]),
+      ) as Record<string, string>;
+    },
+    staleTime: 50 * 60 * 1000,
+  });
+
   const catalog: Service[] = useMemo(() => {
-    if (dbServices && dbServices.length > 0) {
-      return dbServices.map((s) => ({
-        id: s.id,
-        name: s.name,
-        price: Number(s.price),
-        unit: s.unit ?? "unité",
-        category: (s.category as Category) ?? "Impression",
-        icon: FileText,
-      }));
-    }
-    return CATALOG;
-  }, [dbServices]);
+    return dbServices.map((service) => ({
+      id: service.id,
+      name: service.name,
+      price: Number(service.price),
+      unit: service.unit ?? "unité",
+      category: service.category,
+      type: service.type === "product" ? "product" : "service",
+      photoUrl: service.photo_url ? (catalogPhotoUrls[service.photo_url] ?? null) : null,
+      stock: service.stock === null ? null : Number(service.stock),
+    }));
+  }, [catalogPhotoUrls, dbServices]);
+
+  const categories = useMemo(
+    () => ["Tous", ...Array.from(new Set(catalog.map((item) => item.category))).sort()],
+    [catalog],
+  );
 
   const filtered = useMemo(() => {
     return catalog.filter((s) => {
@@ -240,15 +135,34 @@ export function PosPage() {
   const total = Math.max(0, subTotal - discount);
 
   const addToCart = (s: Service) => {
+    if (s.type === "product" && s.stock !== null && s.stock < 1) {
+      toast.error("Cet article est en rupture de stock.");
+      return;
+    }
     setCart((c) => {
       const found = c.find((i) => i.id === s.id);
-      if (found) return c.map((i) => (i.id === s.id ? { ...i, qty: i.qty + 1 } : i));
+      if (found) {
+        if (s.type === "product" && s.stock !== null && found.qty >= s.stock) {
+          toast.error("Stock disponible atteint.");
+          return c;
+        }
+        return c.map((i) => (i.id === s.id ? { ...i, qty: i.qty + 1 } : i));
+      }
       return [...c, { ...s, qty: 1 }];
     });
   };
   const setQty = (id: string, qty: number) => {
     if (qty <= 0) return setCart((c) => c.filter((i) => i.id !== id));
-    setCart((c) => c.map((i) => (i.id === id ? { ...i, qty } : i)));
+    setCart((c) =>
+      c.map((i) => {
+        if (i.id !== id) return i;
+        if (i.type === "product" && i.stock !== null && qty > i.stock) {
+          toast.error("Stock disponible atteint.");
+          return { ...i, qty: i.stock };
+        }
+        return { ...i, qty };
+      }),
+    );
   };
   const clearCart = () => {
     setCart([]);
@@ -293,6 +207,7 @@ export function PosPage() {
       const { error: e2 } = await supabase.from("vente_items").insert(rows);
       if (e2) throw e2;
       queryClient.invalidateQueries({ queryKey: ["ventes", "history"] });
+      queryClient.invalidateQueries({ queryKey: ["services", "pos-catalog"] });
       toast.success(`Vente enregistrée (${dbNumber})`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur d'enregistrement";
@@ -356,7 +271,7 @@ export function PosPage() {
               <div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight">Point de vente</h1>
                 <p className="text-xs md:text-sm text-muted-foreground">
-                  Imprimerie — services & articles
+                  Produits et services de votre catalogue
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -382,12 +297,12 @@ export function PosPage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Rechercher un service..."
+                placeholder="Rechercher un produit ou service..."
                 className="w-full rounded-xl md:rounded-2xl bg-muted/60 border border-border pl-10 pr-4 py-2 text-sm outline-none focus:border-primary/40 transition"
               />
             </div>
             <div className="flex flex-wrap gap-1.5 md:gap-2 mt-3">
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <button
                   key={c}
                   onClick={() => setCategory(c)}
@@ -405,31 +320,54 @@ export function PosPage() {
 
           <div className="flex-1 overflow-y-auto scrollbar-thin p-3 md:p-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
-              {filtered.map((s) => (
-                <motion.button
-                  key={s.id}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => addToCart(s)}
-                  className="group text-left rounded-xl md:rounded-2xl border border-border bg-card p-3 md:p-4 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
-                >
-                  <div className="h-8 w-8 md:h-10 md:w-10 rounded-lg md:rounded-xl bg-primary/10 text-primary grid place-items-center mb-2 md:mb-3 group-hover:bg-primary group-hover:text-white transition-colors">
-                    <s.icon className="h-4 w-4 md:h-5 md:w-5" />
-                  </div>
-                  <div className="font-medium text-xs md:text-sm leading-tight">{s.name}</div>
-                  <div className="mt-1 md:mt-2 flex items-baseline justify-between">
-                    <span className="text-primary font-semibold text-xs md:text-sm">
-                      {formatCurrency(s.price)}
-                    </span>
-                    <span className="text-[9px] md:text-[10px] uppercase tracking-wide text-muted-foreground">
-                      / {s.unit}
-                    </span>
-                  </div>
-                </motion.button>
-              ))}
-              {filtered.length === 0 && (
+              {filtered.map((s) => {
+                const outOfStock = s.type === "product" && s.stock !== null && s.stock < 1;
+                return (
+                  <motion.button
+                    key={s.id}
+                    whileHover={outOfStock ? undefined : { y: -2 }}
+                    whileTap={outOfStock ? undefined : { scale: 0.98 }}
+                    onClick={() => addToCart(s)}
+                    disabled={outOfStock}
+                    className="group overflow-hidden text-left rounded-xl md:rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <div className="aspect-[4/3] w-full bg-muted">
+                      {s.photoUrl ? (
+                        <img src={s.photoUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="grid h-full place-items-center text-muted-foreground">
+                          <ImageIcon className="h-7 w-7" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 md:p-4">
+                      <div className="font-medium text-xs md:text-sm leading-tight">{s.name}</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">{s.category}</div>
+                      <div className="mt-1 md:mt-2 flex items-baseline justify-between gap-2">
+                        <span className="text-primary font-semibold text-xs md:text-sm">
+                          {formatCurrency(s.price)}
+                        </span>
+                        <span className="text-[9px] md:text-[10px] uppercase tracking-wide text-muted-foreground">
+                          / {s.unit}
+                        </span>
+                      </div>
+                      {s.type === "product" && s.stock !== null && (
+                        <div className="mt-2 text-[10px] text-muted-foreground">
+                          {outOfStock ? "Rupture de stock" : `Stock : ${formatNumber(s.stock)}`}
+                        </div>
+                      )}
+                    </div>
+                  </motion.button>
+                );
+              })}
+              {!catalogLoading && filtered.length === 0 && (
                 <div className="col-span-full text-center py-10 md:py-16 text-muted-foreground text-sm">
-                  Aucun service trouvé
+                  Aucun produit ou service disponible
+                </div>
+              )}
+              {catalogLoading && (
+                <div className="col-span-full text-center py-10 md:py-16 text-muted-foreground text-sm">
+                  Chargement du catalogue...
                 </div>
               )}
             </div>

@@ -41,6 +41,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  manageTenantModule,
   manageTenantSubscription,
   type SubscriptionBillingCycle,
   type SuperAdminDashboard,
@@ -70,6 +71,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -258,6 +260,7 @@ function TenantTable({
   onQueryChange: (value: string) => void;
 }) {
   const [selectedTenant, setSelectedTenant] = useState<SuperAdminTenant | null>(null);
+  const [moduleTenant, setModuleTenant] = useState<SuperAdminTenant | null>(null);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("fr");
     if (!normalized) return tenants;
@@ -384,7 +387,6 @@ function TenantTable({
                           variant="ghost"
                           size="icon"
                           className="size-8 rounded-lg text-muted-foreground"
-                          disabled={!tenant.subscriptionId}
                         >
                           <MoreHorizontal className="size-4" />
                           <span className="sr-only">Actions</span>
@@ -393,9 +395,16 @@ function TenantTable({
                       <DropdownMenuContent align="end" className="w-48 rounded-lg">
                         <DropdownMenuLabel>Actions du tenant</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setSelectedTenant(tenant)}>
+                        <DropdownMenuItem
+                          disabled={!tenant.subscriptionId}
+                          onClick={() => setSelectedTenant(tenant)}
+                        >
                           <KeyRound />
                           Gérer la licence
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setModuleTenant(tenant)}>
+                          <Gauge />
+                          Gérer les modules
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -413,7 +422,81 @@ function TenantTable({
           if (!open) setSelectedTenant(null);
         }}
       />
+      <TenantModulesDialog
+        tenant={moduleTenant}
+        open={Boolean(moduleTenant)}
+        onOpenChange={(open) => {
+          if (!open) setModuleTenant(null);
+        }}
+      />
     </Card>
+  );
+}
+
+function TenantModulesDialog({
+  tenant,
+  open,
+  onOpenChange,
+}: {
+  tenant: SuperAdminTenant | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const [pendingModule, setPendingModule] = useState<string | null>(null);
+
+  const toggleModule = async (moduleId: string, enabled: boolean) => {
+    if (!tenant) return;
+    setPendingModule(moduleId);
+    try {
+      await manageTenantModule({
+        data: { tenantId: tenant.id, moduleId, enabled },
+      });
+      toast.success(enabled ? "Module activé." : "Module désactivé.");
+      onOpenChange(false);
+      await router.invalidate();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Impossible de mettre à jour le module.",
+      );
+    } finally {
+      setPendingModule(null);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Modules du tenant</DialogTitle>
+          <DialogDescription>
+            Activez uniquement les fonctions accessibles à {tenant?.name}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] space-y-2 overflow-y-auto py-2">
+          {tenant?.modules.map((module) => (
+            <div
+              key={module.id}
+              className="flex items-center justify-between gap-4 rounded-lg border border-border p-3"
+            >
+              <div className="min-w-0">
+                <Label htmlFor={`module-${module.id}`}>{module.name}</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {module.description ?? module.code}
+                </p>
+              </div>
+              <Switch
+                id={`module-${module.id}`}
+                checked={module.enabled}
+                disabled={pendingModule !== null}
+                onCheckedChange={(enabled) => toggleModule(module.id, enabled)}
+                aria-label={`${module.enabled ? "Désactiver" : "Activer"} ${module.name}`}
+              />
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

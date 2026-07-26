@@ -15,6 +15,7 @@ import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { hasPermission } from "@/lib/auth";
 import { routePermissions } from "@/lib/route-permissions";
+import { getRouteModule } from "@/lib/route-modules";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TenantProvider } from "@/providers/TenantProvider";
 import appCss from "../styles.css?url";
@@ -161,6 +162,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
       if (subscriptionError || !hasValidLicense) {
         throw redirect({ to: "/licence" });
+      }
+
+      const requiredModule = getRouteModule(location.pathname);
+      if (requiredModule) {
+        const { data: moduleEnabled, error: moduleError } = await supabase.rpc(
+          "current_user_module_enabled",
+          { requested_code: requiredModule },
+        );
+        if (moduleError || !moduleEnabled) {
+          throw redirect({ to: "/403" });
+        }
       }
 
       const requiredPermission = routePermissions[location.pathname];

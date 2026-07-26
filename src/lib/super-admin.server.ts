@@ -12,6 +12,15 @@ type TenantMetricRow = {
   updated_at?: string | null;
 };
 type SaleRow = TenantMetricRow & { total?: number | string | null };
+type ModuleRow = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+};
+type TenantModuleRow = { tenant_id: string; module_id: string; enabled: boolean };
 
 export type SubscriptionStatus = "trial" | "active" | "expired" | "suspended";
 export type SubscriptionBillingCycle = "monthly" | "quarterly" | "yearly";
@@ -51,7 +60,10 @@ export type SuperAdminTenant = {
   subscriptionAmount: number;
   daysRemaining: number | null;
   lastActivityAt: string | null;
+  modules: SuperAdminTenantModule[];
 };
+
+export type SuperAdminTenantModule = ModuleRow & { enabled: boolean };
 
 export type SuperAdminDashboard = {
   kpis: { tenants: number; activeTenants: number; users: number; sales: number; revenue: number };
@@ -129,7 +141,15 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
     const { error: expirationError } = await supabaseAdmin.rpc("expire_due_subscriptions");
     if (expirationError) throw new Error(formatSupabaseError(expirationError));
 
-    const [tenantRows, profileRows, saleRows, clientRows, subscriptionRows] = await Promise.all([
+    const [
+      tenantRows,
+      profileRows,
+      saleRows,
+      clientRows,
+      subscriptionRows,
+      moduleRows,
+      tenantModuleRows,
+    ] = await Promise.all([
       fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, is_active, created_at"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "tenant_id, created_at, updated_at"),
       fetchRows<SaleRow>(supabaseAdmin, "ventes", "tenant_id, total, created_at, updated_at"),
@@ -139,9 +159,25 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         "subscriptions",
         "id, tenant_id, trial_started_at, trial_ends_at, starts_at, ends_at, amount, billing_cycle, status",
       ),
+      fetchRows<ModuleRow>(
+        supabaseAdmin,
+        "erp_modules",
+        "id, code, name, description, sort_order, is_active",
+      ),
+      fetchRows<TenantModuleRow>(
+        supabaseAdmin,
+        "tenant_modules",
+        "tenant_id, module_id, enabled",
+      ),
     ]);
     const subscriptionsByTenant = new Map(
       subscriptionRows.map((subscription) => [subscription.tenant_id, subscription]),
+    );
+    const tenantModuleState = new Map(
+      tenantModuleRows.map((assignment) => [
+        `${assignment.tenant_id}:${assignment.module_id}`,
+        assignment.enabled,
+      ]),
     );
     const metrics = new Map<
       string,
@@ -225,6 +261,13 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           subscriptionAmount: Number(subscription?.amount) || 0,
           daysRemaining: remainingDays(subscriptionEnd),
           lastActivityAt: latestDate(tenantMetrics.lastActivityAt, tenant.created_at),
+          modules: moduleRows
+            .filter((module) => module.is_active)
+            .map((module) => ({
+              ...module,
+              enabled: tenantModuleState.get(`${tenant.id}:${module.id}`) ?? false,
+            }))
+            .sort((a, b) => a.sort_order - b.sort_order),
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name, "fr"));
@@ -260,6 +303,30 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       registrations: buildRegistrationSeries(tenants),
       tenants,
     };
+  });
+
+const manageTenantModuleSchema = z.object({
+  tenantId: z.string().uuid(),
+  moduleId: z.string().uuid(),
+  enabled: z.boolean(),
+});
+
+export const manageTenantModule = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(manageTenantModuleSchema)
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("tenant_modules").upsert(
+      {
+        tenant_id: data.tenantId,
+        module_id: data.moduleId,
+        enabled: data.enabled,
+      },
+      { onConflict: "tenant_id,module_id" },
+    );
+    if (error) throw new Error(formatSupabaseError(error));
+    return { success: true };
   });
 
 const manageSubscriptionSchema = z.object({

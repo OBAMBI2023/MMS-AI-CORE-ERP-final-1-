@@ -13,6 +13,7 @@ import { Route as VentesRouteImport } from './routes/ventes'
 import { Route as UtilisateursRouteImport } from './routes/utilisateurs'
 import { Route as TarifsRouteImport } from './routes/tarifs'
 import { Route as SuperAdminRouteImport } from './routes/super-admin'
+import { Route as StockRouteImport } from './routes/stock'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RapportsRouteImport } from './routes/rapports'
 import { Route as ParametresRouteImport } from './routes/parametres'
@@ -26,6 +27,7 @@ import { Route as DevisRouteImport } from './routes/devis'
 import { Route as DepensesRouteImport } from './routes/depenses'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as ClientsRouteImport } from './routes/clients'
+import { Route as CategoriesRouteImport } from './routes/categories'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AchatsRouteImport } from './routes/achats'
 import { Route as R403RouteImport } from './routes/403'
@@ -50,6 +52,11 @@ const TarifsRoute = TarifsRouteImport.update({
 const SuperAdminRoute = SuperAdminRouteImport.update({
   id: '/super-admin',
   path: '/super-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StockRoute = StockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ServicesRoute = ServicesRouteImport.update({
@@ -117,6 +124,11 @@ const ClientsRoute = ClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CategoriesRoute = CategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -148,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
   '/app': typeof AppRouteWithChildren
+  '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
   '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
@@ -161,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRoute
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
@@ -172,6 +186,7 @@ export interface FileRoutesByTo {
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
   '/app': typeof AppRouteWithChildren
+  '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
   '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
@@ -185,6 +200,7 @@ export interface FileRoutesByTo {
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRoute
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
@@ -197,6 +213,7 @@ export interface FileRoutesById {
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
   '/app': typeof AppRouteWithChildren
+  '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
   '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
@@ -210,6 +227,7 @@ export interface FileRoutesById {
   '/parametres': typeof ParametresRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
+  '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRoute
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
@@ -223,6 +241,7 @@ export interface FileRouteTypes {
     | '/403'
     | '/achats'
     | '/app'
+    | '/categories'
     | '/clients'
     | '/demo'
     | '/depenses'
@@ -236,6 +255,7 @@ export interface FileRouteTypes {
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/stock'
     | '/super-admin'
     | '/tarifs'
     | '/utilisateurs'
@@ -247,6 +267,7 @@ export interface FileRouteTypes {
     | '/403'
     | '/achats'
     | '/app'
+    | '/categories'
     | '/clients'
     | '/demo'
     | '/depenses'
@@ -260,6 +281,7 @@ export interface FileRouteTypes {
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/stock'
     | '/super-admin'
     | '/tarifs'
     | '/utilisateurs'
@@ -271,6 +293,7 @@ export interface FileRouteTypes {
     | '/403'
     | '/achats'
     | '/app'
+    | '/categories'
     | '/clients'
     | '/demo'
     | '/depenses'
@@ -284,6 +307,7 @@ export interface FileRouteTypes {
     | '/parametres'
     | '/rapports'
     | '/services'
+    | '/stock'
     | '/super-admin'
     | '/tarifs'
     | '/utilisateurs'
@@ -296,6 +320,7 @@ export interface RootRouteChildren {
   R403Route: typeof R403Route
   AchatsRoute: typeof AchatsRoute
   AppRoute: typeof AppRouteWithChildren
+  CategoriesRoute: typeof CategoriesRoute
   ClientsRoute: typeof ClientsRoute
   DemoRoute: typeof DemoRoute
   DepensesRoute: typeof DepensesRoute
@@ -309,6 +334,7 @@ export interface RootRouteChildren {
   ParametresRoute: typeof ParametresRoute
   RapportsRoute: typeof RapportsRoute
   ServicesRoute: typeof ServicesRoute
+  StockRoute: typeof StockRoute
   SuperAdminRoute: typeof SuperAdminRoute
   TarifsRoute: typeof TarifsRoute
   UtilisateursRoute: typeof UtilisateursRoute
@@ -343,6 +369,13 @@ declare module '@tanstack/react-router' {
       path: '/super-admin'
       fullPath: '/super-admin'
       preLoaderRoute: typeof SuperAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stock': {
+      id: '/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof StockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/services': {
@@ -436,6 +469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/categories': {
+      id: '/categories'
+      path: '/categories'
+      fullPath: '/categories'
+      preLoaderRoute: typeof CategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -489,6 +529,7 @@ const rootRouteChildren: RootRouteChildren = {
   R403Route: R403Route,
   AchatsRoute: AchatsRoute,
   AppRoute: AppRouteWithChildren,
+  CategoriesRoute: CategoriesRoute,
   ClientsRoute: ClientsRoute,
   DemoRoute: DemoRoute,
   DepensesRoute: DepensesRoute,
@@ -502,6 +543,7 @@ const rootRouteChildren: RootRouteChildren = {
   ParametresRoute: ParametresRoute,
   RapportsRoute: RapportsRoute,
   ServicesRoute: ServicesRoute,
+  StockRoute: StockRoute,
   SuperAdminRoute: SuperAdminRoute,
   TarifsRoute: TarifsRoute,
   UtilisateursRoute: UtilisateursRoute,

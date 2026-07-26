@@ -10,10 +10,15 @@ import {
   Receipt,
   TrendingUp,
   Settings,
+  UserCog,
+  Boxes,
+  Tags,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { routePermissions } from "@/lib/route-permissions";
+import { routeModules } from "@/lib/route-modules";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/app" },
@@ -21,21 +26,27 @@ const items = [
   { icon: FileText, label: "Devis", to: "/devis" },
   { icon: Users, label: "Clients", to: "/clients" },
   { icon: Briefcase, label: "Produits & Services", to: "/services" },
+  { icon: Tags, label: "Catégories", to: "/categories" },
+  { icon: Boxes, label: "Stock", to: "/stock" },
   { icon: ShoppingCart, label: "Achats", to: "/achats" },
   { icon: Handshake, label: "Fournisseurs", to: "/fournisseurs" },
   { icon: Receipt, label: "Dépenses", to: "/depenses" },
   { icon: TrendingUp, label: "Rapports", to: "/rapports" },
   { icon: Settings, label: "Paramètres", to: "/parametres" },
+  { icon: UserCog, label: "Utilisateurs", to: "/utilisateurs" },
 ] as const;
 
 export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data, isLoading } = usePermissions();
+  const modulesQuery = useTenantModules();
   const permissions = data?.permissions || [];
   const role = data?.role;
 
   const filteredItems = items.filter((it) => {
-    if (isLoading) return false;
+    if (isLoading || modulesQuery.isLoading) return false;
+    const requiredModule = routeModules[it.to];
+    if (requiredModule && !modulesQuery.data?.has(requiredModule)) return false;
     const requiredPermission = routePermissions[it.to];
     if (requiredPermission) {
       return permissions.includes(requiredPermission);

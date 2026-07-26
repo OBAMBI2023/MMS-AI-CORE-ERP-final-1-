@@ -8,6 +8,140 @@ export type Database = {
   };
   public: {
     Tables: {
+      catalog_categories: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          sort_order: number;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id?: string;
+          name: string;
+          sort_order?: number;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          name?: string;
+          sort_order?: number;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      erp_modules: {
+        Row: {
+          id: string;
+          code: string;
+          name: string;
+          description: string | null;
+          icon: string | null;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          name: string;
+          description?: string | null;
+          icon?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          code?: string;
+          name?: string;
+          description?: string | null;
+          icon?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      inventory_movements: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          service_id: string;
+          movement_type: string;
+          quantity: number;
+          quantity_delta: number;
+          stock_before: number;
+          stock_after: number;
+          reason: string;
+          source: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          service_id: string;
+          movement_type: string;
+          quantity: number;
+          quantity_delta: number;
+          stock_before: number;
+          stock_after: number;
+          reason: string;
+          source: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          service_id?: string;
+          movement_type?: string;
+          quantity?: number;
+          quantity_delta?: number;
+          stock_before?: number;
+          stock_after?: number;
+          reason?: string;
+          source?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      tenant_modules: {
+        Row: {
+          tenant_id: string;
+          module_id: string;
+          enabled: boolean;
+        };
+        Insert: {
+          tenant_id: string;
+          module_id: string;
+          enabled?: boolean;
+        };
+        Update: {
+          tenant_id?: string;
+          module_id?: string;
+          enabled?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_modules_module_id_fkey";
+            columns: ["module_id"];
+            isOneToOne: false;
+            referencedRelation: "erp_modules";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       subscriptions: {
         Row: {
           id: string;
@@ -477,30 +611,50 @@ export type Database = {
           tenant_id: string;
           active: boolean;
           category: string;
+          category_id: string | null;
           created_at: string;
           id: string;
           name: string;
+          photo_url: string | null;
           price: number;
+          stock: number | null;
+          manage_stock: boolean;
+          stock_alert_threshold: number;
+          type: string;
           unit: string;
           updated_at: string;
         };
         Insert: {
+          tenant_id?: string;
           active?: boolean;
           category?: string;
+          category_id?: string | null;
           created_at?: string;
           id?: string;
           name: string;
+          photo_url?: string | null;
           price?: number;
+          stock?: number | null;
+          manage_stock?: boolean;
+          stock_alert_threshold?: number;
+          type?: string;
           unit?: string;
           updated_at?: string;
         };
         Update: {
+          tenant_id?: string;
           active?: boolean;
           category?: string;
+          category_id?: string | null;
           created_at?: string;
           id?: string;
           name?: string;
+          photo_url?: string | null;
           price?: number;
+          stock?: number | null;
+          manage_stock?: boolean;
+          stock_alert_threshold?: number;
+          type?: string;
           unit?: string;
           updated_at?: string;
         };
@@ -610,6 +764,31 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      replace_and_delete_catalog_category: {
+        Args: {
+          source_category_id: string;
+          replacement_category_id: string;
+        };
+        Returns: undefined;
+      };
+      current_user_module_enabled: {
+        Args: { requested_code: string };
+        Returns: boolean;
+      };
+      apply_inventory_movement: {
+        Args: {
+          requested_service_id: string;
+          requested_type: string;
+          requested_quantity: number;
+          requested_reason: string;
+          requested_source?: string;
+        };
+        Returns: Database["public"]["Tables"]["inventory_movements"]["Row"];
+      };
+      current_user_has_module_assignment: {
+        Args: { requested_module_id: string };
+        Returns: boolean;
+      };
       create_trial_workspace: {
         Args: {
           p_user_id: string;
