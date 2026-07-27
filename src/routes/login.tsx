@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Mail, Lock, Eye, EyeOff, Loader2, BarChart3, ShieldCheck, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCompanySettings } from "@/hooks/use-company-settings";
@@ -19,6 +20,12 @@ const loginSchema = z.object({
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
+
+type LoginTenant = {
+  id: string;
+  name: string;
+  logo_url: string | null;
+};
 
 async function getAuthenticatedHome(): Promise<"/app" | "/super-admin"> {
   const { isPlatformAdmin } = await getPlatformAdminAccess();
@@ -57,11 +64,51 @@ export const Route = createFileRoute("/login")({
   },
 });
 
-function LoginPage() {
+export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [tenant, setTenant] = useState<LoginTenant | null>(null);
+  const [tenantLoading, setTenantLoading] = useState(Boolean(tenantSlug));
+  const [tenantNotFound, setTenantNotFound] = useState(false);
   const navigate = useNavigate();
-  const { companyName, logoUrl } = useCompanySettings();
+  const { companyName, logoUrl } = useCompanySettings(tenantSlug ? null : undefined);
+  const displayedCompanyName = tenantSlug ? tenant?.name ?? "AUREX ERP" : companyName;
+
+  useEffect(() => {
+    if (!tenantSlug) {
+      setTenant(null);
+      setTenantLoading(false);
+      setTenantNotFound(false);
+      return;
+    }
+
+    let active = true;
+    setTenant(null);
+    setTenantLoading(true);
+    setTenantNotFound(false);
+
+    void (async () => {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("id, name, logo_url")
+        .eq("slug", tenantSlug)
+        .maybeSingle();
+
+      if (!active) return;
+
+      if (error) {
+        console.error("Impossible de récupérer l’espace demandé :", error);
+      }
+
+      setTenant(data);
+      setTenantNotFound(Boolean(error) || !data);
+      setTenantLoading(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [tenantSlug]);
 
   const {
     register,
@@ -84,10 +131,32 @@ function LoginPage() {
         throw error;
       }
 
+      if (tenantSlug) {
+        if (!tenant) {
+          await supabase.auth.signOut();
+          throw new Error("Espace entreprise introuvable");
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (profileError || profile?.tenant_id !== tenant.id) {
+          await supabase.auth.signOut();
+          void logConnectionAttempt(values.email, "failure");
+          throw new Error("Ce compte n’appartient pas à cet espace.");
+        }
+      }
+
       // La journalisation ne doit jamais bloquer l'accès d'un compte authentifié.
       void logConnectionAttempt(values.email, "success", data.user.id);
 
-      await navigate({ to: await getAuthenticatedHome(), replace: true });
+      await navigate({
+        to: tenantSlug ? "/app" : await getAuthenticatedHome(),
+        replace: true,
+      });
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Une erreur est survenue");
     } finally {
@@ -148,7 +217,7 @@ function LoginPage() {
         </div>
 
         <div className="relative z-10 text-sm text-blue-300/60">
-          © {new Date().getFullYear()} {companyName || "ERP Premium"}. Tous droits réservés.
+          © {new Date().getFullYear()} {displayedCompanyName || "AUREX ERP"}. Tous droits réservés.
         </div>
       </div>
 
@@ -162,21 +231,37 @@ function LoginPage() {
         >
           {/* Logo & Branding */}
           <div className="flex flex-col items-center mb-10">
-            {logoUrl ? (
+            {tenantLoading ? (
+              <Skeleton className="h-20 w-20 mb-4 rounded-3xl" />
+            ) : tenant?.logo_url || (!tenantSlug && logoUrl) ? (
               <img
-                src={logoUrl}
-                alt={companyName}
+                src={tenant?.logo_url ?? logoUrl ?? undefined}
+                alt={tenant?.name ?? companyName}
                 className="max-w-[220px] h-auto mb-4 object-contain"
               />
             ) : (
               <div className="h-20 w-20 mb-4 bg-blue-600 rounded-3xl flex items-center justify-center text-white font-bold text-3xl shadow-lg">
-                {companyName?.charAt(0) || "E"}
+                A
               </div>
             )}
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-              {companyName || "ERP Premium"}
+              {tenantSlug ? "AUREX ERP" : companyName || "AUREX ERP"}
             </h2>
-            <p className="text-slate-500 text-sm mt-1">Connectez-vous à votre espace</p>
+            {tenantLoading ? (
+              <Skeleton className="h-4 w-48 mt-2" />
+            ) : (
+              <p
+                className={`text-sm mt-1 ${
+                  tenantNotFound ? "text-red-600 font-medium" : "text-slate-500"
+                }`}
+              >
+                {tenantNotFound
+                  ? "Espace entreprise introuvable"
+                  : tenant
+                    ? `Espace ${tenant.name}`
+                    : "Connectez-vous à votre espace"}
+              </p>
+            )}
           </div>
 
           <form onSubmit={handleSubmit(handleLogin)} className="space-y-5">
@@ -195,6 +280,7 @@ function LoginPage() {
                   type="email"
                   className="pl-9 h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-blue-500 transition-colors"
                   placeholder="nom@entreprise.com"
+                  disabled={tenantLoading || tenantNotFound}
                 />
               </div>
               {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
@@ -220,11 +306,13 @@ function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   className="pl-9 pr-10 h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-blue-500 transition-colors"
                   placeholder="••••••••"
+                  disabled={tenantLoading || tenantNotFound}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed"
+                  disabled={tenantLoading || tenantNotFound}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -235,7 +323,7 @@ function LoginPage() {
             <Button
               type="submit"
               className="w-full h-12 rounded-xl text-white font-semibold shadow-md shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 transition-all duration-200 mt-2"
-              disabled={loading}
+              disabled={loading || tenantLoading || tenantNotFound}
             >
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Se connecter"}
             </Button>

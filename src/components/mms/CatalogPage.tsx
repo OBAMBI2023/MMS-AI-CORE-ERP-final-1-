@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { ImageIcon, Loader2, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,32 +25,18 @@ import { formatSupabaseError } from "@/lib/supabase-error";
 import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 import { NewCategoryDialog } from "@/components/mms/NewCategoryDialog";
 import type { CatalogCategory } from "@/services/catalog-categories.service";
+import { useCatalogItems, type CatalogItem } from "@/hooks/use-catalog-items";
 
 const CATALOG_BUCKET = "catalog-images";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
-
-type CatalogItem = {
-  id: string;
-  type: "product" | "service";
-  category_id: string | null;
-  category: string;
-  name: string;
-  price: number;
-  unit: string;
-  photo_url: string | null;
-  stock: number | null;
-  manage_stock: boolean;
-  stock_alert_threshold: number;
-  active: boolean;
-  created_at: string;
-};
 
 type CatalogForm = {
   type: "product" | "service";
   category_id: string;
   name: string;
   price: string;
+  cost_price: string;
   unit: string;
   photo_url: string;
   photo_file: File | null;
@@ -65,6 +51,7 @@ const emptyForm: CatalogForm = {
   category_id: "",
   name: "",
   price: "0",
+  cost_price: "0",
   unit: "unité",
   photo_url: "",
   photo_file: null,
@@ -75,7 +62,6 @@ const emptyForm: CatalogForm = {
 };
 
 export function CatalogPage() {
-  const queryClient = useQueryClient();
   const { tenant, loading } = useTenant();
   const { profile, refreshTenant } = useTenant();
   const [search, setSearch] = useState("");
@@ -93,22 +79,7 @@ export function CatalogPage() {
     console.log({ loading, profile, tenant });
   }, [loading, profile, tenant]);
 
-  const itemsQuery = useQuery({
-    queryKey: ["services", tenant?.id],
-    queryFn: async () => {
-      if (!tenant?.id) throw new Error("Tenant connecté introuvable.");
-      const { data, error } = await supabase
-        .from("services")
-        .select(
-          "id, type, category_id, category, name, price, unit, photo_url, stock, manage_stock, stock_alert_threshold, active, created_at",
-        )
-        .eq("tenant_id", tenant.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as CatalogItem[];
-    },
-    enabled: !loading && Boolean(tenant?.id),
-  });
+  const itemsQuery = useCatalogItems();
 
   const requireConnectedTenant = async () => {
     console.log({ loading, profile, tenant });
@@ -192,6 +163,7 @@ export function CatalogPage() {
       category_id: item.category_id ?? "",
       name: item.name,
       price: String(item.price),
+      cost_price: String(item.cost_price),
       unit: item.unit,
       photo_url: item.photo_url ?? "",
       photo_file: null,
@@ -210,9 +182,13 @@ export function CatalogPage() {
         throw new Error("Le nom, la catégorie et l’unité sont requis.");
       }
       const price = Number(form.price);
+      const costPrice = Number(form.cost_price);
       const stock = form.stock.trim() === "" ? null : Number(form.stock);
       const stockAlertThreshold = Number(form.stock_alert_threshold);
       if (!Number.isFinite(price) || price < 0) throw new Error("Le prix est invalide.");
+      if (!Number.isFinite(costPrice) || costPrice < 0) {
+        throw new Error("Le prix de revient est invalide.");
+      }
       if (stock !== null && (!Number.isFinite(stock) || stock < 0)) {
         throw new Error("Le stock est invalide.");
       }
@@ -238,6 +214,7 @@ export function CatalogPage() {
         category_id: form.category_id,
         name: form.name.trim(),
         price,
+        cost_price: form.type === "product" ? costPrice : 0,
         unit: form.unit.trim(),
         photo_url: uploadedPath ?? (form.photo_url.trim() || null),
         manage_stock: manageStock,
@@ -245,7 +222,7 @@ export function CatalogPage() {
         stock_alert_threshold: manageStock ? stockAlertThreshold : 0,
         active: form.active,
       };
-      if (!tenant.id || payload.tenant_id !== tenant.id) {
+      if (!tenant?.id || payload.tenant_id !== tenant.id) {
         throw new Error("Tenant introuvable.");
       }
       const { error } = editing
@@ -266,7 +243,7 @@ export function CatalogPage() {
     onSuccess: async () => {
       toast.success(editing ? "Article mis à jour." : "Article créé.");
       setItemDialogOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["services", tenant?.id] });
+      await itemsQuery.reload();
     },
     onError: (error: Error) => {
       logCatalogError("enregistrement d’article", error);
@@ -286,7 +263,7 @@ export function CatalogPage() {
     },
     onSuccess: async () => {
       toast.success("Article supprimé.");
-      await queryClient.invalidateQueries({ queryKey: ["services", tenant?.id] });
+      await itemsQuery.reload();
     },
     onError: (error: Error) => {
       logCatalogError("suppression d’article", error);
@@ -294,7 +271,12 @@ export function CatalogPage() {
     },
   });
 
-  const isLoading = loading || categoriesQuery.isLoading || itemsQuery.isLoading;
+  const isLoading = loading || categoriesQuery.isLoading || itemsQuery.loading;
+  const loadError =
+    itemsQuery.error ??
+    (categoriesQuery.error
+      ? `Échec du chargement des catégories : ${formatSupabaseError(categoriesQuery.error)}`
+      : null);
 
   return (
     <div className="space-y-5">
@@ -325,6 +307,11 @@ export function CatalogPage() {
       )}
 
       <Card className="overflow-hidden">
+        {loadError && (
+          <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {loadError}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -344,6 +331,12 @@ export function CatalogPage() {
                 <tr>
                   <td colSpan={8} className="py-12 text-center">
                     <Loader2 className="mx-auto size-5 animate-spin" />
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-destructive">
+                    Le catalogue n’a pas pu être affiché.
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
@@ -535,6 +528,18 @@ function CatalogItemDialog({
               onChange={(event) => update("price", event.target.value)}
             />
           </label>
+          {form.type === "product" && (
+            <label className="space-y-2">
+              <Label>Prix de revient</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.cost_price}
+                onChange={(event) => update("cost_price", event.target.value)}
+              />
+            </label>
+          )}
           <label className="space-y-2">
             <Label>Unité</Label>
             <Input value={form.unit} onChange={(event) => update("unit", event.target.value)} />

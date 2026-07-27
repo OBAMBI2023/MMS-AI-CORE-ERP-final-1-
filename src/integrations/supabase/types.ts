@@ -8,6 +8,27 @@ export type Database = {
   };
   public: {
     Tables: {
+      tenants: {
+        Row: {
+          id: string;
+          name: string;
+          logo_url: string | null;
+          slug: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          logo_url?: string | null;
+          slug?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          logo_url?: string | null;
+          slug?: string;
+        };
+        Relationships: [];
+      };
       catalog_categories: {
         Row: {
           id: string;
@@ -612,6 +633,7 @@ export type Database = {
           active: boolean;
           category: string;
           category_id: string | null;
+          cost_price: number;
           created_at: string;
           id: string;
           name: string;
@@ -629,6 +651,7 @@ export type Database = {
           active?: boolean;
           category?: string;
           category_id?: string | null;
+          cost_price?: number;
           created_at?: string;
           id?: string;
           name: string;
@@ -646,6 +669,7 @@ export type Database = {
           active?: boolean;
           category?: string;
           category_id?: string | null;
+          cost_price?: number;
           created_at?: string;
           id?: string;
           name?: string;
@@ -662,32 +686,41 @@ export type Database = {
       };
       vente_items: {
         Row: {
+          cost_price: number;
           id: string;
+          item_type: string;
           line_total: number;
           name: string;
           price: number;
           qty: number;
           service_id: string | null;
+          selling_price: number;
           unit: string | null;
           vente_id: string;
         };
         Insert: {
+          cost_price?: number;
           id?: string;
+          item_type?: string;
           line_total?: number;
           name: string;
           price?: number;
           qty?: number;
           service_id?: string | null;
+          selling_price?: number;
           unit?: string | null;
           vente_id: string;
         };
         Update: {
+          cost_price?: number;
           id?: string;
+          item_type?: string;
           line_total?: number;
           name?: string;
           price?: number;
           qty?: number;
           service_id?: string | null;
+          selling_price?: number;
           unit?: string | null;
           vente_id?: string;
         };
@@ -724,6 +757,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          tenant_id: string;
           cashier?: string | null;
           client_id?: string | null;
           client_name?: string | null;
@@ -737,6 +771,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          tenant_id?: string;
           cashier?: string | null;
           client_id?: string | null;
           client_name?: string | null;
@@ -797,7 +832,11 @@ export type Database = {
           p_email: string;
           p_phone: string;
         };
-        Returns: string;
+        Returns: {
+          tenantId: string;
+          slug: string;
+          loginUrl: string;
+        };
       };
       rollback_trial_workspace: {
         Args: {

@@ -9,6 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 export interface LineItem {
   id?: string;
+  service_id?: string | null;
+  item_type?: "service" | "product";
+  cost_price?: number;
+  selling_price?: number;
   name: string;
   unit: string;
   qty: number;
@@ -34,24 +38,18 @@ export interface LineItemsDialogProps {
   onClose: () => void;
 }
 
+type DynamicQuery = PromiseLike<{ data: unknown; error: Error | null }> & {
+  eq: (column: string, value: unknown) => DynamicQuery;
+  order: (
+    column: string,
+    options?: { ascending?: boolean },
+  ) => Promise<{ data: unknown; error: Error | null }>;
+  maybeSingle: () => Promise<{ data: unknown; error: Error | null }>;
+};
+
 const db = supabase as unknown as {
   from: (t: string) => {
-    select: (c: string) => {
-      eq: (
-        col: string,
-        v: unknown,
-      ) => Promise<{ data: unknown; error: Error | null }> & {
-        maybeSingle: () => Promise<{ data: unknown; error: Error | null }>;
-        order: (
-          c: string,
-          o?: { ascending?: boolean },
-        ) => Promise<{ data: unknown; error: Error | null }>;
-      };
-      order: (
-        c: string,
-        o?: { ascending?: boolean },
-      ) => Promise<{ data: unknown; error: Error | null }>;
-    };
+    select: (columns: string) => DynamicQuery;
     insert: (p: Record<string, unknown> | Record<string, unknown>[]) => Promise<{
       error: Error | null;
     }> & {
@@ -108,9 +106,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
     queryKey: [partnerTable ?? "no-partner", tenantId],
     queryFn: async () => {
       if (!partnerTable) return [] as { id: string; name: string }[];
-      let query = (db
-        .from(partnerTable)
-        .select("id, name") as any);
+      let query = db.from(partnerTable).select("id, name");
       if (tenantId) query = query.eq("tenant_id", tenantId);
       const { data, error } = await query.order("name", { ascending: true });
       if (error) throw error;
@@ -121,23 +117,27 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   const { data: services = [] } = useQuery({
     queryKey: ["services", "active", tenantId],
     queryFn: async () => {
-      let query = (db
-        .from("services")
-        .select("id, name, unit, price") as any);
+      let query = db.from("services").select("id, name, unit, price, type, cost_price");
       if (tenantId) query = query.eq("tenant_id", tenantId);
       const { data, error } = await query.order("name", { ascending: true });
       if (error) throw error;
-      return (data as { id: string; name: string; unit: string; price: number }[]) ?? [];
+      return (
+        data as {
+          id: string;
+          name: string;
+          unit: string;
+          price: number;
+          type: "service" | "product";
+          cost_price: number;
+        }[]
+      ) ?? [];
     },
   });
 
   useEffect(() => {
     if (!isEdit || !initialId) return;
     (async () => {
-      let headQuery = (db
-        .from(headerTable)
-        .select("*")
-        .eq("id", initialId) as any);
+      let headQuery = db.from(headerTable).select("*").eq("id", initialId);
       if (tenantId) headQuery = headQuery.eq("tenant_id", tenantId);
       const { data: head, error: e1 } = await headQuery.maybeSingle();
       if (e1 || !head) return;
@@ -158,7 +158,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       setExtra(ex);
       const { data: rows } = await db
         .from(itemsTable)
-        .select("id, name, unit, qty, price")
+        .select("id, service_id, item_type, cost_price, selling_price, name, unit, qty, price")
         .eq(fkColumn, initialId);
       const list = (rows as LineItem[]) ?? [];
       if (list.length) setItems(list);
@@ -214,6 +214,14 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
         qty: Number(i.qty),
         price: Number(i.price),
         line_total: Number(i.qty) * Number(i.price),
+        ...(headerTable === "ventes"
+          ? {
+              service_id: i.service_id ?? null,
+              item_type: i.item_type ?? "service",
+              cost_price: i.item_type === "product" ? Number(i.cost_price ?? 0) : 0,
+              selling_price: Number(i.price),
+            }
+          : {}),
       }));
       const { error: e2 } = await db.from(itemsTable).insert(rows);
       if (e2) throw e2;
@@ -348,6 +356,10 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                             name: svc.name,
                             unit: svc.unit,
                             price: Number(svc.price),
+                            service_id: svc.id,
+                            item_type: svc.type,
+                            cost_price: Number(svc.cost_price),
+                            selling_price: Number(svc.price),
                           });
                         else updateItem(idx, { name: v });
                       }}

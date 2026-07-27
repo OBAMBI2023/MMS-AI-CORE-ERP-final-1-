@@ -13,6 +13,7 @@ import {
   UserCog,
   Boxes,
   Tags,
+  Bot,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -22,6 +23,7 @@ import { routeModules } from "@/lib/route-modules";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/app" },
+  { icon: Bot, label: "Assistant IA", to: "/app/assistant-ia" },
   { icon: Wallet, label: "Ventes (POS)", to: "/ventes" },
   { icon: FileText, label: "Devis", to: "/devis" },
   { icon: Users, label: "Clients", to: "/clients" },
@@ -57,10 +59,7 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   return (
     <nav className="flex-1 flex flex-col gap-1 mt-2">
       {filteredItems.map((it, idx) => {
-        const active =
-          it.to === "/ventes"
-            ? pathname.startsWith("/ventes")
-            : pathname === it.to;
+        const active = pathname === it.to;
 
         return (
           <Link

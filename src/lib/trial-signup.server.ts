@@ -152,7 +152,7 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
     let workspaceCreated = false;
 
     try {
-      const { error: onboardingError } = await supabaseAdmin.rpc("create_trial_workspace", {
+      const { data: workspace, error: onboardingError } = await supabaseAdmin.rpc("create_trial_workspace", {
         p_user_id: userId,
         p_company_name: data.companyName,
         p_full_name: data.fullName,
@@ -182,6 +182,7 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
       return {
         accessToken: sessionData.session.access_token,
         refreshToken: sessionData.session.refresh_token,
+        loginUrl: workspace.loginUrl,
       };
     } catch (error: unknown) {
       try {

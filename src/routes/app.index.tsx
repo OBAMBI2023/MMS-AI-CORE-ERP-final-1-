@@ -742,6 +742,6 @@ function Dashboard() {
   );
 }
 
-export const Route = createFileRoute("/app")({
+export const Route = createFileRoute("/app/")({
   component: Dashboard,
 });

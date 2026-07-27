@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
 
-type TenantRow = { id: string; name: string; is_active: boolean; created_at: string };
+type TenantRow = { id: string; name: string; slug: string; is_active: boolean; created_at: string };
 type TenantMetricRow = {
   tenant_id: string | null;
   created_at?: string | null;
@@ -21,9 +21,77 @@ type ModuleRow = {
   is_active: boolean;
 };
 type TenantModuleRow = { tenant_id: string; module_id: string; enabled: boolean };
+type AiPlanRow = {
+  code: string;
+  name: string;
+  monthly_request_limit: number | null;
+  price: number | string | null;
+  enabled: boolean;
+};
+type AiSubscriptionRow = {
+  id: string;
+  tenant_id: string;
+  plan_code: string;
+  status: AiSubscriptionStatus;
+  monthly_request_limit: number;
+  requests_used: number;
+  current_period_start: string;
+  current_period_end: string;
+  activated_at: string | null;
+  expires_at: string | null;
+};
+type AiUsageRow = {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  tool_name: string | null;
+  request_type: string;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  estimated_cost: number | string | null;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+};
 
 export type SubscriptionStatus = "trial" | "active" | "expired" | "suspended";
 export type SubscriptionBillingCycle = "monthly" | "quarterly" | "yearly";
+export type AiSubscriptionStatus = "trial" | "active" | "expired" | "suspended" | "cancelled";
+
+export type SuperAdminAiPlan = {
+  code: string;
+  name: string;
+  monthlyRequestLimit: number | null;
+  price: number | null;
+  enabled: boolean;
+};
+
+export type SuperAdminAiSubscription = {
+  id: string;
+  planCode: string;
+  status: AiSubscriptionStatus;
+  monthlyRequestLimit: number;
+  requestsUsed: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  activatedAt: string | null;
+  expiresAt: string | null;
+};
+
+export type SuperAdminAiUsage = {
+  id: string;
+  userId: string;
+  toolName: string | null;
+  requestType: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  estimatedCost: number | null;
+  status: string;
+  errorMessage: string | null;
+  createdAt: string;
+};
 
 type SubscriptionRow = {
   id: string;
@@ -46,6 +114,8 @@ export type RegistrationPoint = {
 export type SuperAdminTenant = {
   id: string;
   name: string;
+  slug: string;
+  loginUrl: string;
   status: string;
   createdAt: string | null;
   users: number;
@@ -61,6 +131,8 @@ export type SuperAdminTenant = {
   daysRemaining: number | null;
   lastActivityAt: string | null;
   modules: SuperAdminTenantModule[];
+  aiSubscription: SuperAdminAiSubscription | null;
+  aiUsageHistory: SuperAdminAiUsage[];
 };
 
 export type SuperAdminTenantModule = ModuleRow & { enabled: boolean };
@@ -69,6 +141,7 @@ export type SuperAdminDashboard = {
   kpis: { tenants: number; activeTenants: number; users: number; sales: number; revenue: number };
   subscriptions: { active: number; trials: number; expired: number; recurringRevenue: number };
   registrations: RegistrationPoint[];
+  aiPlans: SuperAdminAiPlan[];
   tenants: SuperAdminTenant[];
 };
 
@@ -149,8 +222,11 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       subscriptionRows,
       moduleRows,
       tenantModuleRows,
+      aiPlanRows,
+      aiSubscriptionRows,
+      aiUsageRows,
     ] = await Promise.all([
-      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, is_active, created_at"),
+      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "tenant_id, created_at, updated_at"),
       fetchRows<SaleRow>(supabaseAdmin, "ventes", "tenant_id, total, created_at, updated_at"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "clients", "tenant_id, created_at, updated_at"),
@@ -169,10 +245,34 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         "tenant_modules",
         "tenant_id, module_id, enabled",
       ),
+      fetchRows<AiPlanRow>(
+        supabaseAdmin,
+        "ai_plans",
+        "code, name, monthly_request_limit, price, enabled",
+      ),
+      fetchRows<AiSubscriptionRow>(
+        supabaseAdmin,
+        "tenant_ai_subscriptions",
+        "id, tenant_id, plan_code, status, monthly_request_limit, requests_used, current_period_start, current_period_end, activated_at, expires_at",
+      ),
+      fetchRows<AiUsageRow>(
+        supabaseAdmin,
+        "ai_usage_logs",
+        "id, tenant_id, user_id, tool_name, request_type, input_tokens, output_tokens, total_tokens, estimated_cost, status, error_message, created_at",
+      ),
     ]);
     const subscriptionsByTenant = new Map(
       subscriptionRows.map((subscription) => [subscription.tenant_id, subscription]),
     );
+    const aiSubscriptionsByTenant = new Map(
+      aiSubscriptionRows.map((subscription) => [subscription.tenant_id, subscription]),
+    );
+    const aiUsageByTenant = new Map<string, AiUsageRow[]>();
+    for (const usage of aiUsageRows) {
+      const rows = aiUsageByTenant.get(usage.tenant_id) ?? [];
+      rows.push(usage);
+      aiUsageByTenant.set(usage.tenant_id, rows);
+    }
     const tenantModuleState = new Map(
       tenantModuleRows.map((assignment) => [
         `${assignment.tenant_id}:${assignment.module_id}`,
@@ -244,6 +344,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       .map((tenant): SuperAdminTenant => {
         const tenantMetrics = getMetrics(tenant.id);
         const subscription = subscriptionsByTenant.get(tenant.id);
+        const aiSubscription = aiSubscriptionsByTenant.get(tenant.id);
         const subscriptionEnd =
           subscription?.status === "trial"
             ? subscription.trial_ends_at
@@ -251,6 +352,8 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         return {
           id: tenant.id,
           name: tenant.name,
+          slug: tenant.slug,
+          loginUrl: `/login/${tenant.slug}`,
           status: subscription?.status ?? (tenant.is_active ? "active" : "suspended"),
           createdAt: tenant.created_at,
           ...tenantMetrics,
@@ -268,6 +371,36 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
               enabled: tenantModuleState.get(`${tenant.id}:${module.id}`) ?? false,
             }))
             .sort((a, b) => a.sort_order - b.sort_order),
+          aiSubscription: aiSubscription
+            ? {
+                id: aiSubscription.id,
+                planCode: aiSubscription.plan_code,
+                status: aiSubscription.status,
+                monthlyRequestLimit: aiSubscription.monthly_request_limit,
+                requestsUsed: aiSubscription.requests_used,
+                currentPeriodStart: aiSubscription.current_period_start,
+                currentPeriodEnd: aiSubscription.current_period_end,
+                activatedAt: aiSubscription.activated_at,
+                expiresAt: aiSubscription.expires_at,
+              }
+            : null,
+          aiUsageHistory: (aiUsageByTenant.get(tenant.id) ?? [])
+            .sort((a, b) => b.created_at.localeCompare(a.created_at))
+            .slice(0, 50)
+            .map((usage) => ({
+              id: usage.id,
+              userId: usage.user_id,
+              toolName: usage.tool_name,
+              requestType: usage.request_type,
+              inputTokens: usage.input_tokens,
+              outputTokens: usage.output_tokens,
+              totalTokens: usage.total_tokens,
+              estimatedCost:
+                usage.estimated_cost === null ? null : Number(usage.estimated_cost),
+              status: usage.status,
+              errorMessage: usage.error_message,
+              createdAt: usage.created_at,
+            })),
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name, "fr"));
@@ -301,6 +434,13 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           }, 0),
       },
       registrations: buildRegistrationSeries(tenants),
+      aiPlans: aiPlanRows.map((plan) => ({
+        code: plan.code,
+        name: plan.name,
+        monthlyRequestLimit: plan.monthly_request_limit,
+        price: plan.price === null ? null : Number(plan.price),
+        enabled: plan.enabled,
+      })),
       tenants,
     };
   });
@@ -392,5 +532,87 @@ export const manageTenantSubscription = createServerFn({ method: "POST" })
       .update(update)
       .eq("id", subscription.id);
     if (updateError) throw new Error(formatSupabaseError(updateError));
+    return { success: true };
+  });
+
+const manageAiSubscriptionSchema = z.object({
+  tenantId: z.string().uuid(),
+  action: z.enum(["activate", "suspend", "renew", "extend", "cancel", "update"]),
+  activationStatus: z.enum(["active", "trial"]).optional(),
+  planCode: z.string().trim().min(1).optional(),
+  monthlyRequestLimit: z.number().int().positive().optional(),
+  days: z.number().int().min(1).max(3650).optional(),
+});
+
+export const manageTenantAiSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(manageAiSubscriptionSchema)
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing, error: existingError } = await (supabaseAdmin as any)
+      .from("tenant_ai_subscriptions")
+      .select("*")
+      .eq("tenant_id", data.tenantId)
+      .maybeSingle();
+    if (existingError) throw new Error(formatSupabaseError(existingError));
+
+    if (!existing && !["activate"].includes(data.action)) {
+      throw new Error("Aucun abonnement Assistant IA à modifier pour ce tenant.");
+    }
+
+    const now = new Date();
+    const current = existing as AiSubscriptionRow | null;
+    const planCode = data.planCode ?? current?.plan_code;
+    const monthlyRequestLimit = data.monthlyRequestLimit ?? current?.monthly_request_limit;
+    if (!planCode || !monthlyRequestLimit) {
+      throw new Error("Le plan et un quota mensuel positif sont obligatoires.");
+    }
+    const { data: plan, error: planError } = await (supabaseAdmin as any)
+      .from("ai_plans")
+      .select("code")
+      .eq("code", planCode)
+      .single();
+    if (planError || !plan) throw new Error("Plan Assistant IA inconnu.");
+
+    const days = data.days ?? 30;
+    const update: Record<string, unknown> = {
+      plan_code: planCode,
+      monthly_request_limit: monthlyRequestLimit,
+    };
+
+    if (data.action === "suspend") {
+      update.status = "suspended";
+    } else if (data.action === "cancel") {
+      update.status = "cancelled";
+    } else if (data.action === "extend") {
+      const base = Math.max(now.getTime(), new Date(current?.expires_at ?? now).getTime());
+      update.expires_at = new Date(base + days * 86_400_000).toISOString();
+    } else if (data.action === "activate" || data.action === "renew") {
+      const periodEnd = new Date(now);
+      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + 1);
+      update.status = data.action === "activate" ? (data.activationStatus ?? "active") : "active";
+      update.activated_at = current?.activated_at ?? now.toISOString();
+      update.expires_at = new Date(now.getTime() + days * 86_400_000).toISOString();
+      update.current_period_start = now.toISOString();
+      update.current_period_end = periodEnd.toISOString();
+      update.requests_used = 0;
+    }
+
+    if (current) {
+      const { error } = await (supabaseAdmin as any)
+        .from("tenant_ai_subscriptions")
+        .update(update)
+        .eq("id", current.id);
+      if (error) throw new Error(formatSupabaseError(error));
+    } else {
+      const { error } = await (supabaseAdmin as any)
+        .from("tenant_ai_subscriptions")
+        .insert({
+          tenant_id: data.tenantId,
+          ...update,
+        });
+      if (error) throw new Error(formatSupabaseError(error));
+    }
     return { success: true };
   });

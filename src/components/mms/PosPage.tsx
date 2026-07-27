@@ -34,6 +34,7 @@ import { SalesHistoryModal } from "@/components/mms/SalesHistoryModal";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { History } from "lucide-react";
 import { useTenant } from "@/providers/TenantProvider";
+import { useCatalogItems } from "@/hooks/use-catalog-items";
 
 // ---------------- Types & catalogue ----------------
 type Category = string;
@@ -41,6 +42,7 @@ type Service = {
   id: string;
   name: string;
   price: number;
+  costPrice: number;
   unit: string;
   category: Category;
   type: "product" | "service";
@@ -67,19 +69,12 @@ export function PosPage() {
   const queryClient = useQueryClient();
   const { profile } = useTenant();
 
-  // RLS is the security boundary: the client does not select a tenant.
-  const { data: dbServices = [], isLoading: catalogLoading } = useQuery({
-    queryKey: ["services", "pos-catalog"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("id, name, category, unit, price, type, photo_url, stock")
-        .eq("active", true)
-        .order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const {
+    data: dbServices,
+    loading: catalogLoading,
+    error: catalogError,
+    reload: reloadCatalog,
+  } = useCatalogItems({ activeOnly: true });
 
   const { settings, logoUrl } = useCompanySettings();
   const canProcessSale = useActionPermission("ventes.create");
@@ -103,6 +98,7 @@ export function PosPage() {
       ) as Record<string, string>;
     },
     staleTime: 50 * 60 * 1000,
+    retry: false,
   });
 
   const catalog: Service[] = useMemo(() => {
@@ -110,6 +106,7 @@ export function PosPage() {
       id: service.id,
       name: service.name,
       price: Number(service.price),
+      costPrice: Number(service.cost_price),
       unit: service.unit ?? "unité",
       category: service.category,
       type: service.type === "product" ? "product" : "service",
@@ -191,7 +188,7 @@ export function PosPage() {
           payment_method: payment,
           cashier: "Bamba",
           tenant_id: profile.tenant_id,
-        } as any)
+        })
         .select("id")
         .single();
       if (e1 || !venteRow) throw e1 ?? new Error("Insertion échouée");
@@ -202,12 +199,15 @@ export function PosPage() {
         unit: i.unit,
         qty: i.qty,
         price: i.price,
+        item_type: i.type,
+        cost_price: i.type === "product" ? i.costPrice : 0,
+        selling_price: i.price,
         line_total: i.qty * i.price,
       }));
       const { error: e2 } = await supabase.from("vente_items").insert(rows);
       if (e2) throw e2;
       queryClient.invalidateQueries({ queryKey: ["ventes", "history"] });
-      queryClient.invalidateQueries({ queryKey: ["services", "pos-catalog"] });
+      void reloadCatalog();
       toast.success(`Vente enregistrée (${dbNumber})`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur d'enregistrement";
@@ -360,7 +360,7 @@ export function PosPage() {
                   </motion.button>
                 );
               })}
-              {!catalogLoading && filtered.length === 0 && (
+              {!catalogLoading && !catalogError && filtered.length === 0 && (
                 <div className="col-span-full text-center py-10 md:py-16 text-muted-foreground text-sm">
                   Aucun produit ou service disponible
                 </div>
@@ -368,6 +368,11 @@ export function PosPage() {
               {catalogLoading && (
                 <div className="col-span-full text-center py-10 md:py-16 text-muted-foreground text-sm">
                   Chargement du catalogue...
+                </div>
+              )}
+              {!catalogLoading && catalogError && (
+                <div className="col-span-full rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-6 text-center text-sm text-destructive">
+                  {catalogError}
                 </div>
               )}
             </div>

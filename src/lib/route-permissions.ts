@@ -1,5 +1,6 @@
 export const routePermissions: Record<string, string> = {
   "/app": "dashboard.view",
+  "/app/assistant-ia": "assistant.use",
   "/ventes": "ventes.view",
   "/devis": "ventes.view",
   "/clients": "clients.view",

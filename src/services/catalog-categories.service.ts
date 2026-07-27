@@ -32,10 +32,11 @@ export const catalogCategoriesService = {
       .from("catalog_categories")
       .select(categoryColumns)
       .eq("tenant_id", tenantId)
-      .order("sort_order")
-      .order("name");
+      .order("sort_order");
     if (error) throw error;
-    return (data ?? []) as CatalogCategory[];
+    return ((data ?? []) as CatalogCategory[]).sort(
+      (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "fr"),
+    );
   },
 
   async create(tenantId: string, name: string) {

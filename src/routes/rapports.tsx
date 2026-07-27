@@ -11,6 +11,7 @@ import {
   Download,
   PieChart as PieChartIcon,
   BarChart3,
+  type LucideIcon,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { AppShell } from "@/components/mms/AppShell";
@@ -50,6 +51,30 @@ import { Button } from "@/components/ui/button";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useActionPermission } from "@/hooks/use-action-permission";
 
+type SaleItemType = "service" | "product";
+type SalesFilter = "all" | SaleItemType;
+type ReportSaleItem = {
+  item_type: string;
+  qty: number;
+  cost_price: number;
+  selling_price: number;
+  line_total: number;
+};
+type ReportSale = {
+  total: number;
+  subtotal: number;
+  created_at: string;
+  vente_items: ReportSaleItem[];
+};
+type AutoTableDocument = jsPDF & {
+  autoTable: (options: {
+    startY: number;
+    head: string[][];
+    body: (string | number)[][];
+  }) => void;
+  lastAutoTable: { finalY: number };
+};
+
 export const Route = createFileRoute("/rapports")({
   component: RapportsPage,
   head: () => ({
@@ -65,14 +90,18 @@ function useData() {
     queryKey: ["stats-data"],
     queryFn: async () => {
       const [ventes, depenses, achats, devis, clients] = await Promise.all([
-        supabase.from("ventes").select("total, created_at"),
+        supabase
+          .from("ventes")
+          .select(
+            "total, subtotal, created_at, vente_items(item_type, qty, cost_price, selling_price, line_total)",
+          ),
         supabase.from("depenses").select("amount, paid_at"),
         supabase.from("achats").select("total, created_at"),
         supabase.from("devis").select("id, status, total, created_at"),
         supabase.from("clients").select("id, created_at"),
       ]);
       return {
-        ventes: ventes.data ?? [],
+        ventes: (ventes.data ?? []) as ReportSale[],
         depenses: depenses.data ?? [],
         achats: achats.data ?? [],
         devis: devis.data ?? [],
@@ -89,6 +118,7 @@ function RapportsPage() {
   const END_YEAR = 2030;
   const currentYear = Math.min(new Date().getFullYear(), END_YEAR);
   const [year, setYear] = useState(currentYear);
+  const [salesFilter, setSalesFilter] = useState<SalesFilter>("all");
 
   const stats = useMemo(() => {
     if (!data) return null;
@@ -121,15 +151,66 @@ function RapportsPage() {
         ),
       };
 
-      const sumV = filtered.ventes.reduce((s, r) => s + Number(r.total), 0);
+      const revenueForType = (sale: ReportSale, type: SaleItemType) => {
+        // A header-only legacy sale cannot be classified from missing lines;
+        // keep its historical revenue visible under services instead of losing it.
+        if (sale.vente_items.length === 0) {
+          return type === "service" ? Number(sale.total) : 0;
+        }
+        const gross = sale.vente_items
+          .filter((item) => item.item_type === type)
+          .reduce((sum, item) => sum + Number(item.line_total), 0);
+        const discountFactor =
+          Number(sale.subtotal) > 0 ? Number(sale.total) / Number(sale.subtotal) : 0;
+        return gross * discountFactor;
+      };
+      const serviceRevenue = filtered.ventes.reduce(
+        (sum, sale) => sum + revenueForType(sale, "service"),
+        0,
+      );
+      const productRevenue = filtered.ventes.reduce(
+        (sum, sale) => sum + revenueForType(sale, "product"),
+        0,
+      );
+      const totalRevenue = serviceRevenue + productRevenue;
+      const selectedRevenue =
+        salesFilter === "service"
+          ? serviceRevenue
+          : salesFilter === "product"
+            ? productRevenue
+            : totalRevenue;
+      const productMargin = filtered.ventes.reduce((saleSum, sale) => {
+        const discountFactor =
+          Number(sale.subtotal) > 0 ? Number(sale.total) / Number(sale.subtotal) : 0;
+        return (
+          saleSum +
+          sale.vente_items
+            .filter((item) => item.item_type === "product")
+            .reduce(
+              (itemSum, item) =>
+                itemSum +
+                (Number(item.selling_price) * discountFactor - Number(item.cost_price)) *
+                  Number(item.qty),
+              0,
+            )
+        );
+      }, 0);
       const sumD = filtered.depenses.reduce((s, r) => s + Number(r.amount), 0);
       const sumA = filtered.achats.reduce((s, r) => s + Number(r.total), 0);
       return {
-        ventes: sumV,
-        ventesCount: filtered.ventes.length,
+        ventes: selectedRevenue,
+        caServices: serviceRevenue,
+        caProduits: productRevenue,
+        caTotal: totalRevenue,
+        margeProduits: productMargin,
+        ventesCount: filtered.ventes.filter(
+          (sale) =>
+            salesFilter === "all" ||
+            sale.vente_items.some((item) => item.item_type === salesFilter),
+        ).length,
         depenses: sumD,
         achats: sumA,
-        benefice: sumV - sumD,
+        benefice: selectedRevenue - sumD,
         devisCount: filtered.devis.length,
         clientsCount: filtered.clients.length,
       };
@@ -155,7 +236,7 @@ function RapportsPage() {
         clientsCount: compare(target.clientsCount, prevMonth.clientsCount),
       },
     };
-  }, [data, month, year]);
+  }, [data, month, salesFilter, year]);
 
   // Chart data
   const chartData = [
@@ -205,6 +286,10 @@ function RapportsPage() {
     // Summary Table
     const summaryData = [
       ["Chiffre d'affaires", formatCurrency(stats.target.ventes)],
+      ["CA services", formatCurrency(stats.target.caServices)],
+      ["CA produits", formatCurrency(stats.target.caProduits)],
+      ["CA total", formatCurrency(stats.target.caTotal)],
+      ["Marge produits", formatCurrency(stats.target.margeProduits)],
       ["Nombre de devis", stats.target.devisCount.toString()],
       ["Achats", formatCurrency(stats.target.achats)],
       ["Dépenses", formatCurrency(stats.target.depenses)],
@@ -212,14 +297,15 @@ function RapportsPage() {
       ["Nouveaux clients", stats.target.clientsCount.toString()],
     ];
 
-    (doc as any).autoTable({
+    const tableDoc = doc as AutoTableDocument;
+    tableDoc.autoTable({
       startY: 45,
       head: [["Indicateur", "Valeur"]],
       body: summaryData,
     });
 
     // Detailed Table
-    let detailedBody: any[] = [];
+    const detailedBody: (string | number)[][] = [];
 
     const filtered = {
       ventes: data.ventes.filter(
@@ -284,8 +370,8 @@ function RapportsPage() {
         ])
     );
 
-    (doc as any).autoTable({
-      startY: (doc as any).lastAutoTable.finalY + 10,
+    tableDoc.autoTable({
+      startY: tableDoc.lastAutoTable.finalY + 10,
       head: [["Type", "Date", "Détails/Montant"]],
       body: detailedBody,
     });
@@ -299,6 +385,10 @@ function RapportsPage() {
     const csvContent =
       "KPI;Valeur\n" +
       `Chiffre d'affaires;${stats?.target.ventes}\n` +
+      `CA services;${stats?.target.caServices}\n` +
+      `CA produits;${stats?.target.caProduits}\n` +
+      `CA total;${stats?.target.caTotal}\n` +
+      `Marge produits;${stats?.target.margeProduits}\n` +
       `Dépenses;${stats?.target.depenses}\n` +
       `Achats;${stats?.target.achats}\n` +
       `Bénéfice;${stats?.target.benefice}`;
@@ -348,6 +438,16 @@ function RapportsPage() {
               )}
             </SelectContent>
           </Select>
+          <Select value={salesFilter} onValueChange={(value) => setSalesFilter(value as SalesFilter)}>
+            <SelectTrigger className="w-[180px] rounded-xl">
+              <SelectValue placeholder="Type de vente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous</SelectItem>
+              <SelectItem value="service">Services</SelectItem>
+              <SelectItem value="product">Produits</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-2">
           {canExport && (
@@ -373,13 +473,41 @@ function RapportsPage() {
         <div className="text-muted-foreground">Aucune donnée disponible.</div>
       ) : (
         <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <StatCard
               label="Chiffre d'affaires"
               value={stats.target.ventes}
               compare={stats.vsPrev.ventes}
               icon={Wallet}
               color="text-blue-500"
+            />
+            <StatCard
+              label="CA services"
+              value={stats.target.caServices}
+              compare={stats.vsPrev.ventes}
+              icon={Wallet}
+              color="text-cyan-500"
+            />
+            <StatCard
+              label="CA produits"
+              value={stats.target.caProduits}
+              compare={stats.vsPrev.ventes}
+              icon={ShoppingCart}
+              color="text-emerald-500"
+            />
+            <StatCard
+              label="CA total"
+              value={stats.target.caTotal}
+              compare={stats.vsPrev.ventes}
+              icon={TrendingUp}
+              color="text-blue-600"
+            />
+            <StatCard
+              label="Marge produits"
+              value={stats.target.margeProduits}
+              compare={stats.vsPrev.ventes}
+              icon={BarChart3}
+              color="text-violet-500"
             />
             <StatCard
               label="Nombre de devis"
@@ -482,10 +610,19 @@ function StatCard({
   label: string;
   value: number;
   compare: { diff: number; pct: number };
-  icon: any;
+  icon: LucideIcon;
   color: string;
 }) {
-  const isCurrency = ["Chiffre d'affaires", "Dépenses", "Achats", "Bénéfice"].includes(label);
+  const isCurrency = [
+    "Chiffre d'affaires",
+    "CA services",
+    "CA produits",
+    "CA total",
+    "Marge produits",
+    "Dépenses",
+    "Achats",
+    "Bénéfice",
+  ].includes(label);
   const formattedValue = isCurrency ? formatCurrency(value) : value;
   const formattedDiff = isCurrency
     ? formatCurrency(Math.abs(compare.diff))

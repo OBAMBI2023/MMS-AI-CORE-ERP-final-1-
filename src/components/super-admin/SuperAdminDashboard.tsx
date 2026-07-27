@@ -6,8 +6,10 @@ import {
   Activity,
   BarChart3,
   Bell,
+  Bot,
   Building2,
   CalendarClock,
+  ClipboardCopy,
   ChevronDown,
   ChevronRight,
   CircleDollarSign,
@@ -42,9 +44,12 @@ import {
 } from "recharts";
 import {
   manageTenantModule,
+  manageTenantAiSubscription,
   manageTenantSubscription,
+  type AiSubscriptionStatus,
   type SubscriptionBillingCycle,
   type SuperAdminDashboard,
+  type SuperAdminAiPlan,
   type SuperAdminTenant,
 } from "@/lib/super-admin.server";
 import { cn } from "@/lib/utils";
@@ -252,15 +257,27 @@ function ChartCard({
 
 function TenantTable({
   tenants,
+  aiPlans,
   query,
   onQueryChange,
 }: {
   tenants: SuperAdminTenant[];
+  aiPlans: SuperAdminAiPlan[];
   query: string;
   onQueryChange: (value: string) => void;
 }) {
   const [selectedTenant, setSelectedTenant] = useState<SuperAdminTenant | null>(null);
   const [moduleTenant, setModuleTenant] = useState<SuperAdminTenant | null>(null);
+  const [aiTenant, setAiTenant] = useState<SuperAdminTenant | null>(null);
+  const copyLoginUrl = async (tenant: SuperAdminTenant) => {
+    const url = new URL(tenant.loginUrl, window.location.origin).toString();
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Lien de connexion copié.");
+    } catch {
+      toast.error("Impossible de copier le lien de connexion.");
+    }
+  };
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("fr");
     if (!normalized) return tenants;
@@ -340,6 +357,12 @@ function TenantTable({
                         <p className="font-mono text-[11px] text-slate-400">
                           {tenant.id.slice(0, 8)}
                         </p>
+                        <a
+                          href={tenant.loginUrl}
+                          className="block max-w-56 truncate text-xs text-blue-600 hover:underline"
+                        >
+                          {tenant.loginUrl}
+                        </a>
                       </div>
                     </div>
                   </TableCell>
@@ -392,9 +415,13 @@ function TenantTable({
                           <span className="sr-only">Actions</span>
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48 rounded-lg">
+                      <DropdownMenuContent align="end" className="w-64 rounded-lg">
                         <DropdownMenuLabel>Actions du tenant</DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => void copyLoginUrl(tenant)}>
+                          <ClipboardCopy />
+                          Copier le lien de connexion
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={!tenant.subscriptionId}
                           onClick={() => setSelectedTenant(tenant)}
@@ -405,6 +432,10 @@ function TenantTable({
                         <DropdownMenuItem onClick={() => setModuleTenant(tenant)}>
                           <Gauge />
                           Gérer les modules
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAiTenant(tenant)}>
+                          <Bot />
+                          Abonnement Assistant IA
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -429,7 +460,182 @@ function TenantTable({
           if (!open) setModuleTenant(null);
         }}
       />
+      <AiSubscriptionDialog
+        tenant={aiTenant}
+        plans={aiPlans}
+        open={Boolean(aiTenant)}
+        onOpenChange={(open) => {
+          if (!open) setAiTenant(null);
+        }}
+      />
     </Card>
+  );
+}
+
+type AiSubscriptionAction = "activate" | "suspend" | "renew" | "extend" | "cancel" | "update";
+
+function AiSubscriptionDialog({
+  tenant,
+  plans,
+  open,
+  onOpenChange,
+}: {
+  tenant: SuperAdminTenant | null;
+  plans: SuperAdminAiPlan[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const subscription = tenant?.aiSubscription;
+  const [action, setAction] = useState<AiSubscriptionAction>("activate");
+  const [activationStatus, setActivationStatus] = useState<Extract<AiSubscriptionStatus, "active" | "trial">>("active");
+  const [planCode, setPlanCode] = useState("");
+  const [quota, setQuota] = useState("");
+  const [days, setDays] = useState("30");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!tenant) return;
+    setAction(subscription ? "update" : "activate");
+    setActivationStatus(subscription?.status === "trial" ? "trial" : "active");
+    setPlanCode(subscription?.planCode ?? plans[0]?.code ?? "");
+    setQuota(subscription ? String(subscription.monthlyRequestLimit) : "");
+    setDays("30");
+  }, [tenant, subscription, plans]);
+
+  const submit = async () => {
+    if (!tenant) return;
+    const parsedQuota = Number(quota);
+    const parsedDays = Number(days);
+    if (!planCode || !Number.isInteger(parsedQuota) || parsedQuota < 1) {
+      toast.error("Sélectionnez un plan et indiquez un quota mensuel positif.");
+      return;
+    }
+    if (
+      ["activate", "renew", "extend"].includes(action) &&
+      (!Number.isInteger(parsedDays) || parsedDays < 1)
+    ) {
+      toast.error("La durée doit être un nombre entier positif.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await manageTenantAiSubscription({
+        data: {
+          tenantId: tenant.id,
+          action,
+          planCode,
+          monthlyRequestLimit: parsedQuota,
+          ...(action === "activate" ? { activationStatus } : {}),
+          ...(["activate", "renew", "extend"].includes(action) ? { days: parsedDays } : {}),
+        },
+      });
+      toast.success("Abonnement Assistant IA mis à jour.");
+      onOpenChange(false);
+      await router.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Mise à jour impossible.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Abonnement Assistant IA</DialogTitle>
+          <DialogDescription>
+            Abonnement premium indépendant de la licence ERP de {tenant?.name}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 rounded-lg border p-4 text-sm sm:grid-cols-2">
+          <div>Statut : <strong>{subscription?.status ?? "Aucun abonnement"}</strong></div>
+          <div>Plan : <strong>{subscription?.planCode ?? "—"}</strong></div>
+          <div>
+            Consommation : <strong>{subscription ? `${subscription.requestsUsed} / ${subscription.monthlyRequestLimit}` : "—"}</strong>
+          </div>
+          <div>Expiration : <strong>{formatDate(subscription?.expiresAt ?? null)}</strong></div>
+          <div className="sm:col-span-2">
+            Période : <strong>{subscription ? `${formatDate(subscription.currentPeriodStart)} → ${formatDate(subscription.currentPeriodEnd)}` : "—"}</strong>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="ai-action">Action</Label>
+            <select id="ai-action" value={action} onChange={(event) => setAction(event.target.value as AiSubscriptionAction)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              <option value="activate">Activer</option>
+              <option value="update">Modifier plan/quota</option>
+              <option value="renew">Renouveler</option>
+              <option value="extend">Prolonger</option>
+              <option value="suspend">Suspendre</option>
+              <option value="cancel">Résilier</option>
+            </select>
+          </div>
+          {action === "activate" && (
+            <div className="space-y-2">
+              <Label htmlFor="ai-status">Type d’activation</Label>
+              <select id="ai-status" value={activationStatus} onChange={(event) => setActivationStatus(event.target.value as "active" | "trial")} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="active">Actif</option>
+                <option value="trial">Essai</option>
+              </select>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="ai-plan">Plan</Label>
+            <select id="ai-plan" value={planCode} onChange={(event) => {
+              const code = event.target.value;
+              setPlanCode(code);
+              const plan = plans.find((item) => item.code === code);
+              if (!subscription && plan?.monthlyRequestLimit) setQuota(String(plan.monthlyRequestLimit));
+            }} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              <option value="">Sélectionner</option>
+              {plans.map((plan) => (
+                <option key={plan.code} value={plan.code}>{plan.name}{plan.enabled ? "" : " (désactivé)"}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ai-quota">Quota mensuel</Label>
+            <Input id="ai-quota" type="number" min={1} value={quota} onChange={(event) => setQuota(event.target.value)} />
+          </div>
+          {["activate", "renew", "extend"].includes(action) && (
+            <div className="space-y-2">
+              <Label htmlFor="ai-days">Durée en jours</Label>
+              <Input id="ai-days" type="number" min={1} value={days} onChange={(event) => setDays(event.target.value)} />
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h3 className="mb-2 text-sm font-semibold">Historique d’utilisation</h3>
+          <div className="max-h-52 overflow-auto rounded-lg border">
+            {tenant?.aiUsageHistory.length ? (
+              <Table>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Tool</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Tokens</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {tenant.aiUsageHistory.map((usage) => (
+                    <TableRow key={usage.id}>
+                      <TableCell className="whitespace-nowrap text-xs">{formatDate(usage.createdAt, true)}</TableCell>
+                      <TableCell>{usage.toolName ?? usage.requestType}</TableCell>
+                      <TableCell>{usage.status}</TableCell>
+                      <TableCell className="text-right">{usage.totalTokens ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : <p className="p-4 text-sm text-muted-foreground">Aucun appel IA enregistré.</p>}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Annuler</Button>
+          <Button onClick={() => void submit()} disabled={submitting}>{submitting ? "Enregistrement…" : "Confirmer"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -955,7 +1161,7 @@ export function SuperAdminDashboardView({
             </ChartCard>
           </section>
 
-          <TenantTable tenants={data.tenants} query={tenantQuery} onQueryChange={setTenantQuery} />
+          <TenantTable tenants={data.tenants} aiPlans={data.aiPlans} query={tenantQuery} onQueryChange={setTenantQuery} />
           <SubscriptionSummary data={data.subscriptions} />
         </main>
       </div>

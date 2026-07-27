@@ -16,6 +16,7 @@ export function useCatalogCategories(options: { activeOnly?: boolean } = {}) {
     queryKey: catalogCategoriesKey(tenantId),
     queryFn: () => catalogCategoriesService.list(tenantId!),
     enabled: !loading && Boolean(tenantId),
+    retry: false,
     select: options.activeOnly
       ? (categories) => categories.filter((category) => category.active)
       : undefined,

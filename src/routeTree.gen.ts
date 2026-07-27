@@ -28,10 +28,12 @@ import { Route as DepensesRouteImport } from './routes/depenses'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as CategoriesRouteImport } from './routes/categories'
-import { Route as AppRouteImport } from './routes/app'
 import { Route as AchatsRouteImport } from './routes/achats'
 import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
+import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as AppSplatRouteImport } from './routes/app.$'
 
 const VentesRoute = VentesRouteImport.update({
@@ -129,11 +131,6 @@ const CategoriesRoute = CategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppRoute = AppRouteImport.update({
-  id: '/app',
-  path: '/app',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AchatsRoute = AchatsRouteImport.update({
   id: '/achats',
   path: '/achats',
@@ -149,17 +146,31 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/app/',
+  path: '/app/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginSlugRoute = LoginSlugRouteImport.update({
+  id: '/login_/$slug',
+  path: '/login/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppAssistantIaRoute = AppAssistantIaRouteImport.update({
+  id: '/app/assistant-ia',
+  path: '/app/assistant-ia',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppSplatRoute = AppSplatRouteImport.update({
-  id: '/$',
-  path: '/$',
-  getParentRoute: () => AppRoute,
+  id: '/app/$',
+  path: '/app/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
-  '/app': typeof AppRouteWithChildren
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
   '/demo': typeof DemoRoute
@@ -180,12 +191,14 @@ export interface FileRoutesByFullPath {
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
+  '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/login/$slug': typeof LoginSlugRoute
+  '/app/': typeof AppIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
-  '/app': typeof AppRouteWithChildren
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
   '/demo': typeof DemoRoute
@@ -206,13 +219,15 @@ export interface FileRoutesByTo {
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
+  '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/login/$slug': typeof LoginSlugRoute
+  '/app': typeof AppIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/achats': typeof AchatsRoute
-  '/app': typeof AppRouteWithChildren
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
   '/demo': typeof DemoRoute
@@ -233,6 +248,9 @@ export interface FileRoutesById {
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
+  '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/login_/$slug': typeof LoginSlugRoute
+  '/app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -240,7 +258,6 @@ export interface FileRouteTypes {
     | '/'
     | '/403'
     | '/achats'
-    | '/app'
     | '/categories'
     | '/clients'
     | '/demo'
@@ -261,12 +278,14 @@ export interface FileRouteTypes {
     | '/utilisateurs'
     | '/ventes'
     | '/app/$'
+    | '/app/assistant-ia'
+    | '/login/$slug'
+    | '/app/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/403'
     | '/achats'
-    | '/app'
     | '/categories'
     | '/clients'
     | '/demo'
@@ -287,12 +306,14 @@ export interface FileRouteTypes {
     | '/utilisateurs'
     | '/ventes'
     | '/app/$'
+    | '/app/assistant-ia'
+    | '/login/$slug'
+    | '/app'
   id:
     | '__root__'
     | '/'
     | '/403'
     | '/achats'
-    | '/app'
     | '/categories'
     | '/clients'
     | '/demo'
@@ -313,13 +334,15 @@ export interface FileRouteTypes {
     | '/utilisateurs'
     | '/ventes'
     | '/app/$'
+    | '/app/assistant-ia'
+    | '/login_/$slug'
+    | '/app/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R403Route: typeof R403Route
   AchatsRoute: typeof AchatsRoute
-  AppRoute: typeof AppRouteWithChildren
   CategoriesRoute: typeof CategoriesRoute
   ClientsRoute: typeof ClientsRoute
   DemoRoute: typeof DemoRoute
@@ -339,6 +362,10 @@ export interface RootRouteChildren {
   TarifsRoute: typeof TarifsRoute
   UtilisateursRoute: typeof UtilisateursRoute
   VentesRoute: typeof VentesRoute
+  AppSplatRoute: typeof AppSplatRoute
+  AppAssistantIaRoute: typeof AppAssistantIaRoute
+  LoginSlugRoute: typeof LoginSlugRoute
+  AppIndexRoute: typeof AppIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -476,13 +503,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CategoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/app': {
-      id: '/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/achats': {
       id: '/achats'
       path: '/achats'
@@ -504,31 +524,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/': {
+      id: '/app/'
+      path: '/app'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login_/$slug': {
+      id: '/login_/$slug'
+      path: '/login/$slug'
+      fullPath: '/login/$slug'
+      preLoaderRoute: typeof LoginSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/assistant-ia': {
+      id: '/app/assistant-ia'
+      path: '/app/assistant-ia'
+      fullPath: '/app/assistant-ia'
+      preLoaderRoute: typeof AppAssistantIaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/$': {
       id: '/app/$'
-      path: '/$'
+      path: '/app/$'
       fullPath: '/app/$'
       preLoaderRoute: typeof AppSplatRouteImport
-      parentRoute: typeof AppRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface AppRouteChildren {
-  AppSplatRoute: typeof AppSplatRoute
-}
-
-const AppRouteChildren: AppRouteChildren = {
-  AppSplatRoute: AppSplatRoute,
-}
-
-const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R403Route: R403Route,
   AchatsRoute: AchatsRoute,
-  AppRoute: AppRouteWithChildren,
   CategoriesRoute: CategoriesRoute,
   ClientsRoute: ClientsRoute,
   DemoRoute: DemoRoute,
@@ -548,6 +578,10 @@ const rootRouteChildren: RootRouteChildren = {
   TarifsRoute: TarifsRoute,
   UtilisateursRoute: UtilisateursRoute,
   VentesRoute: VentesRoute,
+  AppSplatRoute: AppSplatRoute,
+  AppAssistantIaRoute: AppAssistantIaRoute,
+  LoginSlugRoute: LoginSlugRoute,
+  AppIndexRoute: AppIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

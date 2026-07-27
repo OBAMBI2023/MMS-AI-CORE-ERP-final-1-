@@ -1,5 +1,6 @@
 export const routeModules: Record<string, string> = {
   "/app": "dashboard",
+  "/app/assistant-ia": "ai_assistant",
   "/ventes": "sales",
   "/services": "products_services",
   "/categories": "products_services",
