@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowLeft, Building2, KeyRound, MoreHorizontal, Pencil, Plus, ShieldBan } from "lucide-react";
+import { ArrowLeft, Building2, CalendarPlus, KeyRound, MoreHorizontal, Pencil, Plus, ShieldBan } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   createPartner,
+  assignPartnerOffer,
   resetPartnerPassword,
   setPartnerTenants,
   updatePartner,
@@ -26,7 +30,12 @@ import {
   type PartnerManagementData,
 } from "@/lib/partners.server";
 
-type EditorMode = "create" | "edit" | "tenants" | "password";
+type EditorMode = "create" | "edit" | "tenants" | "password" | "offer";
+
+function dateInputValue(date: Date) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
 
 export function PartnerManagementView({ data }: { data: PartnerManagementData }) {
   const router = useRouter();
@@ -37,6 +46,10 @@ export function PartnerManagementView({ data }: { data: PartnerManagementData })
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [tenantIds, setTenantIds] = useState<string[]>([]);
+  const [offerId, setOfferId] = useState("");
+  const [startsAt, setStartsAt] = useState(dateInputValue(new Date()));
+  const [expiresAt, setExpiresAt] = useState("");
+  const [replaceActive, setReplaceActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -51,7 +64,38 @@ export function PartnerManagementView({ data }: { data: PartnerManagementData })
     setEmail(current?.email ?? "");
     setTenantIds(current?.tenantIds ?? []);
     setPassword("");
+    if (nextMode === "offer") {
+      const firstOffer = data.offers[0];
+      const start = new Date();
+      setOfferId(firstOffer?.id ?? "");
+      setStartsAt(dateInputValue(start));
+      setExpiresAt(firstOffer ? dateInputValue(new Date(start.getTime() + firstOffer.durationDays * 86_400_000)) : "");
+      setReplaceActive(false);
+    }
     setMode(nextMode);
+  };
+
+  const activeSubscription = partner
+    ? data.subscriptions.find((subscription) =>
+        subscription.partnerId === partner.id &&
+        subscription.status === "active" &&
+        new Date(subscription.expiresAt).getTime() > Date.now())
+    : undefined;
+  const selectedOffer = data.offers.find((offer) => offer.id === offerId);
+
+  const selectOffer = (value: string) => {
+    setOfferId(value);
+    const offer = data.offers.find((item) => item.id === value);
+    if (!offer || !startsAt) return;
+    const start = new Date(`${startsAt}T00:00:00`);
+    setExpiresAt(dateInputValue(new Date(start.getTime() + offer.durationDays * 86_400_000)));
+  };
+
+  const changeStart = (value: string) => {
+    setStartsAt(value);
+    if (!selectedOffer || !value) return;
+    const start = new Date(`${value}T00:00:00`);
+    setExpiresAt(dateInputValue(new Date(start.getTime() + selectedOffer.durationDays * 86_400_000)));
   };
 
   const refresh = async (message: string) => {
@@ -132,6 +176,27 @@ export function PartnerManagementView({ data }: { data: PartnerManagementData })
     }
   };
 
+  const submitOffer = async () => {
+    if (!partner || !offerId || !startsAt || !expiresAt) return;
+    setSubmitting(true);
+    try {
+      await assignPartnerOffer({
+        data: {
+          partnerId: partner.id,
+          offerId,
+          startsAt: new Date(`${startsAt}T00:00:00`).toISOString(),
+          expiresAt: new Date(`${expiresAt}T00:00:00`).toISOString(),
+          replaceActive,
+        },
+      });
+      await refresh(activeSubscription ? "Offre remplacée et abonnement activé." : "Offre attribuée avec succès.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Attribution impossible.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-muted/30 p-4 sm:p-6 xl:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -156,7 +221,8 @@ export function PartnerManagementView({ data }: { data: PartnerManagementData })
                 <TableHead>Compte Auth</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Tenants attribués</TableHead>
-                <TableHead className="w-12">Actions</TableHead>
+                <TableHead>Abonnement</TableHead>
+                <TableHead className="w-56">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -179,6 +245,27 @@ export function PartnerManagementView({ data }: { data: PartnerManagementData })
                     </button>
                   </TableCell>
                   <TableCell>
+                    {(() => {
+                      const subscription = data.subscriptions.find((row) =>
+                        row.partnerId === item.id &&
+                        row.status === "active" &&
+                        new Date(row.expiresAt).getTime() > Date.now());
+                      const offer = subscription
+                        ? data.offers.find((row) => row.id === subscription.offerId)
+                        : undefined;
+                      return subscription ? (
+                        <div>
+                          <Badge variant="outline">{offer?.name ?? "Offre active"}</Badge>
+                          <p className="mt-1 text-xs text-muted-foreground">Jusqu’au {new Date(subscription.expiresAt).toLocaleDateString("fr-FR")}</p>
+                        </div>
+                      ) : <span className="text-sm text-muted-foreground">Aucun</span>;
+                    })()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button size="sm" variant="outline" onClick={() => open("offer", item)}>
+                        <CalendarPlus /> Attribuer une offre
+                      </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon"><MoreHorizontal /></Button>
@@ -192,11 +279,12 @@ export function PartnerManagementView({ data }: { data: PartnerManagementData })
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
               {!data.partners.length && (
-                <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground">Aucun partenaire.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Aucun partenaire.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -241,6 +329,63 @@ export function PartnerManagementView({ data }: { data: PartnerManagementData })
           <DialogHeader><DialogTitle>Réinitialiser le mot de passe</DialogTitle><DialogDescription>Définissez un mot de passe temporaire sécurisé pour {partner?.name}.</DialogDescription></DialogHeader>
           <div className="space-y-2"><Label>Nouveau mot de passe</Label><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /><p className="text-xs text-muted-foreground">12 caractères minimum.</p></div>
           <DialogFooter><Button disabled={submitting || password.length < 12} onClick={() => void submitPassword()}>{submitting ? "Réinitialisation…" : "Réinitialiser"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mode === "offer"} onOpenChange={(value) => !value && setMode(null)}>
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Attribuer une offre</DialogTitle>
+            <DialogDescription>
+              Crée un abonnement actif pour {partner?.name}. Les crédits et quotas proviennent de l’offre.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Partenaire</Label>
+              <Input value={partner?.name ?? ""} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label>Offre active</Label>
+              <Select value={offerId} onValueChange={selectOffer}>
+                <SelectTrigger><SelectValue placeholder="Sélectionner une offre" /></SelectTrigger>
+                <SelectContent>
+                  {data.offers.map((offer) => <SelectItem key={offer.id} value={offer.id}>{offer.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {!data.offers.length && <p className="text-xs text-destructive">Aucune offre active disponible.</p>}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2"><Label>Date de début</Label><Input type="date" value={startsAt} onChange={(event) => changeStart(event.target.value)} /></div>
+              <div className="space-y-2"><Label>Date de fin</Label><Input type="date" value={expiresAt} disabled /></div>
+            </div>
+            {selectedOffer && (
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                <p className="font-medium">Résumé</p>
+                <p className="mt-1 text-muted-foreground">
+                  {selectedOffer.durationDays} jours · {selectedOffer.includedTenantCredits} crédits · {selectedOffer.maxTrials} essais de {selectedOffer.trialDays} jours
+                </p>
+              </div>
+            )}
+            {activeSubscription && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+                <Checkbox checked={replaceActive} onCheckedChange={(checked) => setReplaceActive(checked === true)} />
+                <span>
+                  <span className="block font-medium">Remplacer l’abonnement actif</span>
+                  <span className="text-muted-foreground">L’ancien sera clôturé et conservé dans l’historique.</span>
+                </span>
+              </label>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMode(null)}>Annuler</Button>
+            <Button
+              disabled={submitting || !offerId || !startsAt || !expiresAt || expiresAt <= startsAt || Boolean(activeSubscription && !replaceActive)}
+              onClick={() => void submitOffer()}
+            >
+              {submitting ? "Attribution…" : activeSubscription ? "Remplacer et attribuer" : "Attribuer"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </main>

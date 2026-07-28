@@ -53,6 +53,7 @@ export type PartnerDashboard = {
     commissionsGenerated: number;
   };
   availableModules: { id: string; code: string; name: string }[];
+  activityProfiles: { code: string; name: string; description: string | null }[];
   payments: {
     id: string; amount: number; currency: string; reference: string; status: string; createdAt: string;
   }[];
@@ -191,6 +192,7 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       trialsResult,
       offerPacksResult,
       modulePackItemsResult,
+      activityProfilesResult,
     ] = await Promise.all([
       context.supabase.from("partners").select("id, name, code").eq("id", partnerId).single(),
       context.supabase.from("partner_tenants").select("tenant_id, assigned_at"),
@@ -207,7 +209,12 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
         .select("id, action, tenant_id, metadata, created_at")
         .order("created_at", { ascending: false })
         .limit(100),
-      context.supabase.from("partner_subscriptions").select("*").eq("partner_id", partnerId).maybeSingle(),
+      context.supabase
+        .from("partner_subscriptions")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .eq("status", "active")
+        .maybeSingle(),
       context.supabase.from("partner_offers").select("*"),
       context.supabase.from("partner_payments").select("*").order("created_at", { ascending: false }).limit(100),
       context.supabase.from("partner_credit_transactions").select("*").order("created_at", { ascending: false }).limit(200),
@@ -215,6 +222,11 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       (context.supabase as any).from("partner_trial_usage").select("*").order("created_at", { ascending: false }).limit(100),
       context.supabase.from("module_packs").select("id, name"),
       context.supabase.from("module_pack_items").select("pack_id, module_id"),
+      (context.supabase as any)
+        .from("trial_activity_profiles")
+        .select("code, name, description")
+        .eq("is_active", true)
+        .order("sort_order"),
     ]);
 
     for (const result of [
@@ -235,6 +247,7 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       trialsResult,
       offerPacksResult,
       modulePackItemsResult,
+      activityProfilesResult,
     ]) {
       if (result.error) throw new Error(formatSupabaseError(result.error));
     }
@@ -346,6 +359,11 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
           ),
         )
         .map(({ id, code, name }) => ({ id, code, name })),
+      activityProfiles: (activityProfilesResult.data ?? []).map((profile: any) => ({
+        code: profile.code,
+        name: profile.name,
+        description: profile.description,
+      })),
       payments: (paymentsResult.data ?? []).map((payment) => ({
         id: payment.id, amount: Number(payment.amount), currency: payment.currency,
         reference: payment.external_reference, status: payment.status, createdAt: payment.created_at,
@@ -382,36 +400,13 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
     };
   });
 
-const createTenantSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(254),
-  trial: z.boolean(),
-});
-
-export const createPartnerTenant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator(createTenantSchema)
-  .handler(async ({ context, data }) => {
-    await requirePartnerMembership(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: tenantId, error } = await supabaseAdmin.rpc("create_partner_tenant", {
-      requested_name: data.name,
-      requested_email: data.email,
-      requested_trial: data.trial,
-      requested_actor_id: context.userId,
-    });
-    if (error) throw new Error(formatSupabaseError(error));
-    return { tenantId: tenantId as string };
-  });
-
 const createPartnerTrialSchema = z.object({
   companyName: z.string().trim().min(2).max(120),
-  sector: z.string().trim().min(2).max(100),
+  activityProfileCode: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{1,49}$/),
   managerName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(6).max(30),
   email: z.string().trim().email().max(254),
   city: z.string().trim().min(2).max(100),
-  moduleIds: z.array(z.string().uuid()).max(100),
 });
 
 export const createPartnerTrial = createServerFn({ method: "POST" })
@@ -446,12 +441,11 @@ export const createPartnerTrial = createServerFn({ method: "POST" })
         "create_partner_trial",
         {
           requested_name: data.companyName,
-          requested_sector: data.sector,
+          requested_activity_profile_code: data.activityProfileCode,
           requested_manager_name: data.managerName,
           requested_phone: data.phone,
           requested_email: data.email,
           requested_city: data.city,
-          requested_module_ids: data.moduleIds,
           requested_admin_user_id: authResult.data.user.id,
           requested_actor_id: context.userId,
         },
@@ -470,18 +464,4 @@ export const createPartnerTrial = createServerFn({ method: "POST" })
       }
       throw error;
     }
-  });
-
-export const activatePartnerTenant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator(z.object({ tenantId: z.string().uuid() }))
-  .handler(async ({ context, data }) => {
-    await requirePartnerMembership(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.rpc("activate_partner_tenant", {
-      requested_tenant_id: data.tenantId,
-      requested_actor_id: context.userId,
-    });
-    if (error) throw new Error(formatSupabaseError(error));
-    return { success: true };
   });

@@ -13,6 +13,22 @@ type PartnerRow = {
 type PartnerUserRow = { partner_id: string; user_id: string };
 type PartnerTenantRow = { partner_id: string; tenant_id: string };
 type TenantRow = { id: string; name: string; slug: string };
+export type PartnerOfferOption = {
+  id: string;
+  name: string;
+  includedTenantCredits: number;
+  durationDays: number;
+  maxTrials: number;
+  trialDays: number;
+};
+export type ManagedPartnerSubscription = {
+  id: string;
+  partnerId: string;
+  offerId: string;
+  status: string;
+  startsAt: string;
+  expiresAt: string;
+};
 
 export type ManagedPartner = {
   id: string;
@@ -28,6 +44,8 @@ export type ManagedPartner = {
 export type PartnerManagementData = {
   partners: ManagedPartner[];
   tenants: TenantRow[];
+  offers: PartnerOfferOption[];
+  subscriptions: ManagedPartnerSubscription[];
 };
 
 async function requirePlatformAdmin(userId: string) {
@@ -46,15 +64,24 @@ export const getPartnerManagement = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<PartnerManagementData> => {
     const admin = await requirePlatformAdmin(context.userId);
-    const [partnersResult, usersResult, assignmentsResult, tenantsResult, authResult] =
+    const [partnersResult, usersResult, assignmentsResult, tenantsResult, offersResult, subscriptionsResult, authResult] =
       await Promise.all([
         admin.from("partners").select("id, name, code, is_active, created_at"),
         admin.from("partner_users").select("partner_id, user_id"),
         admin.from("partner_tenants").select("partner_id, tenant_id"),
         admin.from("tenants").select("id, name, slug").order("name"),
+        admin
+          .from("partner_offers")
+          .select("id, name, included_tenant_credits, subscription_duration_days, max_trials, trial_duration_days")
+          .eq("is_active", true)
+          .order("name"),
+        admin
+          .from("partner_subscriptions")
+          .select("id, partner_id, offer_id, status, starts_at, expires_at")
+          .order("starts_at", { ascending: false }),
         admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       ]);
-    for (const result of [partnersResult, usersResult, assignmentsResult, tenantsResult]) {
+    for (const result of [partnersResult, usersResult, assignmentsResult, tenantsResult, offersResult, subscriptionsResult]) {
       if (result.error) throw new Error(formatSupabaseError(result.error));
     }
     if (authResult.error) throw new Error(formatSupabaseError(authResult.error));
@@ -81,6 +108,78 @@ export const getPartnerManagement = createServerFn({ method: "GET" })
     return {
       partners: partners.sort((a, b) => a.name.localeCompare(b.name, "fr")),
       tenants: (tenantsResult.data ?? []) as TenantRow[],
+      offers: (offersResult.data ?? []).map((offer) => ({
+        id: offer.id,
+        name: offer.name,
+        includedTenantCredits: offer.included_tenant_credits,
+        durationDays: offer.subscription_duration_days,
+        maxTrials: offer.max_trials,
+        trialDays: offer.trial_duration_days,
+      })),
+      subscriptions: (subscriptionsResult.data ?? []).map((subscription) => ({
+        id: subscription.id,
+        partnerId: subscription.partner_id,
+        offerId: subscription.offer_id,
+        status: subscription.status,
+        startsAt: subscription.starts_at,
+        expiresAt: subscription.expires_at,
+      })),
+    };
+  });
+
+export const assignPartnerOffer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    partnerId: z.string().uuid(),
+    offerId: z.string().uuid(),
+    startsAt: z.string().datetime(),
+    expiresAt: z.string().datetime(),
+    replaceActive: z.boolean(),
+  }))
+  .handler(async ({ context, data }) => {
+    const admin = await requirePlatformAdmin(context.userId);
+    const { data: subscriptionId, error } = await admin.rpc("manage_partner_offer" as never, {
+      requested_partner_id: data.partnerId,
+      requested_offer_id: data.offerId,
+      requested_starts_at: data.startsAt,
+      requested_expires_at: data.expiresAt,
+      requested_replace_active: data.replaceActive,
+      requested_actor_id: context.userId,
+    } as never);
+    if (error) throw new Error(formatSupabaseError(error));
+    if (typeof subscriptionId !== "string" || !z.string().uuid().safeParse(subscriptionId).success) {
+      throw new Error("La RPC manage_partner_offer n'a retourné aucun identifiant d'abonnement valide.");
+    }
+
+    const { data: createdSubscription, error: verificationError } = await admin
+      .from("partner_subscriptions")
+      .select("id, partner_id, offer_id, status, starts_at, expires_at")
+      .eq("id", subscriptionId)
+      .eq("partner_id", data.partnerId)
+      .eq("offer_id", data.offerId)
+      .maybeSingle();
+    if (verificationError) throw new Error(formatSupabaseError(verificationError));
+    if (!createdSubscription) {
+      throw new Error(
+        `La RPC manage_partner_offer a retourné ${subscriptionId}, mais aucun abonnement correspondant n'existe dans partner_subscriptions.`,
+      );
+    }
+    if (createdSubscription.status !== "active") {
+      throw new Error(
+        `L'abonnement ${subscriptionId} a été créé avec le statut inattendu "${createdSubscription.status}".`,
+      );
+    }
+
+    return {
+      subscriptionId,
+      subscription: {
+        id: createdSubscription.id,
+        partnerId: createdSubscription.partner_id,
+        offerId: createdSubscription.offer_id,
+        status: createdSubscription.status,
+        startsAt: createdSubscription.starts_at,
+        expiresAt: createdSubscription.expires_at,
+      },
     };
   });
 

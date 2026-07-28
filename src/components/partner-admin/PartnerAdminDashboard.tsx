@@ -35,9 +35,7 @@ import {
   YAxis,
 } from "recharts";
 import {
-  activatePartnerTenant,
   createPartnerTrial,
-  createPartnerTenant,
   type PartnerDashboard,
   type PartnerTenant,
 } from "@/lib/partner-admin.server";
@@ -122,14 +120,13 @@ export function PartnerAdminDashboardView({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [tenantDialog, setTenantDialog] = useState<"paid" | "trial" | null>(null);
+  const [tenantDialogOpen, setTenantDialogOpen] = useState(false);
   const [tenantName, setTenantName] = useState("");
   const [tenantEmail, setTenantEmail] = useState("");
-  const [trialSector, setTrialSector] = useState("");
+  const [trialActivityProfile, setTrialActivityProfile] = useState("");
   const [trialManager, setTrialManager] = useState("");
   const [trialPhone, setTrialPhone] = useState("");
   const [trialCity, setTrialCity] = useState("");
-  const [trialModuleIds, setTrialModuleIds] = useState<string[]>([]);
   const [trialQuery, setTrialQuery] = useState("");
   const [trialStatus, setTrialStatus] = useState("all");
   const [submittingTenant, setSubmittingTenant] = useState(false);
@@ -146,47 +143,29 @@ export function PartnerAdminDashboardView({
   };
 
   const submitTenant = async () => {
-    if (!tenantDialog) return;
+    if (!tenantDialogOpen) return;
     setSubmittingTenant(true);
     try {
-      if (tenantDialog === "trial") {
-        const result = await createPartnerTrial({ data: {
-          companyName: tenantName,
-          sector: trialSector,
-          managerName: trialManager,
-          phone: trialPhone,
-          email: tenantEmail,
-          city: trialCity,
-          moduleIds: trialModuleIds,
-        } });
-        if (result.emailSent) {
-          toast.success("Essai créé. L’invitation a été envoyée par email.");
-        } else {
-          toast.success(`Essai créé. Mot de passe temporaire : ${result.temporaryPassword}`, {
-            duration: 20000,
-          });
-        }
+      const result = await createPartnerTrial({ data: {
+        companyName: tenantName,
+        activityProfileCode: trialActivityProfile,
+        managerName: trialManager,
+        phone: trialPhone,
+        email: tenantEmail,
+        city: trialCity,
+      } });
+      if (result.emailSent) {
+        toast.success("Essai créé. L’invitation a été envoyée par email.");
       } else {
-        await createPartnerTenant({ data: {
-          name: tenantName, email: tenantEmail, trial: false,
-        } });
-        toast.success("Tenant payant créé.");
+        toast.success(`Essai créé. Mot de passe temporaire : ${result.temporaryPassword}`, {
+          duration: 20000,
+        });
       }
       window.location.reload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Création impossible.");
     } finally {
       setSubmittingTenant(false);
-    }
-  };
-
-  const activateTenant = async (tenantId: string) => {
-    try {
-      await activatePartnerTenant({ data: { tenantId } });
-      toast.success("Tenant activé avec 1 crédit.");
-      window.location.reload();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Activation impossible.");
     }
   };
 
@@ -388,12 +367,9 @@ export function PartnerAdminDashboardView({
                 <p className="text-slate-500">Expiration : {formatDate(data.subscription?.expiresAt ?? null)}</p>
               </div>
             </Panel>
-            <Panel className="xl:col-span-2" title="Créer une entreprise" subtitle="Les créations payantes consomment un crédit">
+            <Panel className="xl:col-span-2" title="Créer une entreprise" subtitle="Démarrez un essai selon la configuration de la plateforme">
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <Button onClick={() => setTenantDialog("paid")} disabled={!data.subscription || data.partner.creditBalance < 1}>
-                  <Building2 /> Créer un tenant
-                </Button>
-                <Button variant="outline" onClick={() => setTenantDialog("trial")} disabled={!data.subscription}>
+                <Button onClick={() => setTenantDialogOpen(true)} disabled={!data.subscription}>
                   <Clock3 /> Créer un essai gratuit
                 </Button>
               </div>
@@ -474,7 +450,7 @@ export function PartnerAdminDashboardView({
                 description="Suivez uniquement les essais créés par votre espace partenaire."
                 count={data.trials.length}
               />
-              <Button onClick={() => setTenantDialog("trial")}>
+              <Button onClick={() => setTenantDialogOpen(true)}>
                 <Clock3 /> Créer un essai
               </Button>
             </div>
@@ -553,7 +529,7 @@ export function PartnerAdminDashboardView({
             {data.tenants.length ? (
               <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
                 {data.tenants.map((tenant, index) => (
-                  <CompanyCard key={tenant.id} tenant={tenant} index={index} onActivate={activateTenant} />
+                  <CompanyCard key={tenant.id} tenant={tenant} index={index} />
                 ))}
               </div>
             ) : (
@@ -732,25 +708,32 @@ export function PartnerAdminDashboardView({
           </section>
         </main>
       </div>
-      <Dialog open={tenantDialog !== null} onOpenChange={(open) => !open && setTenantDialog(null)}>
-        <DialogContent className={tenantDialog === "trial" ? "max-h-[90vh] overflow-y-auto sm:max-w-2xl" : undefined}>
+      <Dialog open={tenantDialogOpen} onOpenChange={setTenantDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{tenantDialog === "trial" ? "Créer un essai gratuit" : "Créer un tenant payant"}</DialogTitle>
-            <DialogDescription>
-              {tenantDialog === "trial" ? "Aucun crédit ne sera débité au démarrage." : "Cette opération débitera atomiquement 1 crédit."}
-            </DialogDescription>
+            <DialogTitle>Créer un essai gratuit</DialogTitle>
+            <DialogDescription>Aucun crédit ne sera débité au démarrage.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="tenant-name">Entreprise</Label>
               <Input id="tenant-name" value={tenantName} onChange={(event) => setTenantName(event.target.value)} />
             </div>
-            {tenantDialog === "trial" && (
-              <>
+            <>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="trial-sector">Secteur d’activité</Label>
-                    <Input id="trial-sector" value={trialSector} onChange={(event) => setTrialSector(event.target.value)} />
+                    <Label htmlFor="trial-activity-profile">Profil d’activité</Label>
+                    <select
+                      id="trial-activity-profile"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={trialActivityProfile}
+                      onChange={(event) => setTrialActivityProfile(event.target.value)}
+                    >
+                      <option value="">Sélectionner un profil</option>
+                      {data.activityProfiles.map((profile) => (
+                        <option key={profile.code} value={profile.code}>{profile.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="trial-manager">Nom du responsable</Label>
@@ -765,41 +748,23 @@ export function PartnerAdminDashboardView({
                     <Input id="trial-city" value={trialCity} onChange={(event) => setTrialCity(event.target.value)} />
                   </div>
                 </div>
-                <fieldset className="space-y-3">
-                  <legend className="text-sm font-medium">Modules souhaités</legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {data.availableModules.map((module) => (
-                      <label key={module.id} className="flex items-center gap-3 rounded-xl border p-3 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={trialModuleIds.includes(module.id)}
-                          onChange={(event) => setTrialModuleIds((current) =>
-                            event.target.checked
-                              ? [...current, module.id]
-                              : current.filter((id) => id !== module.id),
-                          )}
-                        />
-                        {module.name}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              </>
-            )}
+                <p className="rounded-xl bg-blue-50 p-3 text-sm text-blue-700">
+                  Les modules seront activés automatiquement selon le profil d’activité et l’offre partenaire.
+                </p>
+            </>
             <div className="space-y-2">
               <Label htmlFor="tenant-email">Email client</Label>
               <Input id="tenant-email" type="email" value={tenantEmail} onChange={(event) => setTenantEmail(event.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTenantDialog(null)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setTenantDialogOpen(false)}>Annuler</Button>
             <Button
               disabled={
                 submittingTenant ||
                 !tenantName.trim() ||
                 !tenantEmail.trim() ||
-                (tenantDialog === "trial" &&
-                  (!trialSector.trim() || !trialManager.trim() || !trialPhone.trim() || !trialCity.trim()))
+                !trialActivityProfile || !trialManager.trim() || !trialPhone.trim() || !trialCity.trim()
               }
               onClick={() => void submitTenant()}
             >
@@ -969,11 +934,9 @@ function SectionHeading({
 function CompanyCard({
   tenant,
   index,
-  onActivate,
 }: {
   tenant: PartnerTenant;
   index: number;
-  onActivate: (tenantId: string) => void;
 }) {
   const enabled = tenant.modules.filter((module) => module.enabled);
   return (
@@ -1019,9 +982,9 @@ function CompanyCard({
           <span className="font-semibold text-slate-700">{formatDate(expiryFor(tenant))}</span>
         </div>
         {!["active", "trial"].includes(tenant.subscription?.status ?? "") && (
-          <Button className="mt-4 w-full" size="sm" onClick={() => onActivate(tenant.id)}>
-            Activer avec 1 crédit
-          </Button>
+          <p className="mt-4 text-center text-xs text-slate-500">
+            Activation payante réservée à l’administration de la plateforme.
+          </p>
         )}
       </div>
     </motion.article>
