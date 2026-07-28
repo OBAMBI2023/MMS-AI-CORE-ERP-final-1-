@@ -20,8 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { getPlatformAdminAccess } from "@/lib/super-admin.server";
-import { getPartnerAdminAccess } from "@/lib/partner-admin.server";
+import { getAuthenticatedDestination } from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
 
 const loginSchema = z.object({
@@ -37,11 +36,9 @@ type LoginTenant = {
   logo_url: string | null;
 };
 
-async function getAuthenticatedHome(): Promise<"/app" | "/super-admin" | "/partner-admin"> {
-  const { isPlatformAdmin } = await getPlatformAdminAccess();
-  if (isPlatformAdmin) return "/super-admin";
-  const { isPartnerAdmin } = await getPartnerAdminAccess();
-  return isPartnerAdmin ? "/partner-admin" : "/app";
+async function getAuthenticatedHome(): Promise<"/app" | "/super-admin" | "/partner"> {
+  const destination = await getAuthenticatedDestination();
+  return destination === "/403" ? "/app" : destination;
 }
 
 async function logConnectionAttempt(

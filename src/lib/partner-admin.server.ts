@@ -11,6 +11,7 @@ export type PartnerTenant = {
   slug: string;
   logoUrl: string | null;
   assignedAt: string;
+  pack: { id: string; name: string; code: string } | null;
   subscription: {
     status: string;
     billingCycle: string;
@@ -35,7 +36,7 @@ export type PartnerDashboard = {
 
 export type AuthenticatedDestination =
   | "/super-admin"
-  | "/partner-admin"
+  | "/partner"
   | "/app"
   | "/403";
 
@@ -96,7 +97,16 @@ export const getAuthenticatedDestination = createServerFn({ method: "GET" })
     const { data: partnerId, error: partnerError } =
       await context.supabase.rpc("current_partner_id");
     if (partnerError) throw new Error(formatSupabaseError(partnerError));
-    if (partnerId) return "/partner-admin";
+    if (partnerId) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error: logError } = await supabaseAdmin.from("partner_activity_logs").insert({
+        partner_id: partnerId,
+        user_id: context.userId,
+        action: "partner.login",
+      });
+      if (logError) throw new Error(formatSupabaseError(logError));
+      return "/partner";
+    }
 
     const { data: profile, error: profileError } = await context.supabase
       .from("profiles")
@@ -120,6 +130,8 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       subscriptionsResult,
       tenantModulesResult,
       modulesResult,
+      tenantPacksResult,
+      packsResult,
       historyResult,
     ] = await Promise.all([
       context.supabase.from("partners").select("id, name, code").eq("id", partnerId).single(),
@@ -130,6 +142,8 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
         .select("tenant_id, status, billing_cycle, starts_at, ends_at, trial_ends_at"),
       context.supabase.from("tenant_modules").select("tenant_id, module_id, enabled"),
       context.supabase.from("erp_modules").select("id, code, name").eq("is_active", true),
+      context.supabase.from("tenant_module_packs").select("tenant_id, pack_id"),
+      context.supabase.from("module_packs").select("id, name, code"),
       context.supabase
         .from("partner_activity_logs")
         .select("id, action, tenant_id, metadata, created_at")
@@ -144,6 +158,8 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       subscriptionsResult,
       tenantModulesResult,
       modulesResult,
+      tenantPacksResult,
+      packsResult,
       historyResult,
     ]) {
       if (result.error) throw new Error(formatSupabaseError(result.error));
@@ -161,6 +177,10 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
         row.enabled,
       ]),
     );
+    const packByTenant = new Map(
+      (tenantPacksResult.data ?? []).map((row) => [row.tenant_id, row.pack_id]),
+    );
+    const packs = new Map((packsResult.data ?? []).map((row) => [row.id, row]));
 
     const tenants = (tenantsResult.data ?? [])
       .filter((tenant) => assignedAt.has(tenant.id))
@@ -172,6 +192,7 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
           slug: tenant.slug,
           logoUrl: tenant.logo_url,
           assignedAt: assignedAt.get(tenant.id)!,
+          pack: packs.get(packByTenant.get(tenant.id) ?? "") ?? null,
           subscription: subscription
             ? {
                 status: subscription.status,

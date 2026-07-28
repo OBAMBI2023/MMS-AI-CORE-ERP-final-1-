@@ -18,6 +18,7 @@ import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RapportsRouteImport } from './routes/rapports'
 import { Route as PartnerLoginRouteImport } from './routes/partner-login'
 import { Route as PartnerAdminRouteImport } from './routes/partner-admin'
+import { Route as PartnerRouteImport } from './routes/partner'
 import { Route as ParametresRouteImport } from './routes/parametres'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicenceRouteImport } from './routes/licence'
@@ -34,6 +35,7 @@ import { Route as AchatsRouteImport } from './routes/achats'
 import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
 import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
 import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as AppSplatRouteImport } from './routes/app.$'
@@ -81,6 +83,11 @@ const PartnerLoginRoute = PartnerLoginRouteImport.update({
 const PartnerAdminRoute = PartnerAdminRouteImport.update({
   id: '/partner-admin',
   path: '/partner-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerRoute = PartnerRouteImport.update({
+  id: '/partner',
+  path: '/partner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ParametresRoute = ParametresRouteImport.update({
@@ -163,6 +170,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/app/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuperAdminPartnersRoute = SuperAdminPartnersRouteImport.update({
+  id: '/partners',
+  path: '/partners',
+  getParentRoute: () => SuperAdminRoute,
+} as any)
 const LoginSlugRoute = LoginSlugRouteImport.update({
   id: '/login_/$slug',
   path: '/login/$slug',
@@ -195,18 +207,20 @@ export interface FileRoutesByFullPath {
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
+  '/partner': typeof PartnerRoute
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
-  '/super-admin': typeof SuperAdminRoute
+  '/super-admin': typeof SuperAdminRouteWithChildren
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRoutesByTo {
@@ -225,18 +239,20 @@ export interface FileRoutesByTo {
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
+  '/partner': typeof PartnerRoute
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
-  '/super-admin': typeof SuperAdminRoute
+  '/super-admin': typeof SuperAdminRouteWithChildren
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/app': typeof AppIndexRoute
 }
 export interface FileRoutesById {
@@ -256,18 +272,20 @@ export interface FileRoutesById {
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
+  '/partner': typeof PartnerRoute
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
-  '/super-admin': typeof SuperAdminRoute
+  '/super-admin': typeof SuperAdminRouteWithChildren
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login_/$slug': typeof LoginSlugRoute
+  '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
@@ -288,6 +306,7 @@ export interface FileRouteTypes {
     | '/licence'
     | '/login'
     | '/parametres'
+    | '/partner'
     | '/partner-admin'
     | '/partner-login'
     | '/rapports'
@@ -300,6 +319,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login/$slug'
+    | '/super-admin/partners'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -318,6 +338,7 @@ export interface FileRouteTypes {
     | '/licence'
     | '/login'
     | '/parametres'
+    | '/partner'
     | '/partner-admin'
     | '/partner-login'
     | '/rapports'
@@ -330,6 +351,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login/$slug'
+    | '/super-admin/partners'
     | '/app'
   id:
     | '__root__'
@@ -348,6 +370,7 @@ export interface FileRouteTypes {
     | '/licence'
     | '/login'
     | '/parametres'
+    | '/partner'
     | '/partner-admin'
     | '/partner-login'
     | '/rapports'
@@ -360,6 +383,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login_/$slug'
+    | '/super-admin/partners'
     | '/app/'
   fileRoutesById: FileRoutesById
 }
@@ -379,12 +403,13 @@ export interface RootRouteChildren {
   LicenceRoute: typeof LicenceRoute
   LoginRoute: typeof LoginRoute
   ParametresRoute: typeof ParametresRoute
+  PartnerRoute: typeof PartnerRoute
   PartnerAdminRoute: typeof PartnerAdminRoute
   PartnerLoginRoute: typeof PartnerLoginRoute
   RapportsRoute: typeof RapportsRoute
   ServicesRoute: typeof ServicesRoute
   StockRoute: typeof StockRoute
-  SuperAdminRoute: typeof SuperAdminRoute
+  SuperAdminRoute: typeof SuperAdminRouteWithChildren
   TarifsRoute: typeof TarifsRoute
   UtilisateursRoute: typeof UtilisateursRoute
   VentesRoute: typeof VentesRoute
@@ -457,6 +482,13 @@ declare module '@tanstack/react-router' {
       path: '/partner-admin'
       fullPath: '/partner-admin'
       preLoaderRoute: typeof PartnerAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner': {
+      id: '/partner'
+      path: '/partner'
+      fullPath: '/partner'
+      preLoaderRoute: typeof PartnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/parametres': {
@@ -571,6 +603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/super-admin/partners': {
+      id: '/super-admin/partners'
+      path: '/partners'
+      fullPath: '/super-admin/partners'
+      preLoaderRoute: typeof SuperAdminPartnersRouteImport
+      parentRoute: typeof SuperAdminRoute
+    }
     '/login_/$slug': {
       id: '/login_/$slug'
       path: '/login/$slug'
@@ -595,6 +634,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SuperAdminRouteChildren {
+  SuperAdminPartnersRoute: typeof SuperAdminPartnersRoute
+}
+
+const SuperAdminRouteChildren: SuperAdminRouteChildren = {
+  SuperAdminPartnersRoute: SuperAdminPartnersRoute,
+}
+
+const SuperAdminRouteWithChildren = SuperAdminRoute._addFileChildren(
+  SuperAdminRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R403Route: R403Route,
@@ -611,12 +662,13 @@ const rootRouteChildren: RootRouteChildren = {
   LicenceRoute: LicenceRoute,
   LoginRoute: LoginRoute,
   ParametresRoute: ParametresRoute,
+  PartnerRoute: PartnerRoute,
   PartnerAdminRoute: PartnerAdminRoute,
   PartnerLoginRoute: PartnerLoginRoute,
   RapportsRoute: RapportsRoute,
   ServicesRoute: ServicesRoute,
   StockRoute: StockRoute,
-  SuperAdminRoute: SuperAdminRoute,
+  SuperAdminRoute: SuperAdminRouteWithChildren,
   TarifsRoute: TarifsRoute,
   UtilisateursRoute: UtilisateursRoute,
   VentesRoute: VentesRoute,

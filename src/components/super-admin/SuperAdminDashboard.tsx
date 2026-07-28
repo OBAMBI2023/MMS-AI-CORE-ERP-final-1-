@@ -16,6 +16,8 @@ import {
   CreditCard,
   FileBarChart,
   Gauge,
+  Handshake,
+  Layers3,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -27,6 +29,8 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   Area,
@@ -44,6 +48,9 @@ import {
 } from "recharts";
 import {
   manageTenantModule,
+  assignModulePack,
+  removeModulePack,
+  saveModulePack,
   manageTenantAiSubscription,
   manageTenantSubscription,
   type AiSubscriptionStatus,
@@ -51,12 +58,15 @@ import {
   type SuperAdminDashboard,
   type SuperAdminAiPlan,
   type SuperAdminTenant,
+  type SuperAdminModulePack,
 } from "@/lib/super-admin.server";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,6 +87,13 @@ import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import {
   Table,
@@ -130,6 +147,8 @@ const cycleLabels: Record<SubscriptionBillingCycle, string> = {
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "#dashboard", active: true },
   { label: "Tenants", icon: Building2, href: "#tenants" },
+  { label: "Packs de modules", icon: Layers3, href: "#packs-modules" },
+  { label: "Partenaires", icon: Handshake, href: "/super-admin/partners" },
   { label: "Utilisateurs", icon: Users, href: "#utilisateurs" },
   { label: "Licences", icon: KeyRound, href: "#licences" },
   { label: "Activité", icon: Activity, href: "#activite" },
@@ -253,14 +272,178 @@ function ChartCard({
   );
 }
 
+function ModulePacksSection({
+  packs,
+  modules,
+}: {
+  packs: SuperAdminModulePack[];
+  modules: SuperAdminDashboard["modules"];
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = useState<SuperAdminModulePack | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [active, setActive] = useState(true);
+  const [moduleIds, setModuleIds] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const openEditor = (pack?: SuperAdminModulePack) => {
+    setEditing(pack ?? null);
+    setName(pack?.name ?? "");
+    setCode(pack?.code ?? "");
+    setDescription(pack?.description ?? "");
+    setActive(pack?.is_active ?? true);
+    setModuleIds(pack?.moduleIds ?? []);
+    setDialogOpen(true);
+  };
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      await saveModulePack({
+        data: {
+          id: editing?.id ?? null,
+          name,
+          code,
+          description: description || null,
+          isActive: active,
+          moduleIds,
+        },
+      });
+      toast.success(editing ? "Pack mis à jour." : "Pack créé.");
+      setDialogOpen(false);
+      await router.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible d’enregistrer le pack.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const remove = async (pack: SuperAdminModulePack) => {
+    if (!window.confirm(`Supprimer le pack « ${pack.name} » ?`)) return;
+    try {
+      await removeModulePack({ data: { packId: pack.id } });
+      toast.success("Pack supprimé.");
+      await router.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible de supprimer le pack.");
+    }
+  };
+
+  return (
+    <section id="packs-modules" className="scroll-mt-24 space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Packs de modules</h2>
+          <p className="text-sm text-muted-foreground">
+            Regroupez les modules AUREX et attribuez-les depuis la fiche d’un tenant.
+          </p>
+        </div>
+        <Button onClick={() => openEditor()}><Plus /> Nouveau pack</Button>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {packs.map((pack) => (
+          <Card key={pack.id} className="flex flex-col rounded-xl border-border/70 p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950">
+                <Layers3 className="size-5" />
+              </div>
+              <Badge variant={pack.is_active ? "default" : "secondary"}>
+                {pack.is_active ? "Actif" : "Inactif"}
+              </Badge>
+            </div>
+            <h3 className="mt-4 font-semibold">{pack.name}</h3>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{pack.code}</p>
+            <p className="mt-3 min-h-10 text-sm text-muted-foreground">
+              {pack.description ?? "Aucune description"}
+            </p>
+            <p className="mt-3 text-xs font-medium">
+              {pack.moduleIds.length} module{pack.moduleIds.length > 1 ? "s" : ""}
+            </p>
+            <div className="mt-4 flex gap-2 border-t pt-4">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => openEditor(pack)}>
+                <Pencil /> Modifier
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => void remove(pack)}>
+                <Trash2 className="size-4 text-destructive" />
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier le pack" : "Créer un pack"}</DialogTitle>
+            <DialogDescription>
+              La composition sera enregistrée de façon atomique avec le pack.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="pack-name">Nom</Label>
+              <Input id="pack-name" value={name} onChange={(event) => setName(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pack-code">Code</Label>
+              <Input id="pack-code" value={code} onChange={(event) => setCode(event.target.value.toLowerCase())} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="pack-description">Description</Label>
+              <Textarea id="pack-description" value={description} onChange={(event) => setDescription(event.target.value)} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2">
+              <Label htmlFor="pack-active">Pack actif</Label>
+              <Switch id="pack-active" checked={active} onCheckedChange={setActive} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Modules inclus</Label>
+              <div className="grid max-h-64 gap-2 overflow-y-auto rounded-lg border p-3 sm:grid-cols-2">
+                {modules.map((module) => (
+                  <label key={module.id} className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-muted">
+                    <Checkbox
+                      checked={moduleIds.includes(module.id)}
+                      onCheckedChange={(checked) =>
+                        setModuleIds((current) =>
+                          checked ? [...current, module.id] : current.filter((id) => id !== module.id),
+                        )
+                      }
+                    />
+                    <span>
+                      <span className="block text-sm font-medium">{module.name}</span>
+                      <span className="block text-xs text-muted-foreground">{module.code}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            <Button disabled={submitting || !name.trim() || !code.trim()} onClick={() => void submit()}>
+              {submitting ? "Enregistrement…" : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
 function TenantTable({
   tenants,
   aiPlans,
+  modulePacks,
   query,
   onQueryChange,
 }: {
   tenants: SuperAdminTenant[];
   aiPlans: SuperAdminAiPlan[];
+  modulePacks: SuperAdminModulePack[];
   query: string;
   onQueryChange: (value: string) => void;
 }) {
@@ -280,7 +463,7 @@ function TenantTable({
     const normalized = query.trim().toLocaleLowerCase("fr");
     if (!normalized) return tenants;
     return tenants.filter((tenant) =>
-      [tenant.name, tenant.status, tenant.plan ?? "", tenant.id].some((value) =>
+      [tenant.name, tenant.status, tenant.plan ?? "", tenant.pack?.name ?? "", tenant.id].some((value) =>
         value.toLocaleLowerCase("fr").includes(normalized),
       ),
     );
@@ -332,6 +515,7 @@ function TenantTable({
                 <TableHead className="text-right">Clients</TableHead>
                 <TableHead className="text-right">CA mensuel</TableHead>
                 <TableHead>Plan</TableHead>
+                <TableHead>Pack modules</TableHead>
                 <TableHead>Fin abonnement</TableHead>
                 <TableHead>Activité</TableHead>
                 <TableHead className="w-12">Actions</TableHead>
@@ -389,6 +573,16 @@ function TenantTable({
                     {formatCurrency(tenant.monthlyRevenue)}
                   </TableCell>
                   <TableCell>{tenant.plan ? cycleLabels[tenant.plan] : "—"}</TableCell>
+                  <TableCell>
+                    {tenant.pack ? (
+                      <Badge variant="secondary" className="whitespace-nowrap">
+                        <Layers3 className="mr-1 size-3" />
+                        {tenant.pack.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Aucun</span>
+                    )}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">
                     <div>{formatDate(tenant.subscriptionEnd)}</div>
                     {tenant.daysRemaining !== null && (
@@ -453,6 +647,7 @@ function TenantTable({
       />
       <TenantModulesDialog
         tenant={moduleTenant}
+        packs={modulePacks}
         open={Boolean(moduleTenant)}
         onOpenChange={(open) => {
           if (!open) setModuleTenant(null);
@@ -639,15 +834,38 @@ function AiSubscriptionDialog({
 
 function TenantModulesDialog({
   tenant,
+  packs,
   open,
   onOpenChange,
 }: {
   tenant: SuperAdminTenant | null;
+  packs: SuperAdminModulePack[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const [pendingModule, setPendingModule] = useState<string | null>(null);
+  const [selectedPackId, setSelectedPackId] = useState("");
+  const [assigning, setAssigning] = useState(false);
+
+  useEffect(() => {
+    setSelectedPackId(tenant?.pack?.id ?? "");
+  }, [tenant]);
+
+  const applyPack = async () => {
+    if (!tenant || !selectedPackId) return;
+    setAssigning(true);
+    try {
+      await assignModulePack({ data: { tenantId: tenant.id, packId: selectedPackId } });
+      toast.success("Pack attribué et modules synchronisés.");
+      onOpenChange(false);
+      await router.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible d’attribuer le pack.");
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const toggleModule = async (moduleId: string, enabled: boolean) => {
     if (!tenant) return;
@@ -677,6 +895,31 @@ function TenantModulesDialog({
             Activez uniquement les fonctions accessibles à {tenant?.name}.
           </DialogDescription>
         </DialogHeader>
+        <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+          <Label>Pack actuel</Label>
+          <div className="mt-2 flex gap-2">
+            <Select value={selectedPackId} onValueChange={setSelectedPackId}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Sélectionner un pack" />
+              </SelectTrigger>
+              <SelectContent>
+                {packs.filter((pack) => pack.is_active).map((pack) => (
+                  <SelectItem key={pack.id} value={pack.id}>{pack.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={() => void applyPack()}
+              disabled={!selectedPackId || assigning || selectedPackId === tenant?.pack?.id}
+            >
+              {assigning ? "Attribution…" : "Attribuer"}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            L’attribution synchronise les modules avec le pack. Les interrupteurs ci-dessous
+            permettent ensuite d’ajouter ou retirer des exceptions pour ce tenant.
+          </p>
+        </div>
         <div className="max-h-[60vh] space-y-2 overflow-y-auto py-2">
           {tenant?.modules.map((module) => (
             <div
@@ -1159,7 +1402,14 @@ export function SuperAdminDashboardView({
             </ChartCard>
           </section>
 
-          <TenantTable tenants={data.tenants} aiPlans={data.aiPlans} query={tenantQuery} onQueryChange={setTenantQuery} />
+          <ModulePacksSection packs={data.modulePacks} modules={data.modules} />
+          <TenantTable
+            tenants={data.tenants}
+            aiPlans={data.aiPlans}
+            modulePacks={data.modulePacks}
+            query={tenantQuery}
+            onQueryChange={setTenantQuery}
+          />
           <SubscriptionSummary data={data.subscriptions} />
         </main>
       </div>

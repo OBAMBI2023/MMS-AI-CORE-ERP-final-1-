@@ -402,6 +402,7 @@ export function PartnerAdminDashboardView({
                       <th className="px-5 py-4">Entreprise</th>
                       <th className="px-5 py-4">Statut</th>
                       <th className="px-5 py-4">Licence</th>
+                      <th className="px-5 py-4">Pack</th>
                       <th className="px-5 py-4">Modules</th>
                       <th className="px-5 py-4">Attribuée le</th>
                     </tr>
@@ -409,6 +410,9 @@ export function PartnerAdminDashboardView({
                   <tbody className="divide-y divide-slate-100">
                     {filteredTenants.map((tenant) => (
                       <tr key={tenant.id} className="transition hover:bg-blue-50/30">
+                        <td className="px-5 py-4 font-medium text-slate-700">
+                          {tenant.pack?.name ?? "Aucun"}
+                        </td>
                         <td className="px-5 py-4">
                           <CompanyIdentity tenant={tenant} />
                         </td>
@@ -674,8 +678,9 @@ function CompanyCard({ tenant, index }: { tenant: PartnerTenant; index: number }
           <CompanyIdentity tenant={tenant} large />
           <StatusBadge status={tenant.subscription?.status} />
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-slate-50 p-3">
+        <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl bg-slate-50 p-3">
           <CardStat label="Licence" value={tenant.subscription?.billingCycle ?? "—"} />
+          <CardStat label="Pack" value={tenant.pack?.name ?? "Aucun"} />
           <CardStat label="Modules" value={`${enabled.length}/${tenant.modules.length}`} />
         </div>
         <div className="mt-5">

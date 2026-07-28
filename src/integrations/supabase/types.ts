@@ -32,6 +32,12 @@ export type Database = {
         Update: { id?: string; partner_id?: string; user_id?: string; action?: string; tenant_id?: string | null; metadata?: Json; created_at?: string };
         Relationships: [];
       };
+      platform_user_roles: {
+        Row: { user_id: string; role: Database["public"]["Enums"]["platform_role"]; created_at: string };
+        Insert: { user_id: string; role: Database["public"]["Enums"]["platform_role"]; created_at?: string };
+        Update: { user_id?: string; role?: Database["public"]["Enums"]["platform_role"]; created_at?: string };
+        Relationships: [];
+      };
       tenants: {
         Row: {
           id: string;
@@ -113,6 +119,63 @@ export type Database = {
           sort_order?: number;
           is_active?: boolean;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      module_packs: {
+        Row: {
+          id: string;
+          name: string;
+          code: string;
+          description: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          code: string;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          code?: string;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      module_pack_items: {
+        Row: { pack_id: string; module_id: string };
+        Insert: { pack_id: string; module_id: string };
+        Update: { pack_id?: string; module_id?: string };
+        Relationships: [];
+      };
+      tenant_module_packs: {
+        Row: {
+          tenant_id: string;
+          pack_id: string;
+          assigned_at: string;
+          assigned_by: string | null;
+        };
+        Insert: {
+          tenant_id: string;
+          pack_id: string;
+          assigned_at?: string;
+          assigned_by?: string | null;
+        };
+        Update: {
+          tenant_id?: string;
+          pack_id?: string;
+          assigned_at?: string;
+          assigned_by?: string | null;
         };
         Relationships: [];
       };
@@ -831,6 +894,38 @@ export type Database = {
         Args: { requested_tenant_id: string };
         Returns: boolean;
       };
+      partner_can_read_module: {
+        Args: { requested_module_id: string };
+        Returns: boolean;
+      };
+      create_partner_account: {
+        Args: {
+          requested_partner_id: string;
+          requested_user_id: string;
+          requested_name: string;
+          requested_code: string;
+          requested_actor_id: string;
+        };
+        Returns: string;
+      };
+      update_partner_account: {
+        Args: {
+          requested_partner_id: string;
+          requested_name: string;
+          requested_code: string;
+          requested_is_active: boolean;
+          requested_actor_id: string;
+        };
+        Returns: undefined;
+      };
+      set_partner_tenants: {
+        Args: {
+          requested_partner_id: string;
+          requested_tenant_ids: string[];
+          requested_actor_id: string;
+        };
+        Returns: undefined;
+      };
       replace_and_delete_catalog_category: {
         Args: {
           source_category_id: string;
@@ -891,6 +986,7 @@ export type Database = {
       };
     };
     Enums: {
+      platform_role: "partner";
       subscription_billing_cycle: "monthly" | "quarterly" | "yearly";
       subscription_status: "trial" | "active" | "expired" | "suspended";
     };

@@ -21,6 +21,15 @@ type ModuleRow = {
   is_active: boolean;
 };
 type TenantModuleRow = { tenant_id: string; module_id: string; enabled: boolean };
+type ModulePackRow = {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  is_active: boolean;
+};
+type ModulePackItemRow = { pack_id: string; module_id: string };
+type TenantModulePackRow = { tenant_id: string; pack_id: string };
 type AiPlanRow = {
   code: string;
   name: string;
@@ -131,17 +140,21 @@ export type SuperAdminTenant = {
   daysRemaining: number | null;
   lastActivityAt: string | null;
   modules: SuperAdminTenantModule[];
+  pack: SuperAdminModulePack | null;
   aiSubscription: SuperAdminAiSubscription | null;
   aiUsageHistory: SuperAdminAiUsage[];
 };
 
 export type SuperAdminTenantModule = ModuleRow & { enabled: boolean };
+export type SuperAdminModulePack = ModulePackRow & { moduleIds: string[] };
 
 export type SuperAdminDashboard = {
   kpis: { tenants: number; activeTenants: number; users: number; sales: number; revenue: number };
   subscriptions: { active: number; trials: number; expired: number; recurringRevenue: number };
   registrations: RegistrationPoint[];
   aiPlans: SuperAdminAiPlan[];
+  modules: ModuleRow[];
+  modulePacks: SuperAdminModulePack[];
   tenants: SuperAdminTenant[];
 };
 
@@ -222,6 +235,9 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       subscriptionRows,
       moduleRows,
       tenantModuleRows,
+      modulePackRows,
+      modulePackItemRows,
+      tenantModulePackRows,
       aiPlanRows,
       aiSubscriptionRows,
       aiUsageRows,
@@ -244,6 +260,17 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         supabaseAdmin,
         "tenant_modules",
         "tenant_id, module_id, enabled",
+      ),
+      fetchRows<ModulePackRow>(
+        supabaseAdmin,
+        "module_packs",
+        "id, name, code, description, is_active",
+      ),
+      fetchRows<ModulePackItemRow>(supabaseAdmin, "module_pack_items", "pack_id, module_id"),
+      fetchRows<TenantModulePackRow>(
+        supabaseAdmin,
+        "tenant_module_packs",
+        "tenant_id, pack_id",
       ),
       fetchRows<AiPlanRow>(
         supabaseAdmin,
@@ -278,6 +305,18 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         `${assignment.tenant_id}:${assignment.module_id}`,
         assignment.enabled,
       ]),
+    );
+    const modulePacks = modulePackRows
+      .map((pack) => ({
+        ...pack,
+        moduleIds: modulePackItemRows
+          .filter((item) => item.pack_id === pack.id)
+          .map((item) => item.module_id),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    const packsById = new Map(modulePacks.map((pack) => [pack.id, pack]));
+    const tenantPackState = new Map(
+      tenantModulePackRows.map((assignment) => [assignment.tenant_id, assignment.pack_id]),
     );
     const metrics = new Map<
       string,
@@ -371,6 +410,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
               enabled: tenantModuleState.get(`${tenant.id}:${module.id}`) ?? false,
             }))
             .sort((a, b) => a.sort_order - b.sort_order),
+          pack: packsById.get(tenantPackState.get(tenant.id) ?? "") ?? null,
           aiSubscription: aiSubscription
             ? {
                 id: aiSubscription.id,
@@ -441,8 +481,65 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         price: plan.price === null ? null : Number(plan.price),
         enabled: plan.enabled,
       })),
+      modules: moduleRows.sort((a, b) => a.sort_order - b.sort_order),
+      modulePacks,
       tenants,
     };
+  });
+
+const modulePackSchema = z.object({
+  id: z.string().uuid().nullable(),
+  name: z.string().trim().min(1).max(100),
+  code: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{1,49}$/),
+  description: z.string().trim().max(500).nullable(),
+  isActive: z.boolean(),
+  moduleIds: z.array(z.string().uuid()).max(100),
+});
+
+export const saveModulePack = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(modulePackSchema)
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: packId, error } = await supabaseAdmin.rpc("manage_module_pack", {
+      requested_pack_id: data.id,
+      requested_name: data.name,
+      requested_code: data.code,
+      requested_description: data.description ?? "",
+      requested_is_active: data.isActive,
+      requested_module_ids: [...new Set(data.moduleIds)],
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { success: true, packId: packId as string };
+  });
+
+export const removeModulePack = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ packId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("delete_module_pack", {
+      requested_pack_id: data.packId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { success: true };
+  });
+
+export const assignModulePack = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ tenantId: z.string().uuid(), packId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("assign_module_pack_to_tenant", {
+      requested_tenant_id: data.tenantId,
+      requested_pack_id: data.packId,
+      requested_by: context.userId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { success: true };
   });
 
 const manageTenantModuleSchema = z.object({

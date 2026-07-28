@@ -53,7 +53,7 @@ function isPlatformRoute(pathname: string) {
 }
 
 function isPartnerRoute(pathname: string) {
-  return pathname === "/partner-admin" || pathname.startsWith("/partner-admin/");
+  return pathname === "/partner" || pathname.startsWith("/partner/");
 }
 
 function isLicenseRoute(pathname: string) {
@@ -170,9 +170,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       const { isPartnerAdmin } = await getPartnerAdminAccess();
       if (isPartnerAdmin) {
         if (!isPartnerRoute(location.pathname)) {
-          throw redirect({ to: "/partner-admin" });
+          throw redirect({ to: "/partner" });
         }
         return;
+      }
+
+      if (isPlatformRoute(location.pathname)) {
+        throw redirect({ to: "/403" });
       }
 
       if (isPartnerRoute(location.pathname)) {
