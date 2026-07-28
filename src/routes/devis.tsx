@@ -41,7 +41,7 @@ export const Route = createFileRoute("/devis")({
   component: DevisPage,
   head: () => ({
     meta: [
-      { title: "Devis — MMS AI CORE" },
+      { title: "Devis — AUREX ERP" },
       { name: "description", content: "Gestion des devis clients." },
     ],
   }),

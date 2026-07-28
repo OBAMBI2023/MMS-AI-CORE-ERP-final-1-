@@ -21,9 +21,39 @@ import { TenantProvider } from "@/providers/TenantProvider";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { getPlatformAdminAccess } from "@/lib/super-admin.server";
+import { getPartnerAdminAccess } from "@/lib/partner-admin.server";
+import { PLATFORM_BRANDING } from "@/config/branding";
+import { readEnvVar } from "@/integrations/supabase/env";
+
+function getSiteOrigin() {
+  const browserOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
+  const configuredOrigin = readEnvVar(
+    "VITE_SITE_URL",
+    "SITE_URL",
+    "URL",
+    "DEPLOY_URL",
+    "CF_PAGES_URL",
+    "VERCEL_PROJECT_PRODUCTION_URL",
+    "VERCEL_URL",
+  );
+  const candidate = browserOrigin ?? configuredOrigin ?? "http://localhost:3000";
+  const absoluteCandidate = /^https?:\/\//i.test(candidate) ? candidate : `https://${candidate}`;
+
+  try {
+    return new URL(absoluteCandidate).origin;
+  } catch {
+    return "http://localhost:3000";
+  }
+}
+
+const socialLogoUrl = new URL(PLATFORM_BRANDING.assets.logo, `${getSiteOrigin()}/`).toString();
 
 function isPlatformRoute(pathname: string) {
   return pathname === "/super-admin" || pathname.startsWith("/super-admin/");
+}
+
+function isPartnerRoute(pathname: string) {
+  return pathname === "/partner-admin" || pathname.startsWith("/partner-admin/");
 }
 
 function isLicenseRoute(pathname: string) {
@@ -137,6 +167,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         return;
       }
 
+      const { isPartnerAdmin } = await getPartnerAdminAccess();
+      if (isPartnerAdmin) {
+        if (!isPartnerRoute(location.pathname)) {
+          throw redirect({ to: "/partner-admin" });
+        }
+        return;
+      }
+
+      if (isPartnerRoute(location.pathname)) {
+        throw redirect({ to: "/403" });
+      }
+
       if (isLicenseRoute(location.pathname)) {
         return;
       }
@@ -210,43 +252,41 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MMS AI CORE — Assistant intelligent Maguy Multi Services" },
+      { title: PLATFORM_BRANDING.name },
       {
         name: "description",
         content:
-          "MMS AI CORE : assistant IA premium de l'ERP Maguy Multi Services. Créez factures, devis et clients par la voix ou le chat.",
+          PLATFORM_BRANDING.description,
       },
-      { property: "og:title", content: "MMS AI CORE — Assistant intelligent Maguy Multi Services" },
+      { property: "og:title", content: PLATFORM_BRANDING.name },
       {
         property: "og:description",
         content:
-          "MMS AI CORE : assistant IA premium de l'ERP Maguy Multi Services. Créez factures, devis et clients par la voix ou le chat.",
+          PLATFORM_BRANDING.description,
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       {
         name: "twitter:title",
-        content: "MMS AI CORE — Assistant intelligent Maguy Multi Services",
+        content: PLATFORM_BRANDING.name,
       },
       {
         name: "twitter:description",
         content:
-          "MMS AI CORE : assistant IA premium de l'ERP Maguy Multi Services. Créez factures, devis et clients par la voix ou le chat.",
+          PLATFORM_BRANDING.description,
       },
       {
         property: "og:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/246484be-746c-400a-9d4b-48abed8b0d64/id-preview-e914f378--0600b09e-3bef-44f9-b521-6d65236b2f89.lovable.app-1784056453447.png",
+        content: socialLogoUrl,
       },
       {
         name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/246484be-746c-400a-9d4b-48abed8b0d64/id-preview-e914f378--0600b09e-3bef-44f9-b521-6d65236b2f89.lovable.app-1784056453447.png",
+        content: socialLogoUrl,
       },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: PLATFORM_BRANDING.assets.favicon, type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -281,7 +321,8 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const isPlatformArea = useLocation({
-    select: (location) => isPlatformRoute(location.pathname),
+    select: (location) =>
+      isPlatformRoute(location.pathname) || isPartnerRoute(location.pathname),
   });
   const isPublicArea = useLocation({
     select: (location) => isPublicRoute(location.pathname),
@@ -304,7 +345,7 @@ function RootComponent() {
       <ThemeProvider>
         {isPlatformArea || isPublicArea ? (
           <>
-            <DynamicFavicon />
+            <DynamicFavicon platform />
             <Outlet />
             <Toaster richColors position="top-right" />
           </>

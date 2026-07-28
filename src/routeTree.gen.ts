@@ -16,6 +16,8 @@ import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RapportsRouteImport } from './routes/rapports'
+import { Route as PartnerLoginRouteImport } from './routes/partner-login'
+import { Route as PartnerAdminRouteImport } from './routes/partner-admin'
 import { Route as ParametresRouteImport } from './routes/parametres'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicenceRouteImport } from './routes/licence'
@@ -69,6 +71,16 @@ const ServicesRoute = ServicesRouteImport.update({
 const RapportsRoute = RapportsRouteImport.update({
   id: '/rapports',
   path: '/rapports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerLoginRoute = PartnerLoginRouteImport.update({
+  id: '/partner-login',
+  path: '/partner-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerAdminRoute = PartnerAdminRouteImport.update({
+  id: '/partner-admin',
+  path: '/partner-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ParametresRoute = ParametresRouteImport.update({
@@ -183,6 +195,8 @@ export interface FileRoutesByFullPath {
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
+  '/partner-admin': typeof PartnerAdminRoute
+  '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
@@ -211,6 +225,8 @@ export interface FileRoutesByTo {
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
+  '/partner-admin': typeof PartnerAdminRoute
+  '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
@@ -240,6 +256,8 @@ export interface FileRoutesById {
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
   '/parametres': typeof ParametresRoute
+  '/partner-admin': typeof PartnerAdminRoute
+  '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
@@ -270,6 +288,8 @@ export interface FileRouteTypes {
     | '/licence'
     | '/login'
     | '/parametres'
+    | '/partner-admin'
+    | '/partner-login'
     | '/rapports'
     | '/services'
     | '/stock'
@@ -298,6 +318,8 @@ export interface FileRouteTypes {
     | '/licence'
     | '/login'
     | '/parametres'
+    | '/partner-admin'
+    | '/partner-login'
     | '/rapports'
     | '/services'
     | '/stock'
@@ -326,6 +348,8 @@ export interface FileRouteTypes {
     | '/licence'
     | '/login'
     | '/parametres'
+    | '/partner-admin'
+    | '/partner-login'
     | '/rapports'
     | '/services'
     | '/stock'
@@ -355,6 +379,8 @@ export interface RootRouteChildren {
   LicenceRoute: typeof LicenceRoute
   LoginRoute: typeof LoginRoute
   ParametresRoute: typeof ParametresRoute
+  PartnerAdminRoute: typeof PartnerAdminRoute
+  PartnerLoginRoute: typeof PartnerLoginRoute
   RapportsRoute: typeof RapportsRoute
   ServicesRoute: typeof ServicesRoute
   StockRoute: typeof StockRoute
@@ -417,6 +443,20 @@ declare module '@tanstack/react-router' {
       path: '/rapports'
       fullPath: '/rapports'
       preLoaderRoute: typeof RapportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner-login': {
+      id: '/partner-login'
+      path: '/partner-login'
+      fullPath: '/partner-login'
+      preLoaderRoute: typeof PartnerLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner-admin': {
+      id: '/partner-admin'
+      path: '/partner-admin'
+      fullPath: '/partner-admin'
+      preLoaderRoute: typeof PartnerAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/parametres': {
@@ -571,6 +611,8 @@ const rootRouteChildren: RootRouteChildren = {
   LicenceRoute: LicenceRoute,
   LoginRoute: LoginRoute,
   ParametresRoute: ParametresRoute,
+  PartnerAdminRoute: PartnerAdminRoute,
+  PartnerLoginRoute: PartnerLoginRoute,
   RapportsRoute: RapportsRoute,
   ServicesRoute: ServicesRoute,
   StockRoute: StockRoute,

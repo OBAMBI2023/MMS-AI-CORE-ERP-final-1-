@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTenant } from "@/providers/TenantProvider";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { formatSupabaseError } from "@/lib/supabase-error";
@@ -30,6 +31,19 @@ import { useCatalogItems, type CatalogItem } from "@/hooks/use-catalog-items";
 const CATALOG_BUCKET = "catalog-images";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+const DUPLICATE_SERVICE_MESSAGE =
+  "Un service portant ce nom existe déjà dans cette catégorie.";
+
+function normalizedServiceName(name: string) {
+  return name.trim().toLocaleLowerCase("fr");
+}
+
+function isDuplicateServiceError(error: { code?: string | null; message?: string | null }) {
+  return (
+    error.code === "23505" &&
+    (error.message?.includes("services_tenant_name_type_key") ?? false)
+  );
+}
 
 type CatalogForm = {
   type: "product" | "service";
@@ -65,6 +79,7 @@ export function CatalogPage() {
   const { tenant, loading } = useTenant();
   const { profile, refreshTenant } = useTenant();
   const [search, setSearch] = useState("");
+  const [activeType, setActiveType] = useState<CatalogForm["type"]>("product");
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [newCategoryDialogOpen, setNewCategoryDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
@@ -137,20 +152,30 @@ export function CatalogPage() {
     });
   };
 
+  const itemCounts = useMemo(
+    () => ({
+      product: (itemsQuery.data ?? []).filter((item) => item.type === "product").length,
+      service: (itemsQuery.data ?? []).filter((item) => item.type === "service").length,
+    }),
+    [itemsQuery.data],
+  );
+
   const filteredItems = useMemo(() => {
     const value = search.trim().toLocaleLowerCase("fr");
-    if (!value) return itemsQuery.data ?? [];
-    return (itemsQuery.data ?? []).filter((item) =>
-      [item.name, item.category, item.type, item.unit].some((field) =>
+    const activeItems = (itemsQuery.data ?? []).filter((item) => item.type === activeType);
+    if (!value) return activeItems;
+    return activeItems.filter((item) =>
+      [item.name, item.category, item.unit].some((field) =>
         field.toLocaleLowerCase("fr").includes(value),
       ),
     );
-  }, [itemsQuery.data, search]);
+  }, [activeType, itemsQuery.data, search]);
 
   const openCreate = () => {
     setEditing(null);
     setForm({
       ...emptyForm,
+      type: activeType,
       category_id: categoriesQuery.data?.[0]?.id ?? "",
     });
     setItemDialogOpen(true);
@@ -196,6 +221,23 @@ export function CatalogPage() {
         throw new Error("Le seuil d’alerte est invalide.");
       }
       const manageStock = form.type === "product" && form.manage_stock;
+      let duplicateQuery = supabase
+        .from("services")
+        .select("id, name")
+        .eq("tenant_id", tenantId)
+        .eq("type", form.type)
+        .eq("active", true);
+      if (editing) duplicateQuery = duplicateQuery.neq("id", editing.id);
+      const { data: activeServices, error: duplicateCheckError } = await duplicateQuery;
+      if (duplicateCheckError) throw duplicateCheckError;
+      if (
+        activeServices?.some(
+          (service) =>
+            normalizedServiceName(service.name) === normalizedServiceName(form.name),
+        )
+      ) {
+        throw new Error(DUPLICATE_SERVICE_MESSAGE);
+      }
       let uploadedPath: string | null = null;
       if (form.photo_file) {
         const extension = form.photo_file.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -234,6 +276,7 @@ export function CatalogPage() {
         : await supabase.from("services").insert(payload);
       if (error) {
         if (uploadedPath) await supabase.storage.from(CATALOG_BUCKET).remove([uploadedPath]);
+        if (isDuplicateServiceError(error)) throw new Error(DUPLICATE_SERVICE_MESSAGE);
         throw error;
       }
       if (editing?.photo_url && editing.photo_url !== payload.photo_url) {
@@ -286,7 +329,7 @@ export function CatalogPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Rechercher dans le catalogue..."
+            placeholder={`Rechercher dans les ${activeType === "product" ? "produits" : "services"}...`}
             className="pl-9"
           />
         </div>
@@ -294,7 +337,7 @@ export function CatalogPage() {
           {canCreate && (
             <Button onClick={openCreate}>
               <Plus className="size-4" />
-              Nouvel article
+              {activeType === "product" ? "Nouveau produit" : "Nouveau service"}
             </Button>
           )}
         </div>
@@ -306,6 +349,16 @@ export function CatalogPage() {
         </Card>
       )}
 
+      <Tabs
+        value={activeType}
+        onValueChange={(value) => setActiveType(value as CatalogForm["type"])}
+      >
+        <TabsList className="grid w-full grid-cols-2 sm:w-auto">
+          <TabsTrigger value="product">Produits ({itemCounts.product})</TabsTrigger>
+          <TabsTrigger value="service">Services ({itemCounts.service})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <Card className="overflow-hidden">
         {loadError && (
           <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -313,36 +366,49 @@ export function CatalogPage() {
           </div>
         )}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table
+            className={`w-full text-sm ${
+              activeType === "product" ? "min-w-[800px]" : "min-w-[700px]"
+            }`}
+          >
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Article</th>
-                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">
+                  {activeType === "product" ? "Article" : "Service"}
+                </th>
                 <th className="px-4 py-3">Catégorie</th>
                 <th className="px-4 py-3">Unité</th>
                 <th className="px-4 py-3 text-right">Prix</th>
-                <th className="px-4 py-3 text-right">Stock</th>
+                {activeType === "product" && (
+                  <th className="px-4 py-3 text-right">Stock</th>
+                )}
                 <th className="px-4 py-3">Statut</th>
-                <th className="w-24 px-4 py-3" />
+                <th className="w-24 px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center">
+                  <td colSpan={activeType === "product" ? 7 : 6} className="py-12 text-center">
                     <Loader2 className="mx-auto size-5 animate-spin" />
                   </td>
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-destructive">
+                  <td
+                    colSpan={activeType === "product" ? 7 : 6}
+                    className="py-12 text-center text-destructive"
+                  >
                     Le catalogue n’a pas pu être affiché.
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
-                    Catalogue vide.
+                  <td
+                    colSpan={activeType === "product" ? 7 : 6}
+                    className="py-12 text-center text-muted-foreground"
+                  >
+                    Aucun {activeType === "product" ? "produit" : "service"}.
                   </td>
                 </tr>
               ) : (
@@ -356,17 +422,14 @@ export function CatalogPage() {
                         <span className="font-medium">{item.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      {item.type === "product" ? "Produit" : "Service"}
-                    </td>
                     <td className="px-4 py-3">{item.category}</td>
                     <td className="px-4 py-3">{item.unit}</td>
                     <td className="px-4 py-3 text-right font-medium">
                       {formatCurrency(Number(item.price))}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      {item.type === "product" ? (item.stock ?? "—") : "—"}
-                    </td>
+                    {activeType === "product" && (
+                      <td className="px-4 py-3 text-right">{item.stock ?? "—"}</td>
+                    )}
                     <td className="px-4 py-3">{item.active ? "Actif" : "Inactif"}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">

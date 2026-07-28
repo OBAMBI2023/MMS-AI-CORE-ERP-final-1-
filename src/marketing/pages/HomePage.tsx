@@ -35,7 +35,7 @@ export function HomePage() {
               Pilotez votre activité avec une vision claire.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              MMS AI CORE réunit vos opérations commerciales, vos achats, vos dépenses et votre
+              AUREX ERP réunit vos opérations commerciales, vos achats, vos dépenses et votre
               organisation dans une plateforme SaaS centralisée.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">

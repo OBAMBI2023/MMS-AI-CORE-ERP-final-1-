@@ -79,7 +79,7 @@ export const Route = createFileRoute("/rapports")({
   component: RapportsPage,
   head: () => ({
     meta: [
-      { title: "Rapports — MMS AI CORE" },
+      { title: "Rapports — AUREX ERP" },
       { name: "description", content: "Tableau de bord et rapports d'activité." },
     ],
   }),

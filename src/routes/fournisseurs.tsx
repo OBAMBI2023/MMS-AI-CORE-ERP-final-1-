@@ -36,7 +36,7 @@ export const Route = createFileRoute("/fournisseurs")({
   component: FournisseursPage,
   head: () => ({
     meta: [
-      { title: "Fournisseurs — MMS AI CORE" },
+      { title: "Fournisseurs — AUREX ERP" },
       { name: "description", content: "Répertoire des fournisseurs." },
     ],
   }),

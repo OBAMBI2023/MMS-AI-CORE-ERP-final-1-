@@ -8,6 +8,30 @@ export type Database = {
   };
   public: {
     Tables: {
+      partners: {
+        Row: { id: string; name: string; code: string; is_active: boolean; created_at: string; updated_at: string };
+        Insert: { id?: string; name: string; code: string; is_active?: boolean; created_at?: string; updated_at?: string };
+        Update: { id?: string; name?: string; code?: string; is_active?: boolean; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      partner_users: {
+        Row: { partner_id: string; user_id: string; created_at: string };
+        Insert: { partner_id: string; user_id: string; created_at?: string };
+        Update: { partner_id?: string; user_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      partner_tenants: {
+        Row: { partner_id: string; tenant_id: string; assigned_at: string };
+        Insert: { partner_id: string; tenant_id: string; assigned_at?: string };
+        Update: { partner_id?: string; tenant_id?: string; assigned_at?: string };
+        Relationships: [];
+      };
+      partner_activity_logs: {
+        Row: { id: string; partner_id: string; user_id: string; action: string; tenant_id: string | null; metadata: Json; created_at: string };
+        Insert: { id?: string; partner_id: string; user_id: string; action: string; tenant_id?: string | null; metadata?: Json; created_at?: string };
+        Update: { id?: string; partner_id?: string; user_id?: string; action?: string; tenant_id?: string | null; metadata?: Json; created_at?: string };
+        Relationships: [];
+      };
       tenants: {
         Row: {
           id: string;
@@ -799,6 +823,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      current_partner_id: {
+        Args: Record<PropertyKey, never>;
+        Returns: string | null;
+      };
+      partner_can_read_tenant: {
+        Args: { requested_tenant_id: string };
+        Returns: boolean;
+      };
       replace_and_delete_catalog_category: {
         Args: {
           source_category_id: string;

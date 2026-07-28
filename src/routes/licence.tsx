@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, Headphones, LogOut, TriangleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { PLATFORM_BRANDING } from "@/config/branding";
 
 function LicenseUnavailablePage() {
   const signOut = async () => {
@@ -26,12 +27,16 @@ function LicenseUnavailablePage() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-xl rounded-[2rem] border border-white/80 bg-white/90 p-6 text-center shadow-[0_24px_80px_-24px_rgba(15,23,42,0.25)] backdrop-blur-xl sm:p-10 dark:border-slate-800/80 dark:bg-slate-900/90 dark:shadow-black/40"
       >
-        <div className="mb-8 flex items-center justify-center gap-2 text-sm font-bold tracking-[0.18em] text-slate-900 dark:text-white">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-xs text-white shadow-lg shadow-blue-600/20">
-            A
-          </span>
-          AUREX ERP
-        </div>
+        <img
+          src={PLATFORM_BRANDING.assets.logo}
+          alt={PLATFORM_BRANDING.alt}
+          className="mx-auto mb-8 h-14 w-auto max-w-[230px] dark:hidden"
+        />
+        <img
+          src={PLATFORM_BRANDING.assets.logoDark}
+          alt={PLATFORM_BRANDING.alt}
+          className="mx-auto mb-8 hidden h-14 w-auto max-w-[230px] dark:block"
+        />
 
         <motion.div
           initial={{ scale: 0.8, rotate: -8 }}

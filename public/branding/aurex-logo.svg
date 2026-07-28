@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 300" role="img" aria-labelledby="title desc">
+  <title id="title">AUREX ERP</title>
+  <desc id="desc">Logo horizontal AUREX ERP, monogramme bleu et or</desc>
+  <defs>
+    <linearGradient id="b1" x1="48" y1="208" x2="147" y2="34" gradientUnits="userSpaceOnUse"><stop stop-color="#031A48"/><stop offset=".52" stop-color="#073778"/><stop offset="1" stop-color="#2A67B9"/></linearGradient>
+    <linearGradient id="b2" x1="44" y1="206" x2="218" y2="106" gradientUnits="userSpaceOnUse"><stop stop-color="#0A2A64"/><stop offset=".45" stop-color="#1556A7"/><stop offset="1" stop-color="#061C4B"/></linearGradient>
+    <linearGradient id="g1" x1="143" y1="38" x2="207" y2="211" gradientUnits="userSpaceOnUse"><stop stop-color="#7C4A08"/><stop offset=".25" stop-color="#E5AD34"/><stop offset=".5" stop-color="#FFD866"/><stop offset=".75" stop-color="#C88310"/><stop offset="1" stop-color="#F1C44E"/></linearGradient>
+    <linearGradient id="word" x1="300" y1="93" x2="910" y2="218" gradientUnits="userSpaceOnUse"><stop stop-color="#061C4A"/><stop offset=".5" stop-color="#0B3472"/><stop offset="1" stop-color="#06183F"/></linearGradient>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#061A42" flood-opacity=".14"/></filter>
+  </defs>
+  <g transform="translate(28 22)" filter="url(#s)">
+    <path fill="url(#g1)" d="M137.5 32h14.2a8 8 0 0 1 7.1 4.3L225 207.8H179l-22.5-57.3 29.7-18.7-38.7-93.2a10 10 0 0 0-10-6.6Z"/>
+    <path fill="url(#g1)" d="m130.2 175.5 20.1 32.3h-45.8l21.4-32.3a2.6 2.6 0 0 1 4.3 0Z"/>
+    <path fill="url(#b1)" d="M39 207.8 130.1 38a11.5 11.5 0 0 1 10.1-6h11.5L93.4 141.7l-22.2 66.1H39Z"/>
+    <path fill="url(#b2)" d="M39 207.8c38.7-49.3 82.8-81.4 132.4-96.3 23.5-7 44.5-10.5 63.1-10.5-47.7 7.6-91.3 27.3-130.8 59.1-13.7 11-27 26.9-39.9 47.7H39Z"/>
+    <path fill="#2A70C9" d="M39 207.8c41.7-45.1 84.9-74.5 129.6-88.1 21.1-6.4 43.1-11.5 65.9-15.1-38.8 1.2-75.5 10.7-110.1 28.5-31 16-59.4 40.9-85.4 74.7Z" opacity=".72"/>
+  </g>
+  <g fill="url(#word)" transform="translate(296 82)">
+    <path d="M0 129 55 8h31l55 121h-32l-12-28H44l-12 28H0Zm55-54h31L70.5 38 55 75Z"/>
+    <path d="M155 8h29v70c0 20 12 29 35 29s35-9 35-29V8h29v73c0 35-23 52-64 52s-64-17-64-52V8Z"/>
+    <path fill-rule="evenodd" d="M308 129V8h78c32 0 51 17 51 44 0 21-12 35-32 41l38 36h-40l-34-33h-32v33h-29Zm29-59h47c15 0 23-6 23-18s-8-18-23-18h-47v36Z"/>
+    <path d="M463 129V8h119l-17 27h-73v20h76l-15 25h-61v22h92l-17 27H463Z"/>
+    <path d="m596 8 45 51-44 70h37l28-47 42 47h39l-63-71 42-50h-37l-25 30-26-30h-38Z"/>
+    <path fill="url(#g1)" d="m682 58 43-50h37l-59 70-21-20Z"/>
+  </g>
+  <g fill="url(#g1)" transform="translate(510 226)">
+    <path d="M0 48V0h52v11H13v8h34v10H13v8h40v11H0Z"/>
+    <path fill-rule="evenodd" d="M75 48V0h36c15 0 24 8 24 21 0 9-5 16-14 19l16 8h-22l-14-8H88v8H75Zm13-19h22c8 0 12-3 12-8s-4-9-12-9H88v17Z"/>
+    <path fill-rule="evenodd" d="M160 48V0h34c17 0 27 7 27 19s-10 19-27 19h-21v10h-13Zm13-22h20c10 0 15-2 15-7s-5-7-15-7h-20v14Z"/>
+  </g>
+</svg>

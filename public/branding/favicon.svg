@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="AUREX ERP">
+  <defs>
+    <linearGradient id="b" x1="5" y1="28" x2="19" y2="4" gradientUnits="userSpaceOnUse"><stop stop-color="#031A48"/><stop offset="1" stop-color="#2870C8"/></linearGradient>
+    <linearGradient id="g" x1="18" y1="4" x2="27" y2="28" gradientUnits="userSpaceOnUse"><stop stop-color="#9C620B"/><stop offset=".5" stop-color="#FFD866"/><stop offset="1" stop-color="#C98210"/></linearGradient>
+  </defs>
+  <path fill="url(#g)" d="M17.6 3h1.7L28 28h-6.2l-3-9.1 4-2.2L18 4.2 17.6 3Z"/>
+  <path fill="url(#b)" d="M4 28 16.2 3h2.1l-8 17-2.1 8H4Z"/>
+  <path fill="#0D4A98" d="M4 28c6.2-7.7 14.2-12.5 24-14.3-8.4 2.5-14.8 7.2-19.1 14.3H4Z"/>
+</svg>

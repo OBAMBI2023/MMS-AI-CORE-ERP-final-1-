@@ -2,7 +2,6 @@ import { Fragment, useMemo, useRef, useState } from "react";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useCompanySettings } from "@/hooks/use-company-settings";
-import type { Tables } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,10 +51,12 @@ type Service = {
 
 type CartItem = Service & { qty: number };
 type PayMethod = "Espèces" | "Wave" | "Orange Money" | "Carte";
+type CatalogTab = Service["type"];
 
 // ---------------- POS Page ----------------
 export function PosPage() {
   const [query, setQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<CatalogTab>("product");
   const [category, setCategory] = useState<Category | "Tous">("Tous");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [client, setClient] = useState("");
@@ -67,7 +68,7 @@ export function PosPage() {
   const [saving, setSaving] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const queryClient = useQueryClient();
-  const { profile } = useTenant();
+  const { profile, tenant, loading: tenantLoading } = useTenant();
 
   const {
     data: dbServices,
@@ -76,7 +77,26 @@ export function PosPage() {
     reload: reloadCatalog,
   } = useCatalogItems({ activeOnly: true });
 
-  const { settings, logoUrl } = useCompanySettings();
+  const { settings, logoUrl } = useCompanySettings(
+    tenantLoading ? null : (profile?.tenant_id ?? null),
+  );
+  const tenantIdentity = useMemo(
+    () => ({
+      name:
+        settings?.company_name?.trim() ||
+        (typeof tenant?.name === "string" ? tenant.name.trim() : ""),
+      tradeName: settings?.trade_name?.trim() ?? "",
+      logoUrl: logoUrl ?? null,
+      phone: settings?.phone?.trim() ?? "",
+      whatsapp: settings?.whatsapp?.trim() ?? "",
+      email: settings?.email?.trim() ?? "",
+      address: [settings?.address?.trim(), settings?.city?.trim()].filter(Boolean).join(", "),
+      website: settings?.website?.trim() ?? "",
+      taxNumber: settings?.tax_number?.trim() ?? "",
+      rccm: settings?.rccm?.trim() ?? "",
+    }),
+    [logoUrl, settings, tenant],
+  );
   const canProcessSale = useActionPermission("ventes.create");
   const permissionsQuery = usePermissions();
   const canManageSales = permissionsQuery.data?.role === "Administrateur";
@@ -116,17 +136,28 @@ export function PosPage() {
   }, [catalogPhotoUrls, dbServices]);
 
   const categories = useMemo(
-    () => ["Tous", ...Array.from(new Set(catalog.map((item) => item.category))).sort()],
-    [catalog],
+    () => [
+      "Tous",
+      ...Array.from(
+        new Set(catalog.filter((item) => item.type === activeTab).map((item) => item.category)),
+      ).sort(),
+    ],
+    [activeTab, catalog],
   );
 
   const filtered = useMemo(() => {
     return catalog.filter((s) => {
+      const matchType = s.type === activeTab;
       const matchCat = category === "Tous" || s.category === category;
       const matchQ = s.name.toLowerCase().includes(query.toLowerCase());
-      return matchCat && matchQ;
+      return matchType && matchCat && matchQ;
     });
-  }, [query, category, catalog]);
+  }, [activeTab, query, category, catalog]);
+
+  const selectTab = (tab: CatalogTab) => {
+    setActiveTab(tab);
+    setCategory("Tous");
+  };
 
   const subTotal = cart.reduce((sum, i) => sum + i.qty * i.price, 0);
   const total = Math.max(0, subTotal - discount);
@@ -292,12 +323,35 @@ export function PosPage() {
                 </Button>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted/60 p-1 mb-3">
+              {[
+                { value: "product" as const, label: "Produits" },
+                { value: "service" as const, label: "Services" },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => selectTab(tab.value)}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                    activeTab === tab.value
+                      ? "bg-background text-primary shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Rechercher un produit ou service..."
+                placeholder={
+                  activeTab === "product"
+                    ? "Rechercher un produit..."
+                    : "Rechercher un service..."
+                }
                 className="w-full rounded-xl md:rounded-2xl bg-muted/60 border border-border pl-10 pr-4 py-2 text-sm outline-none focus:border-primary/40 transition"
               />
             </div>
@@ -362,7 +416,9 @@ export function PosPage() {
               })}
               {!catalogLoading && !catalogError && filtered.length === 0 && (
                 <div className="col-span-full text-center py-10 md:py-16 text-muted-foreground text-sm">
-                  Aucun produit ou service disponible
+                  {activeTab === "product"
+                    ? "Aucun produit disponible"
+                    : "Aucun service disponible"}
                 </div>
               )}
               {catalogLoading && (
@@ -406,7 +462,7 @@ export function PosPage() {
               <div className="h-full grid place-items-center text-center text-muted-foreground text-xs md:text-sm p-4 md:p-6">
                 <div>
                   <ReceiptIcon className="h-8 w-8 md:h-10 md:w-10 mx-auto mb-2 md:mb-3 opacity-40" />
-                  Sélectionnez des services
+                  Sélectionnez des produits ou services
                   <br />
                   pour démarrer la vente
                 </div>
@@ -530,8 +586,7 @@ export function PosPage() {
         {checkout && (
           <ReceiptModal
             ticket={checkout}
-            settings={settings}
-            logoUrl={logoUrl}
+            identity={tenantIdentity}
             onClose={() => {
               setCheckout(null);
               clearCart();
@@ -585,13 +640,22 @@ type Ticket = {
 
 function ReceiptModal({
   ticket,
-  settings,
-  logoUrl,
+  identity,
   onClose,
 }: {
   ticket: Ticket;
-  settings: Tables<"parametres"> | null | undefined;
-  logoUrl: string | null | undefined;
+  identity: {
+    name: string;
+    tradeName: string;
+    logoUrl: string | null;
+    phone: string;
+    whatsapp: string;
+    email: string;
+    address: string;
+    website: string;
+    taxNumber: string;
+    rccm: string;
+  };
   onClose: () => void;
 }) {
   const printRef = useRef<HTMLDivElement>(null);
@@ -618,6 +682,39 @@ function ReceiptModal({
       </style></head><body onload="window.print();setTimeout(()=>window.close(),300)">
       <div class="ticket">${html}</div></body></html>`);
     w.document.close();
+  };
+
+  const handleWhatsApp = () => {
+    const contactLines = [
+      identity.name,
+      identity.address,
+      identity.phone ? `Tél. ${identity.phone}` : "",
+      identity.email,
+      identity.logoUrl ? `Logo: ${identity.logoUrl}` : "",
+    ].filter(Boolean);
+    const itemLines = ticket.items.map(
+      (item) => `${item.qty} x ${item.name} — ${formatNumber(item.qty * item.price)} FCFA`,
+    );
+    const message = [
+      ...contactLines,
+      "",
+      `Ticket ${ticket.number}`,
+      `Date: ${ticket.date.toLocaleString("fr-FR")}`,
+      `Client: ${ticket.client}`,
+      "",
+      ...itemLines,
+      "",
+      `TOTAL: ${formatNumber(ticket.total)} FCFA`,
+      `Paiement: ${ticket.payment}`,
+      "",
+      `Merci de votre visite${identity.name ? ` chez ${identity.name}` : ""} !`,
+    ].join("\n");
+    const recipient = identity.whatsapp.replace(/\D/g, "");
+    window.open(
+      `https://wa.me/${recipient}?text=${encodeURIComponent(message)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   return (
@@ -657,25 +754,34 @@ function ReceiptModal({
             style={{ width: 300 }}
           >
             <div className="center">
-              {logoUrl && (
-                <img src={logoUrl} alt="Logo" style={{ maxWidth: "60px", margin: "0 auto 5px" }} />
+              {identity.logoUrl && (
+                <img
+                  src={identity.logoUrl}
+                  alt={identity.name ? `Logo ${identity.name}` : "Logo"}
+                  style={{ maxWidth: "60px", margin: "0 auto 5px" }}
+                />
               )}
-              <h1 style={{ fontSize: 14, margin: "2px 0", fontWeight: 700 }}>
-                {settings?.company_name || "MAGUY MULTI SERVICES"}
-              </h1>
-              <div>{settings?.trade_name || "Imprimerie & Bureautique"}</div>
-              <div>{settings?.address || ""}</div>
-              <div>
-                {settings?.city ? `${settings.city} — ` : ""}
-                {settings?.phone ? `Tél. ${settings.phone}` : ""}
-              </div>
-              <div>
-                {settings?.email || ""} · {settings?.website || ""}
-              </div>
-              <div>
-                {settings?.tax_number ? `NINEA: ${settings.tax_number}` : ""}{" "}
-                {settings?.rccm ? `· RC: ${settings.rccm}` : ""}
-              </div>
+              {identity.name && (
+                <h1 style={{ fontSize: 14, margin: "2px 0", fontWeight: 700 }}>
+                  {identity.name}
+                </h1>
+              )}
+              {identity.tradeName && <div>{identity.tradeName}</div>}
+              {identity.address && <div>{identity.address}</div>}
+              {identity.phone && <div>Tél. {identity.phone}</div>}
+              {(identity.email || identity.website) && (
+                <div>{[identity.email, identity.website].filter(Boolean).join(" · ")}</div>
+              )}
+              {(identity.taxNumber || identity.rccm) && (
+                <div>
+                  {[
+                    identity.taxNumber ? `NINEA: ${identity.taxNumber}` : "",
+                    identity.rccm ? `RC: ${identity.rccm}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              )}
             </div>
             <div className="sep" style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
             <div className="row" style={{ display: "flex", justifyContent: "space-between" }}>
@@ -748,8 +854,12 @@ function ReceiptModal({
             <div className="sep" style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
             <div className="center" style={{ textAlign: "center" }}>
               Merci de votre visite !<br />
-              À bientôt chez MMS
-              <br />
+              {identity.name && (
+                <>
+                  À bientôt chez {identity.name}
+                  <br />
+                </>
+              )}
               <span style={{ fontSize: 10 }}>Ticket non remboursable</span>
             </div>
           </div>
@@ -762,7 +872,10 @@ function ReceiptModal({
           >
             <Printer className="h-4 w-4" /> Imprimer le ticket
           </button>
-          <button className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium bg-green-500 text-white hover:opacity-90 transition">
+          <button
+            onClick={handleWhatsApp}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium bg-green-500 text-white hover:opacity-90 transition"
+          >
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </button>
           <button

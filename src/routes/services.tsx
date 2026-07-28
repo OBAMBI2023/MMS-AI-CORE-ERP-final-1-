@@ -6,7 +6,7 @@ export const Route = createFileRoute("/services")({
   component: ServicesPage,
   head: () => ({
     meta: [
-      { title: "Produits & Services — MMS AI CORE" },
+      { title: "Produits & Services — AUREX ERP" },
       { name: "description", content: "Catalogue universel des produits et services." },
     ],
   }),

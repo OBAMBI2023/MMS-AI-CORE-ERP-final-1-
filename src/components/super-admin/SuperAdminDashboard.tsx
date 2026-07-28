@@ -77,6 +77,7 @@ import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import {
   Table,
   TableBody,
@@ -141,15 +142,12 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
   return (
     <div className="flex h-full flex-col bg-[#0a0a0b] text-white">
       <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-white text-black shadow-lg shadow-black/20">
-          <ShieldCheck className="size-5" />
-        </div>
-        <div>
-          <p className="text-[15px] font-semibold tracking-tight">Aurex Console</p>
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500">
-            Platform admin
-          </p>
-        </div>
+        <img
+          src={PLATFORM_BRANDING.assets.logoDark}
+          alt={PLATFORM_BRANDING.alt}
+          className="h-10 w-auto max-w-[155px]"
+        />
+        <span className="sr-only">Platform admin</span>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5" aria-label="Navigation">

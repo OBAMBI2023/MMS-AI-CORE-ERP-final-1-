@@ -31,7 +31,7 @@ export function FeaturesPage() {
             Les outils métier réunis dans un même environnement.
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-            MMS AI CORE organise les principaux flux de gestion sans fragmenter les informations.
+            AUREX ERP organise les principaux flux de gestion sans fragmenter les informations.
           </p>
         </div>
       </section>

@@ -75,7 +75,7 @@ export const Route = createFileRoute("/parametres")({
   component: ParametresPage,
   head: () => ({
     meta: [
-      { title: "Paramètres — MMS AI CORE" },
+      { title: "Paramètres — AUREX ERP" },
       { name: "description", content: "Centre de configuration de l'entreprise." },
     ],
   }),

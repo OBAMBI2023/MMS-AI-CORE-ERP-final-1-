@@ -32,7 +32,7 @@ export const Route = createFileRoute("/achats")({
   component: AchatsPage,
   head: () => ({
     meta: [
-      { title: "Achats — MMS AI CORE" },
+      { title: "Achats — AUREX ERP" },
       { name: "description", content: "Suivi des achats fournisseurs." },
     ],
   }),

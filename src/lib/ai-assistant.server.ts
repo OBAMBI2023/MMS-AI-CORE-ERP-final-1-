@@ -34,6 +34,8 @@ const confirmSchema = z.object({
   pendingActionId: z.string().uuid(),
   confirmed: z.boolean(),
 });
+const DUPLICATE_SERVICE_MESSAGE =
+  "Un service portant ce nom existe déjà dans cette catégorie.";
 
 type Context = {
   userId: string;
@@ -407,7 +409,46 @@ export const confirmAssistantAction = createServerFn({ method: "POST" })
       const { data: row, error: e } = await ctx.client.from("depenses").insert(payload).select("id").single(); if (e) throw new Error(e.message); entityId = row.id;
     } else if (tool === "create_product") {
       const stock = payload.stock ?? 0;
-      const { data: row, error: e } = await ctx.client.from("services").insert({ ...payload, type: "product", active: true, manage_stock: payload.stock !== undefined, stock: payload.stock !== undefined ? stock : null }).select("id").single(); if (e) throw new Error(e.message); entityId = row.id;
+      const productName = payload.name.trim();
+      const { data: activeProducts, error: duplicateCheckError } = await ctx.client
+        .from("services")
+        .select("id, name")
+        .eq("tenant_id", ctx.tenantId)
+        .eq("type", "product")
+        .eq("active", true);
+      if (duplicateCheckError) throw new Error(duplicateCheckError.message);
+      if (
+        activeProducts?.some(
+          (product: { name: string }) =>
+            product.name.trim().toLocaleLowerCase("fr") ===
+            productName.toLocaleLowerCase("fr"),
+        )
+      ) {
+        throw new Error(DUPLICATE_SERVICE_MESSAGE);
+      }
+      const { data: row, error: e } = await ctx.client
+        .from("services")
+        .insert({
+          ...payload,
+          tenant_id: ctx.tenantId,
+          name: productName,
+          type: "product",
+          active: true,
+          manage_stock: payload.stock !== undefined,
+          stock: payload.stock !== undefined ? stock : null,
+        })
+        .select("id")
+        .single();
+      if (e) {
+        if (
+          e.code === "23505" &&
+          e.message.includes("services_tenant_name_type_key")
+        ) {
+          throw new Error(DUPLICATE_SERVICE_MESSAGE);
+        }
+        throw new Error(e.message);
+      }
+      entityId = row.id;
     } else if (tool === "enable_module") {
       const { data: module, error: mErr } = await supabaseAdmin.from("erp_modules").select("id").eq("code", payload.module_code).eq("is_active", true).single();
       if (mErr || !module) throw new Error("Module inconnu ou inactif.");

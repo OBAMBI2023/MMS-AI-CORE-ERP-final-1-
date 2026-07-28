@@ -6,7 +6,7 @@ export const Route = createFileRoute("/categories")({
   component: CategoriesRoute,
   head: () => ({
     meta: [
-      { title: "Catégories — MMS AI CORE" },
+      { title: "Catégories — AUREX ERP" },
       { name: "description", content: "Gestion des catégories du catalogue." },
     ],
   }),

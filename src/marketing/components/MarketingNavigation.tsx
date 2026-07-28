@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Menu, Sparkles, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { PLATFORM_BRANDING } from "@/config/branding";
 
 const navigationItems = [
   { label: "Accueil", to: "/" },
@@ -19,11 +20,12 @@ export function MarketingNavigation() {
         aria-label="Navigation principale"
         className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8"
       >
-        <Link to="/" className="flex items-center gap-2.5" onClick={() => setIsOpen(false)}>
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
-            <Sparkles className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <span className="text-base font-extrabold tracking-tight text-slate-950">MMS AI CORE</span>
+        <Link to="/" className="flex items-center" onClick={() => setIsOpen(false)}>
+          <img
+            src={PLATFORM_BRANDING.assets.logo}
+            alt={PLATFORM_BRANDING.alt}
+            className="h-11 w-auto max-w-[180px]"
+          />
         </Link>
 
         <div className="hidden items-center gap-7 lg:flex">

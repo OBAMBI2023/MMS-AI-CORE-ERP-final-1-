@@ -1,7 +1,6 @@
-import { motion } from "framer-motion";
-import { Sparkles, Building2 } from "lucide-react";
 import { SidebarContent } from "./SidebarContent";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { PLATFORM_BRANDING } from "@/config/branding";
 
 export function Sidebar() {
   const { logoUrl, settings } = useCompanySettings();
@@ -11,11 +10,19 @@ export function Sidebar() {
     <aside className="hidden md:flex h-full w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border overflow-hidden">
       <div className="p-4">
         <div className="flex items-center gap-2 px-2 py-4">
-          <div className="grid place-items-center h-10 w-10 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-lg shadow-primary/30 overflow-hidden">
+          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl">
             {logoUrl ? (
-              <img src={logoUrl} alt="logo" className="h-full w-full object-cover rounded-2xl" />
+              <img
+                src={logoUrl}
+                alt={`Logo ${companyName}`}
+                className="h-full w-full rounded-xl object-contain"
+              />
             ) : (
-              <Sparkles className="h-5 w-5 text-white" />
+              <img
+                src={PLATFORM_BRANDING.assets.icon}
+                alt={PLATFORM_BRANDING.alt}
+                className="h-full w-full object-contain"
+              />
             )}
           </div>
           <div className="min-w-0">

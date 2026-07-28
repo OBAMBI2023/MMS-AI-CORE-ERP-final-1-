@@ -6,7 +6,7 @@ export const Route = createFileRoute("/stock")({
   component: StockRoute,
   head: () => ({
     meta: [
-      { title: "Stock — MMS AI CORE" },
+      { title: "Stock — AUREX ERP" },
       { name: "description", content: "Stock, alertes et historique des mouvements." },
     ],
   }),
