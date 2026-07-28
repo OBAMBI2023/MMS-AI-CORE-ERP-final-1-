@@ -1,9 +1,10 @@
 import { SidebarContent } from "./SidebarContent";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function Sidebar() {
-  const { logoUrl, settings } = useCompanySettings();
+  const { logoUrl, settings, isLoading } = useCompanySettings();
   const companyName = settings?.company_name ?? "Mon Entreprise";
 
   return (
@@ -11,7 +12,9 @@ export function Sidebar() {
       <div className="p-4">
         <div className="flex items-center gap-2 px-2 py-4">
           <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl">
-            {logoUrl ? (
+            {isLoading ? (
+              <Skeleton className="h-10 w-10 rounded-xl" />
+            ) : logoUrl ? (
               <img
                 src={logoUrl}
                 alt={`Logo ${companyName}`}
@@ -26,7 +29,11 @@ export function Sidebar() {
             )}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-bold tracking-tight">{companyName}</div>
+            {isLoading ? (
+              <Skeleton className="h-4 w-28" />
+            ) : (
+              <div className="text-sm font-bold tracking-tight">{companyName}</div>
+            )}
           </div>
         </div>
       </div>

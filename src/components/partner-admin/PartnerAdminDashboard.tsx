@@ -322,6 +322,19 @@ export function PartnerAdminDashboardView({
                   <span className="block text-xs text-slate-500">Partenaire AUREX</span>
                 </span>
               </button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => void handleSignOut()}
+                disabled={signingOut}
+                aria-busy={signingOut}
+                className="h-10 shrink-0 gap-2 rounded-xl px-2.5 text-[#1546a0] hover:bg-blue-50 hover:text-[#08285f] sm:px-3"
+              >
+                <LogOut className={`h-4 w-4 ${signingOut ? "animate-pulse" : ""}`} />
+                <span className="text-xs font-semibold sm:text-sm">
+                  {signingOut ? "Déconnexion…" : "Déconnexion"}
+                </span>
+              </Button>
             </div>
           </div>
         </header>

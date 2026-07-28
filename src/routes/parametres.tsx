@@ -102,6 +102,11 @@ function formatSupabaseError(error: unknown): string {
     .join(" | ");
 }
 
+function cleanBusinessSector(value: string | null | undefined): string | null {
+  const cleaned = value?.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned || null;
+}
+
 function ParametresPage() {
   const qc = useQueryClient();
   const { profile, loading: tenantLoading } = useTenant();
@@ -213,7 +218,12 @@ function ParametresPage() {
     },
   });
 
-  const saveAll = () => save.mutate(form);
+  const saveAll = () => {
+    const businessSector = cleanBusinessSector(form.business_sector);
+    const cleanedForm = { ...form, business_sector: businessSector };
+    setForm(cleanedForm);
+    save.mutate(cleanedForm);
+  };
 
   return (
     <AppShell
@@ -421,10 +431,12 @@ function GeneralTab({
               required
             />
           </Field>
-          <Field label="Nom commercial">
+          <Field label="Secteur d’activité" hint="Champ facultatif">
             <Input
-              value={form.trade_name ?? ""}
-              onChange={(e) => update("trade_name", e.target.value || null)}
+              value={form.business_sector ?? ""}
+              maxLength={100}
+              placeholder="Ex. Imprimerie, Restaurant, Décoration…"
+              onChange={(e) => update("business_sector", e.target.value || null)}
             />
           </Field>
           <Field label="Téléphone">

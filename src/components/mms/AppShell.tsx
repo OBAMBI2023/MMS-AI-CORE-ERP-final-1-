@@ -9,6 +9,7 @@ import { UserMenu } from "./UserMenu";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useTheme } from "@/components/theme-provider";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function AppShell({
   title,
@@ -23,7 +24,7 @@ export function AppShell({
 }) {
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  const { settings, logoUrl } = useCompanySettings();
+  const { settings, logoUrl, isLoading } = useCompanySettings();
   const companyName = settings?.company_name ?? "Mon Entreprise";
 
   return (
@@ -46,7 +47,9 @@ export function AppShell({
                 <div className="flex flex-col h-full p-4 gap-2">
                   <div className="flex items-center gap-2 px-2 py-4">
                     <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl">
-                      {logoUrl ? (
+                      {isLoading ? (
+                        <Skeleton className="h-10 w-10 rounded-xl" />
+                      ) : logoUrl ? (
                         <img
                           src={logoUrl}
                           alt={`Logo ${companyName}`}
@@ -61,7 +64,11 @@ export function AppShell({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-sm font-bold tracking-tight">{companyName}</div>
+                      {isLoading ? (
+                        <Skeleton className="h-4 w-28" />
+                      ) : (
+                        <div className="text-sm font-bold tracking-tight">{companyName}</div>
+                      )}
                     </div>
                   </div>
                   <SidebarContent onItemClick={() => setOpen(false)} />

@@ -3,12 +3,15 @@ import { useTenant } from "@/providers/TenantProvider";
 import {
   catalogCategoriesService,
   type CatalogCategory,
+  type CatalogCategoryType,
 } from "@/services/catalog-categories.service";
 
 export const catalogCategoriesKey = (tenantId?: string) =>
   ["catalog-categories", tenantId] as const;
 
-export function useCatalogCategories(options: { activeOnly?: boolean } = {}) {
+export function useCatalogCategories(
+  options: { activeOnly?: boolean; type?: CatalogCategoryType } = {},
+) {
   const { profile, loading } = useTenant();
   const tenantId = profile?.tenant_id;
 
@@ -17,9 +20,12 @@ export function useCatalogCategories(options: { activeOnly?: boolean } = {}) {
     queryFn: () => catalogCategoriesService.list(tenantId!),
     enabled: !loading && Boolean(tenantId),
     retry: false,
-    select: options.activeOnly
-      ? (categories) => categories.filter((category) => category.active)
-      : undefined,
+    select: (categories) =>
+      categories.filter(
+        (category) =>
+          (!options.activeOnly || category.active) &&
+          (!options.type || category.type === options.type),
+      ),
   });
 }
 
@@ -41,7 +47,8 @@ export function useCatalogCategoryMutations() {
 
   return {
     create: useMutation({
-      mutationFn: (name: string) => catalogCategoriesService.create(requireTenant(), name),
+      mutationFn: ({ name, type }: { name: string; type: CatalogCategoryType }) =>
+        catalogCategoriesService.create(requireTenant(), name, type),
       onSuccess: (created) => {
         queryClient.setQueryData<CatalogCategory[]>(
           catalogCategoriesKey(tenantId),

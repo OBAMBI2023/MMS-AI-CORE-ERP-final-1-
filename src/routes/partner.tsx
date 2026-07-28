@@ -26,7 +26,7 @@ export const Route = createFileRoute("/partner")({
         if (error) throw error;
 
         queryClient.clear();
-        window.location.replace("/login");
+        window.location.replace("/partner-login");
       } catch (error) {
         console.error("[PartnerPortal] Échec de la déconnexion", error);
         toast.error("La déconnexion a échoué. Veuillez réessayer.");

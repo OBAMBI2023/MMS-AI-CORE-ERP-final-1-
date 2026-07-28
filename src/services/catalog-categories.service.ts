@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type CatalogCategory = {
   id: string;
   tenant_id: string;
+  type: CatalogCategoryType;
   name: string;
   sort_order: number;
   active: boolean;
@@ -10,8 +11,10 @@ export type CatalogCategory = {
   updated_at: string;
 };
 
+export type CatalogCategoryType = "product" | "service";
+
 const categoryColumns =
-  "id, tenant_id, name, sort_order, active, created_at, updated_at" as const;
+  "id, tenant_id, name, type, sort_order, active, created_at, updated_at" as const;
 
 function normalizeName(name: string) {
   const normalized = name.trim().replace(/\s+/g, " ");
@@ -39,10 +42,10 @@ export const catalogCategoriesService = {
     );
   },
 
-  async create(tenantId: string, name: string) {
+  async create(tenantId: string, name: string, type: CatalogCategoryType) {
     const { data, error } = await supabase
       .from("catalog_categories")
-      .insert({ tenant_id: tenantId, name: normalizeName(name) })
+      .insert({ tenant_id: tenantId, name: normalizeName(name), type })
       .select(categoryColumns)
       .single();
     if (error) throw categoryError(error);
@@ -99,13 +102,15 @@ export const catalogCategoriesService = {
   ) {
     const { data: ownedCategories, error: ownershipError } = await supabase
       .from("catalog_categories")
-      .select("id, active")
+      .select("id, active, type")
       .eq("tenant_id", tenantId)
       .in("id", [sourceCategoryId, replacementCategoryId]);
     if (ownershipError) throw ownershipError;
     const sourceOwned = ownedCategories?.some(({ id }) => id === sourceCategoryId);
+    const sourceType = ownedCategories?.find(({ id }) => id === sourceCategoryId)?.type;
     const replacementOwnedAndActive = ownedCategories?.some(
-      ({ id, active }) => id === replacementCategoryId && active,
+      ({ id, active, type }) =>
+        id === replacementCategoryId && active && type === sourceType,
     );
     if (!sourceOwned || !replacementOwnedAndActive) {
       throw new Error("Catégorie inaccessible pour ce tenant.");

@@ -1,30 +1,38 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useSignedUrl } from "@/hooks/use-signed-url";
+import { useSignedUrl, useSignedUrlState } from "@/hooks/use-signed-url";
+import { useTenant } from "@/providers/TenantProvider";
 
 export function useCompanySettings(tenantId?: string | null) {
+  const { profile, loading: tenantLoading } = useTenant();
+  const resolvedTenantId = tenantId === undefined ? profile?.tenant_id ?? null : tenantId;
   const { data: settings, isLoading } = useQuery({
-    queryKey: ["parametres", tenantId ?? "legacy"],
+    queryKey: ["parametres", resolvedTenantId],
     queryFn: async () => {
       let query = supabase.from("parametres").select("*") as any;
-      if (tenantId) query = query.eq("tenant_id", tenantId);
+      if (resolvedTenantId) query = query.eq("tenant_id", resolvedTenantId);
       const { data, error } = await query.limit(1).maybeSingle();
       if (error) throw error;
       return data;
     },
-    enabled: tenantId !== null,
+    enabled: resolvedTenantId !== null,
   });
 
-  const logoUrl = useSignedUrl(settings?.logo_url ?? null);
+  const { url: logoUrl, isLoading: logoLoading } = useSignedUrlState(
+    settings?.logo_url ?? null,
+  );
   const signatureUrl = useSignedUrl(settings?.signature_url ?? null);
   const cachetUrl = useSignedUrl(settings?.cachet_url ?? null);
+  const brandingLoading =
+    (tenantId === undefined && tenantLoading) ||
+    (resolvedTenantId !== null && (isLoading || logoLoading));
 
   return {
     settings,
     logoUrl,
     signatureUrl,
     cachetUrl,
-    isLoading,
+    isLoading: brandingLoading,
     companyName: settings?.nomCommercial ?? "Maguy Multi Services",
     address: settings?.adresse ?? "",
     phone: settings?.telephone ?? "",

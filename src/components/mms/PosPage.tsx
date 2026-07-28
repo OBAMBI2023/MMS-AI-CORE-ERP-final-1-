@@ -5,7 +5,7 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { makeNumber, formatCurrency } from "@/lib/mms/format";
+import { makeNumber, formatCurrency, formatNumber } from "@/lib/mms/format";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -24,6 +24,8 @@ import {
   Image as ImageIcon,
   Menu,
   Sparkles,
+  Package,
+  Wrench,
 } from "lucide-react";
 import { Sidebar } from "@/components/mms/Sidebar";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -34,6 +36,7 @@ import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { History } from "lucide-react";
 import { useTenant } from "@/providers/TenantProvider";
 import { useCatalogItems } from "@/hooks/use-catalog-items";
+import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 
 // ---------------- Types & catalogue ----------------
 type Category = string;
@@ -76,6 +79,10 @@ export function PosPage() {
     error: catalogError,
     reload: reloadCatalog,
   } = useCatalogItems({ activeOnly: true });
+  const catalogCategoriesQuery = useCatalogCategories({
+    activeOnly: true,
+    type: activeTab,
+  });
 
   const { settings, logoUrl } = useCompanySettings(
     tenantLoading ? null : (profile?.tenant_id ?? null),
@@ -138,11 +145,9 @@ export function PosPage() {
   const categories = useMemo(
     () => [
       "Tous",
-      ...Array.from(
-        new Set(catalog.filter((item) => item.type === activeTab).map((item) => item.category)),
-      ).sort(),
+      ...(catalogCategoriesQuery.data ?? []).map((item) => item.name),
     ],
-    [activeTab, catalog],
+    [catalogCategoriesQuery.data],
   );
 
   const filtered = useMemo(() => {
@@ -323,24 +328,36 @@ export function PosPage() {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted/60 p-1 mb-3">
+            <div
+              className="grid grid-cols-2 gap-2 mb-3"
+              role="group"
+              aria-label="Type d'article"
+            >
               {[
-                { value: "product" as const, label: "Produits" },
-                { value: "service" as const, label: "Services" },
-              ].map((tab) => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => selectTab(tab.value)}
-                  className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                    activeTab === tab.value
-                      ? "bg-background text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+                { value: "product" as const, label: "Produits", icon: Package },
+                { value: "service" as const, label: "Services", icon: Wrench },
+              ].map((tab) => {
+                const isActive = activeTab === tab.value;
+                const TabIcon = tab.icon;
+
+                return (
+                  <Button
+                    key={tab.value}
+                    type="button"
+                    variant="outline"
+                    aria-pressed={isActive}
+                    onClick={() => selectTab(tab.value)}
+                    className={`h-10 w-full rounded-lg px-3 text-sm font-semibold transition-all duration-200 md:h-11 md:px-4 ${
+                      isActive
+                        ? "border-0 bg-primary text-primary-foreground shadow-md hover:bg-primary/90 hover:text-primary-foreground"
+                        : "border-border bg-background text-foreground shadow-none hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <TabIcon className="h-4 w-4" aria-hidden="true" />
+                    {tab.label}
+                  </Button>
+                );
+              })}
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

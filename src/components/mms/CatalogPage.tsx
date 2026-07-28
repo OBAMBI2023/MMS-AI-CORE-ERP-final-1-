@@ -105,6 +105,10 @@ export function CatalogPage() {
   const canDelete = useActionPermission("services.delete");
 
   const categoriesQuery = useCatalogCategories({ activeOnly: true });
+  const activeCategories = useMemo(
+    () => (categoriesQuery.data ?? []).filter((category) => category.type === activeType),
+    [activeType, categoriesQuery.data],
+  );
 
   useEffect(() => {
     console.log({ loading, profile, tenant });
@@ -203,6 +207,10 @@ export function CatalogPage() {
   }, [activeType, categoryFilter, search, statusFilter]);
 
   useEffect(() => {
+    setCategoryFilter("all");
+  }, [activeType]);
+
+  useEffect(() => {
     setPage((current) => Math.min(current, pageCount));
   }, [pageCount]);
 
@@ -211,7 +219,7 @@ export function CatalogPage() {
     setForm({
       ...emptyForm,
       type: activeType,
-      category_id: categoriesQuery.data?.[0]?.id ?? "",
+      category_id: activeCategories[0]?.id ?? "",
     });
     setItemDialogOpen(true);
   };
@@ -429,7 +437,7 @@ export function CatalogPage() {
               className="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm sm:w-44"
             >
               <option value="all">Toutes les catégories</option>
-              {(categoriesQuery.data ?? []).map((category) => (
+              {activeCategories.map((category) => (
                 <option key={category.id} value={category.id}>{category.name}</option>
               ))}
             </select>
@@ -609,6 +617,7 @@ export function CatalogPage() {
       <NewCategoryDialog
         open={newCategoryDialogOpen}
         onOpenChange={setNewCategoryDialogOpen}
+        type={form.type}
         onCreated={(category) =>
           setForm((current) => ({ ...current, category_id: category.id }))
         }
@@ -687,7 +696,15 @@ function CatalogItemDialog({
             <Label>Type</Label>
             <select
               value={form.type}
-              onChange={(event) => update("type", event.target.value as CatalogForm["type"])}
+              onChange={(event) => {
+                const type = event.target.value as CatalogForm["type"];
+                setForm((current) => ({
+                  ...current,
+                  type,
+                  category_id:
+                    categories.find((category) => category.type === type)?.id ?? "",
+                }));
+              }}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="service">Service</option>
@@ -702,12 +719,19 @@ function CatalogItemDialog({
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="" disabled>Sélectionner une catégorie</option>
-              {categories.map((category) => (
+              {categories
+                .filter((category) => category.type === form.type)
+                .map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
-              ))}
+                ))}
             </select>
+            {categories.filter((category) => category.type === form.type).length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Aucune catégorie {form.type === "product" ? "produit" : "service"} disponible.
+              </p>
+            )}
             {canCreateCategory && (
               <Button type="button" variant="outline" size="sm" onClick={onOpenCreateCategory}>
                 <Plus className="size-4" />

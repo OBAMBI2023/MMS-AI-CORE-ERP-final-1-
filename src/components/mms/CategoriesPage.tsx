@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Loader2, Package, Pencil, Plus, Search, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NewCategoryDialog } from "@/components/mms/NewCategoryDialog";
 import {
   useCatalogCategories,
   useCatalogCategoryMutations,
 } from "@/hooks/use-catalog-categories";
 import { useActionPermission } from "@/hooks/use-action-permission";
-import type { CatalogCategory } from "@/services/catalog-categories.service";
+import type {
+  CatalogCategory,
+  CatalogCategoryType,
+} from "@/services/catalog-categories.service";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { useTenant } from "@/providers/TenantProvider";
 
@@ -32,7 +36,9 @@ export function CategoriesPage() {
   const canCreate = useActionPermission("services.create");
   const canEdit = useActionPermission("services.edit");
   const canDelete = useActionPermission("services.delete");
+  const [activeType, setActiveType] = useState<CatalogCategoryType>("product");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogCategory | null>(null);
   const [editedName, setEditedName] = useState("");
@@ -44,9 +50,25 @@ export function CategoriesPage() {
   const filtered = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("fr");
     return (categoriesQuery.data ?? []).filter(
-      (category) => !needle || category.name.toLocaleLowerCase("fr").includes(needle),
+      (category) =>
+        category.type === activeType &&
+        (statusFilter === "all" ||
+          (statusFilter === "active" ? category.active : !category.active)) &&
+        (!needle || category.name.toLocaleLowerCase("fr").includes(needle)),
     );
-  }, [categoriesQuery.data, search]);
+  }, [activeType, categoriesQuery.data, search, statusFilter]);
+
+  const categoryCounts = useMemo(
+    () => ({
+      product: (categoriesQuery.data ?? []).filter(
+        (category) => category.type === "product",
+      ).length,
+      service: (categoriesQuery.data ?? []).filter(
+        (category) => category.type === "service",
+      ).length,
+    }),
+    [categoriesQuery.data],
+  );
 
   const openDelete = async (category: CatalogCategory) => {
     setDeleting(category);
@@ -84,7 +106,10 @@ export function CategoriesPage() {
   };
 
   const replacements = (categoriesQuery.data ?? []).filter(
-    (category) => category.active && category.id !== deleting?.id,
+    (category) =>
+      category.active &&
+      category.type === deleting?.type &&
+      category.id !== deleting?.id,
   );
   const deletingPending =
     mutations.remove.isPending || mutations.replaceAndRemove.isPending;
@@ -108,25 +133,90 @@ export function CategoriesPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Rechercher une catégorie..."
-            className="pl-9"
-          />
-        </div>
-        {canCreate && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" />
-            Nouvelle catégorie
-          </Button>
-        )}
-      </div>
+      <Tabs
+        value={activeType}
+        onValueChange={(value) => {
+          setActiveType(value as CatalogCategoryType);
+          setStatusFilter("all");
+        }}
+      >
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-3 bg-transparent p-0 sm:grid-cols-2">
+          <TabsTrigger
+            value="product"
+            className="h-auto justify-start gap-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md data-[state=active]:border-blue-500 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-950 data-[state=active]:shadow-md dark:border-blue-900/60 dark:from-blue-950/50 dark:to-background dark:data-[state=active]:border-blue-500"
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/30">
+              <Package className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-base font-semibold">Catégories produits</span>
+              <span className="block text-xs font-normal text-muted-foreground">
+                Classement des articles physiques
+              </span>
+            </span>
+            <span className="ml-auto rounded-full bg-blue-100 px-2.5 py-1 text-sm font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              {categoryCounts.product}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="service"
+            className="h-auto justify-start gap-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md data-[state=active]:border-violet-500 data-[state=active]:bg-violet-50 data-[state=active]:text-violet-950 data-[state=active]:shadow-md dark:border-violet-900/60 dark:from-violet-950/50 dark:to-background dark:data-[state=active]:border-violet-500"
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-violet-600 text-white shadow-sm shadow-violet-500/30">
+              <Wrench className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-base font-semibold">Catégories services</span>
+              <span className="block text-xs font-normal text-muted-foreground">
+                Classement des prestations
+              </span>
+            </span>
+            <span className="ml-auto rounded-full bg-violet-100 px-2.5 py-1 text-sm font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+              {categoryCounts.service}
+            </span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border-border/70 shadow-sm">
+        <div className="flex flex-col gap-3 border-b bg-muted/20 p-4 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={`Rechercher dans les catégories ${activeType === "product" ? "produits" : "services"}...`}
+              className="bg-background pl-9"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as "all" | "active" | "inactive")
+            }
+            aria-label="Filtrer par statut"
+            className="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm sm:w-36"
+          >
+            <option value="all">Tous les statuts</option>
+            <option value="active">Actives</option>
+            <option value="inactive">Inactives</option>
+          </select>
+          {canCreate && (
+            <Button
+              onClick={() => setCreateOpen(true)}
+              className={
+                activeType === "product"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-violet-600 hover:bg-violet-700"
+              }
+            >
+              <Plus className="size-4" />
+              {activeType === "product"
+                ? "Nouvelle catégorie produit"
+                : "Nouvelle catégorie service"}
+            </Button>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -189,7 +279,11 @@ export function CategoriesPage() {
         </div>
       </Card>
 
-      <NewCategoryDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <NewCategoryDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        type={activeType}
+      />
 
       <Dialog open={Boolean(editing)} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
