@@ -32,6 +32,36 @@ export type Database = {
         Update: { id?: string; partner_id?: string; user_id?: string; action?: string; tenant_id?: string | null; metadata?: Json; created_at?: string };
         Relationships: [];
       };
+      partner_offers: {
+        Row: { id: string; name: string; price: number; included_tenant_credits: number; subscription_duration_days: number; module_pack_id: string; max_trials: number; trial_duration_days: number; is_active: boolean; created_at: string; updated_at: string };
+        Insert: { id?: string; name: string; price: number; included_tenant_credits: number; subscription_duration_days: number; module_pack_id: string; max_trials?: number; trial_duration_days?: number; is_active?: boolean; created_at?: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["partner_offers"]["Insert"]>;
+        Relationships: [];
+      };
+      partner_subscriptions: {
+        Row: { id: string; partner_id: string; offer_id: string; status: string; starts_at: string; expires_at: string; activated_at: string; updated_at: string };
+        Insert: { id?: string; partner_id: string; offer_id: string; status: string; starts_at: string; expires_at: string; activated_at?: string; updated_at?: string };
+        Update: Partial<Database["public"]["Tables"]["partner_subscriptions"]["Insert"]>;
+        Relationships: [];
+      };
+      partner_payments: {
+        Row: { id: string; partner_id: string; offer_id: string; amount: number; currency: string; status: string; external_reference: string; reason: string | null; validated_by: string; validated_at: string; created_at: string };
+        Insert: { id?: string; partner_id: string; offer_id: string; amount: number; currency?: string; status?: string; external_reference: string; reason?: string | null; validated_by: string; validated_at?: string; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["partner_payments"]["Insert"]>;
+        Relationships: [];
+      };
+      partner_credit_transactions: {
+        Row: { id: string; partner_id: string; tenant_id: string | null; payment_id: string | null; transaction_type: string; credits: number; balance_after: number; reason: string; reference: string | null; actor_id: string; created_at: string };
+        Insert: { id?: string; partner_id: string; tenant_id?: string | null; payment_id?: string | null; transaction_type: string; credits: number; balance_after: number; reason: string; reference?: string | null; actor_id: string; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["partner_credit_transactions"]["Insert"]>;
+        Relationships: [];
+      };
+      partner_trial_usage: {
+        Row: { id: string; partner_id: string; tenant_id: string; offer_id: string; client_email: string; normalized_email: string; starts_at: string; expires_at: string; status: string; converted_at: string | null; converted_by: string | null; created_by: string; created_at: string };
+        Insert: { id?: string; partner_id: string; tenant_id: string; offer_id: string; client_email: string; normalized_email: string; starts_at?: string; expires_at: string; status?: string; converted_at?: string | null; converted_by?: string | null; created_by: string; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["partner_trial_usage"]["Insert"]>;
+        Relationships: [];
+      };
       platform_user_roles: {
         Row: { user_id: string; role: Database["public"]["Enums"]["platform_role"]; created_at: string };
         Insert: { user_id: string; role: Database["public"]["Enums"]["platform_role"]; created_at?: string };
@@ -44,18 +74,21 @@ export type Database = {
           name: string;
           logo_url: string | null;
           slug: string;
+          is_active: boolean;
         };
         Insert: {
           id?: string;
           name: string;
           logo_url?: string | null;
           slug?: string;
+          is_active?: boolean;
         };
         Update: {
           id?: string;
           name?: string;
           logo_url?: string | null;
           slug?: string;
+          is_active?: boolean;
         };
         Relationships: [];
       };
@@ -925,6 +958,43 @@ export type Database = {
           requested_actor_id: string;
         };
         Returns: undefined;
+      };
+      expire_partner_trials: { Args: Record<PropertyKey, never>; Returns: number };
+      create_partner_tenant: {
+        Args: { requested_name: string; requested_email: string; requested_trial: boolean; requested_actor_id: string };
+        Returns: string;
+      };
+      activate_partner_tenant: {
+        Args: { requested_tenant_id: string; requested_actor_id: string };
+        Returns: undefined;
+      };
+      manage_partner_offer: {
+        Args: {
+          requested_offer_id: string | null; requested_name: string; requested_price: number;
+          requested_credits: number; requested_duration_days: number; requested_pack_id: string;
+          requested_max_trials: number; requested_trial_days: number;
+          requested_is_active: boolean; requested_actor_id: string;
+        };
+        Returns: string;
+      };
+      delete_partner_offer: {
+        Args: { requested_offer_id: string; requested_actor_id: string };
+        Returns: undefined;
+      };
+      validate_partner_payment: {
+        Args: {
+          requested_partner_id: string; requested_offer_id: string; requested_amount: number;
+          requested_currency: string; requested_reference: string; requested_reason: string;
+          requested_actor_id: string;
+        };
+        Returns: string;
+      };
+      adjust_partner_credits: {
+        Args: {
+          requested_partner_id: string; requested_credits: number; requested_reason: string;
+          requested_reference: string; requested_actor_id: string;
+        };
+        Returns: number;
       };
       replace_and_delete_catalog_category: {
         Args: {

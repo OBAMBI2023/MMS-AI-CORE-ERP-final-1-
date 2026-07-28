@@ -18,8 +18,10 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  WalletCards,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Bar,
   BarChart,
@@ -32,8 +34,19 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { PartnerDashboard, PartnerTenant } from "@/lib/partner-admin.server";
+import {
+  activatePartnerTenant,
+  createPartnerTenant,
+  type PartnerDashboard,
+  type PartnerTenant,
+} from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 
 const BLUE = "#1546a0";
 const GOLD = "#c99b3b";
@@ -104,6 +117,36 @@ export function PartnerAdminDashboardView({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [tenantDialog, setTenantDialog] = useState<"paid" | "trial" | null>(null);
+  const [tenantName, setTenantName] = useState("");
+  const [tenantEmail, setTenantEmail] = useState("");
+  const [submittingTenant, setSubmittingTenant] = useState(false);
+
+  const submitTenant = async () => {
+    if (!tenantDialog) return;
+    setSubmittingTenant(true);
+    try {
+      await createPartnerTenant({ data: {
+        name: tenantName, email: tenantEmail, trial: tenantDialog === "trial",
+      } });
+      toast.success(tenantDialog === "trial" ? "Essai créé." : "Tenant payant créé.");
+      window.location.reload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Création impossible.");
+    } finally {
+      setSubmittingTenant(false);
+    }
+  };
+
+  const activateTenant = async (tenantId: string) => {
+    try {
+      await activatePartnerTenant({ data: { tenantId } });
+      toast.success("Tenant activé avec 1 crédit.");
+      window.location.reload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Activation impossible.");
+    }
+  };
 
   const metrics = useMemo(() => {
     const activeLicenses = data.tenants.filter((tenant) =>
@@ -265,9 +308,9 @@ export function PartnerAdminDashboardView({
             </motion.div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <Kpi icon={Building2} label="Tenants" value={data.tenants.length} tone="blue" />
-              <Kpi icon={KeyRound} label="Licences" value={metrics.activeLicenses} tone="gold" />
-              <Kpi icon={Boxes} label="Modules" value={metrics.enabledModules} tone="blue" />
+              <Kpi icon={WalletCards} label="Crédits disponibles" value={data.partner.creditBalance} tone="gold" />
+              <Kpi icon={Building2} label="Tenants actifs" value={data.totals.activeTenants} tone="blue" />
+              <Kpi icon={Clock3} label="Essais en cours" value={data.totals.activeTrials} tone="gold" />
               <Kpi
                 icon={Clock3}
                 label="Expiration proche"
@@ -277,6 +320,26 @@ export function PartnerAdminDashboardView({
               />
               <Kpi icon={Activity} label="Activités" value={data.history.length} tone="gold" />
             </div>
+          </section>
+
+          <section className="grid gap-5 xl:grid-cols-3">
+            <Panel title="Offre actuelle" subtitle="Abonnement partenaire réel">
+              <div className="mt-5 space-y-3 text-sm">
+                <p className="text-xl font-bold">{data.subscription?.offer.name ?? "Aucune offre active"}</p>
+                <p className="text-slate-500">Pack : {data.subscription?.offer.packName ?? "—"}</p>
+                <p className="text-slate-500">Expiration : {formatDate(data.subscription?.expiresAt ?? null)}</p>
+              </div>
+            </Panel>
+            <Panel className="xl:col-span-2" title="Créer une entreprise" subtitle="Les créations payantes consomment un crédit">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <Button onClick={() => setTenantDialog("paid")} disabled={!data.subscription || data.partner.creditBalance < 1}>
+                  <Building2 /> Créer un tenant
+                </Button>
+                <Button variant="outline" onClick={() => setTenantDialog("trial")} disabled={!data.subscription}>
+                  <Clock3 /> Créer un essai gratuit
+                </Button>
+              </div>
+            </Panel>
           </section>
 
           <section id="licences" className="grid scroll-mt-24 gap-5 xl:grid-cols-5">
@@ -355,7 +418,7 @@ export function PartnerAdminDashboardView({
             {data.tenants.length ? (
               <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
                 {data.tenants.map((tenant, index) => (
-                  <CompanyCard key={tenant.id} tenant={tenant} index={index} />
+                  <CompanyCard key={tenant.id} tenant={tenant} index={index} onActivate={activateTenant} />
                 ))}
               </div>
             ) : (
@@ -447,6 +510,31 @@ export function PartnerAdminDashboardView({
             </div>
           </section>
 
+          <section className="grid gap-5 xl:grid-cols-2">
+            <Panel title="Historique des paiements" subtitle="Paiements validés côté serveur">
+              <div className="mt-5 space-y-3">
+                {data.payments.slice(0, 10).map((payment) => (
+                  <div key={payment.id} className="flex items-center justify-between gap-4 rounded-xl border p-3 text-sm">
+                    <div className="min-w-0"><p className="truncate font-semibold">{payment.reference}</p><p className="text-xs text-slate-500">{formatDate(payment.createdAt, true)}</p></div>
+                    <strong>{payment.amount.toLocaleString("fr-FR")} {payment.currency}</strong>
+                  </div>
+                ))}
+                {!data.payments.length && <p className="text-sm text-slate-500">Aucun paiement validé.</p>}
+              </div>
+            </Panel>
+            <Panel title="Historique des crédits" subtitle="Crédits et débits du portefeuille">
+              <div className="mt-5 space-y-3">
+                {data.creditTransactions.slice(0, 10).map((transaction) => (
+                  <div key={transaction.id} className="flex items-center justify-between gap-4 rounded-xl border p-3 text-sm">
+                    <div className="min-w-0"><p className="truncate font-semibold">{transaction.reason}</p><p className="text-xs text-slate-500">{formatDate(transaction.createdAt, true)} · Solde {transaction.balanceAfter}</p></div>
+                    <strong className={transaction.credits > 0 ? "text-emerald-600" : "text-red-600"}>{transaction.credits > 0 ? "+" : ""}{transaction.credits}</strong>
+                  </div>
+                ))}
+                {!data.creditTransactions.length && <p className="text-sm text-slate-500">Aucune transaction de crédit.</p>}
+              </div>
+            </Panel>
+          </section>
+
           <section id="activites" className="grid scroll-mt-24 gap-5 xl:grid-cols-3">
             <Panel
               className="xl:col-span-2"
@@ -509,6 +597,32 @@ export function PartnerAdminDashboardView({
           </section>
         </main>
       </div>
+      <Dialog open={tenantDialog !== null} onOpenChange={(open) => !open && setTenantDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tenantDialog === "trial" ? "Créer un essai gratuit" : "Créer un tenant payant"}</DialogTitle>
+            <DialogDescription>
+              {tenantDialog === "trial" ? "Aucun crédit ne sera débité au démarrage." : "Cette opération débitera atomiquement 1 crédit."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tenant-name">Entreprise</Label>
+              <Input id="tenant-name" value={tenantName} onChange={(event) => setTenantName(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tenant-email">Email client</Label>
+              <Input id="tenant-email" type="email" value={tenantEmail} onChange={(event) => setTenantEmail(event.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTenantDialog(null)}>Annuler</Button>
+            <Button disabled={submittingTenant || !tenantName.trim() || !tenantEmail.trim()} onClick={() => void submitTenant()}>
+              {submittingTenant ? "Création…" : "Créer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -662,7 +776,15 @@ function SectionHeading({
   );
 }
 
-function CompanyCard({ tenant, index }: { tenant: PartnerTenant; index: number }) {
+function CompanyCard({
+  tenant,
+  index,
+  onActivate,
+}: {
+  tenant: PartnerTenant;
+  index: number;
+  onActivate: (tenantId: string) => void;
+}) {
   const enabled = tenant.modules.filter((module) => module.enabled);
   return (
     <motion.article
@@ -706,6 +828,11 @@ function CompanyCard({ tenant, index }: { tenant: PartnerTenant; index: number }
           <span className="text-slate-400">Échéance</span>
           <span className="font-semibold text-slate-700">{formatDate(expiryFor(tenant))}</span>
         </div>
+        {!["active", "trial"].includes(tenant.subscription?.status ?? "") && (
+          <Button className="mt-4 w-full" size="sm" onClick={() => onActivate(tenant.id)}>
+            Activer avec 1 crédit
+          </Button>
+        )}
       </div>
     </motion.article>
   );

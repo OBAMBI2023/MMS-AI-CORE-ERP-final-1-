@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react";
-import { useRouter } from "@tanstack/react-router";
+import { useLocation, useRouter } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -53,12 +53,17 @@ import {
   saveModulePack,
   manageTenantAiSubscription,
   manageTenantSubscription,
+  adjustPartnerCredits,
+  removePartnerOffer,
+  savePartnerOffer,
+  validatePartnerPayment,
   type AiSubscriptionStatus,
   type SubscriptionBillingCycle,
   type SuperAdminDashboard,
   type SuperAdminAiPlan,
   type SuperAdminTenant,
   type SuperAdminModulePack,
+  type SuperAdminPartnerOffer,
 } from "@/lib/super-admin.server";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -111,6 +116,84 @@ const currencyFormatter = new Intl.NumberFormat("fr-FR", {
 });
 const numberFormatter = new Intl.NumberFormat("fr-FR");
 
+const emptyDashboard: SuperAdminDashboard = {
+  kpis: { tenants: 0, activeTenants: 0, users: 0, sales: 0, revenue: 0 },
+  subscriptions: { active: 0, trials: 0, expired: 0, recurringRevenue: 0 },
+  registrations: [],
+  aiPlans: [],
+  modules: [],
+  modulePacks: [],
+  tenants: [],
+  partnerCommerce: {
+    offers: [],
+    partners: [],
+    subscriptions: [],
+    payments: [],
+    credits: [],
+    trials: [],
+  },
+};
+
+function normalizeDashboardData(
+  value: SuperAdminDashboard | null | undefined,
+): SuperAdminDashboard {
+  if (!value || typeof value !== "object") return emptyDashboard;
+
+  const kpis = value.kpis ?? emptyDashboard.kpis;
+  const subscriptions = value.subscriptions ?? emptyDashboard.subscriptions;
+  const commerce = value.partnerCommerce ?? emptyDashboard.partnerCommerce;
+  const safeNumber = (candidate: unknown) =>
+    typeof candidate === "number" && Number.isFinite(candidate) ? candidate : 0;
+  const safeArray = <T,>(candidate: T[] | null | undefined): T[] =>
+    Array.isArray(candidate) ? candidate.filter(Boolean) : [];
+
+  return {
+    kpis: {
+      tenants: safeNumber(kpis.tenants),
+      activeTenants: safeNumber(kpis.activeTenants),
+      users: safeNumber(kpis.users),
+      sales: safeNumber(kpis.sales),
+      revenue: safeNumber(kpis.revenue),
+    },
+    subscriptions: {
+      active: safeNumber(subscriptions.active),
+      trials: safeNumber(subscriptions.trials),
+      expired: safeNumber(subscriptions.expired),
+      recurringRevenue: safeNumber(subscriptions.recurringRevenue),
+    },
+    registrations: safeArray(value.registrations),
+    aiPlans: safeArray(value.aiPlans),
+    modules: safeArray(value.modules),
+    modulePacks: safeArray(value.modulePacks).map((pack) => ({
+      ...pack,
+      moduleIds: safeArray(pack?.moduleIds),
+    })),
+    tenants: safeArray(value.tenants).map((tenant) => ({
+      ...tenant,
+      id: tenant?.id ?? "",
+      name: tenant?.name ?? "Tenant sans nom",
+      status: tenant?.status ?? "suspended",
+      loginUrl: tenant?.loginUrl ?? "#",
+      users: safeNumber(tenant?.users),
+      sales: safeNumber(tenant?.sales),
+      clients: safeNumber(tenant?.clients),
+      revenue: safeNumber(tenant?.revenue),
+      monthlyRevenue: safeNumber(tenant?.monthlyRevenue),
+      subscriptionAmount: safeNumber(tenant?.subscriptionAmount),
+      modules: safeArray(tenant?.modules),
+      aiUsageHistory: safeArray(tenant?.aiUsageHistory),
+    })),
+    partnerCommerce: {
+      offers: safeArray(commerce.offers),
+      partners: safeArray(commerce.partners),
+      subscriptions: safeArray(commerce.subscriptions),
+      payments: safeArray(commerce.payments),
+      credits: safeArray(commerce.credits),
+      trials: safeArray(commerce.trials),
+    },
+  };
+}
+
 function formatCurrency(value: number) {
   return currencyFormatter.format(value).replace("XOF", "FCFA");
 }
@@ -145,9 +228,10 @@ const cycleLabels: Record<SubscriptionBillingCycle, string> = {
 };
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "#dashboard", active: true },
+  { label: "Dashboard", icon: LayoutDashboard, href: "#dashboard" },
   { label: "Tenants", icon: Building2, href: "#tenants" },
   { label: "Packs de modules", icon: Layers3, href: "#packs-modules" },
+  { label: "Offres partenaires", icon: CreditCard, href: "#offres-partenaires" },
   { label: "Partenaires", icon: Handshake, href: "/super-admin/partners" },
   { label: "Utilisateurs", icon: Users, href: "#utilisateurs" },
   { label: "Licences", icon: KeyRound, href: "#licences" },
@@ -158,6 +242,9 @@ const navItems = [
 ] as const;
 
 function SidebarContent({ mobile = false }: { mobile?: boolean }) {
+  const { pathname, hash } = useLocation();
+  const isDashboardRoute = pathname === "/super-admin" || pathname === "/super-admin/";
+
   return (
     <div className="flex h-full flex-col bg-[#0a0a0b] text-white">
       <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5">
@@ -173,22 +260,29 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
         <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
           Espace plateforme
         </p>
-        {navItems.map(({ label, icon: Icon, href, active }) => (
-          <a
-            key={label}
-            href={href}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all",
-              active
-                ? "bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.06)]"
-                : "text-zinc-400 hover:bg-white/5 hover:text-white",
-            )}
-          >
-            <Icon className="size-[18px]" />
-            <span>{label}</span>
-            {active && <ChevronRight className="ml-auto size-4" />}
-          </a>
-        ))}
+        {navItems.map(({ label, icon: Icon, href }) => {
+          const sectionId = href.startsWith("#") ? href.slice(1) : null;
+          const isActive = sectionId
+            ? isDashboardRoute && (hash === sectionId || (!hash && sectionId === "dashboard"))
+            : pathname === href || pathname.startsWith(`${href}/`);
+
+          return (
+            <a
+              key={label}
+              href={href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all",
+                isActive
+                  ? "bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.06)]"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-white",
+              )}
+            >
+              <Icon className="size-[18px]" />
+              <span>{label}</span>
+              {isActive && <ChevronRight className="ml-auto size-4" />}
+            </a>
+          );
+        })}
       </nav>
 
       <div className="space-y-3 border-t border-white/10 p-3">
@@ -272,6 +366,128 @@ function ChartCard({
   );
 }
 
+function PartnerOffersSection({
+  commerce,
+  packs,
+}: {
+  commerce: SuperAdminDashboard["partnerCommerce"];
+  packs: SuperAdminModulePack[];
+}) {
+  const [editing, setEditing] = useState<SuperAdminPartnerOffer | null>(null);
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("0");
+  const [credits, setCredits] = useState("1");
+  const [duration, setDuration] = useState("30");
+  const [packId, setPackId] = useState("");
+  const [maxTrials, setMaxTrials] = useState("0");
+  const [trialDays, setTrialDays] = useState("0");
+  const [offerActive, setOfferActive] = useState(true);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [partnerId, setPartnerId] = useState("");
+  const [selectedOfferId, setSelectedOfferId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [reference, setReference] = useState("");
+  const [reason, setReason] = useState("");
+  const [adjustment, setAdjustment] = useState("1");
+  const [submitting, setSubmitting] = useState(false);
+
+  const openOffer = (offer?: SuperAdminPartnerOffer) => {
+    setEditing(offer ?? null);
+    setName(offer?.name ?? "");
+    setPrice(String(offer?.price ?? 0));
+    setCredits(String(offer?.includedTenantCredits ?? 1));
+    setDuration(String(offer?.durationDays ?? 30));
+    setPackId(offer?.modulePackId ?? packs[0]?.id ?? "");
+    setMaxTrials(String(offer?.maxTrials ?? 0));
+    setTrialDays(String(offer?.trialDays ?? 0));
+    setOfferActive(offer?.isActive ?? true);
+    setOfferOpen(true);
+  };
+
+  const saveOffer = async () => {
+    setSubmitting(true);
+    try {
+      await savePartnerOffer({ data: {
+        id: editing?.id ?? null, name, price: Number(price),
+        includedTenantCredits: Number(credits), durationDays: Number(duration),
+        modulePackId: packId, maxTrials: Number(maxTrials), trialDays: Number(trialDays),
+        isActive: offerActive,
+      } });
+      toast.success("Offre enregistrée.");
+      window.location.reload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Enregistrement impossible.");
+    } finally { setSubmitting(false); }
+  };
+
+  const validatePayment = async () => {
+    setSubmitting(true);
+    try {
+      await validatePartnerPayment({ data: {
+        partnerId, offerId: selectedOfferId, amount: Number(amount),
+        currency: "XOF", reference, reason,
+      } });
+      toast.success("Paiement validé et crédits attribués.");
+      window.location.reload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Validation impossible.");
+    } finally { setSubmitting(false); }
+  };
+
+  const adjustCredits = async () => {
+    setSubmitting(true);
+    try {
+      await adjustPartnerCredits({ data: {
+        partnerId, credits: Number(adjustment), reason, reference,
+      } });
+      toast.success("Solde ajusté.");
+      window.location.reload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ajustement impossible.");
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <section id="offres-partenaires" className="scroll-mt-24 space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div><h2 className="text-xl font-bold">Offres partenaires</h2><p className="text-sm text-muted-foreground">Abonnements, paiements et ledger de crédits réels.</p></div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setAdjustOpen(true)}>Ajuster les crédits</Button>
+          <Button variant="outline" onClick={() => setPaymentOpen(true)}>Valider un paiement</Button>
+          <Button onClick={() => openOffer()}><Plus /> Nouvelle offre</Button>
+        </div>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {commerce.offers.length === 0 ? (
+          <Card className="p-5 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+            Aucune offre partenaire enregistrée.
+          </Card>
+        ) : commerce.offers.map((offer) => (
+          <Card key={offer.id} className="p-5">
+            <div className="flex items-start justify-between gap-3"><h3 className="font-semibold">{offer.name}</h3><Badge variant={offer.isActive ? "default" : "secondary"}>{offer.isActive ? "Active" : "Inactive"}</Badge></div>
+            <p className="mt-3 text-2xl font-bold">{formatCurrency(offer.price)}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{offer.includedTenantCredits} crédits · {offer.durationDays} jours · {offer.maxTrials} essais de {offer.trialDays} jours</p>
+            <div className="mt-4 flex gap-2"><Button size="sm" variant="outline" onClick={() => openOffer(offer)}>Modifier</Button><Button size="sm" variant="ghost" onClick={async () => { try { await removePartnerOffer({ data: { offerId: offer.id } }); window.location.reload(); } catch (error) { toast.error(error instanceof Error ? error.message : "Suppression impossible."); } }}><Trash2 className="text-destructive" /></Button></div>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Card className="overflow-hidden"><div className="border-b p-4 font-semibold">Paiements ({commerce.payments.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Référence</TableHead><TableHead>Montant</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{commerce.payments.map((payment) => <TableRow key={payment.id}><TableCell>{commerce.partners.find((partner) => partner.id === payment.partner_id)?.name ?? payment.partner_id}</TableCell><TableCell>{payment.external_reference}</TableCell><TableCell>{formatCurrency(Number(payment.amount))}</TableCell><TableCell>{formatDate(payment.created_at, true)}</TableCell></TableRow>)}</TableBody></Table></div></Card>
+        <Card className="overflow-hidden"><div className="border-b p-4 font-semibold">Crédits et débits ({commerce.credits.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Variation</TableHead><TableHead>Motif</TableHead><TableHead>Solde</TableHead></TableRow></TableHeader><TableBody>{commerce.credits.map((item) => <TableRow key={item.id}><TableCell>{commerce.partners.find((partner) => partner.id === item.partner_id)?.name ?? item.partner_id}</TableCell><TableCell className={item.credits > 0 ? "text-emerald-600" : "text-destructive"}>{item.credits > 0 ? "+" : ""}{item.credits}</TableCell><TableCell>{item.reason}</TableCell><TableCell>{item.balance_after}</TableCell></TableRow>)}</TableBody></Table></div></Card>
+        <Card className="overflow-hidden xl:col-span-2"><div className="border-b p-4 font-semibold">Essais et activations ({commerce.trials.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Email</TableHead><TableHead>Statut</TableHead><TableHead>Début</TableHead><TableHead>Expiration</TableHead></TableRow></TableHeader><TableBody>{commerce.trials.map((trial) => <TableRow key={trial.id}><TableCell>{commerce.partners.find((partner) => partner.id === trial.partner_id)?.name ?? trial.partner_id}</TableCell><TableCell>{trial.client_email}</TableCell><TableCell>{trial.status}</TableCell><TableCell>{formatDate(trial.starts_at)}</TableCell><TableCell>{formatDate(trial.expires_at)}</TableCell></TableRow>)}</TableBody></Table></div></Card>
+      </div>
+
+      <Dialog open={offerOpen} onOpenChange={setOfferOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{editing ? "Modifier l’offre" : "Créer une offre"}</DialogTitle></DialogHeader><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2 sm:col-span-2"><Label>Nom</Label><Input value={name} onChange={(event) => setName(event.target.value)} /></div><div className="space-y-2"><Label>Prix XOF</Label><Input type="number" min="0" value={price} onChange={(event) => setPrice(event.target.value)} /></div><div className="space-y-2"><Label>Crédits inclus</Label><Input type="number" min="0" value={credits} onChange={(event) => setCredits(event.target.value)} /></div><div className="space-y-2"><Label>Durée (jours)</Label><Input type="number" min="1" value={duration} onChange={(event) => setDuration(event.target.value)} /></div><div className="space-y-2"><Label>Pack</Label><Select value={packId} onValueChange={setPackId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{packs.map((pack) => <SelectItem key={pack.id} value={pack.id}>{pack.name}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Essais maximum</Label><Input type="number" min="0" value={maxTrials} onChange={(event) => setMaxTrials(event.target.value)} /></div><div className="space-y-2"><Label>Durée essai (jours)</Label><Input type="number" min="0" value={trialDays} onChange={(event) => setTrialDays(event.target.value)} /></div><div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2"><Label>Offre active</Label><Switch checked={offerActive} onCheckedChange={setOfferActive} /></div></div><DialogFooter><Button variant="outline" onClick={() => setOfferOpen(false)}>Annuler</Button><Button disabled={submitting || !name || !packId} onClick={() => void saveOffer()}>Enregistrer</Button></DialogFooter></DialogContent></Dialog>
+
+      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent><DialogHeader><DialogTitle>Valider un paiement</DialogTitle><DialogDescription>La référence rend cette validation idempotente.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={partnerId} onValueChange={setPartnerId}><SelectTrigger><SelectValue placeholder="Partenaire" /></SelectTrigger><SelectContent>{commerce.partners.map((partner) => <SelectItem key={partner.id} value={partner.id}>{partner.name}</SelectItem>)}</SelectContent></Select><Select value={selectedOfferId} onValueChange={(value) => { setSelectedOfferId(value); setAmount(String(commerce.offers.find((offer) => offer.id === value)?.price ?? "")); }}><SelectTrigger><SelectValue placeholder="Offre" /></SelectTrigger><SelectContent>{commerce.offers.filter((offer) => offer.isActive).map((offer) => <SelectItem key={offer.id} value={offer.id}>{offer.name}</SelectItem>)}</SelectContent></Select><Input type="number" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Montant" /><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Référence externe unique" /><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Note (optionnelle)" /></div><DialogFooter><Button variant="outline" onClick={() => setPaymentOpen(false)}>Annuler</Button><Button disabled={submitting || !partnerId || !selectedOfferId || !reference} onClick={() => void validatePayment()}>Valider</Button></DialogFooter></DialogContent></Dialog>
+
+      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}><DialogContent><DialogHeader><DialogTitle>Ajustement manuel</DialogTitle><DialogDescription>Utilisez une valeur positive pour créditer, négative pour débiter.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={partnerId} onValueChange={setPartnerId}><SelectTrigger><SelectValue placeholder="Partenaire" /></SelectTrigger><SelectContent>{commerce.partners.map((partner) => <SelectItem key={partner.id} value={partner.id}>{partner.name} · {partner.creditBalance} crédits</SelectItem>)}</SelectContent></Select><Input type="number" value={adjustment} onChange={(event) => setAdjustment(event.target.value)} placeholder="Variation de crédits" /><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Motif obligatoire" /><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Référence (optionnelle)" /></div><DialogFooter><Button variant="outline" onClick={() => setAdjustOpen(false)}>Annuler</Button><Button disabled={submitting || !partnerId || !reason.trim() || Number(adjustment) === 0} onClick={() => void adjustCredits()}>Appliquer</Button></DialogFooter></DialogContent></Dialog>
+    </section>
+  );
+}
+
 function ModulePacksSection({
   packs,
   modules,
@@ -345,7 +561,11 @@ function ModulePacksSection({
         <Button onClick={() => openEditor()}><Plus /> Nouveau pack</Button>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {packs.map((pack) => (
+        {packs.length === 0 ? (
+          <Card className="p-5 text-sm text-muted-foreground md:col-span-2 xl:col-span-4">
+            Aucun pack de modules enregistré.
+          </Card>
+        ) : packs.map((pack) => (
           <Card key={pack.id} className="flex flex-col rounded-xl border-border/70 p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950">
@@ -376,14 +596,14 @@ function ModulePacksSection({
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="shrink-0 px-4 pb-4 pt-6 sm:px-6">
             <DialogTitle>{editing ? "Modifier le pack" : "Créer un pack"}</DialogTitle>
             <DialogDescription>
               La composition sera enregistrée de façon atomique avec le pack.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid min-w-0 flex-1 gap-4 overflow-x-hidden overflow-y-auto px-4 py-2 sm:grid-cols-2 sm:px-6">
             <div className="space-y-2">
               <Label htmlFor="pack-name">Nom</Label>
               <Input id="pack-name" value={name} onChange={(event) => setName(event.target.value)} />
@@ -422,7 +642,7 @@ function ModulePacksSection({
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 shrink-0 gap-2 border-t bg-background px-4 py-4 sm:px-6">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
             <Button disabled={submitting || !name.trim() || !code.trim()} onClick={() => void submit()}>
               {submitting ? "Enregistrement…" : "Enregistrer"}
@@ -921,7 +1141,11 @@ function TenantModulesDialog({
           </p>
         </div>
         <div className="max-h-[60vh] space-y-2 overflow-y-auto py-2">
-          {tenant?.modules.map((module) => (
+          {!tenant?.modules.length ? (
+            <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              Aucun module disponible pour ce tenant.
+            </p>
+          ) : tenant.modules.map((module) => (
             <div
               key={module.id}
               className="flex items-center justify-between gap-4 rounded-lg border border-border p-3"
@@ -1148,15 +1372,16 @@ export function SuperAdminDashboardView({
   onSignOut: () => Promise<void>;
 }) {
   const [tenantQuery, setTenantQuery] = useState("");
+  const dashboard = useMemo(() => normalizeDashboardData(data), [data]);
   const tenantDistribution = [
-    { name: "Actifs", value: data.kpis.activeTenants, color: "#2563EB" },
+    { name: "Actifs", value: dashboard.kpis.activeTenants, color: "#2563EB" },
     {
       name: "Autres",
-      value: Math.max(0, data.kpis.tenants - data.kpis.activeTenants),
+      value: Math.max(0, dashboard.kpis.tenants - dashboard.kpis.activeTenants),
       color: "#CBD5E1",
     },
   ];
-  const salesByTenant = [...data.tenants]
+  const salesByTenant = [...dashboard.tenants]
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 6)
     .map((tenant) => ({ name: tenant.name, value: tenant.revenue }));
@@ -1239,35 +1464,35 @@ export function SuperAdminDashboardView({
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <KpiCard
               title="Total tenants"
-              value={numberFormatter.format(data.kpis.tenants)}
+              value={numberFormatter.format(dashboard.kpis.tenants)}
               icon={Building2}
               tone="bg-blue-50 text-blue-600"
               note="Comptes enregistrés"
             />
             <KpiCard
               title="Tenants actifs"
-              value={numberFormatter.format(data.kpis.activeTenants)}
+              value={numberFormatter.format(dashboard.kpis.activeTenants)}
               icon={Gauge}
               tone="bg-emerald-50 text-emerald-600"
               note="Statut actif"
             />
             <KpiCard
               title="Utilisateurs"
-              value={numberFormatter.format(data.kpis.users)}
+              value={numberFormatter.format(dashboard.kpis.users)}
               icon={Users}
               tone="bg-violet-50 text-violet-600"
               note="Profils rattachés"
             />
             <KpiCard
               title="Ventes totales"
-              value={numberFormatter.format(data.kpis.sales)}
+              value={numberFormatter.format(dashboard.kpis.sales)}
               icon={BarChart3}
               tone="bg-amber-50 text-amber-600"
               note="Transactions enregistrées"
             />
             <KpiCard
               title="CA total"
-              value={formatCurrency(data.kpis.revenue)}
+              value={formatCurrency(dashboard.kpis.revenue)}
               icon={CircleDollarSign}
               tone="bg-cyan-50 text-cyan-600"
               note="Toutes ventes confondues"
@@ -1283,7 +1508,7 @@ export function SuperAdminDashboardView({
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
-                    data={data.registrations}
+                    data={dashboard.registrations}
                     margin={{ top: 5, right: 4, bottom: 0, left: -24 }}
                   >
                     <defs>
@@ -1326,7 +1551,7 @@ export function SuperAdminDashboardView({
               className="xl:col-span-3"
             >
               <div className="relative h-64">
-                {data.kpis.tenants === 0 ? (
+                {dashboard.kpis.tenants === 0 ? (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">
                     Aucun résultat
                   </div>
@@ -1350,7 +1575,7 @@ export function SuperAdminDashboardView({
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-bold">{data.kpis.tenants}</span>
+                      <span className="text-2xl font-bold">{dashboard.kpis.tenants}</span>
                       <span className="text-[11px] text-slate-400">Tenants</span>
                     </div>
                   </>
@@ -1402,15 +1627,19 @@ export function SuperAdminDashboardView({
             </ChartCard>
           </section>
 
-          <ModulePacksSection packs={data.modulePacks} modules={data.modules} />
+          <ModulePacksSection packs={dashboard.modulePacks} modules={dashboard.modules} />
+          <PartnerOffersSection
+            commerce={dashboard.partnerCommerce}
+            packs={dashboard.modulePacks}
+          />
           <TenantTable
-            tenants={data.tenants}
-            aiPlans={data.aiPlans}
-            modulePacks={data.modulePacks}
+            tenants={dashboard.tenants}
+            aiPlans={dashboard.aiPlans}
+            modulePacks={dashboard.modulePacks}
             query={tenantQuery}
             onQueryChange={setTenantQuery}
           />
-          <SubscriptionSummary data={data.subscriptions} />
+          <SubscriptionSummary data={dashboard.subscriptions} />
         </main>
       </div>
     </div>

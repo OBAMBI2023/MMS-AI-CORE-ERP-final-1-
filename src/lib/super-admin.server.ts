@@ -30,6 +30,27 @@ type ModulePackRow = {
 };
 type ModulePackItemRow = { pack_id: string; module_id: string };
 type TenantModulePackRow = { tenant_id: string; pack_id: string };
+type PartnerOfferRow = {
+  id: string; name: string; price: number | string; included_tenant_credits: number;
+  subscription_duration_days: number; module_pack_id: string; max_trials: number;
+  trial_duration_days: number; is_active: boolean;
+};
+type CommercialPartnerRow = { id: string; name: string; code: string; is_active: boolean };
+type PartnerSubscriptionRow = {
+  id: string; partner_id: string; offer_id: string; status: string; starts_at: string; expires_at: string;
+};
+type PartnerPaymentRow = {
+  id: string; partner_id: string; offer_id: string; amount: number | string; currency: string;
+  status: string; external_reference: string; reason: string | null; validated_by: string; created_at: string;
+};
+type CreditTransactionRow = {
+  id: string; partner_id: string; tenant_id: string | null; transaction_type: string;
+  credits: number; balance_after: number; reason: string; reference: string | null; actor_id: string; created_at: string;
+};
+type TrialUsageRow = {
+  id: string; partner_id: string; tenant_id: string; client_email: string; status: string;
+  starts_at: string; expires_at: string; created_by: string;
+};
 type AiPlanRow = {
   code: string;
   name: string;
@@ -147,6 +168,10 @@ export type SuperAdminTenant = {
 
 export type SuperAdminTenantModule = ModuleRow & { enabled: boolean };
 export type SuperAdminModulePack = ModulePackRow & { moduleIds: string[] };
+export type SuperAdminPartnerOffer = {
+  id: string; name: string; price: number; includedTenantCredits: number; durationDays: number;
+  modulePackId: string; maxTrials: number; trialDays: number; isActive: boolean;
+};
 
 export type SuperAdminDashboard = {
   kpis: { tenants: number; activeTenants: number; users: number; sales: number; revenue: number };
@@ -156,6 +181,14 @@ export type SuperAdminDashboard = {
   modules: ModuleRow[];
   modulePacks: SuperAdminModulePack[];
   tenants: SuperAdminTenant[];
+  partnerCommerce: {
+    offers: SuperAdminPartnerOffer[];
+    partners: { id: string; name: string; code: string; isActive: boolean; creditBalance: number }[];
+    subscriptions: PartnerSubscriptionRow[];
+    payments: PartnerPaymentRow[];
+    credits: CreditTransactionRow[];
+    trials: TrialUsageRow[];
+  };
 };
 
 function latestDate(current: string | null, candidate?: string | null) {
@@ -241,6 +274,12 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       aiPlanRows,
       aiSubscriptionRows,
       aiUsageRows,
+      partnerOfferRows,
+      commercialPartnerRows,
+      partnerSubscriptionRows,
+      partnerPaymentRows,
+      creditTransactionRows,
+      trialUsageRows,
     ] = await Promise.all([
       fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "tenant_id, created_at, updated_at"),
@@ -287,6 +326,12 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         "ai_usage_logs",
         "id, tenant_id, user_id, tool_name, request_type, input_tokens, output_tokens, total_tokens, estimated_cost, status, error_message, created_at",
       ),
+      fetchRows<PartnerOfferRow>(supabaseAdmin, "partner_offers", "id, name, price, included_tenant_credits, subscription_duration_days, module_pack_id, max_trials, trial_duration_days, is_active"),
+      fetchRows<CommercialPartnerRow>(supabaseAdmin, "partners", "id, name, code, is_active"),
+      fetchRows<PartnerSubscriptionRow>(supabaseAdmin, "partner_subscriptions", "id, partner_id, offer_id, status, starts_at, expires_at"),
+      fetchRows<PartnerPaymentRow>(supabaseAdmin, "partner_payments", "id, partner_id, offer_id, amount, currency, status, external_reference, reason, validated_by, created_at"),
+      fetchRows<CreditTransactionRow>(supabaseAdmin, "partner_credit_transactions", "id, partner_id, tenant_id, transaction_type, credits, balance_after, reason, reference, actor_id, created_at"),
+      fetchRows<TrialUsageRow>(supabaseAdmin, "partner_trial_usage", "id, partner_id, tenant_id, client_email, status, starts_at, expires_at, created_by"),
     ]);
     const subscriptionsByTenant = new Map(
       subscriptionRows.map((subscription) => [subscription.tenant_id, subscription]),
@@ -484,6 +529,25 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       modules: moduleRows.sort((a, b) => a.sort_order - b.sort_order),
       modulePacks,
       tenants,
+      partnerCommerce: {
+        offers: partnerOfferRows.map((offer) => ({
+          id: offer.id, name: offer.name, price: Number(offer.price),
+          includedTenantCredits: offer.included_tenant_credits,
+          durationDays: offer.subscription_duration_days, modulePackId: offer.module_pack_id,
+          maxTrials: offer.max_trials, trialDays: offer.trial_duration_days, isActive: offer.is_active,
+        })),
+        partners: commercialPartnerRows.map((partner) => ({
+          id: partner.id, name: partner.name, code: partner.code,
+          isActive: partner.is_active,
+          creditBalance: creditTransactionRows
+            .filter((transaction) => transaction.partner_id === partner.id)
+            .reduce((balance, transaction) => balance + transaction.credits, 0),
+        })),
+        subscriptions: partnerSubscriptionRows,
+        payments: partnerPaymentRows,
+        credits: creditTransactionRows,
+        trials: trialUsageRows,
+      },
     };
   });
 
@@ -525,6 +589,92 @@ export const removeModulePack = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(formatSupabaseError(error));
     return { success: true };
+  });
+
+const partnerOfferSchema = z.object({
+  id: z.string().uuid().nullable(),
+  name: z.string().trim().min(1).max(120),
+  price: z.number().finite().nonnegative(),
+  includedTenantCredits: z.number().int().nonnegative(),
+  durationDays: z.number().int().positive().max(3650),
+  modulePackId: z.string().uuid(),
+  maxTrials: z.number().int().nonnegative().max(100000),
+  trialDays: z.number().int().nonnegative().max(365),
+  isActive: z.boolean(),
+});
+
+export const savePartnerOffer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(partnerOfferSchema)
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: offerId, error } = await supabaseAdmin.rpc("manage_partner_offer", {
+      requested_offer_id: data.id,
+      requested_name: data.name,
+      requested_price: data.price,
+      requested_credits: data.includedTenantCredits,
+      requested_duration_days: data.durationDays,
+      requested_pack_id: data.modulePackId,
+      requested_max_trials: data.maxTrials,
+      requested_trial_days: data.trialDays,
+      requested_is_active: data.isActive,
+      requested_actor_id: context.userId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { offerId: offerId as string };
+  });
+
+export const removePartnerOffer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ offerId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("delete_partner_offer", {
+      requested_offer_id: data.offerId,
+      requested_actor_id: context.userId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { success: true };
+  });
+
+export const validatePartnerPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    partnerId: z.string().uuid(), offerId: z.string().uuid(),
+    amount: z.number().finite().nonnegative(), currency: z.string().trim().length(3),
+    reference: z.string().trim().min(1).max(160), reason: z.string().trim().max(500),
+  }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: paymentId, error } = await supabaseAdmin.rpc("validate_partner_payment", {
+      requested_partner_id: data.partnerId, requested_offer_id: data.offerId,
+      requested_amount: data.amount, requested_currency: data.currency.toUpperCase(),
+      requested_reference: data.reference, requested_reason: data.reason,
+      requested_actor_id: context.userId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { paymentId: paymentId as string };
+  });
+
+export const adjustPartnerCredits = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    partnerId: z.string().uuid(), credits: z.number().int().refine((value) => value !== 0),
+    reason: z.string().trim().min(1).max(500), reference: z.string().trim().max(160),
+  }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: balance, error } = await supabaseAdmin.rpc("adjust_partner_credits", {
+      requested_partner_id: data.partnerId, requested_credits: data.credits,
+      requested_reason: data.reason, requested_reference: data.reference,
+      requested_actor_id: context.userId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { balance: balance as number };
   });
 
 export const assignModulePack = createServerFn({ method: "POST" })

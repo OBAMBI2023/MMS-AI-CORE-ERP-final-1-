@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import type { Json } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
+import { z } from "zod";
 
 export type PartnerTenant = {
   id: string;
@@ -23,7 +24,33 @@ export type PartnerTenant = {
 };
 
 export type PartnerDashboard = {
-  partner: { id: string; name: string; code: string };
+  partner: { id: string; name: string; code: string; creditBalance: number };
+  subscription: {
+    status: string;
+    startsAt: string;
+    expiresAt: string;
+    offer: {
+      id: string;
+      name: string;
+      price: number;
+      includedTenantCredits: number;
+      durationDays: number;
+      maxTrials: number;
+      trialDays: number;
+      packName: string;
+    };
+  } | null;
+  totals: { credited: number; consumed: number; activeTenants: number; activeTrials: number };
+  payments: {
+    id: string; amount: number; currency: string; reference: string; status: string; createdAt: string;
+  }[];
+  creditTransactions: {
+    id: string; tenantId: string | null; type: string; credits: number; balanceAfter: number;
+    reason: string; reference: string | null; createdAt: string;
+  }[];
+  trials: {
+    id: string; tenantId: string; email: string; status: string; startsAt: string; expiresAt: string;
+  }[];
   tenants: PartnerTenant[];
   history: {
     id: string;
@@ -122,6 +149,13 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<PartnerDashboard> => {
     const partnerId = await requirePartnerMembership(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [partnerExpiry, tenantExpiry] = await Promise.all([
+      supabaseAdmin.rpc("expire_partner_trials"),
+      supabaseAdmin.rpc("expire_due_subscriptions"),
+    ]);
+    if (partnerExpiry.error) throw new Error(formatSupabaseError(partnerExpiry.error));
+    if (tenantExpiry.error) throw new Error(formatSupabaseError(tenantExpiry.error));
 
     const [
       partnerResult,
@@ -133,6 +167,13 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       tenantPacksResult,
       packsResult,
       historyResult,
+      partnerSubscriptionResult,
+      offersResult,
+      paymentsResult,
+      creditsResult,
+      creditBalanceResult,
+      trialsResult,
+      offerPacksResult,
     ] = await Promise.all([
       context.supabase.from("partners").select("id, name, code").eq("id", partnerId).single(),
       context.supabase.from("partner_tenants").select("tenant_id, assigned_at"),
@@ -149,6 +190,13 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
         .select("id, action, tenant_id, metadata, created_at")
         .order("created_at", { ascending: false })
         .limit(100),
+      context.supabase.from("partner_subscriptions").select("*").eq("partner_id", partnerId).maybeSingle(),
+      context.supabase.from("partner_offers").select("*"),
+      context.supabase.from("partner_payments").select("*").order("created_at", { ascending: false }).limit(100),
+      context.supabase.from("partner_credit_transactions").select("*").order("created_at", { ascending: false }).limit(200),
+      context.supabase.from("partner_credit_transactions").select("credits"),
+      context.supabase.from("partner_trial_usage").select("*").order("created_at", { ascending: false }).limit(100),
+      context.supabase.from("module_packs").select("id, name"),
     ]);
 
     for (const result of [
@@ -161,6 +209,13 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       tenantPacksResult,
       packsResult,
       historyResult,
+      partnerSubscriptionResult,
+      offersResult,
+      paymentsResult,
+      creditsResult,
+      creditBalanceResult,
+      trialsResult,
+      offerPacksResult,
     ]) {
       if (result.error) throw new Error(formatSupabaseError(result.error));
     }
@@ -218,8 +273,53 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
     });
     if (logError) throw new Error(formatSupabaseError(logError));
 
+    const commercialSubscription = partnerSubscriptionResult.data;
+    const offer = (offersResult.data ?? []).find((item) => item.id === commercialSubscription?.offer_id);
+    const offerPack = (offerPacksResult.data ?? []).find((pack) => pack.id === offer?.module_pack_id);
+    const creditTransactions = creditsResult.data ?? [];
+
     return {
-      partner: partnerResult.data!,
+      partner: {
+        id: partnerResult.data!.id,
+        name: partnerResult.data!.name,
+        code: partnerResult.data!.code,
+        creditBalance: (creditBalanceResult.data ?? [])
+          .reduce((balance, transaction) => balance + transaction.credits, 0),
+      },
+      subscription: commercialSubscription && offer ? {
+        status: commercialSubscription.status,
+        startsAt: commercialSubscription.starts_at,
+        expiresAt: commercialSubscription.expires_at,
+        offer: {
+          id: offer.id,
+          name: offer.name,
+          price: Number(offer.price),
+          includedTenantCredits: offer.included_tenant_credits,
+          durationDays: offer.subscription_duration_days,
+          maxTrials: offer.max_trials,
+          trialDays: offer.trial_duration_days,
+          packName: offerPack?.name ?? "Pack indisponible",
+        },
+      } : null,
+      totals: {
+        credited: creditTransactions.filter((item) => item.credits > 0).reduce((sum, item) => sum + item.credits, 0),
+        consumed: Math.abs(creditTransactions.filter((item) => item.credits < 0).reduce((sum, item) => sum + item.credits, 0)),
+        activeTenants: tenants.filter((tenant) => tenant.subscription?.status === "active").length,
+        activeTrials: (trialsResult.data ?? []).filter((trial) => trial.status === "active").length,
+      },
+      payments: (paymentsResult.data ?? []).map((payment) => ({
+        id: payment.id, amount: Number(payment.amount), currency: payment.currency,
+        reference: payment.external_reference, status: payment.status, createdAt: payment.created_at,
+      })),
+      creditTransactions: creditTransactions.map((transaction) => ({
+        id: transaction.id, tenantId: transaction.tenant_id, type: transaction.transaction_type,
+        credits: transaction.credits, balanceAfter: transaction.balance_after,
+        reason: transaction.reason, reference: transaction.reference, createdAt: transaction.created_at,
+      })),
+      trials: (trialsResult.data ?? []).map((trial) => ({
+        id: trial.id, tenantId: trial.tenant_id, email: trial.client_email,
+        status: trial.status, startsAt: trial.starts_at, expiresAt: trial.expires_at,
+      })),
       tenants,
       history: (historyResult.data ?? []).map((row) => ({
         id: row.id,
@@ -229,4 +329,40 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
         createdAt: row.created_at,
       })),
     };
+  });
+
+const createTenantSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  email: z.string().trim().email().max(254),
+  trial: z.boolean(),
+});
+
+export const createPartnerTenant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(createTenantSchema)
+  .handler(async ({ context, data }) => {
+    await requirePartnerMembership(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: tenantId, error } = await supabaseAdmin.rpc("create_partner_tenant", {
+      requested_name: data.name,
+      requested_email: data.email,
+      requested_trial: data.trial,
+      requested_actor_id: context.userId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { tenantId: tenantId as string };
+  });
+
+export const activatePartnerTenant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ tenantId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    await requirePartnerMembership(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("activate_partner_tenant", {
+      requested_tenant_id: data.tenantId,
+      requested_actor_id: context.userId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { success: true };
   });
