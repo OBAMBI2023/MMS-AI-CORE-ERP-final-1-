@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/mms/AppShell";
 import { ResourceTable, type FieldDef, type ColumnDef } from "@/components/mms/ResourceTable";
-import { formatCurrency, formatDate } from "@/lib/mms/format";
+import { formatCurrency, formatDate, getCurrency } from "@/lib/mms/format";
 import { jsPDF } from "jspdf";
 import {
   renderDepensesHeader,
@@ -38,7 +38,7 @@ const METHODS = ["Espèces", "Wave", "Orange Money", "Carte", "Virement"] as con
 
 const fields: FieldDef[] = [
   { name: "category", label: "Catégorie", type: "select", options: CATEGORIES, required: true },
-  { name: "amount", label: "Montant (FCFA)", type: "number", required: true, step: "1" },
+  { name: "amount", label: `Montant (${getCurrency()})`, type: "number", required: true, step: "1" },
   { name: "paid_at", label: "Date", type: "date", required: true },
   { name: "payment_method", label: "Mode de paiement", type: "select", options: METHODS },
   { name: "description", label: "Description", type: "textarea" },

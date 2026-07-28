@@ -5,6 +5,16 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { readEnvVar } from "./env";
 
+export class AuthHttpError extends Error {
+  statusCode: 401 | 403;
+
+  constructor(statusCode: 401 | 403, message: string) {
+    super(message);
+    this.name = "AuthHttpError";
+    this.statusCode = statusCode;
+  }
+}
+
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
 }
@@ -53,26 +63,26 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
     const request = getRequest();
 
     if (!request?.headers) {
-      throw new Error("Unauthorized: No request headers available");
+      throw new AuthHttpError(401, "Unauthorized: No request headers available");
     }
 
     const authHeader = request.headers.get("authorization");
 
     if (!authHeader) {
-      throw new Error("Unauthorized: No authorization header provided");
+      throw new AuthHttpError(401, "Unauthorized: No authorization header provided");
     }
 
     if (!authHeader.startsWith("Bearer ")) {
-      throw new Error("Unauthorized: Only Bearer tokens are supported");
+      throw new AuthHttpError(401, "Unauthorized: Only Bearer tokens are supported");
     }
 
     const token = authHeader.replace("Bearer ", "");
     if (!token) {
-      throw new Error("Unauthorized: No token provided");
+      throw new AuthHttpError(401, "Unauthorized: No token provided");
     }
 
     if (token.split(".").length !== 3) {
-      throw new Error("Unauthorized: Invalid token");
+      throw new AuthHttpError(401, "Unauthorized: Invalid token");
     }
 
     const supabase = createClient<Database>(SUPABASE_URL!, SUPABASE_PUBLISHABLE_KEY!, {
@@ -91,11 +101,11 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
 
     const { data, error } = await supabase.auth.getClaims(token);
     if (error || !data?.claims) {
-      throw new Error("Unauthorized: Invalid token");
+      throw new AuthHttpError(401, "Unauthorized: Invalid token");
     }
 
     if (!data.claims.sub) {
-      throw new Error("Unauthorized: No user ID found in token");
+      throw new AuthHttpError(401, "Unauthorized: No user ID found in token");
     }
 
     return next({

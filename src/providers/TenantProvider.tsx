@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tenant, TenantProfile } from "@/types/tenant";
+import { configureCurrency, DEFAULT_CURRENCY } from "@/lib/mms/format";
 
 type TenantContextType = {
   profile: TenantProfile | null;
@@ -27,6 +28,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     const sequence = ++loadSequence.current;
     setLoading(true);
     if (!session) {
+      configureCurrency(DEFAULT_CURRENCY);
       setProfile(null);
       setTenant(null);
       setLoading(false);
@@ -101,8 +103,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       .eq("id", profileData.tenant_id)
       .maybeSingle();
     const { data: tenantData, error: tenantError, status: tenantStatus } = tenantResult;
+    const { data: currencySettings } = await (supabase as any)
+      .from("parametres")
+      .select("currency,decimals")
+      .eq("tenant_id", profileData.tenant_id)
+      .limit(1)
+      .maybeSingle();
 
     if (sequence === loadSequence.current) {
+      configureCurrency(currencySettings?.currency, currencySettings?.decimals);
       if (tenantError || !tenantData) {
         console.error("[TenantProvider] Tenant du profil introuvable", {
           user_id: session.user.id,
@@ -130,6 +139,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         console.error("[TenantProvider] Échec inattendu du chargement du tenant", { error });
         setProfile(null);
         setTenant(null);
+        configureCurrency(DEFAULT_CURRENCY);
         setLoading(false);
       }
       return null;

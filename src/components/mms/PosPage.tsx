@@ -5,7 +5,7 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { makeNumber, formatCurrency, formatNumber } from "@/lib/mms/format";
+import { makeNumber, formatCurrency } from "@/lib/mms/format";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -693,7 +693,7 @@ function ReceiptModal({
       identity.logoUrl ? `Logo: ${identity.logoUrl}` : "",
     ].filter(Boolean);
     const itemLines = ticket.items.map(
-      (item) => `${item.qty} x ${item.name} — ${formatNumber(item.qty * item.price)} FCFA`,
+      (item) => `${item.qty} x ${item.name} — ${formatCurrency(item.qty * item.price)}`,
     );
     const message = [
       ...contactLines,
@@ -704,7 +704,7 @@ function ReceiptModal({
       "",
       ...itemLines,
       "",
-      `TOTAL: ${formatNumber(ticket.total)} FCFA`,
+      `TOTAL: ${formatCurrency(ticket.total)}`,
       `Paiement: ${ticket.payment}`,
       "",
       `Merci de votre visite${identity.name ? ` chez ${identity.name}` : ""} !`,
@@ -841,8 +841,8 @@ function ReceiptModal({
                 marginTop: 4,
               }}
             >
-              <span>TOTAL FCFA</span>
-              <span>{formatNumber(ticket.total)}</span>
+              <span>TOTAL</span>
+              <span>{formatCurrency(ticket.total)}</span>
             </div>
             <div
               className="row"

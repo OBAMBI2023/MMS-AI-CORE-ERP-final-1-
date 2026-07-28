@@ -1,12 +1,21 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Bot, Crown, Database, Loader2, Send, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Activity, Bot, Coins, Crown, Database, History, Loader2, Send, ShieldCheck, TriangleAlert } from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  getTenantAiPortal,
+  purchaseTenantAiCredits,
+  toggleTenantAiAgent,
+  type TenantAiPortal,
+} from "@/lib/ai-platform.server";
+import { formatCurrency } from "@/lib/mms/format";
 import {
   askAssistant,
   confirmAssistantAction,
@@ -36,8 +45,10 @@ const suggestions = [
 ];
 
 function AssistantPage() {
-  const initialAccess = Route.useLoaderData();
+  const loaderData = Route.useLoaderData();
+  const initialAccess = loaderData.access;
   const [access, setAccess] = useState<AssistantAccessState>(initialAccess);
+  const [portal, setPortal] = useState<TenantAiPortal>(loaderData.portal);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<AssistantResponse | null>(null);
@@ -89,6 +100,24 @@ function AssistantPage() {
       setError(cause instanceof Error ? cause.message : "L’action a échoué.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function toggleAgent(agentId: string, enabled: boolean) {
+    try {
+      await toggleTenantAiAgent({ data: { agentId, enabled } });
+      setPortal((current) => ({ ...current, agents: current.agents.map((item) => item.id === agentId ? { ...item, enabled } : item) }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Activation impossible.");
+    }
+  }
+
+  async function buyCredits(amount: number) {
+    try {
+      await purchaseTenantAiCredits({ data: { amount } });
+      setPortal((current) => ({ ...current, creditBalance: current.creditBalance + amount }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Achat impossible.");
     }
   }
 
@@ -147,6 +176,25 @@ function AssistantPage() {
           <Badge variant={access.quotaExhausted ? "destructive" : "outline"}>
             {access.remainingRequests ?? 0} requête{access.remainingRequests === 1 ? "" : "s"} restante{access.remainingRequests === 1 ? "" : "s"}
           </Badge>
+        </Card>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card className="rounded-2xl p-5"><Activity className="mb-3 size-5 text-primary" /><p className="text-2xl font-bold">{portal.requestsUsed.toLocaleString("fr-FR")}</p><p className="text-xs text-muted-foreground">Requêtes utilisées sur {portal.requestLimit?.toLocaleString("fr-FR") ?? "illimité"}</p></Card>
+          <Card className="rounded-2xl p-5"><Database className="mb-3 size-5 text-primary" /><p className="text-2xl font-bold">{portal.tokensUsed.toLocaleString("fr-FR")}</p><p className="text-xs text-muted-foreground">Tokens consommés · {formatCurrency(portal.cost)}</p></Card>
+          <Card className="rounded-2xl p-5"><Coins className="mb-3 size-5 text-primary" /><p className="text-2xl font-bold">{formatCurrency(portal.creditBalance)}</p><p className="text-xs text-muted-foreground">Crédits IA disponibles</p><Button size="sm" variant="outline" className="mt-3" onClick={() => void buyCredits(25)}>Acheter {formatCurrency(25)}</Button></Card>
+        </div>
+
+        <Card className="rounded-2xl p-5">
+          <div className="mb-4"><h2 className="font-semibold">Agents inclus dans votre plan {portal.planCode ?? ""}</h2><p className="text-xs text-muted-foreground">Vous pouvez uniquement activer les agents autorisés par votre abonnement.</p></div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {portal.agents.map((agent) => <div key={agent.id} className="flex items-center justify-between gap-3 rounded-xl border p-4"><div><p className="font-medium">{agent.name}</p><p className="text-xs text-muted-foreground">{agent.description || `${agent.provider ?? ""} · ${agent.model ?? ""}`}</p></div><Switch checked={agent.enabled} onCheckedChange={(enabled) => void toggleAgent(agent.id, enabled)} /></div>)}
+            {!portal.agents.length && <p className="text-sm text-muted-foreground">Aucun agent n’est inclus dans ce plan pour le moment.</p>}
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden rounded-2xl">
+          <div className="flex items-center gap-2 p-5 pb-2"><History className="size-5 text-primary" /><h2 className="font-semibold">Historique récent</h2></div>
+          <Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Appel</TableHead><TableHead>Tokens</TableHead><TableHead>Statut</TableHead></TableRow></TableHeader><TableBody>{portal.usage.slice(0, 10).map((row) => <TableRow key={row.id}><TableCell>{new Date(row.createdAt).toLocaleString("fr-FR")}</TableCell><TableCell>{row.toolName ?? row.requestType}</TableCell><TableCell>{row.tokens}</TableCell><TableCell><Badge variant={row.status === "error" ? "destructive" : "outline"}>{row.status}</Badge></TableCell></TableRow>)}</TableBody></Table>
         </Card>
 
         {access.quotaExhausted && (
@@ -286,7 +334,10 @@ function AssistantPage() {
 }
 
 export const Route = createFileRoute("/app/assistant-ia")({
-  beforeLoad: async () => ({ assistantAccess: await getAssistantAccessState() }),
+  beforeLoad: async () => {
+    const [access, portal] = await Promise.all([getAssistantAccessState(), getTenantAiPortal()]);
+    return { assistantAccess: { access, portal } };
+  },
   loader: ({ context }) => context.assistantAccess,
   component: AssistantPage,
   head: () => ({

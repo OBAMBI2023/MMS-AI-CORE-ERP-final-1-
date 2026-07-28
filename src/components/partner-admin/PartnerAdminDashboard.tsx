@@ -36,11 +36,13 @@ import {
 } from "recharts";
 import {
   activatePartnerTenant,
+  createPartnerTrial,
   createPartnerTenant,
   type PartnerDashboard,
   type PartnerTenant,
 } from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { formatCurrency } from "@/lib/mms/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,6 +71,8 @@ function formatDate(value: string | null, withTime = false) {
 function statusLabel(status?: string) {
   if (status === "active") return "Active";
   if (status === "trial") return "Essai";
+  if (status === "pending") return "En attente";
+  if (status === "converted") return "Actif";
   if (status === "expired") return "Expirée";
   if (status === "suspended") return "Suspendue";
   return status || "Sans licence";
@@ -101,6 +105,7 @@ function initials(value: string) {
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "clients", label: "Clients", icon: Building2 },
+  { id: "essais", label: "Essais", icon: Clock3 },
   { id: "licences", label: "Licences", icon: KeyRound },
   { id: "modules", label: "Modules", icon: Boxes },
   { id: "activites", label: "Activités", icon: Activity },
@@ -112,7 +117,7 @@ export function PartnerAdminDashboardView({
   onSignOut,
 }: {
   data: PartnerDashboard;
-  onSignOut: () => void;
+  onSignOut: () => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -120,16 +125,53 @@ export function PartnerAdminDashboardView({
   const [tenantDialog, setTenantDialog] = useState<"paid" | "trial" | null>(null);
   const [tenantName, setTenantName] = useState("");
   const [tenantEmail, setTenantEmail] = useState("");
+  const [trialSector, setTrialSector] = useState("");
+  const [trialManager, setTrialManager] = useState("");
+  const [trialPhone, setTrialPhone] = useState("");
+  const [trialCity, setTrialCity] = useState("");
+  const [trialModuleIds, setTrialModuleIds] = useState<string[]>([]);
+  const [trialQuery, setTrialQuery] = useState("");
+  const [trialStatus, setTrialStatus] = useState("all");
   const [submittingTenant, setSubmittingTenant] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await onSignOut();
+    } catch {
+      setSigningOut(false);
+    }
+  };
 
   const submitTenant = async () => {
     if (!tenantDialog) return;
     setSubmittingTenant(true);
     try {
-      await createPartnerTenant({ data: {
-        name: tenantName, email: tenantEmail, trial: tenantDialog === "trial",
-      } });
-      toast.success(tenantDialog === "trial" ? "Essai créé." : "Tenant payant créé.");
+      if (tenantDialog === "trial") {
+        const result = await createPartnerTrial({ data: {
+          companyName: tenantName,
+          sector: trialSector,
+          managerName: trialManager,
+          phone: trialPhone,
+          email: tenantEmail,
+          city: trialCity,
+          moduleIds: trialModuleIds,
+        } });
+        if (result.emailSent) {
+          toast.success("Essai créé. L’invitation a été envoyée par email.");
+        } else {
+          toast.success(`Essai créé. Mot de passe temporaire : ${result.temporaryPassword}`, {
+            duration: 20000,
+          });
+        }
+      } else {
+        await createPartnerTenant({ data: {
+          name: tenantName, email: tenantEmail, trial: false,
+        } });
+        toast.success("Tenant payant créé.");
+      }
       window.location.reload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Création impossible.");
@@ -201,6 +243,18 @@ export function PartnerAdminDashboardView({
     });
   }, [data.tenants, query, statusFilter]);
 
+  const filteredTrials = useMemo(() => {
+    const normalized = trialQuery.trim().toLocaleLowerCase("fr");
+    return data.trials.filter((trial) => {
+      const matchesQuery =
+        !normalized ||
+        trial.tenantName.toLocaleLowerCase("fr").includes(normalized) ||
+        trial.email.toLocaleLowerCase("fr").includes(normalized) ||
+        (trial.managerName ?? "").toLocaleLowerCase("fr").includes(normalized);
+      return matchesQuery && (trialStatus === "all" || trial.status === trialStatus);
+    });
+  }, [data.trials, trialQuery, trialStatus]);
+
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     setMobileNavOpen(false);
@@ -209,7 +263,12 @@ export function PartnerAdminDashboardView({
   return (
     <div className="min-h-screen bg-[#f6f8fc] text-[#14213d]">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-hidden bg-[#08285f] text-white shadow-2xl lg:flex">
-        <SidebarContent data={data} onNavigate={scrollTo} onSignOut={onSignOut} />
+        <SidebarContent
+          data={data}
+          onNavigate={scrollTo}
+          onSignOut={handleSignOut}
+          signingOut={signingOut}
+        />
       </aside>
 
       {mobileNavOpen && (
@@ -231,7 +290,12 @@ export function PartnerAdminDashboardView({
             >
               <X className="h-5 w-5" />
             </button>
-            <SidebarContent data={data} onNavigate={scrollTo} onSignOut={onSignOut} />
+            <SidebarContent
+              data={data}
+              onNavigate={scrollTo}
+              onSignOut={handleSignOut}
+              signingOut={signingOut}
+            />
           </motion.aside>
         </div>
       )}
@@ -308,17 +372,11 @@ export function PartnerAdminDashboardView({
             </motion.div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <Kpi icon={WalletCards} label="Crédits disponibles" value={data.partner.creditBalance} tone="gold" />
-              <Kpi icon={Building2} label="Tenants actifs" value={data.totals.activeTenants} tone="blue" />
-              <Kpi icon={Clock3} label="Essais en cours" value={data.totals.activeTrials} tone="gold" />
-              <Kpi
-                icon={Clock3}
-                label="Expiration proche"
-                value={metrics.expiringSoon}
-                hint="Sous 30 jours"
-                tone="blue"
-              />
-              <Kpi icon={Activity} label="Activités" value={data.history.length} tone="gold" />
+              <Kpi icon={Clock3} label="Essais créés" value={data.totals.trialsCreated} tone="gold" />
+              <Kpi icon={CheckCircle2} label="Essais actifs" value={data.totals.activeTrials} tone="blue" />
+              <Kpi icon={Building2} label="Essais convertis" value={data.totals.convertedTrials} tone="gold" />
+              <Kpi icon={Activity} label="Taux de conversion" value={`${data.totals.conversionRate.toFixed(1)} %`} tone="blue" />
+              <Kpi icon={WalletCards} label="Commissions générées" value={formatCurrency(data.totals.commissionsGenerated)} tone="gold" />
             </div>
           </section>
 
@@ -406,6 +464,83 @@ export function PartnerAdminDashboardView({
                 <Empty label="Aucun module activé" />
               )}
             </Panel>
+          </section>
+
+          <section id="essais" className="scroll-mt-24 space-y-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <SectionHeading
+                eyebrow="ACQUISITION"
+                title="Essais ERP"
+                description="Suivez uniquement les essais créés par votre espace partenaire."
+                count={data.trials.length}
+              />
+              <Button onClick={() => setTenantDialog("trial")}>
+                <Clock3 /> Créer un essai
+              </Button>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Input
+                value={trialQuery}
+                onChange={(event) => setTrialQuery(event.target.value)}
+                placeholder="Entreprise, responsable ou email…"
+                className="sm:max-w-sm"
+              />
+              <select
+                value={trialStatus}
+                onChange={(event) => setTrialStatus(event.target.value)}
+                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"
+              >
+                <option value="all">Tous les statuts</option>
+                <option value="active">Essai</option>
+                <option value="converted">Actif</option>
+                <option value="expired">Expiré</option>
+                <option value="pending">En attente</option>
+              </select>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[850px] text-left text-sm">
+                  <thead className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-5 py-4">Entreprise</th>
+                      <th className="px-5 py-4">Responsable</th>
+                      <th className="px-5 py-4">Statut</th>
+                      <th className="px-5 py-4">Création</th>
+                      <th className="px-5 py-4">Expiration</th>
+                      <th className="px-5 py-4">Accès</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredTrials.map((trial) => (
+                      <tr key={trial.id} className="hover:bg-blue-50/30">
+                        <td className="px-5 py-4">
+                          <strong className="block">{trial.tenantName}</strong>
+                          <span className="text-xs text-slate-500">{trial.sector ?? "Secteur non renseigné"} · {trial.city ?? "—"}</span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="block">{trial.managerName ?? "—"}</span>
+                          <span className="text-xs text-slate-500">{trial.email}</span>
+                        </td>
+                        <td className="px-5 py-4"><StatusBadge status={trial.status === "converted" ? "active" : trial.status === "active" ? "trial" : trial.status} /></td>
+                        <td className="px-5 py-4 text-slate-500">{formatDate(trial.createdAt)}</td>
+                        <td className="px-5 py-4 text-slate-500">{formatDate(trial.expiresAt)}</td>
+                        <td className="px-5 py-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!trial.loginUrl}
+                            onClick={() => trial.loginUrl && window.open(trial.loginUrl, "_blank", "noopener,noreferrer")}
+                          >
+                            Ouvrir le tenant
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {!filteredTrials.length && <Empty label="Aucun essai pour ces critères." />}
+            </div>
           </section>
 
           <section id="clients" className="scroll-mt-24 space-y-5">
@@ -516,7 +651,7 @@ export function PartnerAdminDashboardView({
                 {data.payments.slice(0, 10).map((payment) => (
                   <div key={payment.id} className="flex items-center justify-between gap-4 rounded-xl border p-3 text-sm">
                     <div className="min-w-0"><p className="truncate font-semibold">{payment.reference}</p><p className="text-xs text-slate-500">{formatDate(payment.createdAt, true)}</p></div>
-                    <strong>{payment.amount.toLocaleString("fr-FR")} {payment.currency}</strong>
+                    <strong>{formatCurrency(payment.amount, payment.currency)}</strong>
                   </div>
                 ))}
                 {!data.payments.length && <p className="text-sm text-slate-500">Aucun paiement validé.</p>}
@@ -598,7 +733,7 @@ export function PartnerAdminDashboardView({
         </main>
       </div>
       <Dialog open={tenantDialog !== null} onOpenChange={(open) => !open && setTenantDialog(null)}>
-        <DialogContent>
+        <DialogContent className={tenantDialog === "trial" ? "max-h-[90vh] overflow-y-auto sm:max-w-2xl" : undefined}>
           <DialogHeader>
             <DialogTitle>{tenantDialog === "trial" ? "Créer un essai gratuit" : "Créer un tenant payant"}</DialogTitle>
             <DialogDescription>
@@ -610,6 +745,47 @@ export function PartnerAdminDashboardView({
               <Label htmlFor="tenant-name">Entreprise</Label>
               <Input id="tenant-name" value={tenantName} onChange={(event) => setTenantName(event.target.value)} />
             </div>
+            {tenantDialog === "trial" && (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="trial-sector">Secteur d’activité</Label>
+                    <Input id="trial-sector" value={trialSector} onChange={(event) => setTrialSector(event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="trial-manager">Nom du responsable</Label>
+                    <Input id="trial-manager" value={trialManager} onChange={(event) => setTrialManager(event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="trial-phone">Téléphone</Label>
+                    <Input id="trial-phone" type="tel" value={trialPhone} onChange={(event) => setTrialPhone(event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="trial-city">Ville</Label>
+                    <Input id="trial-city" value={trialCity} onChange={(event) => setTrialCity(event.target.value)} />
+                  </div>
+                </div>
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-medium">Modules souhaités</legend>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {data.availableModules.map((module) => (
+                      <label key={module.id} className="flex items-center gap-3 rounded-xl border p-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={trialModuleIds.includes(module.id)}
+                          onChange={(event) => setTrialModuleIds((current) =>
+                            event.target.checked
+                              ? [...current, module.id]
+                              : current.filter((id) => id !== module.id),
+                          )}
+                        />
+                        {module.name}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="tenant-email">Email client</Label>
               <Input id="tenant-email" type="email" value={tenantEmail} onChange={(event) => setTenantEmail(event.target.value)} />
@@ -617,7 +793,16 @@ export function PartnerAdminDashboardView({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTenantDialog(null)}>Annuler</Button>
-            <Button disabled={submittingTenant || !tenantName.trim() || !tenantEmail.trim()} onClick={() => void submitTenant()}>
+            <Button
+              disabled={
+                submittingTenant ||
+                !tenantName.trim() ||
+                !tenantEmail.trim() ||
+                (tenantDialog === "trial" &&
+                  (!trialSector.trim() || !trialManager.trim() || !trialPhone.trim() || !trialCity.trim()))
+              }
+              onClick={() => void submitTenant()}
+            >
               {submittingTenant ? "Création…" : "Créer"}
             </Button>
           </DialogFooter>
@@ -631,10 +816,12 @@ function SidebarContent({
   data,
   onNavigate,
   onSignOut,
+  signingOut,
 }: {
   data: PartnerDashboard;
   onNavigate: (id: string) => void;
-  onSignOut: () => void;
+  onSignOut: () => Promise<void>;
+  signingOut: boolean;
 }) {
   return (
     <>
@@ -678,11 +865,14 @@ function SidebarContent({
           </div>
         </div>
         <button
-          onClick={onSignOut}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-blue-100/65 transition hover:bg-red-400/10 hover:text-red-100"
+          type="button"
+          onClick={() => void onSignOut()}
+          disabled={signingOut}
+          aria-busy={signingOut}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-blue-100/65 transition hover:bg-red-400/10 hover:text-red-100 disabled:cursor-wait disabled:opacity-60"
         >
-          <LogOut className="h-4 w-4" />
-          Déconnexion
+          <LogOut className={`h-4 w-4 ${signingOut ? "animate-pulse" : ""}`} />
+          {signingOut ? "Déconnexion…" : "Déconnexion"}
         </button>
       </div>
     </>

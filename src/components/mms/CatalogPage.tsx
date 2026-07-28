@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ImageIcon, Loader2, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ImageIcon,
+  Loader2,
+  Package,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  Wrench,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useActionPermission } from "@/hooks/use-action-permission";
@@ -31,6 +43,7 @@ import { useCatalogItems, type CatalogItem } from "@/hooks/use-catalog-items";
 const CATALOG_BUCKET = "catalog-images";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+const ITEMS_PER_PAGE = 10;
 const DUPLICATE_SERVICE_MESSAGE =
   "Un service portant ce nom existe déjà dans cette catégorie.";
 
@@ -80,6 +93,9 @@ export function CatalogPage() {
   const { profile, refreshTenant } = useTenant();
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState<CatalogForm["type"]>("product");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [page, setPage] = useState(1);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [newCategoryDialogOpen, setNewCategoryDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
@@ -162,14 +178,33 @@ export function CatalogPage() {
 
   const filteredItems = useMemo(() => {
     const value = search.trim().toLocaleLowerCase("fr");
-    const activeItems = (itemsQuery.data ?? []).filter((item) => item.type === activeType);
-    if (!value) return activeItems;
-    return activeItems.filter((item) =>
-      [item.name, item.category, item.unit].some((field) =>
-        field.toLocaleLowerCase("fr").includes(value),
-      ),
-    );
-  }, [activeType, itemsQuery.data, search]);
+    return (itemsQuery.data ?? []).filter((item) => {
+      if (item.type !== activeType) return false;
+      if (categoryFilter !== "all" && item.category_id !== categoryFilter) return false;
+      if (statusFilter === "active" && !item.active) return false;
+      if (statusFilter === "inactive" && item.active) return false;
+      return (
+        !value ||
+        [item.name, item.category, item.unit].some((field) =>
+          field.toLocaleLowerCase("fr").includes(value),
+        )
+      );
+    });
+  }, [activeType, categoryFilter, itemsQuery.data, search, statusFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const paginatedItems = filteredItems.slice(
+    (page - 1) * ITEMS_PER_PAGE,
+    page * ITEMS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeType, categoryFilter, search, statusFilter]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount));
+  }, [pageCount]);
 
   const openCreate = () => {
     setEditing(null);
@@ -323,26 +358,6 @@ export function CatalogPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={`Rechercher dans les ${activeType === "product" ? "produits" : "services"}...`}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex gap-2">
-          {canCreate && (
-            <Button onClick={openCreate}>
-              <Plus className="size-4" />
-              {activeType === "product" ? "Nouveau produit" : "Nouveau service"}
-            </Button>
-          )}
-        </div>
-      </div>
-
       {(categoriesQuery.data?.length ?? 0) === 0 && !isLoading && (
         <Card className="p-5 text-sm text-muted-foreground">
           Créez d’abord une catégorie pour ajouter votre premier produit ou service.
@@ -351,15 +366,100 @@ export function CatalogPage() {
 
       <Tabs
         value={activeType}
-        onValueChange={(value) => setActiveType(value as CatalogForm["type"])}
+        onValueChange={(value) => {
+          setActiveType(value as CatalogForm["type"]);
+          setCategoryFilter("all");
+          setStatusFilter("all");
+        }}
       >
-        <TabsList className="grid w-full grid-cols-2 sm:w-auto">
-          <TabsTrigger value="product">Produits ({itemCounts.product})</TabsTrigger>
-          <TabsTrigger value="service">Services ({itemCounts.service})</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-3 bg-transparent p-0 sm:grid-cols-2">
+          <TabsTrigger
+            value="product"
+            className="h-auto justify-start gap-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md data-[state=active]:border-blue-500 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-950 data-[state=active]:shadow-md dark:border-blue-900/60 dark:from-blue-950/50 dark:to-background dark:data-[state=active]:border-blue-500"
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/30">
+              <Package className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-base font-semibold">Produits</span>
+              <span className="block text-xs font-normal text-muted-foreground">
+                Articles physiques et stock
+              </span>
+            </span>
+            <span className="ml-auto rounded-full bg-blue-100 px-2.5 py-1 text-sm font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              {itemCounts.product}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="service"
+            className="h-auto justify-start gap-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md data-[state=active]:border-violet-500 data-[state=active]:bg-violet-50 data-[state=active]:text-violet-950 data-[state=active]:shadow-md dark:border-violet-900/60 dark:from-violet-950/50 dark:to-background dark:data-[state=active]:border-violet-500"
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-violet-600 text-white shadow-sm shadow-violet-500/30">
+              <Wrench className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-base font-semibold">Services</span>
+              <span className="block text-xs font-normal text-muted-foreground">
+                Prestations sans gestion de stock
+              </span>
+            </span>
+            <span className="ml-auto rounded-full bg-violet-100 px-2.5 py-1 text-sm font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+              {itemCounts.service}
+            </span>
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border-border/70 shadow-sm">
+        <div className="flex flex-col gap-3 border-b bg-muted/20 p-4 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={`Rechercher dans les ${activeType === "product" ? "produits" : "services"}...`}
+              className="bg-background pl-9"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              aria-label="Filtrer par catégorie"
+              className="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm sm:w-44"
+            >
+              <option value="all">Toutes les catégories</option>
+              {(categoriesQuery.data ?? []).map((category) => (
+                <option key={category.id} value={category.id}>{category.name}</option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as "all" | "active" | "inactive")
+              }
+              aria-label="Filtrer par statut"
+              className="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm sm:w-36"
+            >
+              <option value="all">Tous les statuts</option>
+              <option value="active">Actifs</option>
+              <option value="inactive">Inactifs</option>
+            </select>
+          </div>
+          {canCreate && (
+            <Button
+              onClick={openCreate}
+              className={
+                activeType === "product"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-violet-600 hover:bg-violet-700"
+              }
+            >
+              <Plus className="size-4" />
+              {activeType === "product" ? "Nouveau produit" : "Nouveau service"}
+            </Button>
+          )}
+        </div>
         {loadError && (
           <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {loadError}
@@ -412,8 +512,11 @@ export function CatalogPage() {
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((item) => (
-                  <tr key={item.id} className="border-t border-border">
+                paginatedItems.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="border-t border-border transition-colors hover:bg-muted/30"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
@@ -459,6 +562,35 @@ export function CatalogPage() {
             </tbody>
           </table>
         </div>
+        {!isLoading && !loadError && filteredItems.length > 0 && (
+          <div className="flex flex-col gap-3 border-t px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {(page - 1) * ITEMS_PER_PAGE + 1}–
+              {Math.min(page * ITEMS_PER_PAGE, filteredItems.length)} sur {filteredItems.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 1}
+                onClick={() => setPage((current) => current - 1)}
+              >
+                <ChevronLeft className="size-4" />
+                Précédent
+              </Button>
+              <span className="min-w-20 text-center">Page {page} / {pageCount}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === pageCount}
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Suivant
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <CatalogItemDialog
@@ -541,8 +673,14 @@ function CatalogItemDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-xl flex-col gap-0 overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)] sm:w-full">
         <DialogHeader className="shrink-0 border-b px-4 py-4 pr-12 sm:px-6">
-          <DialogTitle>{editing ? "Modifier l’article" : "Nouvel article"}</DialogTitle>
-          <DialogDescription>Produit physique ou service facturable du tenant.</DialogDescription>
+          <DialogTitle>
+            {editing ? "Modifier" : "Nouveau"} {form.type === "product" ? "produit" : "service"}
+          </DialogTitle>
+          <DialogDescription>
+            {form.type === "product"
+              ? "Article physique avec gestion de stock optionnelle."
+              : "Prestation facturable sans information de stock."}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto overscroll-contain px-4 py-4 sm:grid-cols-2 sm:px-6">
           <label className="space-y-2">
@@ -691,7 +829,9 @@ function CatalogItemDialog({
               checked={form.active}
               onCheckedChange={(checked) => update("active", checked)}
             />
-            <Label htmlFor="catalog-active">Article actif</Label>
+            <Label htmlFor="catalog-active">
+              {form.type === "product" ? "Produit actif" : "Service actif"}
+            </Label>
           </div>
         </div>
         <DialogFooter className="shrink-0 gap-2 border-t bg-background px-4 py-3 sm:px-6">

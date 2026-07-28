@@ -1,11 +1,37 @@
-export function formatCurrency(amount: number): string {
-  // Use a regular space instead of the non-breaking space (U+202F or U+00A0)
-  // to ensure compatibility with the PDF generator, which can struggle with these characters.
-  return (
-    new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 })
-      .format(Math.round(amount || 0))
-      .replace(/\u202F|\u00A0/g, " ") + " FCFA"
-  );
+export const DEFAULT_CURRENCY = "XOF";
+
+let activeCurrency = DEFAULT_CURRENCY;
+let activeDecimals: number | undefined;
+
+export function normalizeCurrency(currency?: string | null): string {
+  const code = currency?.trim().toUpperCase();
+  return !code || code === "FCFA" ? DEFAULT_CURRENCY : code;
+}
+
+export function configureCurrency(currency?: string | null, decimals?: number | null) {
+  activeCurrency = normalizeCurrency(currency);
+  activeDecimals = typeof decimals === "number" ? decimals : undefined;
+}
+
+export function getCurrency(): string {
+  return activeCurrency;
+}
+
+export function formatCurrency(
+  amount: number,
+  currency = activeCurrency,
+  decimals = activeDecimals,
+): string {
+  const normalizedCurrency = normalizeCurrency(currency);
+  const fractionDigits = decimals ?? (normalizedCurrency === "XOF" ? 0 : 2);
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: normalizedCurrency,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })
+    .format(Number.isFinite(Number(amount)) ? Number(amount) : 0)
+    .replace(/\u202F|\u00A0/g, " ");
 }
 
 export function formatNumber(n: number): string {

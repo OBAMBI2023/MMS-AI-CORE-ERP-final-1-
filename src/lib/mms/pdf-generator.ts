@@ -47,11 +47,11 @@ export async function generateDevisPDF(
     if (quote.client.email) doc.text(quote.client.email, 10, afterHeaderY + 55);
 
     // Items Table
-    renderTable(doc, quote.items, afterHeaderY + 65);
+    renderTable(doc, quote.items, afterHeaderY + 65, settings.currency, settings.decimals);
 
     // Totals
     const finalY = (doc as any).lastAutoTable.finalY + 10;
-    renderTotals(doc, quote.totals, finalY);
+    renderTotals(doc, quote.totals, finalY, settings.currency, settings.decimals);
 
     // Footer, Signature and Stamp
     if (images.signature) {

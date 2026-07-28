@@ -100,6 +100,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { DEFAULT_CURRENCY, formatCurrency } from "@/lib/mms/format";
 import {
   Table,
   TableBody,
@@ -109,11 +110,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const currencyFormatter = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "XOF",
-  maximumFractionDigits: 0,
-});
 const numberFormatter = new Intl.NumberFormat("fr-FR");
 
 const emptyDashboard: SuperAdminDashboard = {
@@ -194,10 +190,6 @@ function normalizeDashboardData(
   };
 }
 
-function formatCurrency(value: number) {
-  return currencyFormatter.format(value).replace("XOF", "FCFA");
-}
-
 function formatDate(value: string | null, withTime = false) {
   if (!value) return "—";
   const date = new Date(value);
@@ -228,11 +220,12 @@ const cycleLabels: Record<SubscriptionBillingCycle, string> = {
 };
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "#dashboard" },
-  { label: "Tenants", icon: Building2, href: "#tenants" },
-  { label: "Packs de modules", icon: Layers3, href: "#packs-modules" },
-  { label: "Offres partenaires", icon: CreditCard, href: "#offres-partenaires" },
+  { label: "Dashboard", icon: LayoutDashboard, href: "/super-admin#dashboard" },
+  { label: "Tenants", icon: Building2, href: "/super-admin#tenants" },
+  { label: "Packs de modules", icon: Layers3, href: "/super-admin#packs-modules" },
+  { label: "Offres partenaires", icon: CreditCard, href: "/super-admin#offres-partenaires" },
   { label: "Partenaires", icon: Handshake, href: "/super-admin/partners" },
+  { label: "IA Platform", icon: Bot, href: "/super-admin/ia-platform" },
   { label: "Utilisateurs", icon: Users, href: "#utilisateurs" },
   { label: "Licences", icon: KeyRound, href: "#licences" },
   { label: "Activité", icon: Activity, href: "#activite" },
@@ -261,7 +254,9 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
           Espace plateforme
         </p>
         {navItems.map(({ label, icon: Icon, href }) => {
-          const sectionId = href.startsWith("#") ? href.slice(1) : null;
+          const sectionId = href.startsWith("/super-admin#")
+            ? href.slice("/super-admin#".length)
+            : null;
           const isActive = sectionId
             ? isDashboardRoute && (hash === sectionId || (!hash && sectionId === "dashboard"))
             : pathname === href || pathname.startsWith(`${href}/`);
@@ -1269,7 +1264,7 @@ function SubscriptionDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="subscription-amount">Montant (FCFA)</Label>
+                  <Label htmlFor="subscription-amount">Montant ({DEFAULT_CURRENCY})</Label>
                   <Input
                     id="subscription-amount"
                     type="number"

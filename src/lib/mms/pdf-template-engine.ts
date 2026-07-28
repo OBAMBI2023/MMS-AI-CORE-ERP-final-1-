@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { CompanySettings, DocumentItem, DocumentTotals } from "./pdf-types";
+import { formatCurrency } from "./format";
 
 async function urlToDataURL(url: string): Promise<string> {
   const response = await fetch(url);
@@ -140,17 +141,23 @@ export function renderDepensesTotals(doc: jsPDF, total: string, startY: number) 
   doc.text(`TOTAL DES DÉPENSES : ${total}`, 15, finalY + 7);
 }
 
-export function renderTable(doc: jsPDF, items: DocumentItem[], startY: number) {
+export function renderTable(
+  doc: jsPDF,
+  items: DocumentItem[],
+  startY: number,
+  currency?: string,
+  decimals?: number,
+) {
   autoTable(doc, {
     startY: startY,
     head: [["Description", "Qté", "Prix U.", "Remise", "TVA", "Montant"]],
     body: items.map((item) => [
       item.description,
       item.quantite.toString(),
-      item.prixUnitaire.toString(),
-      item.remise.toString(),
+      formatCurrency(item.prixUnitaire, currency, decimals),
+      formatCurrency(item.remise, currency, decimals),
       item.tva.toString(),
-      item.montant.toString(),
+      formatCurrency(item.montant, currency, decimals),
     ]),
     theme: "plain", // Use 'plain' for cleaner look
     headStyles: {
@@ -183,7 +190,13 @@ export function renderFooter(doc: jsPDF, settings: CompanySettings) {
   }
 }
 
-export function renderTotals(doc: jsPDF, totals: DocumentTotals, startY: number) {
+export function renderTotals(
+  doc: jsPDF,
+  totals: DocumentTotals,
+  startY: number,
+  currency?: string,
+  decimals?: number,
+) {
   const rightMargin = 200;
 
   // Background box
@@ -192,14 +205,14 @@ export function renderTotals(doc: jsPDF, totals: DocumentTotals, startY: number)
 
   doc.setFontSize(10);
   doc.setTextColor(50, 50, 50);
-  doc.text(`Sous-total: ${totals.sousTotal}`, rightMargin - 5, startY, { align: "right" });
-  doc.text(`Remise: ${totals.remise}`, rightMargin - 5, startY + 5, { align: "right" });
-  doc.text(`TVA: ${totals.tva}`, rightMargin - 5, startY + 10, { align: "right" });
+  doc.text(`Sous-total: ${formatCurrency(totals.sousTotal, currency, decimals)}`, rightMargin - 5, startY, { align: "right" });
+  doc.text(`Remise: ${formatCurrency(totals.remise, currency, decimals)}`, rightMargin - 5, startY + 5, { align: "right" });
+  doc.text(`TVA: ${formatCurrency(totals.tva, currency, decimals)}`, rightMargin - 5, startY + 10, { align: "right" });
 
   doc.setFontSize(12);
   doc.setFont(undefined, "bold");
   doc.setTextColor(37, 99, 235); // Primary color
-  doc.text(`Total TTC: ${totals.totalTTC}`, rightMargin - 5, startY + 18, { align: "right" });
+  doc.text(`Total TTC: ${formatCurrency(totals.totalTTC, currency, decimals)}`, rightMargin - 5, startY + 18, { align: "right" });
   doc.setFont(undefined, "normal");
   doc.setTextColor(50, 50, 50);
 }

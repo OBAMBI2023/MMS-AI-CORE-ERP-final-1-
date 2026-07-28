@@ -51,6 +51,7 @@ import { UserManagement } from "@/components/mms/UserManagementTable";
 // import { PermissionsTab } from "@/components/mms/PermissionsTab";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTenant } from "@/providers/TenantProvider";
+import { configureCurrency } from "@/lib/mms/format";
 
 // Assuming AiSettings is available in the scope or imported.
 // Since the original file didn't import it, I'll assume it's part of the type definition context
@@ -147,7 +148,7 @@ function ParametresPage() {
           .insert({
             tenant_id: tenantId,
             company_name: "Nouvelle Entreprise",
-            currency: "FCFA",
+            currency: "XOF",
             quote_prefix: "DEV-",
             invoice_prefix: "FAC-",
             receipt_prefix: "REC-",
@@ -202,6 +203,7 @@ function ParametresPage() {
       await Promise.all(tasks);
     },
     onSuccess: () => {
+      configureCurrency(form.currency, form.decimals);
       toast.success("Paramètres enregistrés");
       qc.invalidateQueries({ queryKey: ["parametres"] });
     },
@@ -544,14 +546,15 @@ function BillingTab({
     <Card title="Facturation" icon={<Receipt className="h-4 w-4" />}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Devise">
-          <Select value={form.currency ?? "FCFA"} onValueChange={(v) => update("currency", v)}>
+          <Select value={form.currency === "FCFA" ? "XOF" : (form.currency ?? "XOF")} onValueChange={(v) => update("currency", v)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="FCFA">FCFA (F CFA)</SelectItem>
-              <SelectItem value="USD">USD ($)</SelectItem>
-              <SelectItem value="EUR">EUR (€)</SelectItem>
+              <SelectItem value="XOF">XOF</SelectItem>
+              <SelectItem value="USD">USD</SelectItem>
+              <SelectItem value="EUR">EUR</SelectItem>
+              <SelectItem value="MAD">MAD</SelectItem>
               <SelectItem value="GBP">GBP (£)</SelectItem>
             </SelectContent>
           </Select>
@@ -1030,6 +1033,10 @@ function QuickActions({
       if (Object.keys(aiPatch).length > 0) {
         await saveAiSettings({ data: aiPatch });
       }
+      configureCurrency(
+        typeof paramPatch.currency === "string" ? paramPatch.currency : form.currency,
+        typeof paramPatch.decimals === "number" ? paramPatch.decimals : form.decimals,
+      );
       refetch();
       toast.success("Configuration importée");
     } catch (e) {
@@ -1054,7 +1061,7 @@ function QuickActions({
         tax_number: null,
         tax_regime: null,
         vat_rate: null,
-        currency: "FCFA",
+        currency: "XOF",
         quote_prefix: "DEV-",
         invoice_prefix: "FAC-",
         receipt_prefix: "REC-",
@@ -1067,6 +1074,7 @@ function QuickActions({
       .eq("id", settingsId)
       .eq("tenant_id", tenantId);
     if (error) return toast.error(formatSupabaseError(error));
+    configureCurrency("XOF", 0);
     try {
       await saveAiSettings({
         data: { openai_key: null, gemini_key: null, claude_key: null, ai_model: null },

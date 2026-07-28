@@ -4,12 +4,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import type { Json } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
+import { readEnvVar } from "@/integrations/supabase/env";
 import { z } from "zod";
 
 export type PartnerTenant = {
   id: string;
   name: string;
   slug: string;
+  loginUrl: string | null;
   logoUrl: string | null;
   assignedAt: string;
   pack: { id: string; name: string; code: string } | null;
@@ -40,7 +42,17 @@ export type PartnerDashboard = {
       packName: string;
     };
   } | null;
-  totals: { credited: number; consumed: number; activeTenants: number; activeTrials: number };
+  totals: {
+    credited: number;
+    consumed: number;
+    activeTenants: number;
+    trialsCreated: number;
+    activeTrials: number;
+    convertedTrials: number;
+    conversionRate: number;
+    commissionsGenerated: number;
+  };
+  availableModules: { id: string; code: string; name: string }[];
   payments: {
     id: string; amount: number; currency: string; reference: string; status: string; createdAt: string;
   }[];
@@ -49,7 +61,11 @@ export type PartnerDashboard = {
     reason: string; reference: string | null; createdAt: string;
   }[];
   trials: {
-    id: string; tenantId: string; email: string; status: string; startsAt: string; expiresAt: string;
+    id: string; tenantId: string; tenantName: string; tenantSlug: string;
+    loginUrl: string | null; email: string; managerName: string | null;
+    sector: string | null; city: string | null; status: string;
+    startsAt: string; expiresAt: string; createdAt: string;
+    commissionAmount: number;
   }[];
   tenants: PartnerTenant[];
   history: {
@@ -174,6 +190,7 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       creditBalanceResult,
       trialsResult,
       offerPacksResult,
+      modulePackItemsResult,
     ] = await Promise.all([
       context.supabase.from("partners").select("id, name, code").eq("id", partnerId).single(),
       context.supabase.from("partner_tenants").select("tenant_id, assigned_at"),
@@ -195,8 +212,9 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       context.supabase.from("partner_payments").select("*").order("created_at", { ascending: false }).limit(100),
       context.supabase.from("partner_credit_transactions").select("*").order("created_at", { ascending: false }).limit(200),
       context.supabase.from("partner_credit_transactions").select("credits"),
-      context.supabase.from("partner_trial_usage").select("*").order("created_at", { ascending: false }).limit(100),
+      (context.supabase as any).from("partner_trial_usage").select("*").order("created_at", { ascending: false }).limit(100),
       context.supabase.from("module_packs").select("id, name"),
+      context.supabase.from("module_pack_items").select("pack_id, module_id"),
     ]);
 
     for (const result of [
@@ -216,6 +234,7 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
       creditBalanceResult,
       trialsResult,
       offerPacksResult,
+      modulePackItemsResult,
     ]) {
       if (result.error) throw new Error(formatSupabaseError(result.error));
     }
@@ -245,6 +264,7 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug,
+          loginUrl: `/login/${tenant.slug}`,
           logoUrl: tenant.logo_url,
           assignedAt: assignedAt.get(tenant.id)!,
           pack: packs.get(packByTenant.get(tenant.id) ?? "") ?? null,
@@ -277,6 +297,9 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
     const offer = (offersResult.data ?? []).find((item) => item.id === commercialSubscription?.offer_id);
     const offerPack = (offerPacksResult.data ?? []).find((pack) => pack.id === offer?.module_pack_id);
     const creditTransactions = creditsResult.data ?? [];
+    const trialRows = (trialsResult.data ?? []) as any[];
+    const convertedTrials = trialRows.filter((trial) => trial.status === "converted").length;
+    const tenantById = new Map(tenants.map((tenant) => [tenant.id, tenant]));
 
     return {
       partner: {
@@ -305,8 +328,24 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
         credited: creditTransactions.filter((item) => item.credits > 0).reduce((sum, item) => sum + item.credits, 0),
         consumed: Math.abs(creditTransactions.filter((item) => item.credits < 0).reduce((sum, item) => sum + item.credits, 0)),
         activeTenants: tenants.filter((tenant) => tenant.subscription?.status === "active").length,
-        activeTrials: (trialsResult.data ?? []).filter((trial) => trial.status === "active").length,
+        trialsCreated: trialRows.length,
+        activeTrials: trialRows.filter((trial) => trial.status === "active").length,
+        convertedTrials,
+        conversionRate: trialRows.length ? (convertedTrials / trialRows.length) * 100 : 0,
+        commissionsGenerated: trialRows.reduce(
+          (sum, trial) => sum + Number(trial.commission_amount ?? 0),
+          0,
+        ),
       },
+      availableModules: (modulesResult.data ?? [])
+        .filter((module) =>
+          (modulePackItemsResult.data ?? []).some(
+            (item) =>
+              item.pack_id === offer?.module_pack_id &&
+              item.module_id === module.id,
+          ),
+        )
+        .map(({ id, code, name }) => ({ id, code, name })),
       payments: (paymentsResult.data ?? []).map((payment) => ({
         id: payment.id, amount: Number(payment.amount), currency: payment.currency,
         reference: payment.external_reference, status: payment.status, createdAt: payment.created_at,
@@ -316,9 +355,21 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
         credits: transaction.credits, balanceAfter: transaction.balance_after,
         reason: transaction.reason, reference: transaction.reference, createdAt: transaction.created_at,
       })),
-      trials: (trialsResult.data ?? []).map((trial) => ({
-        id: trial.id, tenantId: trial.tenant_id, email: trial.client_email,
-        status: trial.status, startsAt: trial.starts_at, expiresAt: trial.expires_at,
+      trials: trialRows.map((trial) => ({
+        id: trial.id,
+        tenantId: trial.tenant_id,
+        tenantName: tenantById.get(trial.tenant_id)?.name ?? "Tenant",
+        tenantSlug: tenantById.get(trial.tenant_id)?.slug ?? "",
+        loginUrl: tenantById.get(trial.tenant_id)?.loginUrl ?? null,
+        email: trial.client_email,
+        managerName: trial.manager_name ?? null,
+        sector: trial.business_sector ?? null,
+        city: trial.city ?? null,
+        status: trial.status,
+        startsAt: trial.starts_at,
+        expiresAt: trial.expires_at,
+        createdAt: trial.created_at,
+        commissionAmount: Number(trial.commission_amount ?? 0),
       })),
       tenants,
       history: (historyResult.data ?? []).map((row) => ({
@@ -351,6 +402,74 @@ export const createPartnerTenant = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(formatSupabaseError(error));
     return { tenantId: tenantId as string };
+  });
+
+const createPartnerTrialSchema = z.object({
+  companyName: z.string().trim().min(2).max(120),
+  sector: z.string().trim().min(2).max(100),
+  managerName: z.string().trim().min(2).max(120),
+  phone: z.string().trim().min(6).max(30),
+  email: z.string().trim().email().max(254),
+  city: z.string().trim().min(2).max(100),
+  moduleIds: z.array(z.string().uuid()).max(100),
+});
+
+export const createPartnerTrial = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(createPartnerTrialSchema)
+  .handler(async ({ context, data }) => {
+    await requirePartnerMembership(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const emailEnabled = ["1", "true", "yes"].includes(
+      (readEnvVar("PARTNER_TRIAL_EMAIL_ENABLED") ?? "").toLowerCase(),
+    );
+    const temporaryPassword = `${crypto.randomUUID()}Aa1!`;
+
+    const authResult = emailEnabled
+      ? await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+          data: { full_name: data.managerName, phone: data.phone },
+          redirectTo: `${readEnvVar("VITE_SITE_URL", "SITE_URL") ?? "http://localhost:3000"}/login`,
+        })
+      : await supabaseAdmin.auth.admin.createUser({
+          email: data.email,
+          password: temporaryPassword,
+          email_confirm: true,
+          user_metadata: { full_name: data.managerName, phone: data.phone },
+        });
+
+    if (authResult.error || !authResult.data.user) {
+      throw new Error(formatSupabaseError(authResult.error ?? new Error("Compte non créé")));
+    }
+
+    try {
+      const { data: tenantId, error } = await (supabaseAdmin as any).rpc(
+        "create_partner_trial",
+        {
+          requested_name: data.companyName,
+          requested_sector: data.sector,
+          requested_manager_name: data.managerName,
+          requested_phone: data.phone,
+          requested_email: data.email,
+          requested_city: data.city,
+          requested_module_ids: data.moduleIds,
+          requested_admin_user_id: authResult.data.user.id,
+          requested_actor_id: context.userId,
+        },
+      );
+      if (error) throw new Error(formatSupabaseError(error));
+      return {
+        tenantId: tenantId as string,
+        emailSent: emailEnabled,
+        temporaryPassword: emailEnabled ? null : temporaryPassword,
+      };
+    } catch (error) {
+      const { error: rollbackError } =
+        await supabaseAdmin.auth.admin.deleteUser(authResult.data.user.id);
+      if (rollbackError) {
+        console.error("[PartnerTrial] Échec du rollback Auth", rollbackError);
+      }
+      throw error;
+    }
   });
 
 export const activatePartnerTenant = createServerFn({ method: "POST" })

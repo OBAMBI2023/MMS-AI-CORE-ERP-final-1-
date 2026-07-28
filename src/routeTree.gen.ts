@@ -36,6 +36,7 @@ import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
+import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.ia-platform'
 import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
 import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as AppSplatRouteImport } from './routes/app.$'
@@ -175,6 +176,11 @@ const SuperAdminPartnersRoute = SuperAdminPartnersRouteImport.update({
   path: '/partners',
   getParentRoute: () => SuperAdminRoute,
 } as any)
+const SuperAdminIaPlatformRoute = SuperAdminIaPlatformRouteImport.update({
+  id: '/ia-platform',
+  path: '/ia-platform',
+  getParentRoute: () => SuperAdminRoute,
+} as any)
 const LoginSlugRoute = LoginSlugRouteImport.update({
   id: '/login_/$slug',
   path: '/login/$slug',
@@ -220,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/app/': typeof AppIndexRoute
 }
@@ -252,6 +259,7 @@ export interface FileRoutesByTo {
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/app': typeof AppIndexRoute
 }
@@ -285,6 +293,7 @@ export interface FileRoutesById {
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login_/$slug': typeof LoginSlugRoute
+  '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/app/': typeof AppIndexRoute
 }
@@ -319,6 +328,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login/$slug'
+    | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
@@ -351,6 +361,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login/$slug'
+    | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/app'
   id:
@@ -383,6 +394,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login_/$slug'
+    | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/app/'
   fileRoutesById: FileRoutesById
@@ -610,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperAdminPartnersRouteImport
       parentRoute: typeof SuperAdminRoute
     }
+    '/super-admin/ia-platform': {
+      id: '/super-admin/ia-platform'
+      path: '/ia-platform'
+      fullPath: '/super-admin/ia-platform'
+      preLoaderRoute: typeof SuperAdminIaPlatformRouteImport
+      parentRoute: typeof SuperAdminRoute
+    }
     '/login_/$slug': {
       id: '/login_/$slug'
       path: '/login/$slug'
@@ -635,10 +654,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface SuperAdminRouteChildren {
+  SuperAdminIaPlatformRoute: typeof SuperAdminIaPlatformRoute
   SuperAdminPartnersRoute: typeof SuperAdminPartnersRoute
 }
 
 const SuperAdminRouteChildren: SuperAdminRouteChildren = {
+  SuperAdminIaPlatformRoute: SuperAdminIaPlatformRoute,
   SuperAdminPartnersRoute: SuperAdminPartnersRoute,
 }
 

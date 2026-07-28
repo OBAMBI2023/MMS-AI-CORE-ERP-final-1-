@@ -9,7 +9,6 @@ export const Route = createFileRoute("/super-admin/partners")({
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("Platform Admin requis")) throw redirect({ to: "/403" });
-      if (message.includes("Unauthorized")) throw redirect({ to: "/login" });
       throw error;
     }
   },
