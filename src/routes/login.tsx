@@ -21,7 +21,7 @@ type LoginValues = z.infer<typeof loginSchema>;
 type LoginTenant = { id: string; name: string; logo_url: string | null };
 
 const loginInputClassName =
-  "login-field h-13 rounded-2xl border-slate-300 bg-white pl-12 pr-12 text-sm text-slate-900 caret-slate-900 shadow-sm shadow-slate-100 transition-all duration-200 placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-[#0F5BFF] focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-blue-500/10 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:caret-white dark:shadow-none dark:placeholder:text-slate-400 dark:hover:border-slate-500 dark:focus-visible:border-blue-400 dark:focus-visible:bg-slate-900 dark:focus-visible:ring-blue-400/20";
+  "login-field h-[60px] rounded-2xl border-slate-300 bg-white pl-12 pr-12 text-sm text-slate-900 caret-slate-900 shadow-sm shadow-slate-100 transition-all duration-200 placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-[#0F5BFF] focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-blue-500/10 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:caret-white dark:shadow-none dark:placeholder:text-slate-400 dark:hover:border-slate-500 dark:focus-visible:border-blue-400 dark:focus-visible:bg-slate-900 dark:focus-visible:ring-blue-400/20";
 
 async function getAuthenticatedHome(): Promise<"/app" | "/super-admin" | "/partner"> {
   const destination = await getAuthenticatedDestination();
@@ -142,12 +142,6 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
   };
 
   const companyName = tenant?.name ?? PLATFORM_BRANDING.name;
-  const tenantStatus = tenantNotFound
-    ? "Espace entreprise introuvable"
-    : tenant
-      ? `Espace ${tenant.name}`
-      : "Votre espace de gestion intelligent";
-
   return (
     <AuthLayout
       icon={Building2}
@@ -166,10 +160,12 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
       logoAlt={tenant ? `Logo ${tenant.name}` : PLATFORM_BRANDING.alt}
       backLink={tenantSlug ? { href: "/login", label: "Retour" } : undefined}
       premium
+      showSecurityFooter={false}
+      compactMobile
     >
       <LoginCard
         title="Connexion"
-        description={tenantStatus}
+        description="Accédez à votre espace de travail sécurisé."
         emailRegistration={register("email")}
         passwordRegistration={register("password")}
         emailError={errors.email}
@@ -191,7 +187,7 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
         logoAlt={tenant ? `Logo ${companyName}` : PLATFORM_BRANDING.alt}
         headerContent={
           tenantLoading ? (
-            <Skeleton className="mx-auto h-20 w-20 rounded-2xl" />
+            <Skeleton className="mx-auto mb-4 h-24 w-24 rounded-2xl" />
           ) : undefined
         }
         premium

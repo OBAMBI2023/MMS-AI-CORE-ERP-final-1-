@@ -1,11 +1,6 @@
 import { BrandLogo } from "@/components/branding/BrandLogo";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTenant } from "@/providers/TenantProvider";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { cn } from "@/lib/utils";
@@ -21,6 +16,13 @@ function tenantText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function shortBusinessActivity(value: unknown) {
+  const activity = tenantText(value);
+  const [shortActivity] = activity.split(/\s+(?:et|&)\s+/i);
+
+  return shortActivity || activity;
+}
+
 export function SidebarCompanyHeader({
   logoUrl,
   isLoading = false,
@@ -32,16 +34,17 @@ export function SidebarCompanyHeader({
   const loading = isLoading || tenantLoading || settingsLoading;
   const companyName = tenantText(tenant?.name);
   const businessActivity =
-    tenantText(settings?.business_sector) || "Secteur non renseigné";
+    shortBusinessActivity(settings?.business_sector) || "Secteur non renseigné";
 
   const logo = loading ? (
-    <Skeleton className="size-[72px] shrink-0 rounded-2xl" />
+    <Skeleton className="size-16 shrink-0 rounded-2xl" />
   ) : (
     <BrandLogo
       context="sidebar"
       src={logoUrl}
       alt={companyName ? `Logo ${companyName}` : "Logo de l’entreprise"}
-      className="size-[72px] rounded-2xl bg-white p-1 shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
+      className="size-16 rounded-2xl bg-white p-[2px] shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
+      imageClassName="size-[90%]"
     />
   );
 
@@ -87,7 +90,10 @@ export function SidebarCompanyHeader({
             <p className="line-clamp-2 text-[18px] font-bold leading-[22px] text-white">
               {companyName}
             </p>
-            <p className="mt-1 whitespace-normal break-words text-[13px] leading-[18px] text-[#A8B3CF]">
+            <p
+              className="mt-1 truncate text-[13px] leading-[18px] text-[#A8B3CF]"
+              title={businessActivity}
+            >
               {businessActivity}
             </p>
           </>

@@ -17,6 +17,8 @@ type AuthLayoutProps = {
   accentClassName?: string;
   backLink?: { href: string; label: string };
   premium?: boolean;
+  showSecurityFooter?: boolean;
+  compactMobile?: boolean;
 };
 
 export function AuthLayout({
@@ -30,6 +32,8 @@ export function AuthLayout({
   accentClassName = "text-blue-300",
   backLink,
   premium = false,
+  showSecurityFooter = true,
+  compactMobile = false,
 }: AuthLayoutProps) {
   const { theme, toggleTheme } = useTheme();
   const themeToggle = (
@@ -45,7 +49,7 @@ export function AuthLayout({
 
   if (premium) {
     return (
-      <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#071A52] px-4 py-8 sm:px-6 sm:py-12">
+      <main className={`relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#071A52] px-4 sm:px-6 sm:py-12 ${compactMobile ? "py-3" : "py-8"}`}>
         {themeToggle}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_16%,rgba(45,119,255,0.42),transparent_28%),radial-gradient(circle_at_84%_23%,rgba(73,105,255,0.28),transparent_27%),radial-gradient(circle_at_54%_92%,rgba(13,83,214,0.28),transparent_35%),linear-gradient(145deg,#071A52_0%,#061441_55%,#030d2c_100%)]" />
         <div className="pointer-events-none absolute left-[-12%] top-[8%] h-[34rem] w-[34rem] rounded-full border border-blue-300/[0.09]" />
@@ -81,7 +85,7 @@ export function AuthLayout({
           >
             {children}
           </motion.div>
-          <motion.div
+          {showSecurityFooter && <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35, duration: 0.5 }}
@@ -89,7 +93,7 @@ export function AuthLayout({
           >
             <ShieldCheck className="h-4 w-4 shrink-0 text-blue-300" aria-hidden="true" />
             <span>{PLATFORM_BRANDING.productName} protège vos données selon les meilleures normes de sécurité.</span>
-          </motion.div>
+          </motion.div>}
         </div>
       </main>
     );

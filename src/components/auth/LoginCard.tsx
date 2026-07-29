@@ -44,32 +44,23 @@ export function LoginCard({
 
   if (premium) {
     return (
-      <Card className="w-full rounded-[28px] border border-white/70 bg-white/[0.96] shadow-[0_32px_90px_rgba(0,8,35,0.38)] backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-950/[0.96]">
-        <CardHeader className="space-y-0 px-6 pb-5 pt-7 text-center sm:px-10 sm:pt-9">
-          <div className="mb-5 flex justify-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#0F5BFF]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#0F5BFF] shadow-[0_0_0_4px_rgba(15,91,255,.12)]" />
-              ERP SaaS
-            </span>
-          </div>
+      <Card className="w-full rounded-[32px] border border-white/70 bg-white/[0.96] shadow-[0_24px_70px_rgba(0,8,35,0.3)] backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-950/[0.96]">
+        <CardHeader className="space-y-0 px-8 pb-0 pt-8 text-center">
           {headerContent ?? (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.12, duration: 0.4 }}
-              className="mb-5 flex justify-center"
+              className="mb-4 flex justify-center"
             >
-              <BrandLogo context="login" src={logo} alt={logoAlt} />
+              <BrandLogo context="login" src={logo} alt={logoAlt} className="size-24 bg-transparent p-0" />
             </motion.div>
           )}
-          <CardTitle className="text-[28px] font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">{title}</CardTitle>
-          <CardDescription className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-300">{description}</CardDescription>
-          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Connectez-vous à votre espace de travail sécurisé.
-          </p>
+          <CardTitle className="text-[44px] font-bold leading-none tracking-[-0.035em] text-slate-950 dark:text-white">{title}</CardTitle>
+          <CardDescription className="mx-auto mt-2 max-w-[340px] text-[18px] leading-6 text-slate-500 dark:text-slate-300">{description}</CardDescription>
         </CardHeader>
-        <CardContent className="px-6 pb-7 sm:px-10 sm:pb-9">
-          <form onSubmit={onSubmit} className="space-y-4">
+        <CardContent className="px-8 pb-8 pt-6">
+          <form onSubmit={onSubmit} className="space-y-3">
             <div className="space-y-2">
               <Label htmlFor={emailId} className="text-sm font-medium text-slate-700 dark:text-slate-200">Adresse e-mail</Label>
               <div className="group relative">
@@ -101,7 +92,7 @@ export function LoginCard({
               </label>
               <ShieldCheck className="h-[18px] w-[18px] text-emerald-500" aria-label="Connexion sécurisée" />
             </div>
-            <Button type="submit" className="group mt-1 h-13 w-full rounded-2xl bg-gradient-to-r from-[#0F5BFF] to-[#3478FF] font-semibold text-white shadow-[0_12px_26px_rgba(15,91,255,0.26)] transition-all duration-300 hover:-translate-y-0.5 hover:from-[#0B4FDF] hover:to-[#2468ED] hover:shadow-[0_16px_32px_rgba(15,91,255,0.34)] active:translate-y-0" disabled={inputsDisabled}>
+            <Button type="submit" className="group mt-1 h-[58px] w-full rounded-2xl bg-gradient-to-r from-[#0F5BFF] to-[#3478FF] font-semibold text-white shadow-[0_12px_26px_rgba(15,91,255,0.26)] transition-all duration-300 hover:-translate-y-0.5 hover:from-[#0B4FDF] hover:to-[#2468ED] hover:shadow-[0_16px_32px_rgba(15,91,255,0.34)] active:translate-y-0" disabled={inputsDisabled}>
               {submitting ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
