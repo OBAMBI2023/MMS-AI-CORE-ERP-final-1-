@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -76,7 +77,7 @@ export const Route = createFileRoute("/parametres")({
   component: ParametresPage,
   head: () => ({
     meta: [
-      { title: "Paramètres — AUREX ERP" },
+      { title: `Paramètres — ${PLATFORM_BRANDING.productName}` },
       { name: "description", content: "Centre de configuration de l'entreprise." },
     ],
   }),

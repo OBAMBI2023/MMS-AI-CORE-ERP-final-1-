@@ -1,5 +1,6 @@
 import { ArrowRight, BarChart3, Building2, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { MarketingCta } from "../components/MarketingCta";
 
 const capabilities = [
@@ -29,13 +30,13 @@ export function HomePage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">
               <Sparkles className="h-4 w-4" aria-hidden="true" />
-              Gestion d’entreprise unifiée
+              {PLATFORM_BRANDING.descriptor}
             </div>
             <h1 className="mt-6 max-w-4xl text-5xl font-extrabold tracking-[-0.04em] text-slate-950 sm:text-6xl">
               Pilotez votre activité avec une vision claire.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              AUREX ERP réunit vos opérations commerciales, vos achats, vos dépenses et votre
+              {PLATFORM_BRANDING.productName} réunit vos opérations commerciales, vos achats, vos dépenses et votre
               organisation dans une plateforme SaaS centralisée.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">

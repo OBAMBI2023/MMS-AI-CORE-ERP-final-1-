@@ -29,6 +29,7 @@ export function usePermissions() {
       if ((data.roles as any)?.tenant_id !== tenantId) {
         return { permissions: [], role: null, roleId: null };
       }
+      if (!roleId) return { permissions: [], role: roleName ?? null, roleId: null };
 
       // Get all permissions associated with this user's role
       const { data: rolePermissions, error: permsError } = await supabase

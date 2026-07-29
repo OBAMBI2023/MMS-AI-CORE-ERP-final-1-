@@ -225,7 +225,7 @@ const navItems = [
   { label: "Packs de modules", icon: Layers3, href: "/super-admin#packs-modules" },
   { label: "Offres partenaires", icon: CreditCard, href: "/super-admin#offres-partenaires" },
   { label: "Partenaires", icon: Handshake, href: "/super-admin/partners" },
-  { label: "IA Platform", icon: Bot, href: "/super-admin/ia-platform" },
+  { label: PLATFORM_BRANDING.products.ai, icon: Bot, href: "/super-admin/ia-platform" },
   { label: "Utilisateurs", icon: Users, href: "#utilisateurs" },
   { label: "Licences", icon: KeyRound, href: "#licences" },
   { label: "Activité", icon: Activity, href: "#activite" },
@@ -240,11 +240,11 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
 
   return (
     <div className="flex h-full flex-col bg-[#0a0a0b] text-white">
-      <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5">
+      <div className="flex h-24 shrink-0 items-center border-b border-white/10 px-5">
         <img
-          src={PLATFORM_BRANDING.assets.logoDark}
+          src={PLATFORM_BRANDING.assets.logo}
           alt={PLATFORM_BRANDING.alt}
-          className="h-10 w-auto max-w-[155px]"
+          className="h-16 w-auto max-w-[220px] object-contain object-left"
         />
         <span className="sr-only">Platform admin</span>
       </div>
@@ -550,7 +550,7 @@ function ModulePacksSection({
         <div>
           <h2 className="text-lg font-semibold">Packs de modules</h2>
           <p className="text-sm text-muted-foreground">
-            Regroupez les modules AUREX et attribuez-les depuis la fiche d’un tenant.
+            Regroupez les modules {PLATFORM_BRANDING.shortName} et attribuez-les depuis la fiche d’un tenant.
           </p>
         </div>
         <Button onClick={() => openEditor()}><Plus /> Nouveau pack</Button>
@@ -1403,6 +1403,11 @@ export function SuperAdminDashboardView({
                   <SidebarContent mobile />
                 </SheetContent>
               </Sheet>
+              <img
+                src={PLATFORM_BRANDING.assets.logo}
+                alt={PLATFORM_BRANDING.alt}
+                className="h-11 w-auto max-w-[132px] object-contain sm:hidden"
+              />
               <div className="hidden min-w-0 sm:block">
                 <h1 className="truncate text-base font-semibold tracking-tight">Vue d’ensemble</h1>
                 <p className="truncate text-xs text-muted-foreground">Pilotage de la plateforme</p>

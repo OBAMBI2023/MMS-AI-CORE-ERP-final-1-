@@ -16,6 +16,7 @@ import {
   type TenantAiPortal,
 } from "@/lib/ai-platform.server";
 import { formatCurrency } from "@/lib/mms/format";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import {
   askAssistant,
   confirmAssistantAction,
@@ -123,18 +124,18 @@ function AssistantPage() {
 
   if (!access.moduleEnabled || !access.permissionGranted || !access.valid) {
     const title = !access.moduleEnabled
-      ? "Module Assistant IA non activé"
+      ? `Module ${PLATFORM_BRANDING.products.ai} non activé`
       : !access.permissionGranted
-        ? "Accès Assistant IA non autorisé"
+        ? `Accès ${PLATFORM_BRANDING.products.ai} non autorisé`
         : access.status === "expired"
-          ? "Abonnement Assistant IA expiré"
+          ? `Abonnement ${PLATFORM_BRANDING.products.ai} expiré`
           : access.status === "suspended"
-            ? "Abonnement Assistant IA suspendu"
+            ? `Abonnement ${PLATFORM_BRANDING.products.ai} suspendu`
             : access.status === "cancelled"
-              ? "Abonnement Assistant IA résilié"
-              : "Assistant IA Premium";
+              ? `Abonnement ${PLATFORM_BRANDING.products.ai} résilié`
+              : `${PLATFORM_BRANDING.products.ai} Premium`;
     return (
-      <AppShell title="Assistant IA" subtitle="Option premium indépendante de votre licence ERP">
+      <AppShell title={PLATFORM_BRANDING.products.ai} subtitle="Option premium indépendante de votre licence ERP">
         <div className="mx-auto max-w-3xl">
           <Card className="rounded-2xl p-8 text-center">
             <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -144,7 +145,7 @@ function AssistantPage() {
             <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
               {!access.permissionGranted && access.moduleEnabled
                 ? "Votre rôle ne possède pas la permission assistant.use. Contactez un administrateur de votre tenant."
-                : "Un abonnement Assistant IA actif ou en période d’essai est requis. Il reste indépendant de votre licence AUREX ERP."}
+                : `Un abonnement ${PLATFORM_BRANDING.products.ai} actif ou en période d’essai est requis. Il reste indépendant de votre licence ${PLATFORM_BRANDING.productName}.`}
             </p>
             {access.planName && <Badge className="mt-5">{access.planName}</Badge>}
             {access.expiresAt && (
@@ -160,7 +161,7 @@ function AssistantPage() {
 
   return (
     <AppShell
-      title="Assistant IA"
+      title={PLATFORM_BRANDING.products.ai}
       subtitle="Analyses sécurisées et actions ERP avec confirmation"
     >
       <div className="mx-auto max-w-5xl space-y-5">
@@ -200,9 +201,9 @@ function AssistantPage() {
         {access.quotaExhausted && (
           <Alert variant="destructive">
             <TriangleAlert className="h-4 w-4" />
-            <AlertTitle>Quota Assistant IA épuisé</AlertTitle>
+            <AlertTitle>Quota {PLATFORM_BRANDING.products.ai} épuisé</AlertTitle>
             <AlertDescription>
-              Seul l’Assistant IA est bloqué. Votre ERP reste accessible. Le quota sera réinitialisé
+              Seul {PLATFORM_BRANDING.products.ai} est bloqué. Votre {PLATFORM_BRANDING.productName} reste accessible. Le quota sera réinitialisé
               {access.currentPeriodEnd
                 ? ` le ${new Date(access.currentPeriodEnd).toLocaleString("fr-FR")}.`
                 : " à la prochaine période."}
@@ -342,8 +343,8 @@ export const Route = createFileRoute("/app/assistant-ia")({
   component: AssistantPage,
   head: () => ({
     meta: [
-      { title: "Assistant IA — AUREX ERP" },
-      { name: "description", content: "Assistant IA sécurisé et activable d’AUREX ERP." },
+      { title: `${PLATFORM_BRANDING.products.ai} — ${PLATFORM_BRANDING.productName}` },
+      { name: "description", content: `${PLATFORM_BRANDING.products.ai} sécurisé et activable dans ${PLATFORM_BRANDING.productName}.` },
     ],
   }),
 });

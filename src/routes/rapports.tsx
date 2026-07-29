@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/mms/AppShell";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/mms/format";
 import { useTenant } from "@/providers/TenantProvider";
@@ -117,7 +118,7 @@ export const Route = createFileRoute("/rapports")({
   component: RapportsPage,
   head: () => ({
     meta: [
-      { title: "Rapports — AUREX ERP" },
+      { title: `Rapports — ${PLATFORM_BRANDING.productName}` },
       { name: "description", content: "Rapports financiers par activité." },
     ],
   }),

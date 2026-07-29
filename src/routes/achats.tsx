@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
@@ -14,6 +15,7 @@ import {
   renderAchatsTable,
   renderAchatsTotals,
 } from "@/lib/mms/pdf-achats-template";
+import { renderPdfFooter, tenantFromSettings } from "@/lib/mms/PdfTheme";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
@@ -32,7 +34,7 @@ export const Route = createFileRoute("/achats")({
   component: AchatsPage,
   head: () => ({
     meta: [
-      { title: "Achats — AUREX ERP" },
+      { title: `Achats — ${PLATFORM_BRANDING.productName}` },
       { name: "description", content: "Suivi des achats fournisseurs." },
     ],
   }),
@@ -102,6 +104,7 @@ function AchatsPage() {
     );
 
     renderAchatsTotals(doc, formatCurrency(total));
+    renderPdfFooter(doc, tenantFromSettings(settings, logoUrl));
 
     doc.save(`Achats_${new Date().toISOString().slice(0, 10)}.pdf`);
     toast.success("PDF généré.");
@@ -120,7 +123,9 @@ function AchatsPage() {
     },
     onSuccess: async (achat) => {
       if (userId) {
-        await logAction(userId, roleId, "delete", "achats", { achat_number: achat.number });
+        await logAction(userId, roleId ?? null, "delete", "achats", {
+          achat_number: achat.number,
+        });
       }
       toast.success("Achat supprimé");
       qc.invalidateQueries({ queryKey: ["achats"] });

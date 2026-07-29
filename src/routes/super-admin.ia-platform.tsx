@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { TriangleAlert } from "lucide-react";
 import { AiPlatformView } from "@/components/super-admin/AiPlatform";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,9 @@ export const Route = createFileRoute("/super-admin/ia-platform")({
         <Card className="w-full max-w-lg space-y-4 rounded-2xl p-6 text-center">
           <TriangleAlert className="mx-auto size-10 text-destructive" />
           <div>
-            <h1 className="text-xl font-semibold">IA Platform indisponible</h1>
+            <h1 className="text-xl font-semibold">
+              {PLATFORM_BRANDING.products.ai} indisponible
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {error instanceof Error ? error.message : "Impossible de charger les données de la plateforme."}
             </p>
@@ -52,5 +55,11 @@ export const Route = createFileRoute("/super-admin/ia-platform")({
       </main>
     );
   },
-  head: () => ({ meta: [{ title: "IA Platform — AUREX ERP" }] }),
+  head: () => ({
+    meta: [
+      {
+        title: `${PLATFORM_BRANDING.products.ai} — ${PLATFORM_BRANDING.products.erp}`,
+      },
+    ],
+  }),
 });

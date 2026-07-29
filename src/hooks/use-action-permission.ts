@@ -7,5 +7,5 @@ export function useActionPermission(permission: string) {
   // Admin has full access
   if (data.role === "Administrateur") return true;
   
-  return data.permissions.includes(permission);
+  return (data.permissions as string[]).includes(permission);
 }

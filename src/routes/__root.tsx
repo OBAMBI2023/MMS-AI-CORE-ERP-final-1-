@@ -24,6 +24,7 @@ import { getPlatformAdminAccess } from "@/lib/super-admin.server";
 import { getPartnerAdminAccess } from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { readEnvVar } from "@/integrations/supabase/env";
+import { handlePasswordRecoveryCallback } from "@/integrations/supabase/password-recovery";
 
 function getSiteOrigin() {
   const browserOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
@@ -67,6 +68,8 @@ const publicRoutes = new Set([
   "/demo",
   "/essai-gratuit",
   "/login",
+  "/forgot-password",
+  "/reset-password",
 ]);
 
 function isPublicRoute(pathname: string) {
@@ -136,6 +139,16 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
     if (typeof window === "undefined") {
+      return;
+    }
+
+    // Supabase may return recovery credentials on the configured Site URL
+    // (including in the hash). Normalize every recovery callback before the
+    // regular public/authenticated route guards can redirect elsewhere.
+    if (await handlePasswordRecoveryCallback()) {
+      if (location.pathname !== "/reset-password") {
+        throw redirect({ to: "/reset-password" });
+      }
       return;
     }
 
@@ -290,7 +303,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: PLATFORM_BRANDING.assets.favicon, type: "image/svg+xml" },
+      { rel: "icon", href: PLATFORM_BRANDING.assets.logo, type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

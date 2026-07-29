@@ -44,22 +44,22 @@ export function AppShell({
                 className="w-[300px] p-0 bg-sidebar text-sidebar-foreground"
               >
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
-                <div className="flex flex-col h-full p-4 gap-2">
-                  <div className="flex items-center gap-2 px-2 py-4">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl">
+                <div className="flex h-full flex-col gap-2">
+                  <div className="flex h-24 shrink-0 items-center gap-3 border-b border-sidebar-border px-5">
+                    <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl">
                       {isLoading ? (
-                        <Skeleton className="h-10 w-10 rounded-xl" />
+                        <Skeleton className="h-16 w-16 rounded-2xl" />
                       ) : logoUrl ? (
                         <img
                           src={logoUrl}
                           alt={`Logo ${companyName}`}
-                          className="h-full w-full rounded-xl object-contain"
+                          className="max-h-16 w-auto max-w-16 rounded-2xl object-contain"
                         />
                       ) : (
                         <img
-                          src={PLATFORM_BRANDING.assets.icon}
+                          src={PLATFORM_BRANDING.assets.logo}
                           alt={PLATFORM_BRANDING.alt}
-                          className="h-full w-full object-contain"
+                          className="max-h-16 w-auto max-w-16 object-contain"
                         />
                       )}
                     </div>
@@ -67,15 +67,28 @@ export function AppShell({
                       {isLoading ? (
                         <Skeleton className="h-4 w-28" />
                       ) : (
-                        <div className="text-sm font-bold tracking-tight">{companyName}</div>
+                        <div className="truncate text-sm font-bold tracking-tight">{companyName}</div>
                       )}
                     </div>
                   </div>
-                  <SidebarContent onItemClick={() => setOpen(false)} />
+                  <div className="flex-1 px-4">
+                    <SidebarContent onItemClick={() => setOpen(false)} />
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
-            <div>
+            <div className="flex h-12 w-[min(34vw,132px)] items-center sm:hidden">
+              {isLoading ? (
+                <Skeleton className="h-11 w-11 rounded-xl" />
+              ) : (
+                <img
+                  src={logoUrl ?? PLATFORM_BRANDING.assets.logo}
+                  alt={logoUrl ? `Logo ${companyName}` : PLATFORM_BRANDING.alt}
+                  className="max-h-12 w-auto max-w-full object-contain object-left"
+                />
+              )}
+            </div>
+            <div className="hidden sm:block">
               <h1 className="text-xl font-bold tracking-tight md:text-2xl">{title}</h1>
               {subtitle && (
                 <p className="text-xs text-muted-foreground mt-1 md:text-sm">{subtitle}</p>

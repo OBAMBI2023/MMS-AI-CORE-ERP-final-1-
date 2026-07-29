@@ -70,7 +70,7 @@ export function RolesManagement() {
     },
     onSuccess: async (role) => {
       if (userId) {
-        await logAction(userId, roleId, "delete", "roles", { role_name: role.name });
+        await logAction(userId, roleId ?? null, "delete", "roles", { role_name: role.name });
       }
       toast.success("Rôle supprimé");
       qc.invalidateQueries({ queryKey: ["roles", tenantId] });

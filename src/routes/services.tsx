@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { AppShell } from "@/components/mms/AppShell";
 import { CatalogPage } from "@/components/mms/CatalogPage";
 
@@ -6,7 +7,7 @@ export const Route = createFileRoute("/services")({
   component: ServicesPage,
   head: () => ({
     meta: [
-      { title: "Produits & Services — AUREX ERP" },
+      { title: `Produits & Services — ${PLATFORM_BRANDING.productName}` },
       { name: "description", content: "Catalogue universel des produits et services." },
     ],
   }),

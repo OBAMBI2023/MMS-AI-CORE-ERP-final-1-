@@ -15,6 +15,7 @@ import { Route as TarifsRouteImport } from './routes/tarifs'
 import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as ServicesRouteImport } from './routes/services'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RapportsRouteImport } from './routes/rapports'
 import { Route as PartnerLoginRouteImport } from './routes/partner-login'
 import { Route as PartnerAdminRouteImport } from './routes/partner-admin'
@@ -24,6 +25,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicenceRouteImport } from './routes/licence'
 import { Route as JournalRouteImport } from './routes/journal'
 import { Route as FournisseursRouteImport } from './routes/fournisseurs'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as FonctionnalitesRouteImport } from './routes/fonctionnalites'
 import { Route as EssaiGratuitRouteImport } from './routes/essai-gratuit'
 import { Route as DevisRouteImport } from './routes/devis'
@@ -71,6 +73,11 @@ const ServicesRoute = ServicesRouteImport.update({
   path: '/services',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RapportsRoute = RapportsRouteImport.update({
   id: '/rapports',
   path: '/rapports',
@@ -114,6 +121,11 @@ const JournalRoute = JournalRouteImport.update({
 const FournisseursRoute = FournisseursRouteImport.update({
   id: '/fournisseurs',
   path: '/fournisseurs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FonctionnalitesRoute = FonctionnalitesRouteImport.update({
@@ -208,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/devis': typeof DevisRoute
   '/essai-gratuit': typeof EssaiGratuitRoute
   '/fonctionnalites': typeof FonctionnalitesRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
@@ -217,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -241,6 +255,7 @@ export interface FileRoutesByTo {
   '/devis': typeof DevisRoute
   '/essai-gratuit': typeof EssaiGratuitRoute
   '/fonctionnalites': typeof FonctionnalitesRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
@@ -250,6 +265,7 @@ export interface FileRoutesByTo {
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -275,6 +291,7 @@ export interface FileRoutesById {
   '/devis': typeof DevisRoute
   '/essai-gratuit': typeof EssaiGratuitRoute
   '/fonctionnalites': typeof FonctionnalitesRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
@@ -284,6 +301,7 @@ export interface FileRoutesById {
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
   '/rapports': typeof RapportsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -310,6 +328,7 @@ export interface FileRouteTypes {
     | '/devis'
     | '/essai-gratuit'
     | '/fonctionnalites'
+    | '/forgot-password'
     | '/fournisseurs'
     | '/journal'
     | '/licence'
@@ -319,6 +338,7 @@ export interface FileRouteTypes {
     | '/partner-admin'
     | '/partner-login'
     | '/rapports'
+    | '/reset-password'
     | '/services'
     | '/stock'
     | '/super-admin'
@@ -343,6 +363,7 @@ export interface FileRouteTypes {
     | '/devis'
     | '/essai-gratuit'
     | '/fonctionnalites'
+    | '/forgot-password'
     | '/fournisseurs'
     | '/journal'
     | '/licence'
@@ -352,6 +373,7 @@ export interface FileRouteTypes {
     | '/partner-admin'
     | '/partner-login'
     | '/rapports'
+    | '/reset-password'
     | '/services'
     | '/stock'
     | '/super-admin'
@@ -376,6 +398,7 @@ export interface FileRouteTypes {
     | '/devis'
     | '/essai-gratuit'
     | '/fonctionnalites'
+    | '/forgot-password'
     | '/fournisseurs'
     | '/journal'
     | '/licence'
@@ -385,6 +408,7 @@ export interface FileRouteTypes {
     | '/partner-admin'
     | '/partner-login'
     | '/rapports'
+    | '/reset-password'
     | '/services'
     | '/stock'
     | '/super-admin'
@@ -410,6 +434,7 @@ export interface RootRouteChildren {
   DevisRoute: typeof DevisRoute
   EssaiGratuitRoute: typeof EssaiGratuitRoute
   FonctionnalitesRoute: typeof FonctionnalitesRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   FournisseursRoute: typeof FournisseursRoute
   JournalRoute: typeof JournalRoute
   LicenceRoute: typeof LicenceRoute
@@ -419,6 +444,7 @@ export interface RootRouteChildren {
   PartnerAdminRoute: typeof PartnerAdminRoute
   PartnerLoginRoute: typeof PartnerLoginRoute
   RapportsRoute: typeof RapportsRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   ServicesRoute: typeof ServicesRoute
   StockRoute: typeof StockRoute
   SuperAdminRoute: typeof SuperAdminRouteWithChildren
@@ -473,6 +499,13 @@ declare module '@tanstack/react-router' {
       path: '/services'
       fullPath: '/services'
       preLoaderRoute: typeof ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rapports': {
@@ -536,6 +569,13 @@ declare module '@tanstack/react-router' {
       path: '/fournisseurs'
       fullPath: '/fournisseurs'
       preLoaderRoute: typeof FournisseursRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/fonctionnalites': {
@@ -678,6 +718,7 @@ const rootRouteChildren: RootRouteChildren = {
   DevisRoute: DevisRoute,
   EssaiGratuitRoute: EssaiGratuitRoute,
   FonctionnalitesRoute: FonctionnalitesRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   FournisseursRoute: FournisseursRoute,
   JournalRoute: JournalRoute,
   LicenceRoute: LicenceRoute,
@@ -687,6 +728,7 @@ const rootRouteChildren: RootRouteChildren = {
   PartnerAdminRoute: PartnerAdminRoute,
   PartnerLoginRoute: PartnerLoginRoute,
   RapportsRoute: RapportsRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   ServicesRoute: ServicesRoute,
   StockRoute: StockRoute,
   SuperAdminRoute: SuperAdminRouteWithChildren,

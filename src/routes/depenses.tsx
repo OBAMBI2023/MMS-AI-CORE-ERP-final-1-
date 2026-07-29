@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { AppShell } from "@/components/mms/AppShell";
 import { ResourceTable, type FieldDef, type ColumnDef } from "@/components/mms/ResourceTable";
 import { formatCurrency, formatDate, getCurrency } from "@/lib/mms/format";
@@ -8,6 +9,7 @@ import {
   renderDepensesTable,
   renderDepensesTotals,
 } from "@/lib/mms/pdf-template-engine";
+import { renderPdfFooter, tenantFromSettings } from "@/lib/mms/PdfTheme";
 import { FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useCompanySettings } from "@/hooks/use-company-settings";
@@ -68,7 +70,7 @@ export const Route = createFileRoute("/depenses")({
   component: DepensesPage,
   head: () => ({
     meta: [
-      { title: "Dépenses — AUREX ERP" },
+      { title: `Dépenses — ${PLATFORM_BRANDING.productName}` },
       { name: "description", content: "Suivi des dépenses." },
     ],
   }),
@@ -107,6 +109,7 @@ function DepensesPage() {
     );
 
     renderDepensesTotals(doc, formatCurrency(total), 0);
+    renderPdfFooter(doc, tenantFromSettings(settings, logoUrl));
 
     doc.save(`Depenses_${new Date().toISOString().slice(0, 10)}.pdf`);
     toast.success("PDF généré.");

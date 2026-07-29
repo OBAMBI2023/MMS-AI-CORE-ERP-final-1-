@@ -12,6 +12,7 @@ import { MarketingLayout } from "@/marketing/layouts/MarketingLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { createTrialWorkspace } from "@/lib/trial-signup.server";
 import { Turnstile, type TurnstileHandle } from "@/components/Turnstile";
+import { PLATFORM_BRANDING } from "@/config/branding";
 
 const signupSchema = z
   .object({
@@ -115,7 +116,7 @@ function TrialSignupPage() {
               Créez votre espace entreprise.
             </h1>
             <p className="mt-4 leading-7 text-slate-300">
-              Accédez immédiatement à AUREX ERP, sans données fictives et sans carte bancaire.
+              Accédez immédiatement à {PLATFORM_BRANDING.productName}, sans données fictives et sans carte bancaire.
             </p>
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300">
               Votre compte est administrateur de votre espace. Vos utilisateurs, rôles et données

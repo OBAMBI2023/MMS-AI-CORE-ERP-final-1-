@@ -164,6 +164,10 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
         logSupabaseError(onboardingError);
         throw new Error(formatSupabaseError(onboardingError));
       }
+      const createdWorkspace = workspace as { loginUrl: string } | null;
+      if (!createdWorkspace?.loginUrl) {
+        throw new Error("L'espace d'essai ne contient pas d'URL de connexion.");
+      }
       workspaceCreated = true;
 
       const isolatedAuth = createIsolatedAuthClient();
@@ -182,7 +186,7 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
       return {
         accessToken: sessionData.session.access_token,
         refreshToken: sessionData.session.refresh_token,
-        loginUrl: workspace.loginUrl,
+        loginUrl: createdWorkspace.loginUrl,
       };
     } catch (error: unknown) {
       try {

@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import {
   deleteAiAgent, saveAiAgent, saveAiModel, saveAiQuota, saveAiSettings, setAiAgentStatus,
   type AiAgent, type AiModel, type AiPlatformData, type AiProvider,
@@ -57,7 +58,7 @@ export function AiPlatformView({ data }: { data: AiPlatformData }) {
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <Button variant="ghost" className="-ml-3 mb-2" asChild><a href="/super-admin"><ArrowLeft /> Super Admin</a></Button>
-            <div className="flex items-center gap-3"><div className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25"><BrainCircuit /></div><div><h1 className="text-3xl font-bold tracking-tight">IA Platform</h1><p className="text-sm text-muted-foreground">Centre de contrôle des agents IA AUREX ERP</p></div></div>
+            <div className="flex items-center gap-3"><div className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25"><BrainCircuit /></div><div><h1 className="text-3xl font-bold tracking-tight">{PLATFORM_BRANDING.products.ai}</h1><p className="text-sm text-muted-foreground">Centre de contrôle des agents {PLATFORM_BRANDING.products.ai}</p></div></div>
           </div>
           <Button onClick={() => setAgent(blankAgent())}><Plus /> Nouvel agent</Button>
         </header>

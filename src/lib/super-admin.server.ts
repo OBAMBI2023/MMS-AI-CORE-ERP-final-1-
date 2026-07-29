@@ -567,7 +567,7 @@ export const saveModulePack = createServerFn({ method: "POST" })
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: packId, error } = await supabaseAdmin.rpc("manage_module_pack", {
-      requested_pack_id: data.id,
+      requested_pack_id: data.id as string,
       requested_name: data.name,
       requested_code: data.code,
       requested_description: data.description ?? "",
@@ -610,7 +610,7 @@ export const savePartnerOffer = createServerFn({ method: "POST" })
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: offerId, error } = await supabaseAdmin.rpc("manage_partner_offer", {
-      requested_offer_id: data.id,
+      requested_offer_id: data.id as string,
       requested_name: data.name,
       requested_price: data.price,
       requested_credits: data.includedTenantCredits,

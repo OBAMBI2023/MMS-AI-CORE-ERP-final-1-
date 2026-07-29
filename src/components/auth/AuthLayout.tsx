@@ -1,8 +1,9 @@
 import type { LucideIcon } from "lucide-react";
-import { ShieldCheck } from "lucide-react";
+import { Moon, ShieldCheck, Sun } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { useTheme } from "@/components/theme-provider";
 
 type AuthLayoutProps = {
   children: ReactNode;
@@ -22,16 +23,29 @@ export function AuthLayout({
   icon: Icon,
   title,
   subtitle,
-  logo = PLATFORM_BRANDING.assets.logoDark,
+  logo = PLATFORM_BRANDING.assets.logo,
   logoAlt = PLATFORM_BRANDING.alt,
   badge,
   accentClassName = "text-blue-300",
   backLink,
   premium = false,
 }: AuthLayoutProps) {
+  const { theme, toggleTheme } = useTheme();
+  const themeToggle = (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className="absolute right-4 top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-slate-950/20 text-white backdrop-blur transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:right-6 sm:top-6"
+      aria-label={theme === "dark" ? "Activer le thème clair" : "Activer le thème sombre"}
+    >
+      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+
   if (premium) {
     return (
       <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#071A52] px-4 py-8 sm:px-6 sm:py-12">
+        {themeToggle}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_16%,rgba(45,119,255,0.42),transparent_28%),radial-gradient(circle_at_84%_23%,rgba(73,105,255,0.28),transparent_27%),radial-gradient(circle_at_54%_92%,rgba(13,83,214,0.28),transparent_35%),linear-gradient(145deg,#071A52_0%,#061441_55%,#030d2c_100%)]" />
         <div className="pointer-events-none absolute left-[-12%] top-[8%] h-[34rem] w-[34rem] rounded-full border border-blue-300/[0.09]" />
         <div className="pointer-events-none absolute left-[-7%] top-[16%] h-[25rem] w-[25rem] rounded-full border border-blue-300/[0.07]" />
@@ -73,7 +87,7 @@ export function AuthLayout({
             className="mt-6 flex max-w-md items-center justify-center gap-2.5 text-center text-xs leading-5 text-blue-100/65 sm:text-sm"
           >
             <ShieldCheck className="h-4 w-4 shrink-0 text-blue-300" aria-hidden="true" />
-            <span>AUREX ERP protège vos données selon les meilleures normes de sécurité.</span>
+            <span>{PLATFORM_BRANDING.productName} protège vos données selon les meilleures normes de sécurité.</span>
           </motion.div>
         </div>
       </main>
@@ -82,6 +96,7 @@ export function AuthLayout({
 
   return (
     <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-slate-950 px-5 py-10">
+      {themeToggle}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(15,91,255,0.28),transparent_34%),radial-gradient(circle_at_85%_80%,rgba(37,99,235,0.16),transparent_34%)]" />
       <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[30px] border border-white/10 bg-white shadow-2xl lg:grid-cols-[1.05fr_0.95fr]">
         <section className="hidden flex-col justify-between bg-[#07113D] p-12 text-white lg:flex">

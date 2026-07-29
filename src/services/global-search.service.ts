@@ -12,11 +12,7 @@ export const globalSearchService = {
     console.log("Global search initiated with query:", query);
     console.log("RPC arguments:", { search_query: query });
 
-    const { data, error } = await supabase.rpc(
-      "global_search",
-      { search_query: query },
-      { schema: "public" },
-    );
+    const { data, error } = await supabase.rpc("global_search", { search_query: query });
 
     console.log("RPC result:", { data, error });
     console.log("RPC data length:", data?.length);

@@ -185,6 +185,23 @@
     -webkit-text-fill-color: var(--foreground);
     box-shadow: 0 0 0 1000px var(--muted) inset;
   }
+
+  /* Login fields remain readable independently from the authenticated layout. */
+  input.login-field:-webkit-autofill,
+  input.login-field:-webkit-autofill:hover,
+  input.login-field:-webkit-autofill:focus {
+    -webkit-text-fill-color: #0f172a;
+    caret-color: #0f172a;
+    box-shadow: 0 0 0 1000px #ffffff inset;
+  }
+
+  .dark input.login-field:-webkit-autofill,
+  .dark input.login-field:-webkit-autofill:hover,
+  .dark input.login-field:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff;
+    caret-color: #ffffff;
+    box-shadow: 0 0 0 1000px #0f172a inset;
+  }
 }
 
 @utility scrollbar-thin {

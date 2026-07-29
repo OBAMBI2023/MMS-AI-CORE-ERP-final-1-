@@ -8,6 +8,7 @@ import {
   Truck,
   Users,
 } from "lucide-react";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { MarketingCta } from "../components/MarketingCta";
 
 const features = [
@@ -31,7 +32,7 @@ export function FeaturesPage() {
             Les outils métier réunis dans un même environnement.
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-            AUREX ERP organise les principaux flux de gestion sans fragmenter les informations.
+            {PLATFORM_BRANDING.productName} organise les principaux flux de gestion sans fragmenter les informations.
           </p>
         </div>
       </section>

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSignedUrl, useSignedUrlState } from "@/hooks/use-signed-url";
 import { useTenant } from "@/providers/TenantProvider";
+import { PLATFORM_BRANDING } from "@/config/branding";
 
 export function useCompanySettings(tenantId?: string | null) {
   const { profile, loading: tenantLoading } = useTenant();
@@ -33,7 +34,11 @@ export function useCompanySettings(tenantId?: string | null) {
     signatureUrl,
     cachetUrl,
     isLoading: brandingLoading,
-    companyName: settings?.nomCommercial ?? "Maguy Multi Services",
+    companyName:
+      settings?.company_name?.trim() ||
+      settings?.trade_name?.trim() ||
+      settings?.nomCommercial?.trim() ||
+      PLATFORM_BRANDING.productName,
     address: settings?.adresse ?? "",
     phone: settings?.telephone ?? "",
     email: settings?.email ?? "",

@@ -20,6 +20,9 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 type LoginTenant = { id: string; name: string; logo_url: string | null };
 
+const loginInputClassName =
+  "login-field h-13 rounded-2xl border-slate-300 bg-white pl-12 pr-12 text-sm text-slate-900 caret-slate-900 shadow-sm shadow-slate-100 transition-all duration-200 placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-[#0F5BFF] focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-blue-500/10 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:caret-white dark:shadow-none dark:placeholder:text-slate-400 dark:hover:border-slate-500 dark:focus-visible:border-blue-400 dark:focus-visible:bg-slate-900 dark:focus-visible:ring-blue-400/20";
+
 async function getAuthenticatedHome(): Promise<"/app" | "/super-admin" | "/partner"> {
   const destination = await getAuthenticatedDestination();
   return destination === "/403" ? "/app" : destination;
@@ -158,7 +161,7 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
       logo={
         tenantLoading
           ? undefined
-          : (tenant?.logo_url ?? PLATFORM_BRANDING.assets.logoDark)
+          : (tenant?.logo_url ?? PLATFORM_BRANDING.assets.logo)
       }
       logoAlt={tenant ? `Logo ${tenant.name}` : PLATFORM_BRANDING.alt}
       backLink={tenantSlug ? { href: "/login", label: "Retour" } : undefined}
@@ -179,10 +182,11 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
         emailId={tenantSlug ? "tenant-email" : "email"}
         passwordId={tenantSlug ? "tenant-password" : "password"}
         emailPlaceholder="nom@entreprise.com"
+        inputClassName={loginInputClassName}
         logo={
           tenantLoading
             ? undefined
-            : (tenant?.logo_url ?? PLATFORM_BRANDING.assets.logoVertical)
+            : (tenant?.logo_url ?? PLATFORM_BRANDING.assets.logo)
         }
         logoAlt={tenant ? `Logo ${companyName}` : PLATFORM_BRANDING.alt}
         headerContent={

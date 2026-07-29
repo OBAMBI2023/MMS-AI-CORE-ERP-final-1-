@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { AppShell } from "@/components/mms/AppShell";
 import { ResourceTable, type FieldDef, type ColumnDef } from "@/components/mms/ResourceTable";
 import { formatDate } from "@/lib/mms/format";
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/fournisseurs")({
   component: FournisseursPage,
   head: () => ({
     meta: [
-      { title: "Fournisseurs — AUREX ERP" },
+      { title: `Fournisseurs — ${PLATFORM_BRANDING.productName}` },
       { name: "description", content: "Répertoire des fournisseurs." },
     ],
   }),

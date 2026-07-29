@@ -241,7 +241,7 @@ export function PartnerAdminDashboardView({
 
   return (
     <div className="min-h-screen bg-[#f6f8fc] text-[#14213d]">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-hidden bg-[#08285f] text-white shadow-2xl lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[250px] flex-col overflow-hidden bg-[#08285f] text-white shadow-2xl lg:flex">
         <SidebarContent
           data={data}
           onNavigate={scrollTo}
@@ -279,7 +279,7 @@ export function PartnerAdminDashboardView({
         </div>
       )}
 
-      <div className="lg:pl-64">
+      <div className="lg:pl-[250px]">
         <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
           <div className="flex h-[76px] items-center gap-3 px-4 sm:px-6 xl:px-8">
             <button
@@ -298,6 +298,11 @@ export function PartnerAdminDashboardView({
                 className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
               />
             </div>
+            <img
+              src={PLATFORM_BRANDING.assets.logo}
+              alt={PLATFORM_BRANDING.alt}
+              className="h-11 w-auto max-w-[132px] object-contain lg:hidden"
+            />
             <div className="ml-auto flex items-center gap-2 sm:gap-4">
               <button
                 onClick={() => scrollTo("activites")}
@@ -319,7 +324,7 @@ export function PartnerAdminDashboardView({
                 </span>
                 <span className="hidden sm:block">
                   <span className="block text-sm font-semibold">{data.partner.name}</span>
-                  <span className="block text-xs text-slate-500">Partenaire AUREX</span>
+                  <span className="block text-xs text-slate-500">Partenaire {PLATFORM_BRANDING.shortName}</span>
                 </span>
               </button>
               <Button
@@ -357,7 +362,7 @@ export function PartnerAdminDashboardView({
                   Bonjour, {data.partner.name}
                 </h1>
                 <p className="mt-2 text-sm leading-6 text-blue-100 sm:text-base">
-                  Pilotez votre portefeuille clients et suivez les licences AUREX depuis un espace
+                  Pilotez votre portefeuille clients et suivez les licences {PLATFORM_BRANDING.shortName} depuis un espace
                   unifié.
                 </p>
               </div>
@@ -803,14 +808,20 @@ function SidebarContent({
 }) {
   return (
     <>
-      <div className="relative border-b border-white/10 px-6 py-6">
-        <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-blue-400/10 blur-3xl" />
-        <img src={PLATFORM_BRANDING.assets.logoDark} alt={PLATFORM_BRANDING.alt} className="relative h-9 w-auto max-w-36 object-contain object-left" />
-        <p className="relative mt-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#e3c26f]">
-          Partner Portal
-        </p>
+      <div className="relative flex h-[110px] shrink-0 flex-col items-center justify-center overflow-hidden border-b border-[rgba(212,175,55,0.25)] px-5">
+        <div className="absolute left-1/2 top-0 h-28 w-40 -translate-x-1/2 rounded-full bg-blue-400/10 blur-3xl" />
+        <div className="relative flex w-full min-w-0 flex-col items-center">
+          <img
+            src={PLATFORM_BRANDING.assets.logo}
+            alt={PLATFORM_BRANDING.alt}
+            className="h-[60px] w-auto max-w-[180px] object-contain"
+          />
+          <p className="mt-1 text-center text-[10px] font-semibold uppercase leading-none tracking-[0.28em] text-[#e3c26f]">
+            Partner Portal
+          </p>
+        </div>
       </div>
-      <nav className="flex-1 space-y-1.5 px-3 py-6">
+      <nav className="flex-1 space-y-1.5 px-3 pb-6 pt-5">
         <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-200/50">
           Navigation
         </p>

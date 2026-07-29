@@ -119,7 +119,7 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
     },
     onSuccess: async (row) => {
       if (userId && entityName) {
-        await logAction(userId, roleId, "delete", entityName, { id: row.id });
+        await logAction(userId, roleId ?? null, "delete", entityName, { id: row.id });
       }
       toast.success(`${singular} supprimé`);
       qc.invalidateQueries({ queryKey: [table] });

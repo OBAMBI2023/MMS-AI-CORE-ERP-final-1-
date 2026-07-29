@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
@@ -41,7 +42,7 @@ export const Route = createFileRoute("/devis")({
   component: DevisPage,
   head: () => ({
     meta: [
-      { title: "Devis — AUREX ERP" },
+      { title: `Devis — ${PLATFORM_BRANDING.productName}` },
       { name: "description", content: "Gestion des devis clients." },
     ],
   }),
@@ -96,7 +97,7 @@ function DevisPage() {
         numero: devis.number,
         date: new Date(devis.created_at).toLocaleDateString(),
         dateExpiration: devis.due_date ? new Date(devis.due_date).toLocaleDateString() : "",
-        statut: devis.status,
+        statut: devis.status ?? "",
         client: {
           nom: devis.client_name ?? "Client inconnu",
         },
@@ -149,7 +150,9 @@ function DevisPage() {
     },
     onSuccess: async (devis) => {
       if (userId) {
-        await logAction(userId, roleId, "delete", "devis", { devis_number: devis.number });
+        await logAction(userId, roleId ?? null, "delete", "devis", {
+          devis_number: devis.number,
+        });
       }
       toast.success("Devis supprimé");
       qc.invalidateQueries({ queryKey: ["devis"] });

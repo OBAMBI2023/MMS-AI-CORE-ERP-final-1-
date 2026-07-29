@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable, { type CellHookData, type UserOptions } from "jspdf-autotable";
+import { PLATFORM_BRANDING } from "@/config/branding";
 
 export const PDF_COLORS = {
   primary: [11, 31, 58] as [number, number, number],
@@ -41,7 +42,8 @@ const value = (settings: RawSettings, ...keys: string[]) => {
 export function tenantFromSettings(settings: RawSettings, logoUrl?: string | null): PdfTenant {
   return {
     companyName:
-      value(settings, "company_name", "nomCommercial", "trade_name") || "AUREX ERP",
+      value(settings, "company_name", "nomCommercial", "trade_name") ||
+      PLATFORM_BRANDING.productName,
     address: value(settings, "address", "adresse"),
     phone: value(settings, "phone", "telephone"),
     email: value(settings, "email"),

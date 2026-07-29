@@ -34,7 +34,7 @@ export const Turnstile = forwardRef<
   }
 >(function Turnstile({ siteKey, onTokenChange }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const widgetIdRef = useRef<string>();
+  const widgetIdRef = useRef<string | undefined>(undefined);
   const [error, setError] = useState("");
 
   useImperativeHandle(

@@ -29,6 +29,7 @@ import {
   type ManagedPartner,
   type PartnerManagementData,
 } from "@/lib/partners.server";
+import { PLATFORM_BRANDING } from "@/config/branding";
 
 type EditorMode = "create" | "edit" | "tenants" | "password" | "offer";
 
@@ -207,7 +208,7 @@ export function PartnerManagementView({ data }: { data: PartnerManagementData })
             </Button>
             <h1 className="text-2xl font-bold tracking-tight">Comptes Partenaires</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Gérez les accès plateforme et les portefeuilles de tenants AUREX.
+              Gérez les accès plateforme et les portefeuilles de tenants {PLATFORM_BRANDING.shortName}.
             </p>
           </div>
           <Button onClick={() => open("create")}><Plus /> Nouveau partenaire</Button>

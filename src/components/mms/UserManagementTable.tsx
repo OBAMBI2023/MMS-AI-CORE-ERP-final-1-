@@ -67,7 +67,9 @@ export function UserManagement() {
     mutationFn: deleteUser,
     onSuccess: async (_, variables) => {
       if (userId && userToDeleteName) {
-        await logAction(userId, roleId, "delete", "users", { user_name: userToDeleteName });
+        await logAction(userId, roleId ?? null, "delete", "users", {
+          user_name: userToDeleteName,
+        });
       }
       qc.invalidateQueries({ queryKey: ["users", tenantId] });
       toast.success("Utilisateur supprimé");

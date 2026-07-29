@@ -33,7 +33,7 @@ function LicenseUnavailablePage() {
           className="mx-auto mb-8 h-14 w-auto max-w-[230px] dark:hidden"
         />
         <img
-          src={PLATFORM_BRANDING.assets.logoDark}
+          src={PLATFORM_BRANDING.assets.logo}
           alt={PLATFORM_BRANDING.alt}
           className="mx-auto mb-8 hidden h-14 w-auto max-w-[230px] dark:block"
         />
@@ -52,7 +52,7 @@ function LicenseUnavailablePage() {
           Votre abonnement nécessite une action
         </h1>
         <p className="mx-auto mt-5 max-w-md text-pretty text-[15px] leading-7 text-slate-600 sm:text-base dark:text-slate-300">
-          L&apos;accès à votre espace AUREX ERP est momentanément indisponible.
+          L&apos;accès à votre espace {PLATFORM_BRANDING.productName} est momentanément indisponible.
           <span className="mt-3 block">
             Votre période d&apos;essai est terminée ou votre abonnement n&apos;est plus actif. Dès le
             renouvellement de votre abonnement, vous retrouverez immédiatement l&apos;accès à toutes

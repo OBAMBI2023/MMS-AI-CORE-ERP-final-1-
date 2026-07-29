@@ -10,7 +10,7 @@ export function getAIProvider(): AIProvider {
     async ask(prompt: string) {
       // Import and call the existing Gemini implementation
       const { callGemini } = await import("./ai-server");
-      const result = await callGemini({ prompt });
+      const result = await callGemini({ data: { prompt } });
       return { text: result.text };
     },
   };

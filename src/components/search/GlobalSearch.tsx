@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactElement } from "react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -32,7 +32,7 @@ export function GlobalSearch({
 }) {
   const { query, setQuery, results, isLoading, history, clearHistory } = useGlobalSearch();
 
-  const iconMap: Record<SearchModule, JSX.Element> = {
+  const iconMap: Record<SearchModule, ReactElement> = {
     Clients: <Users className="h-4 w-4" />,
     Fournisseurs: <Truck className="h-4 w-4" />,
     Services: <Briefcase className="h-4 w-4" />,

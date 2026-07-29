@@ -37,7 +37,13 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { logAction } from "@/lib/audit.server";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import {
+  renderPdfFooter,
+  renderPdfHeader,
+  renderPdfTable,
+  renderPdfTotalCard,
+  tenantFromSettings,
+} from "@/lib/mms/PdfTheme";
 import { useTenant } from "@/providers/TenantProvider";
 
 interface SalesHistoryModalProps {
@@ -78,7 +84,7 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
   });
 
   const { role, roleId } = permissionsQuery.data || { permissions: [], role: null, roleId: null };
-  const { settings, logoUrl, companyName, address, phone, email } = useCompanySettings();
+  const { settings, logoUrl } = useCompanySettings();
   // La gestion d'une vente est volontairement plus stricte qu'une permission
   // configurable : seul le rôle Administrateur peut la modifier ou la supprimer.
   const canManageSales = role === "Administrateur";
@@ -99,22 +105,14 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
 
   const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 10;
-
-    // Header
-    doc.setFontSize(18);
-    doc.text("Historique des ventes", pageWidth / 2, y, { align: "center" });
-    y += 10;
-    
-    doc.setFontSize(10);
-    doc.text(`${companyName}`, 10, y);
-    doc.text(`Email: ${email}`, 10, y + 5);
-    doc.text(`Tél: ${phone}`, 10, y + 10);
-    doc.text(`Adresse: ${address}`, 10, y + 15);
-    y += 25;
+    const tenant = tenantFromSettings(settings, logoUrl);
+    const total = filteredSales.reduce((sum, sale) => sum + Number(sale.total), 0);
+    const y = await renderPdfHeader(doc, tenant, "Historique des ventes", [
+      { label: "Nombre de ventes", value: String(filteredSales.length) },
+      { label: "Montant total", value: formatCurrency(total) },
+    ]);
 
     // Sales Table
     const tableData = filteredSales.map((s) => [
@@ -126,20 +124,15 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
       "Validée",
     ]);
 
-    (doc as any).autoTable({
-      head: [["Référence", "Date", "Client", "Montant", "Paiement", "Statut"]],
-      body: tableData,
-      startY: y,
-      didDrawPage: (data: any) => {
-        // Footer with page number
-        doc.text(
-          `Page ${data.pageNumber} / ${data.pageCount}`,
-          pageWidth / 2,
-          doc.internal.pageSize.getHeight() - 10,
-          { align: "center" }
-        );
-      },
-    });
+    const finalY = renderPdfTable(
+      doc,
+      ["Référence", "Date", "Client", "Montant", "Paiement", "Statut"],
+      tableData,
+      y,
+      { columnStyles: { 3: { halign: "right", fontStyle: "bold" } } },
+    );
+    renderPdfTotalCard(doc, "Total des ventes", formatCurrency(total), finalY + 7);
+    renderPdfFooter(doc, tenant);
 
     doc.save("historique-ventes.pdf");
     toast.success("PDF généré");
@@ -147,20 +140,27 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
 
   const canPrint = (_sale: any) => true;
 
-  const handlePrint = (sale: any) => {
-    const doc = new jsPDF({ format: "a7", unit: "mm" });
-    doc.setFontSize(8);
-    doc.text("Ticket de caisse", 10, 5);
-    doc.text(`Ref: ${sale.number}`, 10, 10);
-    doc.text(`Date: ${new Date(sale.created_at).toLocaleDateString()}`, 10, 15);
-    doc.text("-----------------------", 10, 20);
-
-    sale.vente_items?.forEach((item: any, index: number) => {
-      doc.text(`${item.qty} x ${item.name} : ${formatCurrency(item.price)}`, 10, 25 + index * 5);
-    });
-
-    doc.text("-----------------------", 10, 25 + (sale.vente_items?.length || 0) * 5);
-    doc.text(`Total: ${formatCurrency(sale.total)}`, 10, 30 + (sale.vente_items?.length || 0) * 5);
+  const handlePrint = async (sale: any) => {
+    const doc = new jsPDF({ format: "a4", unit: "mm" });
+    const tenant = tenantFromSettings(settings, logoUrl);
+    const y = await renderPdfHeader(doc, tenant, "Ticket de caisse", [
+      { label: "Référence", value: sale.number },
+      { label: "Date", value: new Date(sale.created_at).toLocaleDateString("fr-FR") },
+    ]);
+    const finalY = renderPdfTable(
+      doc,
+      ["Article", "Quantité", "Prix unitaire", "Montant"],
+      (sale.vente_items ?? []).map((item: any) => [
+        item.name,
+        item.qty,
+        formatCurrency(item.price),
+        formatCurrency(Number(item.price) * Number(item.qty)),
+      ]),
+      y,
+      { columnStyles: { 2: { halign: "right" }, 3: { halign: "right", fontStyle: "bold" } } },
+    );
+    renderPdfTotalCard(doc, "Total", formatCurrency(sale.total), finalY + 7);
+    renderPdfFooter(doc, tenant);
 
     doc.save(`ticket-${sale.number}.pdf`);
     toast.success("Impression lancée");
@@ -178,7 +178,9 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     if (error) {
       toast.error("Erreur lors de la suppression");
     } else {
-      await logAction(userId, roleId, "delete", "ventes", { sale_number: saleToDelete.number });
+      await logAction(userId, roleId ?? null, "delete", "ventes", {
+        sale_number: saleToDelete.number,
+      });
       toast.success("Vente supprimée");
       queryClient.invalidateQueries({ queryKey: ["ventes", "history"] });
       setSaleToDelete(null);
