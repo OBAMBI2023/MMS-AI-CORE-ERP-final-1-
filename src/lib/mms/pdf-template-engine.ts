@@ -1,7 +1,14 @@
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
-import { CompanySettings, DocumentItem, DocumentTotals } from "./pdf-types";
+import type { CompanySettings, DocumentItem, DocumentTotals } from "./pdf-types";
 import { formatCurrency } from "./format";
+import {
+  PDF_COLORS,
+  renderPdfFooter,
+  renderPdfHeader,
+  renderPdfTable,
+  renderPdfTotalCard,
+  tenantFromSettings,
+} from "./PdfTheme";
 
 async function urlToDataURL(url: string): Promise<string> {
   const response = await fetch(url);
@@ -16,32 +23,21 @@ async function urlToDataURL(url: string): Promise<string> {
 
 export async function renderLogo(doc: jsPDF, logoUrl: string) {
   try {
-    const dataUrl = await urlToDataURL(logoUrl);
-    doc.addImage(dataUrl, "PNG", 10, 10, 50, 20); // Adjust dimensions as needed
+    doc.addImage(await urlToDataURL(logoUrl), "PNG", 18, 19, 21, 21);
   } catch (error) {
     console.error("Failed to render logo:", error);
   }
 }
 
-export async function renderSignatureAndStamp(
-  doc: jsPDF,
-  signatureUrl: string,
-  cachetUrl: string | null,
-) {
+export async function renderSignatureAndStamp(doc: jsPDF, signatureUrl: string, cachetUrl: string | null) {
   try {
     const x = 140;
-    const y = doc.internal.pageSize.height - 50; // Adjust as needed
-    const width = 50;
-    const height = 30;
-
-    const signatureData = await urlToDataURL(signatureUrl);
-    doc.addImage(signatureData, "PNG", x, y, width, height);
-
+    const y = doc.internal.pageSize.height - 50;
+    doc.addImage(await urlToDataURL(signatureUrl), "PNG", x, y, 50, 30);
     if (cachetUrl) {
-      const cachetData = await urlToDataURL(cachetUrl);
       doc.saveGraphicsState();
       doc.setGState(new (jsPDF as any).GState({ opacity: 0.75 }));
-      doc.addImage(cachetData, "PNG", x, y, width, height);
+      doc.addImage(await urlToDataURL(cachetUrl), "PNG", x, y, 50, 30);
       doc.restoreGraphicsState();
     }
   } catch (error) {
@@ -49,96 +45,52 @@ export async function renderSignatureAndStamp(
   }
 }
 
-export function renderHeader(doc: jsPDF, settings: CompanySettings, startY: number = 10) {
-  // Set primary color
-  doc.setTextColor(37, 99, 235);
-
-  // Company Name (Right Aligned)
-  doc.setFontSize(22);
-  doc.setFont(undefined, "bold");
-  doc.text(String(settings.company_name ?? "").toUpperCase(), 200, startY + 10, { align: "right" });
-
-  // Company Info (Right Aligned)
-  doc.setFontSize(10);
-  doc.setFont(undefined, "normal");
-  doc.setTextColor(50, 50, 50);
-  doc.text(String(settings.trade_name ?? ""), 200, startY + 16, { align: "right" });
-  doc.text(`${String(settings.address ?? "")}, ${String(settings.city ?? "")}`, 200, startY + 22, {
-    align: "right",
-  });
-  doc.text(
-    `Tél: ${String(settings.phone ?? "")} | Email: ${String(settings.email ?? "")}`,
-    200,
-    startY + 28,
-    { align: "right" },
-  );
-
-  // Horizontal Line
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.5);
-  doc.line(10, startY + 32, 200, startY + 32);
-
-  return startY + 40;
+export function renderHeader(doc: jsPDF, settings: CompanySettings, _startY = 10) {
+  const tenant = tenantFromSettings(settings as unknown as Record<string, unknown>);
+  doc.setTextColor(11, 31, 58);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text(tenant.companyName.toUpperCase(), 200, 22, { align: "right", maxWidth: 140 });
+  return 52;
 }
 
-export async function renderDepensesHeader(
+export function renderPremiumDocumentHeader(
   doc: jsPDF,
   settings: CompanySettings,
-  logoUrl: string | null,
+  title: string,
+  logoUrl?: string | null,
+  summary: Array<{ label: string; value: string }> = [],
 ) {
-  let startY = 10;
-  if (logoUrl) {
-    await renderLogo(doc, logoUrl);
-    startY += 25;
-  }
+  return renderPdfHeader(
+    doc,
+    tenantFromSettings(settings as unknown as Record<string, unknown>, logoUrl),
+    title,
+    summary,
+  );
+}
 
-  doc.setFontSize(18);
-  doc.setFont(undefined, "bold");
-  doc.text(String(settings.company_name ?? "").toUpperCase(), 15, startY + 5);
-
-  doc.setFontSize(14);
-  doc.setFont(undefined, "normal");
-  doc.text("Liste des dépenses", 15, startY + 12);
-
-  // Horizontal Line
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.5);
-  doc.line(10, startY + 15, 200, startY + 15);
-
-  return startY + 25;
+export function renderDepensesHeader(doc: jsPDF, settings: CompanySettings, logoUrl: string | null) {
+  return renderPremiumDocumentHeader(doc, settings, "Liste des dépenses", logoUrl);
 }
 
 export function renderDepensesTable(doc: jsPDF, data: any[], startY: number) {
-  autoTable(doc, {
-    startY: startY,
-    head: [["Date", "Catégorie", "Description", "Mode de paiement", "Montant"]],
-    body: data.map((d) => [
-      d.date,
-      d.category,
-      d.description || "-",
-      d.payment_method || "-",
-      d.amount,
+  return renderPdfTable(
+    doc,
+    ["Date", "Catégorie", "Description", "Mode de paiement", "Montant"],
+    data.map((item) => [
+      item.date,
+      item.category,
+      item.description || "-",
+      item.payment_method || "-",
+      item.amount,
     ]),
-    theme: "striped",
-    headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: [50, 50, 50],
-      fontStyle: "bold",
-    },
-    margin: { left: 10, right: 10 },
-  });
+    startY,
+    { columnStyles: { 4: { halign: "right", fontStyle: "bold" } } },
+  );
 }
 
-export function renderDepensesTotals(doc: jsPDF, total: string, startY: number) {
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
-
-  // Background box
-  doc.setFillColor(240, 240, 240);
-  doc.rect(10, finalY, 190, 10, "F");
-
-  doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
-  doc.text(`TOTAL DES DÉPENSES : ${total}`, 15, finalY + 7);
+export function renderDepensesTotals(doc: jsPDF, total: string, _startY: number) {
+  renderPdfTotalCard(doc, "Total des dépenses", total, (doc as any).lastAutoTable.finalY + 7);
 }
 
 export function renderTable(
@@ -148,46 +100,30 @@ export function renderTable(
   currency?: string,
   decimals?: number,
 ) {
-  autoTable(doc, {
-    startY: startY,
-    head: [["Description", "Qté", "Prix U.", "Remise", "TVA", "Montant"]],
-    body: items.map((item) => [
+  return renderPdfTable(
+    doc,
+    ["Description", "Qté", "Prix U.", "Remise", "TVA", "Montant"],
+    items.map((item) => [
       item.description,
-      item.quantite.toString(),
+      item.quantite,
       formatCurrency(item.prixUnitaire, currency, decimals),
       formatCurrency(item.remise, currency, decimals),
-      item.tva.toString(),
+      item.tva,
       formatCurrency(item.montant, currency, decimals),
     ]),
-    theme: "plain", // Use 'plain' for cleaner look
-    headStyles: {
-      fillColor: [240, 240, 240], // Light grey background
-      textColor: [50, 50, 50],
-      fontStyle: "bold",
-      lineWidth: 0.1,
-      lineColor: [200, 200, 200],
+    startY,
+    {
+      columnStyles: {
+        2: { halign: "right" },
+        3: { halign: "right" },
+        5: { halign: "right", fontStyle: "bold" },
+      },
     },
-    bodyStyles: {
-      lineWidth: 0.1,
-      lineColor: [220, 220, 220],
-    },
-    margin: { left: 10, right: 10 },
-  });
+  );
 }
 
 export function renderFooter(doc: jsPDF, settings: CompanySettings) {
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      `Page ${i} de ${pageCount} - ${settings.company_name}`,
-      doc.internal.pageSize.width / 2,
-      doc.internal.pageSize.height - 10,
-      { align: "center" },
-    );
-  }
+  renderPdfFooter(doc, tenantFromSettings(settings as unknown as Record<string, unknown>));
 }
 
 export function renderTotals(
@@ -197,22 +133,57 @@ export function renderTotals(
   currency?: string,
   decimals?: number,
 ) {
-  const rightMargin = 200;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const blockWidth = 88;
+  const blockX = pageWidth - 10 - blockWidth;
+  const rows = [
+    { label: "Sous-total", value: totals.sousTotal },
+    ...(Number(totals.remise) > 0 ? [{ label: "Remise", value: totals.remise }] : []),
+    ...(Number(totals.tva) > 0 ? [{ label: "TVA", value: totals.tva }] : []),
+  ];
+  const blockHeight = 5 + rows.length * 8 + 4 + 11 + 4;
+  let y = startY;
 
-  // Background box
-  doc.setFillColor(245, 245, 245);
-  doc.rect(130, startY - 5, 75, 25, "F"); // x, y, width, height, 'F'ill
+  if (y + blockHeight > pageHeight - 18) {
+    doc.addPage();
+    y = 20;
+  }
 
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(...PDF_COLORS.line);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(blockX, y, blockWidth, blockHeight, 2.5, 2.5, "FD");
+
+  let rowY = y + 7;
+  rows.forEach((row) => {
+    doc.setTextColor(...PDF_COLORS.primary);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(row.label, blockX + 5, rowY);
+    doc.setFont("helvetica", "bold");
+    doc.text(formatCurrency(row.value, currency, decimals), blockX + blockWidth - 5, rowY, {
+      align: "right",
+      maxWidth: blockWidth - 34,
+    });
+    rowY += 8;
+  });
+
+  doc.setDrawColor(...PDF_COLORS.secondary);
+  doc.setLineWidth(0.4);
+  doc.line(blockX + 5, rowY - 2, blockX + blockWidth - 5, rowY - 2);
+
+  doc.setTextColor(...PDF_COLORS.primary);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(50, 50, 50);
-  doc.text(`Sous-total: ${formatCurrency(totals.sousTotal, currency, decimals)}`, rightMargin - 5, startY, { align: "right" });
-  doc.text(`Remise: ${formatCurrency(totals.remise, currency, decimals)}`, rightMargin - 5, startY + 5, { align: "right" });
-  doc.text(`TVA: ${formatCurrency(totals.tva, currency, decimals)}`, rightMargin - 5, startY + 10, { align: "right" });
+  doc.text("TOTAL TTC", blockX + 5, rowY + 6);
 
-  doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
-  doc.setTextColor(37, 99, 235); // Primary color
-  doc.text(`Total TTC: ${formatCurrency(totals.totalTTC, currency, decimals)}`, rightMargin - 5, startY + 18, { align: "right" });
-  doc.setFont(undefined, "normal");
-  doc.setTextColor(50, 50, 50);
+  doc.setTextColor(...PDF_COLORS.secondary);
+  doc.setFontSize(13);
+  doc.text(
+    formatCurrency(totals.totalTTC, currency, decimals),
+    blockX + blockWidth - 5,
+    rowY + 6,
+    { align: "right", maxWidth: blockWidth - 34 },
+  );
 }

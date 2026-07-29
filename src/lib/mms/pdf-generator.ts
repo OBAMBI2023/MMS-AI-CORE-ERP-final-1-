@@ -1,11 +1,10 @@
 import { jsPDF } from "jspdf";
 import { QuotationData, CompanySettings } from "./pdf-types";
 import {
-  renderHeader,
+  renderPremiumDocumentHeader,
   renderFooter,
   renderTable,
   renderTotals,
-  renderLogo,
   renderSignatureAndStamp,
 } from "./pdf-template-engine";
 import { toast } from "sonner";
@@ -23,31 +22,23 @@ export async function generateDevisPDF(
 
     const doc = new jsPDF();
 
-    // Render Header and Logo
-    let afterHeaderY = renderHeader(doc, settings);
-    if (images.logo) {
-      await renderLogo(doc, images.logo);
-    }
-
-    // Title
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
-    doc.text("DEVIS", 105, afterHeaderY + 10, { align: "center" });
-    doc.setFontSize(10);
-    doc.text(`Numéro: ${quote.numero}`, 105, afterHeaderY + 16, { align: "center" });
-    doc.text(`Date: ${quote.date} | Expiration: ${quote.dateExpiration}`, 105, afterHeaderY + 21, {
-      align: "center",
-    });
+    const afterHeaderY = await renderPremiumDocumentHeader(doc, settings, "Devis", images.logo, [
+      { label: "Numéro", value: quote.numero },
+      { label: "Date", value: quote.date },
+      { label: "Expiration", value: quote.dateExpiration || "-" },
+    ]);
 
     // Customer Info
-    doc.text("Informations du client:", 10, afterHeaderY + 35);
-    doc.text(quote.client.nom, 10, afterHeaderY + 40);
-    if (quote.client.entreprise) doc.text(quote.client.entreprise, 10, afterHeaderY + 45);
-    if (quote.client.telephone) doc.text(quote.client.telephone, 10, afterHeaderY + 50);
-    if (quote.client.email) doc.text(quote.client.email, 10, afterHeaderY + 55);
+    doc.setFontSize(10);
+    doc.setTextColor(31, 41, 55);
+    doc.text("Informations du client", 10, afterHeaderY + 5);
+    doc.text(quote.client.nom, 10, afterHeaderY + 10);
+    if (quote.client.entreprise) doc.text(quote.client.entreprise, 10, afterHeaderY + 15);
+    if (quote.client.telephone) doc.text(quote.client.telephone, 10, afterHeaderY + 20);
+    if (quote.client.email) doc.text(quote.client.email, 10, afterHeaderY + 25);
 
     // Items Table
-    renderTable(doc, quote.items, afterHeaderY + 65, settings.currency, settings.decimals);
+    renderTable(doc, quote.items, afterHeaderY + 32, settings.currency, settings.decimals);
 
     // Totals
     const finalY = (doc as any).lastAutoTable.finalY + 10;
