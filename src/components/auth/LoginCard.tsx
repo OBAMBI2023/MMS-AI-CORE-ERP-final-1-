@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 
 type LoginCardProps = {
   title: string;
@@ -52,14 +53,14 @@ export function LoginCard({
             </span>
           </div>
           {headerContent ?? (
-            <motion.img
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.12, duration: 0.4 }}
-              src={logo}
-              alt={logoAlt}
-              className="mx-auto mb-5 h-[108px] w-auto max-w-[255px] object-contain"
-            />
+              className="mb-5 flex justify-center"
+            >
+              <BrandLogo context="login" src={logo} alt={logoAlt} />
+            </motion.div>
           )}
           <CardTitle className="text-[28px] font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">{title}</CardTitle>
           <CardDescription className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-300">{description}</CardDescription>
@@ -120,7 +121,7 @@ export function LoginCard({
   return (
     <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-200/60">
       <CardHeader className="space-y-3 pb-6 text-center">
-        {headerContent ?? <img src={logo} alt={logoAlt} className="mx-auto h-20 w-auto max-w-[190px] object-contain lg:hidden" />}
+        {headerContent ?? <BrandLogo context="login" src={logo} alt={logoAlt} className="mx-auto lg:hidden" />}
         <CardTitle className="text-2xl text-slate-900">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>

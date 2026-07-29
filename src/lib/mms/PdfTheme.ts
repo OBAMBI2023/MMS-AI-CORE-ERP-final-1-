@@ -106,7 +106,12 @@ export async function renderPdfHeader(
   let logoRendered = false;
   if (tenant.logoUrl) {
     try {
-      doc.addImage(await imageData(tenant.logoUrl), "PNG", 18, 19, 21, 21);
+      const data = await imageData(tenant.logoUrl);
+      const properties = doc.getImageProperties(data);
+      const ratio = properties.width / properties.height;
+      const width = ratio >= 1 ? 10 : 10 * ratio;
+      const height = ratio >= 1 ? 10 / ratio : 10;
+      doc.addImage(data, "PNG", 18 + (10 - width) / 2, 19 + (10 - height) / 2, width, height);
       logoRendered = true;
     } catch (error) {
       console.warn("Logo PDF indisponible, utilisation des initiales.", error);

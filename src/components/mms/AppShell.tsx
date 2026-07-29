@@ -8,8 +8,9 @@ import { useState } from "react";
 import { UserMenu } from "./UserMenu";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useTheme } from "@/components/theme-provider";
-import { PLATFORM_BRANDING } from "@/config/branding";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BrandLogo } from "@/components/branding/BrandLogo";
+import { SidebarCompanyHeader } from "./SidebarCompanyHeader";
 
 export function AppShell({
   title,
@@ -45,32 +46,10 @@ export function AppShell({
               >
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <div className="flex h-full flex-col gap-2">
-                  <div className="flex h-24 shrink-0 items-center gap-3 border-b border-sidebar-border px-5">
-                    <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl">
-                      {isLoading ? (
-                        <Skeleton className="h-16 w-16 rounded-2xl" />
-                      ) : logoUrl ? (
-                        <img
-                          src={logoUrl}
-                          alt={`Logo ${companyName}`}
-                          className="max-h-16 w-auto max-w-16 rounded-2xl object-contain"
-                        />
-                      ) : (
-                        <img
-                          src={PLATFORM_BRANDING.assets.logo}
-                          alt={PLATFORM_BRANDING.alt}
-                          className="max-h-16 w-auto max-w-16 object-contain"
-                        />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      {isLoading ? (
-                        <Skeleton className="h-4 w-28" />
-                      ) : (
-                        <div className="truncate text-sm font-bold tracking-tight">{companyName}</div>
-                      )}
-                    </div>
-                  </div>
+                  <SidebarCompanyHeader
+                    logoUrl={logoUrl}
+                    isLoading={isLoading}
+                  />
                   <div className="flex-1 px-4">
                     <SidebarContent onItemClick={() => setOpen(false)} />
                   </div>
@@ -81,11 +60,7 @@ export function AppShell({
               {isLoading ? (
                 <Skeleton className="h-11 w-11 rounded-xl" />
               ) : (
-                <img
-                  src={logoUrl ?? PLATFORM_BRANDING.assets.logo}
-                  alt={logoUrl ? `Logo ${companyName}` : PLATFORM_BRANDING.alt}
-                  className="max-h-12 w-auto max-w-full object-contain object-left"
-                />
+                <BrandLogo context="mobile" src={logoUrl} alt={`Logo ${companyName}`} />
               )}
             </div>
             <div className="hidden sm:block">

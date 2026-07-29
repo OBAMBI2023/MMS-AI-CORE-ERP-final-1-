@@ -7,5 +7,7 @@ export interface TenantProfile {
 
 export interface Tenant {
   id: string;
+  name?: string | null;
+  business_activity?: string | null;
   [column: string]: unknown;
 }

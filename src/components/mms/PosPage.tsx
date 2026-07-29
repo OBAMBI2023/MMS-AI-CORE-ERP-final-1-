@@ -31,6 +31,7 @@ import { Sidebar } from "@/components/mms/Sidebar";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { SidebarContent } from "@/components/mms/SidebarContent";
+import { SidebarCompanyHeader } from "@/components/mms/SidebarCompanyHeader";
 import { SalesHistoryModal } from "@/components/mms/SalesHistoryModal";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { History } from "lucide-react";
@@ -38,6 +39,7 @@ import { useTenant } from "@/providers/TenantProvider";
 import { useCatalogItems } from "@/hooks/use-catalog-items";
 import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 
 // ---------------- Types & catalogue ----------------
 type Category = string;
@@ -289,30 +291,19 @@ export function PosPage() {
                 >
                   <SheetTitle className="sr-only">Navigation</SheetTitle>
                   <div className="flex h-full flex-col gap-2">
-                    <div className="flex h-24 shrink-0 items-center gap-3 border-b border-sidebar-border px-5">
-                      <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl">
-                        <img
-                          src={logoUrl ?? PLATFORM_BRANDING.assets.logo}
-                          alt={logoUrl ? `Logo ${settings?.company_name ?? "Mon Entreprise"}` : PLATFORM_BRANDING.alt}
-                          className="max-h-16 w-auto max-w-16 object-contain"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-bold tracking-tight">
-                          {settings?.company_name ?? "Mon Entreprise"}
-                        </div>
-                      </div>
-                    </div>
+                    <SidebarCompanyHeader
+                      logoUrl={logoUrl}
+                    />
                     <div className="flex-1 px-4">
                       <SidebarContent onItemClick={() => setMobileMenuOpen(false)} />
                     </div>
                   </div>
                 </SheetContent>
               </Sheet>
-              <img
-                src={logoUrl ?? PLATFORM_BRANDING.assets.logo}
-                alt={logoUrl ? `Logo ${settings?.company_name ?? "Mon Entreprise"}` : PLATFORM_BRANDING.alt}
-                className="h-11 w-auto max-w-[132px] object-contain object-left"
+              <BrandLogo
+                context="mobile"
+                src={logoUrl}
+                alt={`Logo ${settings?.company_name ?? "Mon Entreprise"}`}
               />
             </div>
             <div className="flex items-baseline justify-between mb-3">

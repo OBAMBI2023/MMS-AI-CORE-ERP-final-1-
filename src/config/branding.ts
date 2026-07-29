@@ -16,13 +16,14 @@ export const PLATFORM_BRANDING = {
     pay: "SAOVIA Pay",
     cloud: "SAOVIA Cloud",
   },
-  // TODO: Fournir les variantes vectorielles SAOVIA (logoDark, logoVertical, icon et favicon).
+  // A single official vector is currently available. Keep every surface on
+  // SAOVIA until dedicated, approved variants are supplied.
   assets: {
     logo: "/branding/saovia-logo.svg",
-    logoDark: "/branding/aurex-logo-dark.svg",
-    logoVertical: "/branding/aurex-logo-vertical.svg",
-    icon: "/branding/aurex-icon.svg",
-    favicon: "/branding/favicon.svg",
+    logoDark: "/branding/saovia-logo.svg",
+    logoVertical: "/branding/saovia-logo.svg",
+    icon: "/branding/saovia-logo.svg",
+    favicon: "/branding/saovia-logo.svg",
   },
 } as const;
 

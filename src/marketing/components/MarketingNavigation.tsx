@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 
 const navigationItems = [
   { label: "Accueil", to: "/" },
@@ -21,11 +22,7 @@ export function MarketingNavigation() {
         className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8"
       >
         <Link to="/" className="flex items-center" onClick={() => setIsOpen(false)}>
-          <img
-            src={PLATFORM_BRANDING.assets.logo}
-            alt={PLATFORM_BRANDING.alt}
-            className="h-11 w-auto max-w-[180px]"
-          />
+          <BrandLogo context="header" />
         </Link>
 
         <div className="hidden items-center gap-7 lg:flex">

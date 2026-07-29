@@ -1,16 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { PLATFORM_BRANDING } from "@/config/branding";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 
 export function MarketingFooter() {
   return (
     <footer className="border-t border-slate-200 bg-slate-950 text-slate-300">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-10 sm:flex-row sm:items-center sm:justify-between lg:px-8">
         <div>
-          <img
-            src={PLATFORM_BRANDING.assets.logo}
-            alt={PLATFORM_BRANDING.alt}
-            className="h-12 w-auto max-w-[210px]"
-          />
+          <BrandLogo context="header" />
           <p className="mt-2 max-w-md text-sm text-slate-400">
             Un espace de gestion centralisé pour piloter les opérations de votre entreprise.
           </p>

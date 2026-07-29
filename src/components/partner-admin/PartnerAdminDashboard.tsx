@@ -40,6 +40,7 @@ import {
   type PartnerTenant,
 } from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 import { formatCurrency } from "@/lib/mms/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -298,11 +299,7 @@ export function PartnerAdminDashboardView({
                 className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
               />
             </div>
-            <img
-              src={PLATFORM_BRANDING.assets.logo}
-              alt={PLATFORM_BRANDING.alt}
-              className="h-11 w-auto max-w-[132px] object-contain lg:hidden"
-            />
+            <BrandLogo context="mobile" className="lg:hidden" />
             <div className="ml-auto flex items-center gap-2 sm:gap-4">
               <button
                 onClick={() => scrollTo("activites")}
@@ -811,11 +808,7 @@ function SidebarContent({
       <div className="relative flex h-[110px] shrink-0 flex-col items-center justify-center overflow-hidden border-b border-[rgba(212,175,55,0.25)] px-5">
         <div className="absolute left-1/2 top-0 h-28 w-40 -translate-x-1/2 rounded-full bg-blue-400/10 blur-3xl" />
         <div className="relative flex w-full min-w-0 flex-col items-center">
-          <img
-            src={PLATFORM_BRANDING.assets.logo}
-            alt={PLATFORM_BRANDING.alt}
-            className="h-[60px] w-auto max-w-[180px] object-contain"
-          />
+          <BrandLogo context="partner" />
           <p className="mt-1 text-center text-[10px] font-semibold uppercase leading-none tracking-[0.28em] text-[#e3c26f]">
             Partner Portal
           </p>

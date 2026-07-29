@@ -100,6 +100,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 import { DEFAULT_CURRENCY, formatCurrency } from "@/lib/mms/format";
 import {
   Table,
@@ -241,11 +242,7 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
   return (
     <div className="flex h-full flex-col bg-[#0a0a0b] text-white">
       <div className="flex h-24 shrink-0 items-center border-b border-white/10 px-5">
-        <img
-          src={PLATFORM_BRANDING.assets.logo}
-          alt={PLATFORM_BRANDING.alt}
-          className="h-16 w-auto max-w-[220px] object-contain object-left"
-        />
+        <BrandLogo context="superAdmin" />
         <span className="sr-only">Platform admin</span>
       </div>
 
@@ -1403,11 +1400,7 @@ export function SuperAdminDashboardView({
                   <SidebarContent mobile />
                 </SheetContent>
               </Sheet>
-              <img
-                src={PLATFORM_BRANDING.assets.logo}
-                alt={PLATFORM_BRANDING.alt}
-                className="h-11 w-auto max-w-[132px] object-contain sm:hidden"
-              />
+              <BrandLogo context="mobile" className="sm:hidden" />
               <div className="hidden min-w-0 sm:block">
                 <h1 className="truncate text-base font-semibold tracking-tight">Vue d’ensemble</h1>
                 <p className="truncate text-xs text-muted-foreground">Pilotage de la plateforme</p>

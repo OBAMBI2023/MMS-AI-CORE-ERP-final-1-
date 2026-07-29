@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -890,9 +891,9 @@ function CompanyPreview({ form }: { form: Partial<Parametres> }) {
     <section className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
       <div className="h-20 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent" />
       <div className="px-5 pb-5 -mt-10">
-        <div className="h-20 w-20 rounded-2xl bg-background border border-border shadow-sm flex items-center justify-center overflow-hidden">
+        <div className="flex size-20 items-center justify-center overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
           {logo ? (
-            <img src={logo} alt="logo" className="max-h-full max-w-full object-contain" />
+            <BrandLogo context="dashboard" src={logo} alt="Logo de l’entreprise" />
           ) : (
             <Building2 className="h-8 w-8 text-muted-foreground" />
           )}

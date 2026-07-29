@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { useTheme } from "@/components/theme-provider";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 
 type AuthLayoutProps = {
   children: ReactNode;
@@ -100,7 +101,7 @@ export function AuthLayout({
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(15,91,255,0.28),transparent_34%),radial-gradient(circle_at_85%_80%,rgba(37,99,235,0.16),transparent_34%)]" />
       <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[30px] border border-white/10 bg-white shadow-2xl lg:grid-cols-[1.05fr_0.95fr]">
         <section className="hidden flex-col justify-between bg-[#07113D] p-12 text-white lg:flex">
-          <img src={logo} alt={logoAlt} className="h-14 w-auto max-w-[230px] self-start" />
+          <BrandLogo context="login" src={logo} alt={logoAlt} className="self-start" />
           <div className="my-20">
             {badge && (
               <p className={`mb-5 text-xs font-semibold uppercase tracking-[0.24em] ${accentClassName}`}>

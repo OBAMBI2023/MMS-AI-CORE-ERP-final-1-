@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Headphones, LogOut, TriangleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 
 function LicenseUnavailablePage() {
   const signOut = async () => {
@@ -27,16 +28,7 @@ function LicenseUnavailablePage() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-xl rounded-[2rem] border border-white/80 bg-white/90 p-6 text-center shadow-[0_24px_80px_-24px_rgba(15,23,42,0.25)] backdrop-blur-xl sm:p-10 dark:border-slate-800/80 dark:bg-slate-900/90 dark:shadow-black/40"
       >
-        <img
-          src={PLATFORM_BRANDING.assets.logo}
-          alt={PLATFORM_BRANDING.alt}
-          className="mx-auto mb-8 h-14 w-auto max-w-[230px] dark:hidden"
-        />
-        <img
-          src={PLATFORM_BRANDING.assets.logo}
-          alt={PLATFORM_BRANDING.alt}
-          className="mx-auto mb-8 hidden h-14 w-auto max-w-[230px] dark:block"
-        />
+        <BrandLogo context="superAdmin" className="mx-auto mb-8" />
 
         <motion.div
           initial={{ scale: 0.8, rotate: -8 }}

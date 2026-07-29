@@ -11,8 +11,8 @@ export function DynamicFavicon({ platform = false }: { platform?: boolean }) {
     const favicon = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
     if (favicon) {
       favicon.href = platform
-        ? PLATFORM_BRANDING.assets.logo
-        : (logoUrl ?? PLATFORM_BRANDING.assets.logo);
+        ? PLATFORM_BRANDING.assets.favicon
+        : (logoUrl ?? PLATFORM_BRANDING.assets.favicon);
       favicon.type = platform || !logoUrl ? "image/svg+xml" : "";
     }
 
