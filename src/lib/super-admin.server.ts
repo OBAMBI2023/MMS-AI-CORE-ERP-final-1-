@@ -5,7 +5,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
 
-type TenantRow = { id: string; name: string; slug: string; is_active: boolean; created_at: string };
+type TenantRow = {
+  id: string; name: string; slug: string; is_active: boolean; created_at: string;
+  deleted_at: string | null; deletion_reason: string | null; suspended_at: string | null;
+};
+type PartnerTenantRow = { partner_id: string; tenant_id: string; assigned_at: string };
 type TenantMetricRow = {
   tenant_id: string | null;
   created_at?: string | null;
@@ -57,7 +61,7 @@ type CreditPurchaseRow = {
   attributed_by: string; created_at: string;
 };
 type TrialUsageRow = {
-  id: string; partner_id: string; tenant_id: string; client_email: string; status: string;
+  id: string; partner_id: string; tenant_id: string; offer_id: string; client_email: string; status: string;
   starts_at: string; expires_at: string; created_by: string;
 };
 type AiPlanRow = {
@@ -157,6 +161,11 @@ export type SuperAdminTenant = {
   loginUrl: string;
   status: string;
   createdAt: string | null;
+  deletedAt: string | null;
+  deletionReason: string | null;
+  suspendedAt: string | null;
+  partner: { id: string; name: string; code: string } | null;
+  partnerOffer: { id: string; name: string } | null;
   users: number;
   sales: number;
   clients: number;
@@ -252,6 +261,37 @@ export const getPlatformAdminAccess = createServerFn({ method: "GET" })
     return { isPlatformAdmin: Boolean(data) };
   });
 
+export const manageTenantLifecycle = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    tenantId: z.string().uuid(),
+    action: z.enum(["suspend", "reactivate", "soft_delete", "restore"]),
+    reason: z.string().trim().min(3).max(500),
+    exactName: z.string().max(200).optional(),
+    secondConfirmation: z.literal("CONFIRMER LA SUPPRESSION").optional(),
+  }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { data: result, error } = await (context.supabase as any).rpc(
+      "manage_tenant_lifecycle",
+      {
+        requested_tenant_id: data.tenantId,
+        requested_actor_id: context.userId,
+        requested_action: data.action,
+        requested_reason: data.reason,
+        requested_exact_name: data.exactName ?? null,
+        requested_second_confirmation: data.secondConfirmation ?? null,
+      },
+    );
+    if (error) throw new Error(formatSupabaseError(error));
+    return result as {
+      tenant_id: string;
+      partner_id: string | null;
+      action: string;
+      dependencies: Record<string, number>;
+    };
+  });
+
 async function fetchRows<T>(
   supabaseAdmin: SupabaseClient,
   table: string,
@@ -310,8 +350,9 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       creditPackRows,
       creditPurchaseRows,
       trialUsageRows,
+      partnerTenantRows,
     ] = await Promise.all([
-      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at"),
+      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "tenant_id, created_at, updated_at"),
       fetchRows<SaleRow>(supabaseAdmin, "ventes", "tenant_id, total, created_at, updated_at"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "clients", "tenant_id, created_at, updated_at"),
@@ -363,7 +404,8 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       fetchRows<CreditTransactionRow>(supabaseAdmin, "partner_credit_transactions", "id, partner_id, tenant_id, transaction_type, credits, balance_after, reason, reference, actor_id, created_at"),
       fetchRows<CreditPackRow>(supabaseAdmin, "partner_credit_packs", "id, name, price, credit_count, is_active, created_at"),
       fetchRows<CreditPurchaseRow>(supabaseAdmin, "partner_credit_purchases", "id, partner_id, credit_pack_id, credits, amount, currency, reference, reason, attributed_by, created_at"),
-      fetchRows<TrialUsageRow>(supabaseAdmin, "partner_trial_usage", "id, partner_id, tenant_id, client_email, status, starts_at, expires_at, created_by"),
+      fetchRows<TrialUsageRow>(supabaseAdmin, "partner_trial_usage", "id, partner_id, tenant_id, offer_id, client_email, status, starts_at, expires_at, created_by"),
+      fetchRows<PartnerTenantRow>(supabaseAdmin, "partner_tenants", "partner_id, tenant_id, assigned_at"),
     ]);
     const subscriptionsByTenant = new Map(
       subscriptionRows.map((subscription) => [subscription.tenant_id, subscription]),
@@ -394,6 +436,17 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
     const packsById = new Map(modulePacks.map((pack) => [pack.id, pack]));
     const tenantPackState = new Map(
       tenantModulePackRows.map((assignment) => [assignment.tenant_id, assignment.pack_id]),
+    );
+    const partnersById = new Map(commercialPartnerRows.map((partner) => [partner.id, partner]));
+    const creatorPartnerByTenant = new Map(
+      [...partnerTenantRows]
+        .sort((a, b) => a.assigned_at.localeCompare(b.assigned_at))
+        .map((assignment) => [assignment.tenant_id, assignment.partner_id]),
+    );
+    const offersById = new Map(partnerOfferRows.map((offer) => [offer.id, offer]));
+    const trialByTenant = new Map(trialUsageRows.map((trial) => [trial.tenant_id, trial]));
+    const partnerSubscriptionByPartner = new Map(
+      partnerSubscriptionRows.map((subscription) => [subscription.partner_id, subscription]),
     );
     const metrics = new Map<
       string,
@@ -470,8 +523,26 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           name: tenant.name,
           slug: tenant.slug,
           loginUrl: `/login/${tenant.slug}`,
-          status: subscription?.status ?? (tenant.is_active ? "active" : "suspended"),
+          status: tenant.deleted_at
+            ? "deleted"
+            : !tenant.is_active
+              ? "suspended"
+              : (subscription?.status ?? "active"),
           createdAt: tenant.created_at,
+          deletedAt: tenant.deleted_at,
+          deletionReason: tenant.deletion_reason,
+          suspendedAt: tenant.suspended_at,
+          partner: (() => {
+            const partner = partnersById.get(creatorPartnerByTenant.get(tenant.id) ?? "");
+            return partner ? { id: partner.id, name: partner.name, code: partner.code } : null;
+          })(),
+          partnerOffer: (() => {
+            const partnerId = creatorPartnerByTenant.get(tenant.id);
+            const offerId = trialByTenant.get(tenant.id)?.offer_id
+              ?? (partnerId ? partnerSubscriptionByPartner.get(partnerId)?.offer_id : undefined);
+            const offer = offerId ? offersById.get(offerId) : undefined;
+            return offer ? { id: offer.id, name: offer.name } : null;
+          })(),
           ...tenantMetrics,
           plan: subscription?.billing_cycle ?? null,
           subscriptionId: subscription?.id ?? null,

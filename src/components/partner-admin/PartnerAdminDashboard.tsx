@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   Activity,
@@ -11,10 +12,12 @@ import {
   CircleUserRound,
   Clock3,
   Command,
+  Copy,
   KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
+  Mail,
   Search,
   ShieldCheck,
   Sparkles,
@@ -37,12 +40,17 @@ import {
 import {
   createPartnerTenant,
   createPartnerTrial,
+  requestPartnerTenantSuspension,
+  resendPartnerTenantInvitation,
   type PartnerDashboard,
   type PartnerTenant,
 } from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { BrandLogo } from "@/components/branding/BrandLogo";
 import { formatCurrency } from "@/lib/mms/format";
+import { supabase } from "@/integrations/supabase/client";
+import { runPreservingAuthUid } from "@/lib/preserve-auth-session";
+import { usePartnerTenantLogo } from "@/hooks/use-partner-tenant-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +62,7 @@ const BLUE = "#1546a0";
 const GOLD = "#c99b3b";
 const SKY = "#5b8def";
 const PALE = "#dce8ff";
+const INVITATION_RESEND_COOLDOWN_SECONDS = 60;
 
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" });
 const dateTimeFormatter = new Intl.DateTimeFormat("fr-FR", {
@@ -119,6 +128,7 @@ export function PartnerAdminDashboardView({
   data: PartnerDashboard;
   onSignOut: () => Promise<void>;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -133,7 +143,22 @@ export function PartnerAdminDashboardView({
   const [trialQuery, setTrialQuery] = useState("");
   const [trialStatus, setTrialStatus] = useState("all");
   const [submittingTenant, setSubmittingTenant] = useState(false);
+  const [resendingTenantId, setResendingTenantId] = useState<string | null>(null);
+  const [invitationCooldowns, setInvitationCooldowns] = useState<Record<string, number>>({});
   const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    if (!Object.keys(invitationCooldowns).length) return;
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setInvitationCooldowns((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(([, expiresAt]) => expiresAt > now),
+        ),
+      );
+    }, 1_000);
+    return () => window.clearInterval(timer);
+  }, [invitationCooldowns]);
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -157,21 +182,55 @@ export function PartnerAdminDashboardView({
         email: tenantEmail,
         city: trialCity,
       };
-      const result = tenantMode === "paid"
-        ? await createPartnerTenant({ data: payload })
-        : await createPartnerTrial({ data: payload });
-      if (result.emailSent) {
-        toast.success(`${tenantMode === "paid" ? "Tenant" : "Essai"} créé. L’invitation a été envoyée par email.`);
-      } else {
-        toast.success(`${tenantMode === "paid" ? "Tenant" : "Essai"} créé. Mot de passe temporaire : ${result.temporaryPassword}`, {
-          duration: 20000,
-        });
-      }
-      window.location.reload();
+      const getAuthUid = async () => {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        return user?.id ?? null;
+      };
+      const result = await runPreservingAuthUid(
+        getAuthUid,
+        () => tenantMode === "paid"
+          ? createPartnerTenant({ data: payload })
+          : createPartnerTrial({ data: payload }),
+      );
+      setTenantDialogOpen(false);
+      setTenantName("");
+      setTenantEmail("");
+      setTrialActivityProfile("");
+      setTrialManager("");
+      setTrialPhone("");
+      setTrialCity("");
+      await router.invalidate();
+      toast.success(
+        `${tenantMode === "paid" ? "Tenant" : "Essai"} créé. Invitation envoyée. Accès : ${result.loginUrl}`,
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Création impossible.");
     } finally {
       setSubmittingTenant(false);
+    }
+  };
+
+  const copyLoginUrl = async (loginUrl: string) => {
+    const absoluteUrl = new URL(loginUrl, window.location.origin).toString();
+    await navigator.clipboard.writeText(absoluteUrl);
+    toast.success("Lien de connexion copié.");
+  };
+
+  const resendInvitation = async (tenantId: string) => {
+    if (resendingTenantId || (invitationCooldowns[tenantId] ?? 0) > Date.now()) return;
+    setResendingTenantId(tenantId);
+    try {
+      await resendPartnerTenantInvitation({ data: { tenantId } });
+      setInvitationCooldowns((current) => ({
+        ...current,
+        [tenantId]: Date.now() + INVITATION_RESEND_COOLDOWN_SECONDS * 1_000,
+      }));
+      toast.success("Invitation renvoyée au client.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Envoi impossible.");
+    } finally {
+      setResendingTenantId(null);
     }
   };
 
@@ -535,14 +594,18 @@ export function PartnerAdminDashboardView({
                         <td className="px-5 py-4 text-slate-500">{formatDate(trial.createdAt)}</td>
                         <td className="px-5 py-4 text-slate-500">{formatDate(trial.expiresAt)}</td>
                         <td className="px-5 py-4">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!trial.loginUrl}
-                            onClick={() => trial.loginUrl && window.open(trial.loginUrl, "_blank", "noopener,noreferrer")}
-                          >
-                            Ouvrir le tenant
-                          </Button>
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" disabled={!trial.loginUrl} onClick={() => trial.loginUrl && void copyLoginUrl(trial.loginUrl)}>
+                              <Copy /> Copier le lien
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={resendingTenantId === trial.tenantId || (invitationCooldowns[trial.tenantId] ?? 0) > Date.now()} onClick={() => void resendInvitation(trial.tenantId)}>
+                              <Mail /> {resendingTenantId === trial.tenantId
+                                ? "Envoi…"
+                                : (invitationCooldowns[trial.tenantId] ?? 0) > Date.now()
+                                  ? `Renvoyer dans ${Math.ceil((invitationCooldowns[trial.tenantId] - Date.now()) / 1_000)} s`
+                                  : "Renvoyer l’invitation"}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -563,7 +626,23 @@ export function PartnerAdminDashboardView({
             {data.tenants.length ? (
               <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
                 {data.tenants.map((tenant, index) => (
-                  <CompanyCard key={tenant.id} tenant={tenant} index={index} />
+                  <CompanyCard
+                    key={tenant.id}
+                    tenant={tenant}
+                    index={index}
+                    resending={resendingTenantId === tenant.id}
+                    cooldownSeconds={Math.max(0, Math.ceil(((invitationCooldowns[tenant.id] ?? 0) - Date.now()) / 1_000))}
+                    onCopy={() => void copyLoginUrl(tenant.loginUrl!)}
+                    onResend={() => void resendInvitation(tenant.id)}
+                    onRequestSuspension={() => {
+                      const reason = window.prompt("Motif de la demande de suspension :");
+                      if (!reason?.trim()) return;
+                      void requestPartnerTenantSuspension({
+                        data: { tenantId: tenant.id, reason: reason.trim() },
+                      }).then(() => toast.success("Demande de suspension transmise au Super Admin."))
+                        .catch((error) => toast.error(error instanceof Error ? error.message : "Demande impossible."));
+                    }}
+                  />
                 ))}
               </div>
             ) : (
@@ -970,9 +1049,19 @@ function SectionHeading({
 function CompanyCard({
   tenant,
   index,
+  resending,
+  cooldownSeconds,
+  onCopy,
+  onResend,
+  onRequestSuspension,
 }: {
   tenant: PartnerTenant;
   index: number;
+  resending: boolean;
+  cooldownSeconds: number;
+  onCopy: () => void;
+  onResend: () => void;
+  onRequestSuspension: () => void;
 }) {
   const enabled = tenant.modules.filter((module) => module.enabled);
   return (
@@ -1017,6 +1106,24 @@ function CompanyCard({
           <span className="text-slate-400">Échéance</span>
           <span className="font-semibold text-slate-700">{formatDate(expiryFor(tenant))}</span>
         </div>
+        <p className="mt-4 truncate rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          {tenant.loginUrl}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" disabled={!tenant.loginUrl} onClick={onCopy}>
+            <Copy /> Copier le lien
+          </Button>
+          <Button size="sm" variant="outline" disabled={resending || cooldownSeconds > 0} onClick={onResend}>
+            <Mail /> {resending
+              ? "Envoi…"
+              : cooldownSeconds > 0
+                ? `Renvoyer dans ${cooldownSeconds} s`
+                : "Renvoyer l’invitation"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={onRequestSuspension}>
+            Demander la suspension
+          </Button>
+        </div>
         {!["active", "trial"].includes(tenant.subscription?.status ?? "") && (
           <p className="mt-4 text-center text-xs text-slate-500">
             Activation payante réservée à l’administration de la plateforme.
@@ -1028,11 +1135,17 @@ function CompanyCard({
 }
 
 function CompanyIdentity({ tenant, large = false }: { tenant: PartnerTenant; large?: boolean }) {
+  const { url: logoUrl, isLoading: logoLoading } = usePartnerTenantLogo(
+    tenant.id,
+    tenant.logoPath,
+  );
   return (
     <div className="flex min-w-0 items-center gap-3">
       <div className={`${large ? "h-12 w-12 rounded-2xl" : "h-10 w-10 rounded-xl"} grid shrink-0 place-items-center overflow-hidden border border-slate-200 bg-white shadow-sm`}>
-        {tenant.logoUrl ? (
-          <img src={tenant.logoUrl} alt="" className="h-full w-full object-contain p-1.5" />
+        {logoLoading ? (
+          <div className="h-5 w-5 animate-pulse rounded bg-slate-200" aria-label="Chargement du logo" />
+        ) : logoUrl ? (
+          <img src={logoUrl} alt="" className="h-full w-full object-contain p-1.5" />
         ) : (
           <span className="text-xs font-bold text-[#1546a0]">{initials(tenant.name)}</span>
         )}

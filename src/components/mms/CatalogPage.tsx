@@ -39,6 +39,8 @@ import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 import { NewCategoryDialog } from "@/components/mms/NewCategoryDialog";
 import type { CatalogCategory } from "@/services/catalog-categories.service";
 import { useCatalogItems, type CatalogItem } from "@/hooks/use-catalog-items";
+import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import { catalogTypeEnabled } from "@/lib/catalog-settings";
 
 const CATALOG_BUCKET = "catalog-images";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -103,6 +105,15 @@ export function CatalogPage() {
   const canCreate = useActionPermission("services.create");
   const canEdit = useActionPermission("services.edit");
   const canDelete = useActionPermission("services.delete");
+  const catalogSettingsQuery = useCatalogSettings();
+  const productEnabled = catalogTypeEnabled(catalogSettingsQuery.data, "product");
+  const serviceEnabled = catalogTypeEnabled(catalogSettingsQuery.data, "service");
+
+  useEffect(() => {
+    if (catalogSettingsQuery.data && !catalogTypeEnabled(catalogSettingsQuery.data, activeType)) {
+      setActiveType(catalogSettingsQuery.data.catalog_mode === "services" ? "service" : "product");
+    }
+  }, [activeType, catalogSettingsQuery.data]);
 
   const categoriesQuery = useCatalogCategories({ activeOnly: true });
   const activeCategories = useMemo(
@@ -246,6 +257,9 @@ export function CatalogPage() {
   const saveItem = useMutation({
     mutationFn: async () => {
       const tenantId = await requireConnectedTenant();
+      if (!catalogTypeEnabled(catalogSettingsQuery.data, form.type)) {
+        throw new Error("Ce type de catalogue est désactivé pour votre entreprise.");
+      }
       if (!form.name.trim() || !form.category_id || !form.unit.trim()) {
         throw new Error("Le nom, la catégorie et l’unité sont requis.");
       }
@@ -357,7 +371,7 @@ export function CatalogPage() {
     },
   });
 
-  const isLoading = loading || categoriesQuery.isLoading || itemsQuery.loading;
+  const isLoading = loading || categoriesQuery.isLoading || itemsQuery.loading || catalogSettingsQuery.isLoading;
   const loadError =
     itemsQuery.error ??
     (categoriesQuery.error
@@ -381,7 +395,7 @@ export function CatalogPage() {
         }}
       >
         <TabsList className="grid h-auto w-full grid-cols-1 gap-3 bg-transparent p-0 sm:grid-cols-2">
-          <TabsTrigger
+          {productEnabled && <TabsTrigger
             value="product"
             className="h-auto justify-start gap-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md data-[state=active]:border-blue-500 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-950 data-[state=active]:shadow-md dark:border-blue-900/60 dark:from-blue-950/50 dark:to-background dark:data-[state=active]:border-blue-500"
           >
@@ -397,8 +411,8 @@ export function CatalogPage() {
             <span className="ml-auto rounded-full bg-blue-100 px-2.5 py-1 text-sm font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
               {itemCounts.product}
             </span>
-          </TabsTrigger>
-          <TabsTrigger
+          </TabsTrigger>}
+          {serviceEnabled && <TabsTrigger
             value="service"
             className="h-auto justify-start gap-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md data-[state=active]:border-violet-500 data-[state=active]:bg-violet-50 data-[state=active]:text-violet-950 data-[state=active]:shadow-md dark:border-violet-900/60 dark:from-violet-950/50 dark:to-background dark:data-[state=active]:border-violet-500"
           >
@@ -414,7 +428,7 @@ export function CatalogPage() {
             <span className="ml-auto rounded-full bg-violet-100 px-2.5 py-1 text-sm font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
               {itemCounts.service}
             </span>
-          </TabsTrigger>
+          </TabsTrigger>}
         </TabsList>
       </Tabs>
 
@@ -612,6 +626,8 @@ export function CatalogPage() {
         onSubmit={() => saveItem.mutate()}
         canCreateCategory={canCreate}
         onOpenCreateCategory={() => setNewCategoryDialogOpen(true)}
+        productEnabled={productEnabled}
+        serviceEnabled={serviceEnabled}
       />
 
       <NewCategoryDialog
@@ -637,6 +653,8 @@ function CatalogItemDialog({
   onSubmit,
   canCreateCategory,
   onOpenCreateCategory,
+  productEnabled,
+  serviceEnabled,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -648,6 +666,8 @@ function CatalogItemDialog({
   onSubmit: () => void;
   canCreateCategory: boolean;
   onOpenCreateCategory: () => void;
+  productEnabled: boolean;
+  serviceEnabled: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
@@ -707,8 +727,8 @@ function CatalogItemDialog({
               }}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
-              <option value="service">Service</option>
-              <option value="product">Produit</option>
+              {serviceEnabled && <option value="service">Service</option>}
+              {productEnabled && <option value="product">Produit</option>}
             </select>
           </label>
           <div className="space-y-2">

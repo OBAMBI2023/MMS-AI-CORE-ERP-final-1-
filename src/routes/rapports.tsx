@@ -12,7 +12,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/mms/AppShell";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +58,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 
 type SaleItemType = "service" | "product";
 type SalesFilter = "all" | SaleItemType;
@@ -222,8 +223,19 @@ function RapportsPage() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [salesFilter, setSalesFilter] = useState<SalesFilter>("all");
+  const catalogSettingsQuery = useCatalogSettings();
+  const catalogMode = catalogSettingsQuery.data?.catalog_mode;
+  const showProducts = catalogMode !== "services" && salesFilter !== "service";
+  const showServices = catalogMode !== "products" && salesFilter !== "product";
+  const showMixed = catalogMode === "mixed";
+  const showPurchases = showProducts && catalogSettingsQuery.data?.purchases_enabled;
   const { settings, logoUrl, companyName } = useCompanySettings();
   const canExport = useActionPermission("reports.export");
+
+  useEffect(() => {
+    if (catalogMode === "products") setSalesFilter("product");
+    else if (catalogMode === "services") setSalesFilter("service");
+  }, [catalogMode]);
 
   const report = useMemo(() => {
     if (!data) return null;
@@ -361,18 +373,18 @@ function RapportsPage() {
       },
     ]);
     const rows = [
-      ["CA total", formatCurrency(report.target.totalRevenue)],
-      ["CA produits", formatCurrency(report.target.productRevenue)],
-      ["CA services", formatCurrency(report.target.serviceRevenue)],
-      [
+      ...(showMixed ? [["CA total", formatCurrency(report.target.totalRevenue)]] : []),
+      ...(showProducts ? [["CA produits", formatCurrency(report.target.productRevenue)]] : []),
+      ...(showServices ? [["CA services", formatCurrency(report.target.serviceRevenue)]] : []),
+      ...(showMixed ? [[
         "Part Produits / Services",
         report.target.totalRevenue > 0
           ? `${((report.target.productRevenue / report.target.totalRevenue) * 100).toFixed(1)} % / ${((report.target.serviceRevenue / report.target.totalRevenue) * 100).toFixed(1)} %`
           : "0,0 % / 0,0 %",
-      ],
-      ["Achats", formatCurrency(report.target.purchases)],
+      ]] : []),
+      ...(showPurchases ? [["Achats", formatCurrency(report.target.purchases)]] : []),
       ["Dépenses", formatCurrency(report.target.expenses)],
-      ["Marge brute produits", formatCurrency(report.target.grossMargin)],
+      ...(showProducts ? [["Marge brute produits", formatCurrency(report.target.grossMargin)]] : []),
       ["Nombre de devis", String(report.target.quoteCount)],
       ["Devis acceptés", formatCurrency(report.target.quoteAmounts.accepted)],
       ["Devis en attente", formatCurrency(report.target.quoteAmounts.pending)],
@@ -388,20 +400,13 @@ function RapportsPage() {
       finalY + 8,
       { columnStyles: { 1: { halign: "right" } } },
     );
-    finalY = renderPdfTable(
-      doc,
-      ["Meilleurs produits", "Qté", "CA", "Marge"],
-      report.products.map((row) => [
-        row.name,
-        String(row.quantity),
-        formatCurrency(row.revenue),
-        formatCurrency(row.margin),
-      ]),
+    if (showProducts) finalY = renderPdfTable(
+      doc, ["Meilleurs produits", "Qté", "CA", "Marge"],
+      report.products.map((row) => [row.name, String(row.quantity), formatCurrency(row.revenue), formatCurrency(row.margin)]),
       finalY + 8,
     );
-    finalY = renderPdfTable(
-      doc,
-      ["Meilleurs services", "Qté", "CA"],
+    if (showServices) finalY = renderPdfTable(
+      doc, ["Meilleurs services", "Qté", "CA"],
       report.services.map((row) => [row.name, String(row.quantity), formatCurrency(row.revenue)]),
       finalY + 8,
     );
@@ -415,12 +420,12 @@ function RapportsPage() {
     if (!report) return;
     const rows = [
       ["KPI", "Valeur"],
-      ["CA total", report.target.totalRevenue],
-      ["CA produits", report.target.productRevenue],
-      ["CA services", report.target.serviceRevenue],
-      ["Achats", report.target.purchases],
+      ...(showMixed ? [["CA total", report.target.totalRevenue]] : []),
+      ...(showProducts ? [["CA produits", report.target.productRevenue]] : []),
+      ...(showServices ? [["CA services", report.target.serviceRevenue]] : []),
+      ...(showPurchases ? [["Achats", report.target.purchases]] : []),
       ["Dépenses", report.target.expenses],
-      ["Marge brute produits", report.target.grossMargin],
+      ...(showProducts ? [["Marge brute produits", report.target.grossMargin]] : []),
       ["Résultat net", report.target.netResult],
       ["Nombre de devis", report.target.quoteCount],
       ["Devis acceptés", report.target.quoteAmounts.accepted],
@@ -430,11 +435,8 @@ function RapportsPage() {
       ["Dépenses par catégorie", "Montant"],
       ...report.target.expenseCategories.map((row) => [row.category, row.amount]),
       [],
-      ["Meilleurs produits", "Quantité", "CA", "Coût", "Marge"],
-      ...report.products.map((row) => [row.name, row.quantity, row.revenue, row.cost, row.margin]),
-      [],
-      ["Meilleurs services", "Quantité", "CA"],
-      ...report.services.map((row) => [row.name, row.quantity, row.revenue]),
+      ...(showProducts ? [["Meilleurs produits", "Quantité", "CA", "Coût", "Marge"], ...report.products.map((row) => [row.name, row.quantity, row.revenue, row.cost, row.margin]), []] : []),
+      ...(showServices ? [["Meilleurs services", "Quantité", "CA"], ...report.services.map((row) => [row.name, row.quantity, row.revenue]), []] : []),
     ];
     const blob = new Blob(["\ufeff" + rows.map((row) => row.join(";")).join("\n")], {
       type: "text/csv;charset=utf-8;",
@@ -476,7 +478,7 @@ function RapportsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select
+          {showMixed && <Select
             value={salesFilter}
             onValueChange={(value) => setSalesFilter(value as SalesFilter)}
           >
@@ -488,7 +490,7 @@ function RapportsPage() {
               <SelectItem value="product">Produits</SelectItem>
               <SelectItem value="service">Services</SelectItem>
             </SelectContent>
-          </Select>
+          </Select>}
         </div>
         {canExport && (
           <DropdownMenu>
@@ -505,45 +507,46 @@ function RapportsPage() {
         )}
       </div>
 
-      {isLoading ? (
+      {isLoading || catalogSettingsQuery.isLoading ? (
         <div className="text-muted-foreground">Chargement des données réelles…</div>
-      ) : error ? (
+      ) : error || catalogSettingsQuery.error ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
-          Impossible de charger le rapport : {error.message}
+          Impossible de charger le rapport : {(error ?? catalogSettingsQuery.error)?.message}
+          <Button variant="outline" className="ml-3" onClick={() => { void catalogSettingsQuery.refetch(); }}>Réessayer</Button>
         </div>
       ) : !report ? (
         <div className="text-muted-foreground">Aucune donnée disponible.</div>
       ) : (
         <div className="space-y-8">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
+            {showMixed && <StatCard
               label="CA total"
               value={report.target.totalRevenue}
               compare={report.compare.totalRevenue}
               icon={Wallet}
               tone="blue"
-            />
-            <StatCard
+            />}
+            {showProducts && <StatCard
               label="CA produits"
               value={report.target.productRevenue}
               compare={report.compare.productRevenue}
               icon={Package}
               tone="blue"
-            />
-            <StatCard
+            />}
+            {showServices && <StatCard
               label="CA services"
               value={report.target.serviceRevenue}
               compare={report.compare.serviceRevenue}
               icon={Wrench}
               tone="green"
-            />
-            <StatCard
+            />}
+            {showPurchases && <StatCard
               label="Achats"
               value={report.target.purchases}
               compare={report.compare.purchases}
               icon={ShoppingCart}
               tone="amber"
-            />
+            />}
             <StatCard
               label="Dépenses"
               value={report.target.expenses}
@@ -551,13 +554,13 @@ function RapportsPage() {
               icon={Receipt}
               tone="red"
             />
-            <StatCard
+            {showProducts && <StatCard
               label="Marge brute produits"
               value={report.target.grossMargin}
               compare={report.compare.grossMargin}
               icon={BarChart3}
               tone="blue"
-            />
+            />}
             <StatCard
               label="Résultat net"
               value={report.target.netResult}
@@ -603,27 +606,27 @@ function RapportsPage() {
                     <YAxis tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
-                    <Line
+                    {showProducts && <Line
                       name="Produits"
                       type="monotone"
                       dataKey="produits"
                       stroke={PRODUCT_COLOR}
                       strokeWidth={3}
                       dot={{ r: 5 }}
-                    />
-                    <Line
+                    />}
+                    {showServices && <Line
                       name="Services"
                       type="monotone"
                       dataKey="services"
                       stroke={SERVICE_COLOR}
                       strokeWidth={3}
                       dot={{ r: 5 }}
-                    />
+                    />}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </Panel>
-            <Panel title="Répartition du CA Produits vs Services">
+            {showMixed && <Panel title="Répartition du CA Produits vs Services">
               <div className="h-[320px]">
                 {report.target.totalRevenue === 0 ? (
                   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -674,12 +677,12 @@ function RapportsPage() {
                   </div>
                 </div>
               )}
-            </Panel>
+            </Panel>}
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <PerformanceTable title="Performances produits" rows={report.products} type="product" />
-            <PerformanceTable title="Performances services" rows={report.services} type="service" />
+            {showProducts && <PerformanceTable title="Performances produits" rows={report.products} type="product" />}
+            {showServices && <PerformanceTable title="Performances services" rows={report.services} type="service" />}
           </div>
 
           <Panel title="Dépenses par catégorie">

@@ -53,6 +53,7 @@ import {
   saveModulePack,
   manageTenantAiSubscription,
   manageTenantSubscription,
+  manageTenantLifecycle,
   adjustPartnerCredits,
   purchasePartnerCreditPack,
   removePartnerOffer,
@@ -69,10 +70,6 @@ import {
   type SuperAdminCreditPack,
   type TenantDeletionJob,
 } from "@/lib/super-admin.server";
-import {
-  retryTenantDeletion,
-  startTenantDeletion,
-} from "@/lib/tenant-deletion.server";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -744,6 +741,8 @@ function TenantTable({
   const [aiTenant, setAiTenant] = useState<SuperAdminTenant | null>(null);
   const [deletionTenant, setDeletionTenant] = useState<SuperAdminTenant | null>(null);
   const [confirmationSlug, setConfirmationSlug] = useState("");
+  const [deletionReason, setDeletionReason] = useState("");
+  const [secondConfirmation, setSecondConfirmation] = useState(false);
   const [deletionBusy, setDeletionBusy] = useState(false);
   const router = useRouter();
   const activeDeletionByTenant = useMemo(
@@ -762,15 +761,24 @@ function TenantTable({
     completed: "Terminé",
   };
   const launchDeletion = async () => {
-    if (!deletionTenant || confirmationSlug !== deletionTenant.slug) return;
+    if (!deletionTenant || confirmationSlug !== deletionTenant.name || !secondConfirmation) return;
     setDeletionBusy(true);
     try {
-      await startTenantDeletion({
-        data: { tenantId: deletionTenant.id, slug: confirmationSlug },
+      const result = await manageTenantLifecycle({
+        data: {
+          tenantId: deletionTenant.id,
+          action: "soft_delete",
+          reason: deletionReason,
+          exactName: confirmationSlug,
+          secondConfirmation: "CONFIRMER LA SUPPRESSION",
+        },
       });
-      toast.success("Suppression définitive terminée.");
+      const count = Object.values(result.dependencies).reduce((sum, value) => sum + value, 0);
+      toast.success(`Tenant supprimé logiquement. ${count} dépendance(s) conservée(s).`);
       setDeletionTenant(null);
       setConfirmationSlug("");
+      setDeletionReason("");
+      setSecondConfirmation(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "La suppression a échoué.");
     } finally {
@@ -778,11 +786,23 @@ function TenantTable({
       await router.invalidate();
     }
   };
-  const retryDeletion = async (job: TenantDeletionJob) => {
+  const retryDeletion = async (_job: TenantDeletionJob) => {
+    toast.error("La purge physique est désactivée dans ce parcours.");
+  };
+  const changeLifecycle = async (
+    tenant: SuperAdminTenant,
+    action: "suspend" | "reactivate" | "restore",
+  ) => {
     setDeletionBusy(true);
     try {
-      await retryTenantDeletion({ data: { jobId: job.id } });
-      toast.success("Suppression reprise avec succès.");
+      await manageTenantLifecycle({
+        data: {
+          tenantId: tenant.id,
+          action,
+          reason: `${action} décidé depuis le Super Admin`,
+        },
+      });
+      toast.success(action === "suspend" ? "Tenant suspendu." : action === "restore" ? "Tenant restauré." : "Tenant réactivé.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "La nouvelle tentative a échoué.");
     } finally {
@@ -849,7 +869,10 @@ function TenantTable({
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead>Tenant</TableHead>
+                <TableHead>Partner créateur</TableHead>
                 <TableHead>Statut</TableHead>
+                <TableHead>Offre</TableHead>
+                <TableHead>Création</TableHead>
                 <TableHead className="text-right">Utilisateurs</TableHead>
                 <TableHead className="text-right">Ventes</TableHead>
                 <TableHead className="text-right">Clients</TableHead>
@@ -889,7 +912,17 @@ function TenantTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    {activeDeletionByTenant.has(tenant.id) ? (
+                    {tenant.partner ? (
+                      <div>
+                        <p className="font-medium">{tenant.partner.name}</p>
+                        <p className="text-xs text-muted-foreground">{tenant.partner.code}</p>
+                      </div>
+                    ) : <span className="text-muted-foreground">Direct</span>}
+                  </TableCell>
+                  <TableCell>
+                    {tenant.deletedAt ? (
+                      <Badge variant="destructive">Supprimé</Badge>
+                    ) : activeDeletionByTenant.has(tenant.id) ? (
                       <Badge variant="destructive">
                         {deletionStatusLabels[activeDeletionByTenant.get(tenant.id)!.status]}
                       </Badge>
@@ -927,6 +960,8 @@ function TenantTable({
                       <span className="text-muted-foreground">Aucun</span>
                     )}
                   </TableCell>
+                  <TableCell>{tenant.partnerOffer?.name ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap">{formatDate(tenant.createdAt)}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     <div>{formatDate(tenant.subscriptionEnd)}</div>
                     {tenant.daysRemaining !== null && (
@@ -969,11 +1004,35 @@ function TenantTable({
                           <Gauge />
                           Gérer les modules
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAiTenant(tenant)}>
-                          <Bot />
-                          Abonnement Assistant IA
-                        </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setAiTenant(tenant)}>
+                            <Bot />
+                            Abonnement Assistant IA
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <a
+                              href={`/settings/catalogue?tenantId=${encodeURIComponent(tenant.id)}`}
+                            >
+                              <Settings />
+                              Configurer le catalogue
+                            </a>
+                          </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        {tenant.deletedAt ? (
+                          <DropdownMenuItem onClick={() => void changeLifecycle(tenant, "restore")}>
+                            <Activity />
+                            Restaurer
+                          </DropdownMenuItem>
+                        ) : tenant.suspendedAt || tenant.status === "suspended" ? (
+                          <DropdownMenuItem onClick={() => void changeLifecycle(tenant, "reactivate")}>
+                            <Activity />
+                            Réactiver
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => void changeLifecycle(tenant, "suspend")}>
+                            <Activity />
+                            Suspendre
+                          </DropdownMenuItem>
+                        )}
                         {activeDeletionByTenant.has(tenant.id) ? (
                           <DropdownMenuItem
                             disabled={
@@ -987,16 +1046,18 @@ function TenantTable({
                             <Activity />
                             Réessayer la suppression
                           </DropdownMenuItem>
-                        ) : (
+                        ) : !tenant.deletedAt && (
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => {
                               setConfirmationSlug("");
+                              setDeletionReason("");
+                              setSecondConfirmation(false);
                               setDeletionTenant(tenant);
                             }}
                           >
                             <Trash2 />
-                            Supprimer définitivement
+                            Supprimer logiquement
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
@@ -1059,20 +1120,35 @@ function TenantTable({
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Supprimer définitivement ce tenant ?</DialogTitle>
+            <DialogTitle>Supprimer logiquement ce tenant ?</DialogTitle>
             <DialogDescription>
-              Cette opération désactivera immédiatement le tenant, puis supprimera ses fichiers,
-              ses données et ses comptes. Saisissez exactement{" "}
-              <strong className="font-mono text-foreground">{deletionTenant?.slug}</strong>.
+              Le tenant sera désactivé et masqué des listes actives. Ses profils, rôles,
+              abonnements, crédits, transactions, ventes, devis, fichiers et données métier
+              seront audités puis conservés pour permettre une restauration. Saisissez exactement{" "}
+              <strong className="font-mono text-foreground">{deletionTenant?.name}</strong>.
             </DialogDescription>
           </DialogHeader>
           <Input
             value={confirmationSlug}
             onChange={(event) => setConfirmationSlug(event.target.value)}
-            placeholder="Slug du tenant"
+            placeholder="Nom exact du tenant"
             autoComplete="off"
             disabled={deletionBusy}
           />
+          <Textarea
+            value={deletionReason}
+            onChange={(event) => setDeletionReason(event.target.value)}
+            placeholder="Motif obligatoire"
+            disabled={deletionBusy}
+          />
+          <label className="flex items-start gap-3 rounded-lg border border-destructive/30 p-3 text-sm">
+            <Checkbox
+              checked={secondConfirmation}
+              onCheckedChange={(checked) => setSecondConfirmation(checked === true)}
+              disabled={deletionBusy}
+            />
+            <span>Je confirme une seconde fois la suppression logique de ce tenant.</span>
+          </label>
           <DialogFooter>
             <Button
               variant="outline"
@@ -1086,11 +1162,13 @@ function TenantTable({
               disabled={
                 deletionBusy ||
                 !deletionTenant ||
-                confirmationSlug !== deletionTenant.slug
+                confirmationSlug !== deletionTenant.name ||
+                deletionReason.trim().length < 3 ||
+                !secondConfirmation
               }
               onClick={() => void launchDeletion()}
             >
-              {deletionBusy ? "Suppression en cours…" : "Supprimer définitivement"}
+              {deletionBusy ? "Suppression en cours…" : "Confirmer la suppression logique"}
             </Button>
           </DialogFooter>
         </DialogContent>

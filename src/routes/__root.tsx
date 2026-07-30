@@ -175,7 +175,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // lecture de profil, de tenant ou de permission RBAC.
       const { isPlatformAdmin } = await getPlatformAdminAccess();
       if (isPlatformAdmin) {
-        if (!isPlatformRoute(location.pathname)) {
+        const catalogTenantId = new URLSearchParams(location.searchStr).get("tenantId");
+        const isTenantCatalogView =
+          location.pathname === "/settings/catalogue" &&
+          Boolean(catalogTenantId) &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            catalogTenantId!,
+          );
+        if (!isPlatformRoute(location.pathname) && !isTenantCatalogView) {
           throw redirect({ to: "/super-admin" });
         }
         return;
@@ -231,6 +238,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           { requested_code: requiredModule },
         );
         if (moduleError || !moduleEnabled) {
+          throw redirect({ to: "/403" });
+        }
+      }
+
+      if (["/stock", "/achats", "/fournisseurs"].includes(location.pathname)) {
+        const { data: catalogRouteAllowed, error: catalogRouteError } = await supabase.rpc(
+          "current_user_catalog_route_enabled",
+          { requested_path: location.pathname },
+        );
+        if (catalogRouteError || !catalogRouteAllowed) {
           throw redirect({ to: "/403" });
         }
       }

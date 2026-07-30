@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { BrandLogo } from "@/components/branding/BrandLogo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +31,10 @@ import {
   MapPin,
   KeyRound,
   Percent,
+  Boxes,
+  Landmark,
+  Plug,
+  ClipboardList,
 } from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,10 +53,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Tables } from "@/integrations/supabase/types";
-import { UserManagement } from "@/components/mms/UserManagementTable";
+import { AuditCenter } from "@/components/mms/AuditCenter";
 // import { PermissionsTab } from "@/components/mms/PermissionsTab";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTenant } from "@/providers/TenantProvider";
+import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import type { CatalogSettings } from "@/lib/catalog-settings";
 import { configureCurrency } from "@/lib/mms/format";
 
 // Assuming AiSettings is available in the scope or imported.
@@ -113,6 +119,7 @@ function ParametresPage() {
   const qc = useQueryClient();
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
+  const catalogSettingsQuery = useCatalogSettings();
   const AI_FIELD_NAMES = [
     "openai_key",
     "gemini_key",
@@ -260,35 +267,52 @@ function ParametresPage() {
             <Tabs defaultValue="general">
               <TabsList className="mb-6 flex flex-wrap h-auto p-1 bg-muted/60 rounded-xl">
                 <TabTrig value="general" icon={<Building2 className="h-4 w-4" />}>
-                  Générales
+                  Général
                 </TabTrig>
-                <TabTrig value="legal" icon={<FileText className="h-4 w-4" />}>
-                  Légales
+                <TabTrig value="organization" icon={<FileText className="h-4 w-4" />}>
+                  Organisation
                 </TabTrig>
-                <TabTrig value="billing" icon={<Receipt className="h-4 w-4" />}>
-                  Facturation
+                <TabTrig value="catalogue" icon={<Boxes className="h-4 w-4" />}>
+                  Catalogue
+                </TabTrig>
+                <Link
+                  to="/settings/users"
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-1 text-sm font-medium text-muted-foreground transition-all hover:bg-background hover:text-foreground"
+                >
+                  <Users className="h-4 w-4" />
+                  <span className="hidden sm:inline">Utilisateurs</span>
+                </Link>
+                <TabTrig value="finances" icon={<Landmark className="h-4 w-4" />}>
+                  Finances
                 </TabTrig>
                 <TabTrig value="documents" icon={<FileSignature className="h-4 w-4" />}>
                   Documents
                 </TabTrig>
-                <TabTrig value="users" icon={<Users className="h-4 w-4" />}>
-                  Utilisateurs
+                <TabTrig value="integrations" icon={<Plug className="h-4 w-4" />}>
+                  Intégrations
                 </TabTrig>
-                {/* <TabTrig value="permissions" icon={<KeyRound className="h-4 w-4" />}>
-                  Permissions
-                </TabTrig> */}
                 <TabTrig value="security" icon={<Shield className="h-4 w-4" />}>
                   Sécurité
+                </TabTrig>
+                <TabTrig value="audit" icon={<ClipboardList className="h-4 w-4" />}>
+                  Journal d’audit
                 </TabTrig>
               </TabsList>
 
               <TabsContent value="general">
                 <GeneralTab form={form} update={update} settingsId={data.id} onSave={save.mutate} />
               </TabsContent>
-              <TabsContent value="legal">
+              <TabsContent value="organization">
                 <LegalTab form={form} update={update} />
               </TabsContent>
-              <TabsContent value="billing">
+              <TabsContent value="catalogue">
+                <CatalogueSummaryCard
+                  settings={catalogSettingsQuery.data}
+                  isLoading={catalogSettingsQuery.isLoading}
+                  hasError={catalogSettingsQuery.isError}
+                />
+              </TabsContent>
+              <TabsContent value="finances">
                 <BillingTab form={form} update={update} />
               </TabsContent>
               <TabsContent value="documents">
@@ -299,14 +323,22 @@ function ParametresPage() {
                   onSave={save.mutate}
                 />
               </TabsContent>
-              <TabsContent value="users">
-                <UsersTab />
+              <TabsContent value="integrations">
+                <Card
+                  title="Intégrations"
+                  description="Connectez et configurez les services externes de votre organisation."
+                  icon={<Plug className="h-4 w-4" />}
+                >
+                  <p className="text-sm text-muted-foreground">
+                    Les intégrations disponibles apparaîtront ici lorsqu’elles seront activées.
+                  </p>
+                </Card>
               </TabsContent>
-              {/* <TabsContent value="permissions">
-                <PermissionsTab />
-              </TabsContent> */}
               <TabsContent value="security">
                 <SecurityTab />
+              </TabsContent>
+              <TabsContent value="audit">
+                <AuditCenter />
               </TabsContent>
             </Tabs>
           </div>
@@ -324,6 +356,101 @@ function ParametresPage() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+function CatalogueSummaryCard({
+  settings,
+  isLoading,
+  hasError,
+}: {
+  settings?: CatalogSettings;
+  isLoading: boolean;
+  hasError: boolean;
+}) {
+  const modeLabels: Record<CatalogSettings["catalog_mode"], string> = {
+    products: "Produits uniquement",
+    services: "Services uniquement",
+    mixed: "Produits + Services",
+  };
+  const productAllowed = settings?.catalog_mode !== "services";
+  const serviceAllowed = settings?.catalog_mode !== "products";
+  const options = settings
+    ? [
+        { label: "Mode", value: modeLabels[settings.catalog_mode], enabled: true },
+        { label: "Stock", enabled: productAllowed && settings.stock_enabled },
+        { label: "Achats", enabled: productAllowed && settings.purchases_enabled },
+        { label: "Fournisseurs", enabled: productAllowed && settings.suppliers_enabled },
+        {
+          label: "Produits en vente",
+          enabled: productAllowed && settings.products_in_sales_enabled,
+        },
+        {
+          label: "Services en vente",
+          enabled: serviceAllowed && settings.services_in_sales_enabled,
+        },
+        {
+          label: "Codes catalogue",
+          enabled: productAllowed && settings.catalog_codes_enabled,
+        },
+      ]
+    : [];
+
+  return (
+    <section className="mb-6 rounded-2xl border border-border bg-card shadow-sm">
+      <header className="flex flex-col gap-4 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
+            <Boxes className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-semibold">Catalogue</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {settings
+                ? modeLabels[settings.catalog_mode]
+                : "Produits, services et options commerciales"}
+            </p>
+          </div>
+        </div>
+        <Button asChild size="sm" className="w-full sm:w-auto">
+          <Link to="/settings/catalogue">Configurer</Link>
+        </Button>
+      </header>
+      <div className="p-5 sm:p-6">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Chargement des paramètres actifs…
+          </div>
+        ) : hasError || !settings ? (
+          <p className="text-sm text-muted-foreground">
+            Le résumé du catalogue est momentanément indisponible.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {options.map((option) => (
+              <Badge
+                key={option.label}
+                variant="outline"
+                className="gap-1.5 rounded-full bg-background px-3 py-1.5 font-medium"
+              >
+                <CheckCircle2
+                  className={
+                    option.enabled
+                      ? "h-3.5 w-3.5 text-emerald-600"
+                      : "h-3.5 w-3.5 text-muted-foreground/60"
+                  }
+                />
+                <span>{option.label}</span>
+                <span className="font-normal text-muted-foreground">
+                  {option.value ?? (option.enabled ? "Activé" : "Désactivé")}
+                </span>
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -667,10 +794,6 @@ function DocumentsTab({
   );
 }
 
-function UsersTab() {
-  return <UserManagement />;
-}
-
 import { changePassword } from "@/lib/security.server";
 // ... (rest of imports)
 
@@ -763,6 +886,8 @@ function FileUploader({
   settingsId: string;
   onChange: (path: string | null) => void;
 }) {
+  const { profile } = useTenant();
+  const tenantId = profile?.tenant_id;
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -774,16 +899,12 @@ function FileUploader({
       if (file.size > MAX_MB * 1024 * 1024) return toast.error(`Taille max ${MAX_MB} Mo`);
       setBusy(true);
       try {
+        if (!tenantId) throw new Error("Tenant courant introuvable");
         const ext = file.name.split(".").pop() || "png";
-        const path = `${folder}/${settingsId}-${Date.now()}.${ext}`;
-        if (currentPath)
-          await supabase.storage
-            .from(BUCKET)
-            .remove([currentPath])
-            .catch(() => {});
+        const path = `${tenantId}/${folder}/${settingsId}-${Date.now()}.${ext}`;
         const { error } = await supabase.storage
           .from(BUCKET)
-          .upload(path, file, { upsert: true, contentType: file.type });
+          .upload(path, file, { upsert: false, contentType: file.type });
         if (error) throw error;
         onChange(path);
         toast.success("Fichier téléversé");
@@ -793,7 +914,7 @@ function FileUploader({
         setBusy(false);
       }
     },
-    [currentPath, folder, settingsId, onChange],
+    [currentPath, folder, settingsId, onChange, tenantId],
   );
 
   const remove = async () => {

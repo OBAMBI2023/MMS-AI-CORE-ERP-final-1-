@@ -167,7 +167,7 @@ export function useDashboardData() {
       ] = await Promise.all([
         supabase
           .from("ventes")
-          .select("id, client_name, total, payment_method, created_at")
+          .select("id, client_name, total, subtotal, payment_method, created_at, vente_items(item_type, qty, line_total)")
           .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
         supabase
@@ -228,6 +228,22 @@ export function useDashboardData() {
       const prevMonthStart = startOfMonth(subMonths(now, 1));
 
       const revenueFromVentes = ventes.reduce((s, v) => s + (Number(v.total) || 0), 0);
+      const typedRevenue = (type: "product" | "service") =>
+        ventes.reduce((sum, sale) => {
+          const factor = Number(sale.subtotal) > 0 ? Number(sale.total) / Number(sale.subtotal) : 0;
+          return sum + (sale.vente_items ?? [])
+            .filter((item) => item.item_type === type)
+            .reduce((lineSum, item) => lineSum + Number(item.line_total) * factor, 0);
+        }, 0);
+      const typedQuantity = (type: "product" | "service") =>
+        ventes.reduce(
+          (sum, sale) =>
+            sum +
+            (sale.vente_items ?? [])
+              .filter((item) => item.item_type === type)
+              .reduce((lineSum, item) => lineSum + Number(item.qty), 0),
+          0,
+        );
       const revenueFromDevis = devis.reduce((s, d) => s + (Number(d.total) || 0), 0);
       const revenue = revenueFromVentes + revenueFromDevis;
 
@@ -456,6 +472,12 @@ export function useDashboardData() {
 
       return {
         kpis,
+        catalogSummary: {
+          productRevenue: typedRevenue("product"),
+          serviceRevenue: typedRevenue("service"),
+          productQuantity: typedQuantity("product"),
+          serviceQuantity: typedQuantity("service"),
+        },
         monthlySeries,
         ventesByMethod,
         depensesByCategory,

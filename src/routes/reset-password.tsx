@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -36,9 +36,9 @@ function ResetPasswordPage() {
   const [validSession, setValidSession] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [tenantLoginPath, setTenantLoginPath] = useState("/login");
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -47,28 +47,38 @@ function ResetPasswordPage() {
 
   useEffect(() => {
     let active = true;
-    const timeout = window.setTimeout(() => {
-      if (active) setCheckingLink(false);
-    }, 5000);
+
+    const verifySession = async (source: "initial" | "SIGNED_IN" | "PASSWORD_RECOVERY") => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+      if (!active) return;
+
+      const validRecoveryContext = hasValidPasswordRecoverySession();
+      console.info("[PasswordSetup] Vérification de la session temporaire", {
+        source,
+        hasSession: Boolean(session),
+        validRecoveryContext,
+        error: error?.message,
+      });
+      setValidSession(Boolean(session) && validRecoveryContext);
+      setCheckingLink(false);
+    };
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!active) return;
-      if (event === "PASSWORD_RECOVERY" && session) {
-        setValidSession(true);
-        setCheckingLink(false);
+      if ((event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") && session) {
+        void verifySession(event);
       }
     });
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setValidSession(hasValidPasswordRecoverySession() && Boolean(data.session));
-      setCheckingLink(false);
-    });
+    void verifySession("initial");
 
     return () => {
       active = false;
-      window.clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -76,16 +86,66 @@ function ResetPasswordPage() {
   const updatePassword = async ({ password }: ResetPasswordValues) => {
     setSubmitting(true);
     setServerError(null);
-    const { error } = await supabase.auth.updateUser({ password });
-    setSubmitting(false);
-    if (error) {
-      setServerError("Ce lien est invalide ou a expiré. Demandez un nouveau lien.");
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session || !hasValidPasswordRecoverySession()) {
+      console.warn("[PasswordSetup] Mise à jour refusée : session temporaire absente");
+      setValidSession(false);
+      setSubmitting(false);
       return;
     }
 
-    await supabase.auth.signOut();
+    console.info("[PasswordSetup] Mise à jour du mot de passe démarrée", {
+      userId: session.user.id,
+    });
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      console.error("[PasswordSetup] Échec de mise à jour du mot de passe", {
+        userId: session.user.id,
+        message: error.message,
+      });
+      setServerError("Lien invalide ou expiré. Demandez une nouvelle invitation.");
+      setSubmitting(false);
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    let tenantSlug =
+      typeof user?.user_metadata?.tenant_slug === "string"
+        ? user.user_metadata.tenant_slug
+        : null;
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("tenant_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.tenant_id) {
+        const { data: tenant } = await supabase
+          .from("tenants")
+          .select("slug")
+          .eq("id", profile.tenant_id)
+          .maybeSingle();
+        if (tenant?.slug) tenantSlug = tenant.slug;
+      }
+    }
+    const loginPath = tenantSlug ? `/login/${encodeURIComponent(tenantSlug)}` : "/login";
+    setTenantLoginPath(loginPath);
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      console.warn("[PasswordSetup] Échec de fermeture de la session temporaire", {
+        message: signOutError.message,
+      });
+    }
     clearPasswordRecoveryContext();
+    console.info("[PasswordSetup] Mot de passe défini, redirection vers la connexion", {
+      loginPath,
+    });
+    setSubmitting(false);
     setCompleted(true);
+    window.location.replace(loginPath);
   };
 
   return (
@@ -117,14 +177,14 @@ function ResetPasswordPage() {
               <p className="text-sm leading-6 text-slate-700 dark:text-slate-200">
                 Votre mot de passe a été modifié. Vous pouvez maintenant vous reconnecter.
               </p>
-              <Button type="button" className="h-12 w-full rounded-2xl bg-[#0F5BFF]" onClick={() => navigate({ to: "/login", replace: true })}>
+              <Button type="button" className="h-12 w-full rounded-2xl bg-[#0F5BFF]" onClick={() => window.location.replace(tenantLoginPath)}>
                 Se connecter
               </Button>
             </div>
           ) : !validSession ? (
             <div role="alert" className="space-y-5 text-center">
               <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
-                Ce lien est invalide ou a expiré. Demandez un nouveau lien de réinitialisation.
+                Lien invalide ou expiré. Demandez une nouvelle invitation.
               </p>
               <a href="/forgot-password" className="text-sm font-semibold text-[#0F5BFF] hover:underline dark:text-blue-400">
                 Demander un nouveau lien

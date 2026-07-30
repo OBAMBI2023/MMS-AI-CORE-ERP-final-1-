@@ -32,7 +32,9 @@ function readRecoveryCallback(): RecoveryCallback | null {
     Boolean(callback.accessToken) ||
     Boolean(callback.refreshToken);
 
-  return callback.type === "recovery" || hasRecoveryCredentials ? callback : null;
+  return ["recovery", "invite"].includes(callback.type ?? "") || hasRecoveryCredentials
+    ? callback
+    : null;
 }
 
 export function hasPasswordRecoveryContext(): boolean {
@@ -64,7 +66,7 @@ export async function handlePasswordRecoveryCallback(): Promise<boolean> {
     if (callback.tokenHash) {
       const { data, error } = await supabase.auth.verifyOtp({
         token_hash: callback.tokenHash,
-        type: "recovery",
+        type: callback.type === "invite" ? "invite" : "recovery",
       });
       if (error) console.error("Impossible de vérifier le jeton de récupération Supabase :", error);
       sessionStorage.setItem(RECOVERY_STORAGE_KEY, data.session && !error ? "valid" : "invalid");

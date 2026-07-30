@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useCompanySettings } from "@/hooks/use-company-settings";
@@ -23,7 +23,6 @@ import {
   Receipt as ReceiptIcon,
   Image as ImageIcon,
   Menu,
-  Sparkles,
   Package,
   Wrench,
 } from "lucide-react";
@@ -45,6 +44,8 @@ import { useTenant } from "@/providers/TenantProvider";
 import { useCatalogItems } from "@/hooks/use-catalog-items";
 import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 import { PLATFORM_BRANDING } from "@/config/branding";
+import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import { catalogTypeEnabled } from "@/lib/catalog-settings";
 
 // ---------------- Types & catalogue ----------------
 type Category = string;
@@ -81,6 +82,8 @@ export function PosPage() {
   const [mobileTicketOpen, setMobileTicketOpen] = useState(false);
   const queryClient = useQueryClient();
   const { profile, tenant, loading: tenantLoading } = useTenant();
+  const catalogSettingsQuery = useCatalogSettings();
+  const catalogSettings = catalogSettingsQuery.data;
 
   const {
     data: dbServices,
@@ -92,6 +95,25 @@ export function PosPage() {
     activeOnly: true,
     type: activeTab,
   });
+
+  useEffect(() => {
+    if (!catalogSettings) return;
+    const fallbackTab =
+      catalogSettings.catalog_mode === "products"
+        ? "product"
+        : catalogSettings.catalog_mode === "services"
+          ? "service"
+          : activeTab;
+    if (!catalogTypeEnabled(catalogSettings, activeTab)) {
+      setActiveTab(fallbackTab);
+      setCategory("Tous");
+    }
+    setCart((current) => {
+      const allowed = current.filter((item) => catalogTypeEnabled(catalogSettings, item.type));
+      if (allowed.length !== current.length) toast.info("Le panier a été adapté au nouveau mode catalogue.");
+      return allowed;
+    });
+  }, [activeTab, catalogSettings]);
 
   const { settings, logoUrl } = useCompanySettings(
     tenantLoading ? null : (profile?.tenant_id ?? null),
@@ -178,6 +200,10 @@ export function PosPage() {
   const itemCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
   const addToCart = (s: Service) => {
+    if (!catalogTypeEnabled(catalogSettings, s.type)) {
+      toast.error("Ce type d’article est désactivé pour ce tenant.");
+      return;
+    }
     if (s.type === "product" && s.stock !== null && s.stock < 1) {
       toast.error("Cet article est en rupture de stock.");
       return;
@@ -217,6 +243,10 @@ export function PosPage() {
     if (cart.length === 0) return;
     if (!profile?.tenant_id) {
       toast.error("Impossible de créer la vente : aucun tenant courant n'est disponible.");
+      return;
+    }
+    if (cart.some((item) => !catalogTypeEnabled(catalogSettings, item.type))) {
+      toast.error("Le panier contient un type désactivé. Rechargez le catalogue.");
       return;
     }
     setSaving(true);
@@ -342,7 +372,7 @@ export function PosPage() {
               {[
                 { value: "product" as const, label: "Produits", icon: Package },
                 { value: "service" as const, label: "Services", icon: Wrench },
-              ].map((tab) => {
+              ].filter((tab) => catalogTypeEnabled(catalogSettings, tab.value)).map((tab) => {
                 const isActive = activeTab === tab.value;
                 const TabIcon = tab.icon;
 
@@ -419,6 +449,11 @@ export function PosPage() {
                     </div>
                     <div className="p-3 md:p-4">
                       <div className="font-medium text-xs md:text-sm leading-tight">{s.name}</div>
+                      {catalogSettings?.catalog_mode === "mixed" && (
+                        <span className="mt-2 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary">
+                          {s.type === "product" ? "Produit" : "Service"}
+                        </span>
+                      )}
                       <div className="mt-1 text-[10px] text-muted-foreground">{s.category}</div>
                       <div className="mt-1 md:mt-2 flex items-baseline justify-between gap-2">
                         <span className="text-primary font-semibold text-xs md:text-sm">

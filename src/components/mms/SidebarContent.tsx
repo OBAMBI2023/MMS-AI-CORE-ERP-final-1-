@@ -10,7 +10,6 @@ import {
   Receipt,
   TrendingUp,
   Settings,
-  UserCog,
   Boxes,
   Tags,
   Bot,
@@ -21,6 +20,8 @@ import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { routePermissions } from "@/lib/route-permissions";
 import { routeModules } from "@/lib/route-modules";
 import { canAccessParties } from "@/lib/party-access";
+import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import { catalogRouteEnabled } from "@/lib/catalog-settings";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/app" },
@@ -36,18 +37,19 @@ const items = [
   { icon: Receipt, label: "Dépenses", to: "/depenses" },
   { icon: TrendingUp, label: "Rapports", to: "/rapports" },
   { icon: Settings, label: "Paramètres", to: "/parametres" },
-  { icon: UserCog, label: "Utilisateurs", to: "/utilisateurs" },
 ] as const;
 
 export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data, isLoading } = usePermissions();
   const modulesQuery = useTenantModules();
+  const catalogSettingsQuery = useCatalogSettings();
   const permissions = data?.permissions || [];
   const role = data?.role;
 
   const filteredItems = items.filter((it) => {
-    if (isLoading || modulesQuery.isLoading) return false;
+    if (isLoading || modulesQuery.isLoading || catalogSettingsQuery.isLoading) return false;
+    if (!catalogRouteEnabled(catalogSettingsQuery.data, it.to)) return false;
     const requiredModule = routeModules[it.to];
     if (requiredModule && !modulesQuery.data?.has(requiredModule)) return false;
     if (it.to === "/clients" || it.to === "/fournisseurs") {
@@ -55,7 +57,7 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
     }
     const requiredPermission = routePermissions[it.to];
     if (requiredPermission) {
-      return permissions.includes(requiredPermission);
+      return role === "Administrateur" || permissions.includes(requiredPermission);
     }
     return true;
   });
@@ -63,14 +65,16 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   return (
     <nav className="flex-1 flex flex-col gap-1 mt-2">
       {filteredItems.map((it, idx) => {
-        const active = pathname === it.to;
+        const active =
+          pathname === it.to ||
+          (it.to === "/parametres" && pathname.startsWith("/settings/"));
 
         return (
           <Link
             key={`${it.label}-${idx}`}
             to={it.to}
             onClick={onItemClick}
-            className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-foreground/75 hover:text-white transition-colors"
+            className="relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/75 transition-colors hover:text-white"
           >
             {active && (
               <motion.div
@@ -80,7 +84,15 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
               />
             )}
             <it.icon className={`relative h-[18px] w-[18px] ${active ? "text-white" : ""}`} />
-            <span className={`relative ${active ? "text-white" : ""}`}>{it.label}</span>
+            <span className={`relative ${active ? "text-white" : ""}`}>
+              {it.to === "/services"
+                ? catalogSettingsQuery.data?.catalog_mode === "products"
+                  ? "Produits"
+                  : catalogSettingsQuery.data?.catalog_mode === "services"
+                    ? "Services"
+                    : it.label
+                : it.label}
+            </span>
           </Link>
         );
       })}

@@ -12,6 +12,8 @@ export const routeModules: Record<string, string> = {
   "/devis": "quotes",
   "/rapports": "reports",
   "/parametres": "settings",
+  "/settings/catalogue": "settings",
+  "/settings/users": "users",
   "/utilisateurs": "users",
 };
 

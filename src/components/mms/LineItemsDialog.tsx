@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, makeNumber } from "@/lib/mms/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 
 export interface LineItem {
   id?: string;
@@ -77,6 +78,7 @@ function formatSupabaseError(error: unknown): string {
 }
 
 export function LineItemsDialog(props: LineItemsDialogProps) {
+  const catalogSettingsQuery = useCatalogSettings();
   const {
     headerTable,
     itemsTable,
@@ -115,10 +117,17 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   });
 
   const { data: services = [] } = useQuery({
-    queryKey: ["services", "active", tenantId],
+    queryKey: ["services", "active", tenantId, catalogSettingsQuery.data],
     queryFn: async () => {
       let query = db.from("services").select("id, name, unit, price, type, cost_price");
       if (tenantId) query = query.eq("tenant_id", tenantId);
+      query = query.eq("active", true);
+      const settings = catalogSettingsQuery.data;
+      const allowedTypes: ("product" | "service")[] = [];
+      if (settings?.catalog_mode !== "services" && (headerTable === "achats" || settings?.products_in_sales_enabled)) allowedTypes.push("product");
+      if (headerTable !== "achats" && settings?.catalog_mode !== "products" && settings?.services_in_sales_enabled) allowedTypes.push("service");
+      if (allowedTypes.length === 0) return [];
+      if (allowedTypes.length === 1) query = query.eq("type", allowedTypes[0]);
       const { data, error } = await query.order("name", { ascending: true });
       if (error) throw error;
       return (
@@ -132,6 +141,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
         }[]
       ) ?? [];
     },
+    enabled: catalogSettingsQuery.isSuccess,
   });
 
   useEffect(() => {
@@ -181,6 +191,12 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
 
       const validItems = items.filter((i) => i.name && Number(i.qty) > 0);
       if (validItems.length === 0) throw new Error("Ajoutez au moins une ligne");
+      if (
+        (headerTable === "ventes" || headerTable === "devis") &&
+        validItems.some((item) => !item.service_id || !item.item_type)
+      ) {
+        throw new Error("Sélectionnez chaque produit ou service dans le catalogue.");
+      }
       const partnerFk = partnerTable === "clients" ? "client_id" : "fournisseur_id";
       const partnerNameCol = partnerTable === "clients" ? "client_name" : "fournisseur_name";
       const payload: Record<string, unknown> = {
@@ -208,18 +224,17 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       }
       const rows = validItems.map((i) => ({
         [fkColumn]: headerId,
-        ...(isTenantScopedDocument ? { tenant_id: tenantId } : {}),
         name: i.name,
         unit: i.unit || null,
         qty: Number(i.qty),
         price: Number(i.price),
         line_total: Number(i.qty) * Number(i.price),
-        ...(headerTable === "ventes"
+        ...(headerTable === "ventes" || headerTable === "devis"
           ? {
               service_id: i.service_id ?? null,
               item_type: i.item_type ?? "service",
               cost_price: i.item_type === "product" ? Number(i.cost_price ?? 0) : 0,
-              selling_price: Number(i.price),
+              ...(headerTable === "ventes" ? { selling_price: Number(i.price) } : {}),
             }
           : {}),
       }));

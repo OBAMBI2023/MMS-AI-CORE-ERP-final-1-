@@ -35,10 +35,9 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 function createSupabaseAdminClient() {
   const SUPABASE_URL = readEnvVar("VITE_SUPABASE_URL", "SUPABASE_URL");
-  const SUPABASE_SERVICE_ROLE_KEY = readEnvVar(
-    "VITE_SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
-  );
+  // Never accept a VITE_-prefixed service-role key: Vite exposes that namespace
+  // to browser bundles. Administrative credentials must remain server-only.
+  const SUPABASE_SERVICE_ROLE_KEY = readEnvVar("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [

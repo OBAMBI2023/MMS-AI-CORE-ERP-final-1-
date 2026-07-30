@@ -1,14 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { UserManagement } from "@/components/mms/UserManagementTable";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/utilisateurs")({
-  component: UserManagementPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/users", replace: true });
+  },
 });
-
-function UserManagementPage() {
-  return (
-    <div className="p-6">
-      <UserManagement />
-    </div>
-  );
-}

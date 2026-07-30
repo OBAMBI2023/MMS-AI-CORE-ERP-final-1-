@@ -5,14 +5,29 @@ import type { Database } from "@/integrations/supabase/types";
 import type { Json } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { readEnvVar } from "@/integrations/supabase/env";
+import { resendExistingAuthInvitation } from "@/lib/partner-invitation";
 import { z } from "zod";
+
+function getInvitationRedirectUrl(): string {
+  const appUrl = readEnvVar("APP_URL");
+  if (!appUrl) {
+    throw new Error("APP_URL est requis pour construire l'URL de redirection de l'invitation.");
+  }
+
+  const redirectUrl = new URL("/reset-password", appUrl).toString();
+  console.info("[PartnerInvitation] URL de redirection construite", {
+    redirectUrl,
+    source: "APP_URL",
+  });
+  return redirectUrl;
+}
 
 export type PartnerTenant = {
   id: string;
   name: string;
   slug: string;
   loginUrl: string | null;
-  logoUrl: string | null;
+  logoPath: string | null;
   assignedAt: string;
   pack: { id: string; name: string; code: string } | null;
   subscription: {
@@ -84,6 +99,77 @@ export type AuthenticatedDestination =
   | "/app"
   | "/403";
 
+async function signCompanyAsset(
+  admin: any,
+  path: string | null,
+): Promise<string | null> {
+  if (!path || /^(?:https?:|data:|blob:)/i.test(path)) return path;
+  const { data, error } = await admin.storage
+    .from("company-assets")
+    .createSignedUrl(path, 60 * 60);
+  if (error) throw new Error(formatSupabaseError(error));
+  return data?.signedUrl ?? null;
+}
+
+export const getLoginTenantBranding = createServerFn({ method: "GET" })
+  .validator(z.object({ slug: z.string().trim().min(1).max(120) }))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: tenant, error } = await (supabaseAdmin as any)
+      .from("tenants")
+      .select("id, name, logo_url, is_active, deleted_at")
+      .eq("slug", data.slug)
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error) throw new Error(formatSupabaseError(error));
+    if (!tenant) return null;
+    return {
+      id: tenant.id as string,
+      name: tenant.name as string,
+      logoUrl: await signCompanyAsset(supabaseAdmin, tenant.logo_url as string | null),
+    };
+  });
+
+export const getPartnerTenantLogoSignature = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ tenantId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    const partnerId = await requirePartnerMembership(context.supabase, context.userId);
+    const { data: assignment, error: assignmentError } = await context.supabase
+      .from("partner_tenants")
+      .select("tenant_id")
+      .eq("partner_id", partnerId)
+      .eq("tenant_id", data.tenantId)
+      .maybeSingle();
+    if (assignmentError) throw new Error(formatSupabaseError(assignmentError));
+    if (!assignment) throw new Error("Accès refusé au logo de ce tenant.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: tenant, error: tenantError } = await (supabaseAdmin as any)
+      .from("tenants")
+      .select("logo_url, deleted_at")
+      .eq("id", data.tenantId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (tenantError) throw new Error(formatSupabaseError(tenantError));
+    const path = tenant?.logo_url as string | null | undefined;
+    if (!path) return { path: null, signedUrl: null, expiresAt: null };
+    if (/^(?:https?:|data:|blob:)/i.test(path)) {
+      return { path, signedUrl: path, expiresAt: null };
+    }
+    const expiresIn = 60 * 60;
+    const { data: signed, error: signedError } = await supabaseAdmin.storage
+      .from("company-assets")
+      .createSignedUrl(path, expiresIn);
+    if (signedError) throw new Error(formatSupabaseError(signedError));
+    return {
+      path,
+      signedUrl: signed?.signedUrl ?? null,
+      expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+    };
+  });
+
 async function isPlatformAdmin(
   supabase: SupabaseClient<Database>,
   userId: string,
@@ -129,6 +215,26 @@ export const getPartnerAdminAccess = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase.rpc("current_partner_id");
     if (error) throw new Error(formatSupabaseError(error));
     return { isPartnerAdmin: Boolean(data) };
+  });
+
+export const requestPartnerTenantSuspension = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    tenantId: z.string().uuid(),
+    reason: z.string().trim().min(3).max(500),
+  }))
+  .handler(async ({ context, data }) => {
+    await requirePartnerMembership(context.supabase, context.userId);
+    const { data: requestId, error } = await (context.supabase as any).rpc(
+      "request_tenant_suspension",
+      {
+        requested_tenant_id: data.tenantId,
+        requested_actor_id: context.userId,
+        requested_reason: data.reason,
+      },
+    );
+    if (error) throw new Error(formatSupabaseError(error));
+    return { requestId: requestId as string };
   });
 
 export const getAuthenticatedDestination = createServerFn({ method: "GET" })
@@ -196,7 +302,7 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
     ] = await Promise.all([
       context.supabase.from("partners").select("id, name, code").eq("id", partnerId).single(),
       context.supabase.from("partner_tenants").select("tenant_id, assigned_at"),
-      context.supabase.from("tenants").select("id, name, slug, logo_url"),
+      (context.supabase as any).from("tenants").select("id, name, slug, logo_url, deleted_at").is("deleted_at", null),
       context.supabase
         .from("subscriptions")
         .select("tenant_id, status, billing_cycle, starts_at, ends_at, trial_ends_at"),
@@ -269,16 +375,22 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
     );
     const packs = new Map((packsResult.data ?? []).map((row) => [row.id, row]));
 
-    const tenants = (tenantsResult.data ?? [])
+    const tenants = (await Promise.all(((tenantsResult.data ?? []) as Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo_url: string | null;
+      deleted_at: string | null;
+    }>)
       .filter((tenant) => assignedAt.has(tenant.id))
-      .map((tenant): PartnerTenant => {
+      .map(async (tenant): Promise<PartnerTenant> => {
         const subscription = subscriptions.get(tenant.id);
         return {
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug,
           loginUrl: `/login/${tenant.slug}`,
-          logoUrl: tenant.logo_url,
+          logoPath: tenant.logo_url,
           assignedAt: assignedAt.get(tenant.id)!,
           pack: packs.get(packByTenant.get(tenant.id) ?? "") ?? null,
           subscription: subscription
@@ -295,7 +407,7 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
             enabled: moduleState.get(`${tenant.id}:${module.id}`) ?? false,
           })),
         };
-      })
+      })))
       .sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
     const { error: logError } = await context.supabase.from("partner_activity_logs").insert({
@@ -419,27 +531,18 @@ export const createPartnerTrial = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await requirePartnerMembership(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const emailEnabled = ["1", "true", "yes"].includes(
-      (readEnvVar("PARTNER_TRIAL_EMAIL_ENABLED") ?? "").toLowerCase(),
-    );
-    const temporaryPassword = `${crypto.randomUUID()}Aa1!`;
-
-    const authResult = emailEnabled
-      ? await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
-          data: { full_name: data.managerName, phone: data.phone },
-          redirectTo: `${readEnvVar("VITE_SITE_URL", "SITE_URL") ?? "http://localhost:3000"}/login`,
-        })
-      : await supabaseAdmin.auth.admin.createUser({
-          email: data.email,
-          password: temporaryPassword,
-          email_confirm: true,
-          user_metadata: { full_name: data.managerName, phone: data.phone },
-        });
+    const redirectTo = getInvitationRedirectUrl();
+    console.info("[PartnerInvitation] Envoi d'une invitation", { redirectTo });
+    const authResult = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+      data: { full_name: data.managerName, phone: data.phone },
+      redirectTo,
+    });
 
     if (authResult.error || !authResult.data.user) {
       throw new Error(formatSupabaseError(authResult.error ?? new Error("Compte non créé")));
     }
 
+    let tenantCommitted = false;
     try {
       const { data: tenantId, error } = await (supabaseAdmin as any).rpc(
         "create_partner_trial",
@@ -455,16 +558,31 @@ export const createPartnerTrial = createServerFn({ method: "POST" })
         },
       );
       if (error) throw new Error(formatSupabaseError(error));
-      return {
-        tenantId: tenantId as string,
-        emailSent: emailEnabled,
-        temporaryPassword: emailEnabled ? null : temporaryPassword,
-      };
+      tenantCommitted = true;
+      const { data: tenant, error: tenantError } = await supabaseAdmin
+        .from("tenants")
+        .select("slug")
+        .eq("id", tenantId as string)
+        .single();
+      if (tenantError) throw new Error(formatSupabaseError(tenantError));
+      const { error: metadataError } = await supabaseAdmin.auth.admin.updateUserById(
+        authResult.data.user.id,
+        { user_metadata: { tenant_slug: tenant.slug } },
+      );
+      if (metadataError) {
+        console.warn("[PartnerInvitation] tenant_slug non ajouté aux métadonnées", {
+          userId: authResult.data.user.id,
+          tenantId,
+        });
+      }
+      return { tenantId: tenantId as string, loginUrl: `/login/${tenant.slug}` };
     } catch (error) {
-      const { error: rollbackError } =
-        await supabaseAdmin.auth.admin.deleteUser(authResult.data.user.id);
-      if (rollbackError) {
-        console.error("[PartnerTrial] Échec du rollback Auth", rollbackError);
+      if (!tenantCommitted) {
+        const { error: rollbackError } =
+          await supabaseAdmin.auth.admin.deleteUser(authResult.data.user.id);
+        if (rollbackError) {
+          console.error("[PartnerTrial] Échec du rollback Auth", rollbackError);
+        }
       }
       throw error;
     }
@@ -476,25 +594,17 @@ export const createPartnerTenant = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await requirePartnerMembership(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const emailEnabled = ["1", "true", "yes"].includes(
-      (readEnvVar("PARTNER_TRIAL_EMAIL_ENABLED") ?? "").toLowerCase(),
-    );
-    const temporaryPassword = `${crypto.randomUUID()}Aa1!`;
-    const authResult = emailEnabled
-      ? await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
-          data: { full_name: data.managerName, phone: data.phone },
-          redirectTo: `${readEnvVar("VITE_SITE_URL", "SITE_URL") ?? "http://localhost:3000"}/login`,
-        })
-      : await supabaseAdmin.auth.admin.createUser({
-          email: data.email,
-          password: temporaryPassword,
-          email_confirm: true,
-          user_metadata: { full_name: data.managerName, phone: data.phone },
-        });
+    const redirectTo = getInvitationRedirectUrl();
+    console.info("[PartnerInvitation] Envoi d'une invitation", { redirectTo });
+    const authResult = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+      data: { full_name: data.managerName, phone: data.phone },
+      redirectTo,
+    });
     if (authResult.error || !authResult.data.user) {
       throw new Error(formatSupabaseError(authResult.error ?? new Error("Compte non créé")));
     }
 
+    let tenantCommitted = false;
     try {
       const { data: tenantId, error } = await (supabaseAdmin as any).rpc(
         "create_partner_paid_tenant",
@@ -510,15 +620,70 @@ export const createPartnerTenant = createServerFn({ method: "POST" })
         },
       );
       if (error) throw new Error(formatSupabaseError(error));
-      return {
-        tenantId: tenantId as string,
-        emailSent: emailEnabled,
-        temporaryPassword: emailEnabled ? null : temporaryPassword,
-      };
+      tenantCommitted = true;
+      const { data: tenant, error: tenantError } = await supabaseAdmin
+        .from("tenants")
+        .select("slug")
+        .eq("id", tenantId as string)
+        .single();
+      if (tenantError) throw new Error(formatSupabaseError(tenantError));
+      const { error: metadataError } = await supabaseAdmin.auth.admin.updateUserById(
+        authResult.data.user.id,
+        { user_metadata: { tenant_slug: tenant.slug } },
+      );
+      if (metadataError) {
+        console.warn("[PartnerInvitation] tenant_slug non ajouté aux métadonnées", {
+          userId: authResult.data.user.id,
+          tenantId,
+        });
+      }
+      return { tenantId: tenantId as string, loginUrl: `/login/${tenant.slug}` };
     } catch (error) {
-      const { error: rollbackError } =
-        await supabaseAdmin.auth.admin.deleteUser(authResult.data.user.id);
-      if (rollbackError) console.error("[PartnerTenant] Échec du rollback Auth", rollbackError);
+      if (!tenantCommitted) {
+        const { error: rollbackError } =
+          await supabaseAdmin.auth.admin.deleteUser(authResult.data.user.id);
+        if (rollbackError) console.error("[PartnerTenant] Échec du rollback Auth", rollbackError);
+      }
       throw error;
     }
+  });
+
+export const resendPartnerTenantInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ tenantId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    await requirePartnerMembership(context.supabase, context.userId);
+    const { data: assignment, error: assignmentError } = await context.supabase
+      .from("partner_tenants")
+      .select("tenant_id")
+      .eq("tenant_id", data.tenantId)
+      .maybeSingle();
+    if (assignmentError) throw new Error(formatSupabaseError(assignmentError));
+    if (!assignment) throw new Error("Tenant non attribué à ce partenaire.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: admins, error: adminError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, email, roles!inner(name, tenant_id)")
+      .eq("tenant_id", data.tenantId)
+      .eq("roles.name", "Administrateur")
+      .eq("roles.tenant_id", data.tenantId)
+      .limit(1);
+    if (adminError) throw new Error(formatSupabaseError(adminError));
+    const tenantAdmin = admins?.[0];
+    if (!tenantAdmin?.id || !tenantAdmin.email) {
+      throw new Error("Administrateur du tenant introuvable.");
+    }
+
+    const redirectTo = getInvitationRedirectUrl();
+    console.info("[PartnerInvitation] Renvoi d'une invitation non consommée", {
+      tenantId: data.tenantId,
+      redirectTo,
+    });
+    await resendExistingAuthInvitation(supabaseAdmin.auth, {
+      userId: tenantAdmin.id,
+      email: tenantAdmin.email,
+      redirectTo,
+    });
+    return { sent: true, userId: tenantAdmin.id, tenantId: data.tenantId };
   });

@@ -11,5 +11,7 @@ export const routePermissions: Record<string, string> = {
   "/fournisseurs": "parties.access",
   "/depenses": "ventes.view",
   "/parametres": "settings.manage",
+  "/settings/catalogue": "settings.manage",
+  "/settings/users": "settings.manage",
   "/utilisateurs": "settings.manage",
 };

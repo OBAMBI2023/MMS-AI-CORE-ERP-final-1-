@@ -10,7 +10,11 @@ import { LoginCard } from "@/components/auth/LoginCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { supabase } from "@/integrations/supabase/client";
-import { getAuthenticatedDestination } from "@/lib/partner-admin.server";
+import {
+  getAuthenticatedDestination,
+  getLoginTenantBranding,
+} from "@/lib/partner-admin.server";
+import { profileBelongsToTenant } from "@/lib/tenant-login-access";
 
 const loginSchema = z.object({
   email: z.string().email("Adresse e-mail invalide"),
@@ -18,7 +22,7 @@ const loginSchema = z.object({
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
-type LoginTenant = { id: string; name: string; logo_url: string | null };
+type LoginTenant = { id: string; name: string; logoUrl: string | null };
 
 const loginInputClassName =
   "login-field h-[60px] rounded-2xl border-slate-300 bg-white pl-12 pr-12 text-sm text-slate-900 caret-slate-900 shadow-sm shadow-slate-100 transition-all duration-200 placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-[#0F5BFF] focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-blue-500/10 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:caret-white dark:shadow-none dark:placeholder:text-slate-400 dark:hover:border-slate-500 dark:focus-visible:border-blue-400 dark:focus-visible:bg-slate-900 dark:focus-visible:ring-blue-400/20";
@@ -77,11 +81,13 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
     setTenantNotFound(false);
 
     void (async () => {
-      const { data, error } = await supabase
-        .from("tenants")
-        .select("id, name, logo_url")
-        .eq("slug", tenantSlug)
-        .maybeSingle();
+      let data: LoginTenant | null = null;
+      let error: unknown = null;
+      try {
+        data = await getLoginTenantBranding({ data: { slug: tenantSlug } });
+      } catch (brandingError) {
+        error = brandingError;
+      }
       if (!active) return;
       if (error) console.error("Impossible de récupérer l’espace demandé :", error);
       setTenant(data);
@@ -125,7 +131,7 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
           .eq("id", data.user.id)
           .maybeSingle();
 
-        if (profileError || profile?.tenant_id !== tenant.id) {
+        if (profileError || !profileBelongsToTenant(profile?.tenant_id, tenant.id)) {
           await supabase.auth.signOut();
           void logConnectionAttempt(values.email, "failure");
           throw new Error("Ce compte n’appartient pas à cet espace.");
@@ -155,7 +161,7 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
       logo={
         tenantLoading
           ? undefined
-          : (tenant?.logo_url ?? PLATFORM_BRANDING.assets.logo)
+          : (tenant?.logoUrl ?? PLATFORM_BRANDING.assets.logo)
       }
       logoAlt={tenant ? `Logo ${tenant.name}` : PLATFORM_BRANDING.alt}
       backLink={tenantSlug ? { href: "/login", label: "Retour" } : undefined}
@@ -182,7 +188,7 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
         logo={
           tenantLoading
             ? undefined
-            : (tenant?.logo_url ?? PLATFORM_BRANDING.assets.logo)
+            : (tenant?.logoUrl ?? PLATFORM_BRANDING.assets.logo)
         }
         logoAlt={tenant ? `Logo ${companyName}` : PLATFORM_BRANDING.alt}
         headerContent={

@@ -40,6 +40,8 @@ import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as SuperAdminUsersRouteImport } from './routes/super-admin.users'
 import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
 import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.ia-platform'
+import { Route as SettingsUsersRouteImport } from './routes/settings.users'
+import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
 import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
 import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as AppSplatRouteImport } from './routes/app.$'
@@ -199,6 +201,16 @@ const SuperAdminIaPlatformRoute = SuperAdminIaPlatformRouteImport.update({
   path: '/ia-platform',
   getParentRoute: () => SuperAdminRoute,
 } as any)
+const SettingsUsersRoute = SettingsUsersRouteImport.update({
+  id: '/settings/users',
+  path: '/settings/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsCatalogueRoute = SettingsCatalogueRouteImport.update({
+  id: '/settings/catalogue',
+  path: '/settings/catalogue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginSlugRoute = LoginSlugRouteImport.update({
   id: '/login_/$slug',
   path: '/login/$slug',
@@ -246,6 +258,8 @@ export interface FileRoutesByFullPath {
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/settings/catalogue': typeof SettingsCatalogueRoute
+  '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
@@ -282,6 +296,8 @@ export interface FileRoutesByTo {
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/settings/catalogue': typeof SettingsCatalogueRoute
+  '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
@@ -319,6 +335,8 @@ export interface FileRoutesById {
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/login_/$slug': typeof LoginSlugRoute
+  '/settings/catalogue': typeof SettingsCatalogueRoute
+  '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
@@ -357,6 +375,8 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login/$slug'
+    | '/settings/catalogue'
+    | '/settings/users'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/super-admin/users'
@@ -393,6 +413,8 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login/$slug'
+    | '/settings/catalogue'
+    | '/settings/users'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/super-admin/users'
@@ -429,6 +451,8 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/assistant-ia'
     | '/login_/$slug'
+    | '/settings/catalogue'
+    | '/settings/users'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/super-admin/users'
@@ -466,6 +490,8 @@ export interface RootRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppAssistantIaRoute: typeof AppAssistantIaRoute
   LoginSlugRoute: typeof LoginSlugRoute
+  SettingsCatalogueRoute: typeof SettingsCatalogueRoute
+  SettingsUsersRoute: typeof SettingsUsersRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
@@ -688,6 +714,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperAdminIaPlatformRouteImport
       parentRoute: typeof SuperAdminRoute
     }
+    '/settings/users': {
+      id: '/settings/users'
+      path: '/settings/users'
+      fullPath: '/settings/users'
+      preLoaderRoute: typeof SettingsUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/catalogue': {
+      id: '/settings/catalogue'
+      path: '/settings/catalogue'
+      fullPath: '/settings/catalogue'
+      preLoaderRoute: typeof SettingsCatalogueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login_/$slug': {
       id: '/login_/$slug'
       path: '/login/$slug'
@@ -759,6 +799,8 @@ const rootRouteChildren: RootRouteChildren = {
   AppSplatRoute: AppSplatRoute,
   AppAssistantIaRoute: AppAssistantIaRoute,
   LoginSlugRoute: LoginSlugRoute,
+  SettingsCatalogueRoute: SettingsCatalogueRoute,
+  SettingsUsersRoute: SettingsUsersRoute,
   AppIndexRoute: AppIndexRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Package, Pencil, Plus, Search, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -28,10 +28,13 @@ import type {
 } from "@/services/catalog-categories.service";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { useTenant } from "@/providers/TenantProvider";
+import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import { catalogTypeEnabled } from "@/lib/catalog-settings";
 
 export function CategoriesPage() {
   const { profile, loading: tenantLoading } = useTenant();
   const categoriesQuery = useCatalogCategories();
+  const catalogSettingsQuery = useCatalogSettings();
   const mutations = useCatalogCategoryMutations();
   const canCreate = useActionPermission("services.create");
   const canEdit = useActionPermission("services.edit");
@@ -46,6 +49,12 @@ export function CategoriesPage() {
   const [usageCount, setUsageCount] = useState<number | null>(null);
   const [replacementId, setReplacementId] = useState("");
   const [checkingUsage, setCheckingUsage] = useState(false);
+
+  useEffect(() => {
+    if (catalogSettingsQuery.data && !catalogTypeEnabled(catalogSettingsQuery.data, activeType)) {
+      setActiveType(catalogSettingsQuery.data.catalog_mode === "services" ? "service" : "product");
+    }
+  }, [activeType, catalogSettingsQuery.data]);
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("fr");
@@ -141,7 +150,7 @@ export function CategoriesPage() {
         }}
       >
         <TabsList className="grid h-auto w-full grid-cols-1 gap-3 bg-transparent p-0 sm:grid-cols-2">
-          <TabsTrigger
+          {catalogTypeEnabled(catalogSettingsQuery.data, "product") && <TabsTrigger
             value="product"
             className="h-auto justify-start gap-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md data-[state=active]:border-blue-500 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-950 data-[state=active]:shadow-md dark:border-blue-900/60 dark:from-blue-950/50 dark:to-background dark:data-[state=active]:border-blue-500"
           >
@@ -157,8 +166,8 @@ export function CategoriesPage() {
             <span className="ml-auto rounded-full bg-blue-100 px-2.5 py-1 text-sm font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
               {categoryCounts.product}
             </span>
-          </TabsTrigger>
-          <TabsTrigger
+          </TabsTrigger>}
+          {catalogTypeEnabled(catalogSettingsQuery.data, "service") && <TabsTrigger
             value="service"
             className="h-auto justify-start gap-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md data-[state=active]:border-violet-500 data-[state=active]:bg-violet-50 data-[state=active]:text-violet-950 data-[state=active]:shadow-md dark:border-violet-900/60 dark:from-violet-950/50 dark:to-background dark:data-[state=active]:border-violet-500"
           >
@@ -174,7 +183,7 @@ export function CategoriesPage() {
             <span className="ml-auto rounded-full bg-violet-100 px-2.5 py-1 text-sm font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
               {categoryCounts.service}
             </span>
-          </TabsTrigger>
+          </TabsTrigger>}
         </TabsList>
       </Tabs>
 

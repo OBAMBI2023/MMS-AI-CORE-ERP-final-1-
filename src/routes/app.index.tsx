@@ -53,12 +53,16 @@ import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/mms/format";
 import { usePermissions } from "@/hooks/use-permissions";
 import { canAccessParties } from "@/lib/party-access";
+import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 
 const PIE_COLORS = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4", "#6366f1"];
 
 function Dashboard() {
   const { data, isLoading, error } = useDashboardData();
   const permissionsQuery = usePermissions();
+  const catalogSettingsQuery = useCatalogSettings();
+  const catalogSettings = catalogSettingsQuery.data;
+  const catalogMode = catalogSettings?.catalog_mode;
   const canViewParties = canAccessParties(
     permissionsQuery.data?.role,
     permissionsQuery.data?.permissions,
@@ -99,10 +103,10 @@ function Dashboard() {
     { title: "Nouvelle vente", icon: ShoppingCart, route: "/ventes" },
     { title: "Nouveau devis", icon: FileText, route: "/devis" },
     { title: "Nouveau client", icon: UserPlus, route: "/clients" },
-    { title: "Nouveau fournisseur", icon: Building2, route: "/fournisseurs" },
-    { title: "Nouvel achat", icon: ShoppingBag, route: "/achats" },
+    ...(catalogSettings?.suppliers_enabled ? [{ title: "Nouveau fournisseur", icon: Building2, route: "/fournisseurs" }] : []),
+    ...(catalogSettings?.purchases_enabled ? [{ title: "Nouvel achat", icon: ShoppingBag, route: "/achats" }] : []),
     { title: "Nouvelle dépense", icon: CreditCard, route: "/depenses" },
-    { title: "Nouveau service", icon: Wrench, route: "/services" },
+    { title: catalogMode === "products" ? "Nouveau produit" : catalogMode === "services" ? "Nouveau service" : "Nouvel article", icon: Wrench, route: "/services" },
     { title: "Rapports", icon: BarChart3, route: "/rapports" },
     { title: "Paramètres", icon: Settings, route: "/parametres" },
     // { title: "Assistant IA", icon: Bot, route: "/assistant" },
@@ -142,7 +146,7 @@ function Dashboard() {
         className="space-y-8 pb-4"
       >
         <div>
-          {isLoading || !data?.session ? (
+          {isLoading || catalogSettingsQuery.isLoading || !data?.session ? (
             <div
               className="h-9 w-64 max-w-full animate-pulse rounded-lg bg-muted"
               aria-label="Chargement du message d’accueil"
@@ -156,7 +160,7 @@ function Dashboard() {
         </div>
 
         {/* KPI Premium */}
-        {isLoading || !data ? (
+        {isLoading || catalogSettingsQuery.isLoading || !data ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
             {Array.from({ length: 8 }).map((_, i) => (
               <Card key={i} className="h-32 rounded-2xl" />
@@ -166,15 +170,15 @@ function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <DashboardKpiCard
               index={0}
-              title="Chiffre d'affaires"
-              value={formatCurrency(data.kpis.revenue.value)}
+              title={catalogMode === "products" ? "CA produits" : catalogMode === "services" ? "CA services" : "CA total"}
+              value={formatCurrency(catalogMode === "products" ? data.catalogSummary.productRevenue : catalogMode === "services" ? data.catalogSummary.serviceRevenue : data.kpis.revenue.value)}
               icon={Wallet}
               route="/ventes"
               trend={data.kpis.revenue.trend}
               spark={data.kpis.revenue.spark}
               accent="primary"
             />
-            <DashboardKpiCard
+            {catalogSettings?.purchases_enabled && <DashboardKpiCard
               index={1}
               title="Dépenses"
               value={formatCurrency(data.kpis.depenses.value)}
@@ -183,7 +187,7 @@ function Dashboard() {
               trend={data.kpis.depenses.trend}
               spark={data.kpis.depenses.spark}
               accent="rose"
-            />
+            />}
             <DashboardKpiCard
               index={2}
               title="Achats"
@@ -206,7 +210,7 @@ function Dashboard() {
             />
             {canViewParties && (
               <>
-                <DashboardKpiCard
+                {catalogSettings?.suppliers_enabled && <DashboardKpiCard
                   index={4}
                   title="Clients"
                   value={String(data.kpis.clients.value)}
@@ -215,7 +219,7 @@ function Dashboard() {
                   trend={data.kpis.clients.trend}
                   spark={data.kpis.clients.spark}
                   accent="sky"
-                />
+                />}
                 <DashboardKpiCard
                   index={5}
                   title="Fournisseurs"
@@ -240,8 +244,8 @@ function Dashboard() {
             />
             <DashboardKpiCard
               index={7}
-              title="Produits & Services"
-              value={String(data.kpis.services.value)}
+              title={catalogMode === "products" ? "Produits vendus" : catalogMode === "services" ? "Prestations" : "Produits & Services"}
+              value={catalogMode === "products" ? String(data.catalogSummary.productQuantity) : catalogMode === "services" ? String(data.catalogSummary.serviceQuantity) : String(data.kpis.services.value)}
               icon={Wrench}
               route="/services"
               trend={data.kpis.services.trend}
