@@ -16,7 +16,8 @@ import {
   renderAchatsTable,
   renderAchatsTotals,
 } from "@/lib/mms/pdf-achats-template";
-import { renderPdfFooter, tenantFromSettings } from "@/lib/mms/PdfTheme";
+import { tenantFromSettings } from "@/lib/mms/PdfTheme";
+import { PdfLayoutEngine } from "@/lib/mms/PdfLayoutEngine";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
@@ -105,7 +106,7 @@ function AchatsPage() {
     );
 
     renderAchatsTotals(doc, formatCurrency(total));
-    renderPdfFooter(doc, tenantFromSettings(settings, logoUrl));
+    PdfLayoutEngine.footer(doc, tenantFromSettings(settings, logoUrl));
 
     await downloadPdf(doc, `Achats_${new Date().toISOString().slice(0, 10)}.pdf`);
     toast.success("PDF généré.");

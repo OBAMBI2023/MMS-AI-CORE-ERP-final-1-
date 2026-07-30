@@ -1,11 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { CompanySettings } from "./pdf-types";
-import {
-  renderPdfHeader,
-  renderPdfTable,
-  renderPdfTotalCard,
-  tenantFromSettings,
-} from "./PdfTheme";
+import { tenantFromSettings } from "./PdfTheme";
+import { PdfLayoutEngine } from "./PdfLayoutEngine";
 
 export async function renderAchatsHeader(
   doc: jsPDF,
@@ -14,15 +10,16 @@ export async function renderAchatsHeader(
   totalItems: number,
   totalAmount: string,
 ) {
-  return renderPdfHeader(doc, tenantFromSettings(settings as unknown as Record<string, unknown>, logoUrl), "Liste des achats", [
+  return PdfLayoutEngine.header(doc, tenantFromSettings(settings as unknown as Record<string, unknown>, logoUrl), "Liste des achats", [
     { label: "Date d'export", value: new Date().toLocaleDateString("fr-FR") },
     { label: "Nombre d'achats", value: String(totalItems) },
     { label: "Montant total", value: totalAmount },
+    { label: "Statut", value: "Export validé" },
   ]);
 }
 
 export function renderAchatsTable(doc: jsPDF, data: any[], startY: number) {
-  return renderPdfTable(
+  return PdfLayoutEngine.table(
     doc,
     ["Date", "Référence", "Fournisseur", "Montant"],
     data.map((item) => [item.date, item.reference, item.fournisseur, item.amount]),
@@ -33,5 +30,5 @@ export function renderAchatsTable(doc: jsPDF, data: any[], startY: number) {
 
 export function renderAchatsTotals(doc: jsPDF, total: string) {
   const finalY = (doc as any).lastAutoTable.finalY + 7;
-  renderPdfTotalCard(doc, "Total des achats", total, finalY);
+  PdfLayoutEngine.totals(doc, [{ label: "Total des achats", value: total }], finalY);
 }

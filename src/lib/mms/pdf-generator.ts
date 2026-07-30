@@ -5,8 +5,10 @@ import {
   renderFooter,
   renderTable,
   renderTotals,
+  renderDocumentNotes,
   renderSignatureAndStamp,
 } from "./pdf-template-engine";
+import { PdfLayoutEngine } from "./PdfLayoutEngine";
 import { toast } from "sonner";
 import { downloadPdf } from "./download-pdf";
 
@@ -27,27 +29,31 @@ export async function generateDevisPDF(
       { label: "Numéro", value: quote.numero },
       { label: "Date", value: quote.date },
       { label: "Expiration", value: quote.dateExpiration || "-" },
+      { label: "Statut", value: quote.statut || "-" },
     ]);
 
-    // Customer Info
-    doc.setFontSize(10);
-    doc.setTextColor(31, 41, 55);
-    doc.text("Informations du client", 10, afterHeaderY + 5);
-    doc.text(quote.client.nom, 10, afterHeaderY + 10);
-    if (quote.client.entreprise) doc.text(quote.client.entreprise, 10, afterHeaderY + 15);
-    if (quote.client.telephone) doc.text(quote.client.telephone, 10, afterHeaderY + 20);
-    if (quote.client.email) doc.text(quote.client.email, 10, afterHeaderY + 25);
+    const afterClientY = PdfLayoutEngine.contact(doc, {
+      heading: "Client",
+      name: quote.client.nom,
+      company: quote.client.entreprise,
+      phone: quote.client.telephone,
+      email: quote.client.email,
+      address: quote.client.adresse,
+    }, afterHeaderY);
 
-    // Items Table
-    renderTable(doc, quote.items, afterHeaderY + 32, settings.currency, settings.decimals);
+    renderTable(doc, quote.items, afterClientY + 7, settings.currency, settings.decimals);
 
     // Totals
     const finalY = (doc as any).lastAutoTable.finalY + 10;
-    renderTotals(doc, quote.totals, finalY, settings.currency, settings.decimals);
+    const afterTotalsY = renderTotals(doc, quote.totals, finalY, settings.currency, settings.decimals);
+    const afterNotesY = renderDocumentNotes(doc, [
+      { title: "Conditions de paiement", text: quote.conditionsPaiement },
+      { title: "Notes", text: quote.observations },
+    ], afterTotalsY + 7);
 
     // Footer, Signature and Stamp
     if (images.signature) {
-      await renderSignatureAndStamp(doc, images.signature, images.cachet || null);
+      await renderSignatureAndStamp(doc, images.signature, images.cachet || null, afterNotesY + 3);
     }
 
     renderFooter(doc, settings);

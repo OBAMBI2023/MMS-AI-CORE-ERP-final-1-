@@ -48,13 +48,8 @@ import {
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import { downloadPdf } from "@/lib/mms/download-pdf";
-import {
-  renderPdfFooter,
-  renderPdfHeader,
-  renderPdfTable,
-  renderPdfTotalCard,
-  tenantFromSettings,
-} from "@/lib/mms/PdfTheme";
+import { tenantFromSettings } from "@/lib/mms/PdfTheme";
+import { PdfLayoutEngine } from "@/lib/mms/PdfLayoutEngine";
 import { Button } from "@/components/ui/button";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useActionPermission } from "@/hooks/use-action-permission";
@@ -359,7 +354,7 @@ function RapportsPage() {
     const doc = new jsPDF();
     const tenant = tenantFromSettings(settings, logoUrl);
     const period = `${new Date(year, month - 1).toLocaleString("fr-FR", { month: "long" })} ${year}`;
-    const startY = await renderPdfHeader(doc, tenant, "Rapport financier", [
+    const startY = await PdfLayoutEngine.header(doc, tenant, "Rapport financier", [
       { label: "Période", value: period },
       { label: "CA total", value: formatCurrency(report.target.totalRevenue) },
       {
@@ -371,6 +366,7 @@ function RapportsPage() {
               ? "Produits"
               : "Services",
       },
+      { label: "Indicateur", value: formatCurrency(report.target.netResult) },
     ]);
     const rows = [
       ...(showMixed ? [["CA total", formatCurrency(report.target.totalRevenue)]] : []),
@@ -390,28 +386,46 @@ function RapportsPage() {
       ["Devis en attente", formatCurrency(report.target.quoteAmounts.pending)],
       ["Devis refusés", formatCurrency(report.target.quoteAmounts.rejected)],
     ];
-    let finalY = renderPdfTable(doc, ["Indicateur", "Valeur"], rows, startY, {
+    let finalY = PdfLayoutEngine.table(
+      doc,
+      ["Indicateur", "Valeur"],
+      rows,
+      PdfLayoutEngine.section(doc, "Synthèse", startY),
+      {
       columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
-    });
-    finalY = renderPdfTable(
+      },
+    );
+    finalY = PdfLayoutEngine.section(doc, "Dépenses par catégorie", finalY + 8);
+    finalY = PdfLayoutEngine.table(
       doc,
       ["Catégorie de dépense", "Montant"],
       report.target.expenseCategories.map((row) => [row.category, formatCurrency(row.amount)]),
-      finalY + 8,
+      finalY,
       { columnStyles: { 1: { halign: "right" } } },
     );
-    if (showProducts) finalY = renderPdfTable(
-      doc, ["Meilleurs produits", "Qté", "CA", "Marge"],
+    if (showProducts) {
+      finalY = PdfLayoutEngine.section(doc, "Meilleurs produits", finalY + 8);
+      finalY = PdfLayoutEngine.table(
+      doc, ["Produit", "Qté", "CA", "Marge"],
       report.products.map((row) => [row.name, String(row.quantity), formatCurrency(row.revenue), formatCurrency(row.margin)]),
-      finalY + 8,
+      finalY,
     );
-    if (showServices) finalY = renderPdfTable(
-      doc, ["Meilleurs services", "Qté", "CA"],
+    }
+    if (showServices) {
+      finalY = PdfLayoutEngine.section(doc, "Meilleurs services", finalY + 8);
+      finalY = PdfLayoutEngine.table(
+      doc, ["Service", "Qté", "CA"],
       report.services.map((row) => [row.name, String(row.quantity), formatCurrency(row.revenue)]),
-      finalY + 8,
+      finalY,
     );
-    renderPdfTotalCard(doc, "Résultat net", formatCurrency(report.target.netResult), finalY + 7);
-    renderPdfFooter(doc, tenant);
+    }
+    PdfLayoutEngine.totals(doc, [
+      { label: "Chiffre d'affaires", value: formatCurrency(report.target.totalRevenue) },
+      { label: "Achats", value: formatCurrency(report.target.purchases), hidden: !showPurchases },
+      { label: "Dépenses", value: formatCurrency(report.target.expenses) },
+      { label: "Résultat net", value: formatCurrency(report.target.netResult) },
+    ], finalY + 7);
+    PdfLayoutEngine.footer(doc, tenant);
     await downloadPdf(doc, `Rapport_${companyName || "Entreprise"}_${month}_${year}.pdf`);
     toast.success("Export PDF terminé.");
   };

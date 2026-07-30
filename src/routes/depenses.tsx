@@ -10,7 +10,8 @@ import {
   renderDepensesTable,
   renderDepensesTotals,
 } from "@/lib/mms/pdf-template-engine";
-import { renderPdfFooter, tenantFromSettings } from "@/lib/mms/PdfTheme";
+import { tenantFromSettings } from "@/lib/mms/PdfTheme";
+import { PdfLayoutEngine } from "@/lib/mms/PdfLayoutEngine";
 import { FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useCompanySettings } from "@/hooks/use-company-settings";
@@ -110,7 +111,7 @@ function DepensesPage() {
     );
 
     renderDepensesTotals(doc, formatCurrency(total), 0);
-    renderPdfFooter(doc, tenantFromSettings(settings, logoUrl));
+    PdfLayoutEngine.footer(doc, tenantFromSettings(settings, logoUrl));
 
     await downloadPdf(doc, `Depenses_${new Date().toISOString().slice(0, 10)}.pdf`);
     toast.success("PDF généré.");

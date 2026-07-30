@@ -3,12 +3,9 @@ import type { CompanySettings, DocumentItem, DocumentTotals } from "./pdf-types"
 import { formatCurrency } from "./format";
 import {
   PDF_COLORS,
-  renderPdfFooter,
-  renderPdfHeader,
-  renderPdfTable,
-  renderPdfTotalCard,
   tenantFromSettings,
 } from "./PdfTheme";
+import { PdfLayoutEngine } from "./PdfLayoutEngine";
 
 async function urlToDataURL(url: string): Promise<string> {
   const response = await fetch(url);
@@ -34,19 +31,40 @@ export async function renderLogo(doc: jsPDF, logoUrl: string) {
   }
 }
 
-export async function renderSignatureAndStamp(doc: jsPDF, signatureUrl: string, cachetUrl: string | null) {
+export async function renderSignatureAndStamp(
+  doc: jsPDF,
+  signatureUrl: string,
+  cachetUrl: string | null,
+  requestedY = 225,
+) {
   try {
-    const x = 140;
-    const y = doc.internal.pageSize.height - 50;
-    doc.addImage(await urlToDataURL(signatureUrl), "PNG", x, y, 50, 30);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const x = doc.internal.pageSize.getWidth() - 70;
+    let y = requestedY;
+    if (y + 38 > pageHeight - 18) {
+      doc.addPage();
+      y = 25;
+    }
+    doc.setFillColor(...PDF_COLORS.surface);
+    doc.setDrawColor(...PDF_COLORS.line);
+    doc.roundedRect(x - 5, y - 6, 62, 43, 3, 3, "FD");
+    doc.setFillColor(...PDF_COLORS.secondary);
+    doc.roundedRect(x - 5, y - 6, 2.5, 43, 1.25, 1.25, "F");
+    doc.setTextColor(...PDF_COLORS.primary);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("SIGNATURE ET CACHET", x, y);
+    doc.addImage(await urlToDataURL(signatureUrl), "PNG", x, y + 3, 50, 30);
     if (cachetUrl) {
       doc.saveGraphicsState();
       doc.setGState(new (jsPDF as any).GState({ opacity: 0.75 }));
-      doc.addImage(await urlToDataURL(cachetUrl), "PNG", x, y, 50, 30);
+      doc.addImage(await urlToDataURL(cachetUrl), "PNG", x, y + 3, 50, 30);
       doc.restoreGraphicsState();
     }
+    return y + 35;
   } catch (error) {
     console.error("Failed to render signature/stamp:", error);
+    return requestedY;
   }
 }
 
@@ -66,7 +84,7 @@ export function renderPremiumDocumentHeader(
   logoUrl?: string | null,
   summary: Array<{ label: string; value: string }> = [],
 ) {
-  return renderPdfHeader(
+  return PdfLayoutEngine.header(
     doc,
     tenantFromSettings(settings as unknown as Record<string, unknown>, logoUrl),
     title,
@@ -75,11 +93,16 @@ export function renderPremiumDocumentHeader(
 }
 
 export function renderDepensesHeader(doc: jsPDF, settings: CompanySettings, logoUrl: string | null) {
-  return renderPremiumDocumentHeader(doc, settings, "Liste des dépenses", logoUrl);
+  return renderPremiumDocumentHeader(doc, settings, "Liste des dépenses", logoUrl, [
+    { label: "Date d'export", value: new Date().toLocaleDateString("fr-FR") },
+    { label: "Type", value: "Dépenses" },
+    { label: "Période", value: "Toutes" },
+    { label: "Statut", value: "Export validé" },
+  ]);
 }
 
 export function renderDepensesTable(doc: jsPDF, data: any[], startY: number) {
-  return renderPdfTable(
+  return PdfLayoutEngine.table(
     doc,
     ["Date", "Catégorie", "Description", "Mode de paiement", "Montant"],
     data.map((item) => [
@@ -95,7 +118,7 @@ export function renderDepensesTable(doc: jsPDF, data: any[], startY: number) {
 }
 
 export function renderDepensesTotals(doc: jsPDF, total: string, _startY: number) {
-  renderPdfTotalCard(doc, "Total des dépenses", total, (doc as any).lastAutoTable.finalY + 7);
+  PdfLayoutEngine.totals(doc, [{ label: "Total des dépenses", value: total }], (doc as any).lastAutoTable.finalY + 7);
 }
 
 export function renderTable(
@@ -105,7 +128,7 @@ export function renderTable(
   currency?: string,
   decimals?: number,
 ) {
-  return renderPdfTable(
+  return PdfLayoutEngine.table(
     doc,
     ["Description", "Qté", "Prix U.", "Remise", "TVA", "Montant"],
     items.map((item) => [
@@ -128,7 +151,7 @@ export function renderTable(
 }
 
 export function renderFooter(doc: jsPDF, settings: CompanySettings) {
-  renderPdfFooter(doc, tenantFromSettings(settings as unknown as Record<string, unknown>));
+  PdfLayoutEngine.footer(doc, tenantFromSettings(settings as unknown as Record<string, unknown>));
 }
 
 export function renderTotals(
@@ -138,57 +161,19 @@ export function renderTotals(
   currency?: string,
   decimals?: number,
 ) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const blockWidth = 88;
-  const blockX = pageWidth - 10 - blockWidth;
   const rows = [
-    { label: "Sous-total", value: totals.sousTotal },
-    ...(Number(totals.remise) > 0 ? [{ label: "Remise", value: totals.remise }] : []),
-    ...(Number(totals.tva) > 0 ? [{ label: "TVA", value: totals.tva }] : []),
+    { label: "Sous-total", value: formatCurrency(totals.sousTotal, currency, decimals) },
+    { label: "Remise", value: formatCurrency(totals.remise, currency, decimals), hidden: Number(totals.remise) <= 0 },
+    { label: "TVA", value: formatCurrency(totals.tva, currency, decimals), hidden: Number(totals.tva) <= 0 },
+    { label: "Total TTC", value: formatCurrency(totals.totalTTC, currency, decimals) },
   ];
-  const blockHeight = 5 + rows.length * 8 + 4 + 11 + 4;
-  let y = startY;
+  return PdfLayoutEngine.totals(doc, rows, startY);
+}
 
-  if (y + blockHeight > pageHeight - 18) {
-    doc.addPage();
-    y = 20;
-  }
-
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(...PDF_COLORS.line);
-  doc.setLineWidth(0.25);
-  doc.roundedRect(blockX, y, blockWidth, blockHeight, 2.5, 2.5, "FD");
-
-  let rowY = y + 7;
-  rows.forEach((row) => {
-    doc.setTextColor(...PDF_COLORS.primary);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(row.label, blockX + 5, rowY);
-    doc.setFont("helvetica", "bold");
-    doc.text(formatCurrency(row.value, currency, decimals), blockX + blockWidth - 5, rowY, {
-      align: "right",
-      maxWidth: blockWidth - 34,
-    });
-    rowY += 8;
-  });
-
-  doc.setDrawColor(...PDF_COLORS.secondary);
-  doc.setLineWidth(0.4);
-  doc.line(blockX + 5, rowY - 2, blockX + blockWidth - 5, rowY - 2);
-
-  doc.setTextColor(...PDF_COLORS.primary);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("TOTAL TTC", blockX + 5, rowY + 6);
-
-  doc.setTextColor(...PDF_COLORS.secondary);
-  doc.setFontSize(13);
-  doc.text(
-    formatCurrency(totals.totalTTC, currency, decimals),
-    blockX + blockWidth - 5,
-    rowY + 6,
-    { align: "right", maxWidth: blockWidth - 34 },
-  );
+export function renderDocumentNotes(
+  doc: jsPDF,
+  sections: Array<{ title: string; text?: string | null }>,
+  startY: number,
+) {
+  return PdfLayoutEngine.notes(doc, sections, startY);
 }

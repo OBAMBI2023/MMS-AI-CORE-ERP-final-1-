@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { AuthLayout } from "@/components/auth/AuthLayout";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  cleanPasswordRecoveryUrl,
   clearPasswordRecoveryContext,
   hasValidPasswordRecoverySession,
 } from "@/integrations/supabase/password-recovery";
@@ -39,6 +40,10 @@ function ResetPasswordPage() {
   const [tenantLoginPath, setTenantLoginPath] = useState("/login");
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendComplete, setResendComplete] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -82,6 +87,31 @@ function ResetPasswordPage() {
       subscription.unsubscribe();
     };
   }, []);
+
+  const resendRecoveryEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setResending(true);
+    setResendError(null);
+
+    const email = resendEmail.trim();
+    if (!z.string().email().safeParse(email).success) {
+      setResendError("Saisissez une adresse e-mail valide.");
+      setResending(false);
+      return;
+    }
+
+    const redirectTo = new URL("/reset-password", window.location.origin).toString();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) {
+      console.error("[PasswordSetup] Échec du renvoi du lien :", error);
+      setResendError("Le lien n’a pas pu être envoyé. Réessayez dans quelques instants.");
+      setResending(false);
+      return;
+    }
+
+    setResendComplete(true);
+    setResending(false);
+  };
 
   const updatePassword = async ({ password }: ResetPasswordValues) => {
     setSubmitting(true);
@@ -133,6 +163,7 @@ function ResetPasswordPage() {
     }
     const loginPath = tenantSlug ? `/login/${encodeURIComponent(tenantSlug)}` : "/login";
     setTenantLoginPath(loginPath);
+    cleanPasswordRecoveryUrl();
     const { error: signOutError } = await supabase.auth.signOut();
     if (signOutError) {
       console.warn("[PasswordSetup] Échec de fermeture de la session temporaire", {
@@ -186,9 +217,35 @@ function ResetPasswordPage() {
               <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
                 Lien invalide ou expiré. Demandez une nouvelle invitation.
               </p>
-              <a href="/forgot-password" className="text-sm font-semibold text-[#0F5BFF] hover:underline dark:text-blue-400">
-                Demander un nouveau lien
-              </a>
+              {resendComplete ? (
+                <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                  Si un compte correspond à cette adresse, un nouveau lien vient d’être envoyé.
+                </p>
+              ) : (
+                <form onSubmit={resendRecoveryEmail} className="space-y-3 text-left">
+                  <Label htmlFor="resend-email" className="dark:text-slate-200">
+                    Adresse e-mail
+                  </Label>
+                  <Input
+                    id="resend-email"
+                    type="email"
+                    autoComplete="email"
+                    value={resendEmail}
+                    onChange={(event) => setResendEmail(event.target.value)}
+                    disabled={resending}
+                    required
+                    className="h-12 rounded-2xl dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                  {resendError && <p className="text-sm text-red-600 dark:text-red-400">{resendError}</p>}
+                  <Button
+                    type="submit"
+                    className="h-12 w-full rounded-2xl bg-[#0F5BFF] font-semibold text-white hover:bg-[#0B4FDF]"
+                    disabled={resending}
+                  >
+                    {resending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Envoyer un nouveau lien"}
+                  </Button>
+                </form>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit(updatePassword)} className="space-y-5">

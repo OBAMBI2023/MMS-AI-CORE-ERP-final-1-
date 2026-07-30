@@ -38,13 +38,8 @@ import { logAction } from "@/lib/audit.server";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import { downloadPdf } from "@/lib/mms/download-pdf";
-import {
-  renderPdfFooter,
-  renderPdfHeader,
-  renderPdfTable,
-  renderPdfTotalCard,
-  tenantFromSettings,
-} from "@/lib/mms/PdfTheme";
+import { tenantFromSettings } from "@/lib/mms/PdfTheme";
+import { PdfLayoutEngine } from "@/lib/mms/PdfLayoutEngine";
 import { useTenant } from "@/providers/TenantProvider";
 
 interface SalesHistoryModalProps {
@@ -110,9 +105,11 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     const doc = new jsPDF();
     const tenant = tenantFromSettings(settings, logoUrl);
     const total = filteredSales.reduce((sum, sale) => sum + Number(sale.total), 0);
-    const y = await renderPdfHeader(doc, tenant, "Historique des ventes", [
+    const y = await PdfLayoutEngine.header(doc, tenant, "Historique des ventes", [
       { label: "Nombre de ventes", value: String(filteredSales.length) },
       { label: "Montant total", value: formatCurrency(total) },
+      { label: "Période", value: "Toutes" },
+      { label: "Statut", value: "Validées" },
     ]);
 
     // Sales Table
@@ -125,15 +122,15 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
       "Validée",
     ]);
 
-    const finalY = renderPdfTable(
+    const finalY = PdfLayoutEngine.table(
       doc,
       ["Référence", "Date", "Client", "Montant", "Paiement", "Statut"],
       tableData,
       y,
       { columnStyles: { 3: { halign: "right", fontStyle: "bold" } } },
     );
-    renderPdfTotalCard(doc, "Total des ventes", formatCurrency(total), finalY + 7);
-    renderPdfFooter(doc, tenant);
+    PdfLayoutEngine.totals(doc, [{ label: "Total des ventes", value: formatCurrency(total) }], finalY + 7);
+    PdfLayoutEngine.footer(doc, tenant);
 
     await downloadPdf(doc, "historique-ventes.pdf");
     toast.success("PDF généré");
@@ -144,11 +141,16 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
   const handlePrint = async (sale: any) => {
     const doc = new jsPDF({ format: "a4", unit: "mm" });
     const tenant = tenantFromSettings(settings, logoUrl);
-    const y = await renderPdfHeader(doc, tenant, "Ticket de caisse", [
+    const y = await PdfLayoutEngine.header(doc, tenant, "Ticket de caisse", [
       { label: "Référence", value: sale.number },
       { label: "Date", value: new Date(sale.created_at).toLocaleDateString("fr-FR") },
+      { label: "Statut", value: "Validée" },
+      { label: "Total", value: formatCurrency(sale.total) },
     ]);
-    const finalY = renderPdfTable(
+    const contentY = sale.client_name
+      ? PdfLayoutEngine.contact(doc, { heading: "Client", name: sale.client_name }, y)
+      : y;
+    const finalY = PdfLayoutEngine.table(
       doc,
       ["Article", "Quantité", "Prix unitaire", "Montant"],
       (sale.vente_items ?? []).map((item: any) => [
@@ -157,11 +159,11 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
         formatCurrency(item.price),
         formatCurrency(Number(item.price) * Number(item.qty)),
       ]),
-      y,
+      contentY + 6,
       { columnStyles: { 2: { halign: "right" }, 3: { halign: "right", fontStyle: "bold" } } },
     );
-    renderPdfTotalCard(doc, "Total", formatCurrency(sale.total), finalY + 7);
-    renderPdfFooter(doc, tenant);
+    PdfLayoutEngine.totals(doc, [{ label: "Total TTC", value: formatCurrency(sale.total) }], finalY + 7);
+    PdfLayoutEngine.footer(doc, tenant);
 
     await downloadPdf(doc, `ticket-${sale.number}.pdf`);
     toast.success("Impression lancée");

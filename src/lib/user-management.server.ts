@@ -5,6 +5,22 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { logAction } from "@/lib/audit.server";
 import { formatSupabaseError } from "@/lib/supabase-error";
 
+const TENANT_ROLE_NAMES = [
+  "Administrateur", "Gérant", "Manager", "Comptable",
+  "Commercial", "Caissier", "Employé",
+] as const;
+
+async function logRejectedPrivilegeAttempt(
+  actorId: string,
+  reason: string,
+  metadata: Record<string, unknown>,
+) {
+  await logAction(actorId, null, "Élévation de privilèges refusée", "security", {
+    reason,
+    ...metadata,
+  });
+}
+
 async function getAdminTenantContext() {
   const { user } = await getAuth();
 
@@ -17,7 +33,7 @@ async function getAdminTenantContext() {
   if (error) throw new Error(formatSupabaseError(error));
   if (
     !profile?.tenant_id ||
-    !["Administrateur", "Super Admin"].includes(profile.roles?.name) ||
+    profile.roles?.name !== "Administrateur" ||
     profile.roles?.tenant_id !== profile.tenant_id
   ) {
     throw new Error("Accès refusé : administrateur du tenant requis.");
@@ -29,7 +45,7 @@ async function getAdminTenantContext() {
 async function assertProfileInTenant(profileId: string, tenantId: string) {
   const { data, error } = await (supabaseAdmin as any)
     .from("profiles")
-    .select("id")
+    .select("id, name")
     .eq("id", profileId)
     .eq("tenant_id", tenantId)
     .single();
@@ -47,7 +63,9 @@ async function assertRoleInTenant(roleId: string, tenantId: string) {
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
-  if (!data) throw new Error("Le rôle sélectionné n'appartient pas au tenant actif.");
+  if (!data || !TENANT_ROLE_NAMES.includes(data.name)) {
+    throw new Error("Le rôle sélectionné n'est pas autorisé dans ce tenant.");
+  }
 }
 
 export const deleteUser = createServerFn({ method: "POST" })
@@ -98,7 +116,14 @@ export const createUser = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { user: admin, tenantId } = await getAdminTenantContext();
-    await assertRoleInTenant(data.role_id, tenantId);
+    try {
+      await assertRoleInTenant(data.role_id, tenantId);
+    } catch (error) {
+      await logRejectedPrivilegeAttempt(admin.id, "role_not_allowed", {
+        requestedRoleId: data.role_id, tenantId, operation: "create_user",
+      });
+      throw error;
+    }
 
     const { data: authData, error: authError } = await (supabaseAdmin.auth.admin as any).createUser({
       email: data.email,
@@ -151,7 +176,23 @@ export const updateUser = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { user: admin, tenantId } = await getAdminTenantContext();
     await assertProfileInTenant(data.id, tenantId);
-    if (data.role_id) await assertRoleInTenant(data.role_id, tenantId);
+    if (data.role_id && admin.id === data.id) {
+      await logRejectedPrivilegeAttempt(admin.id, "self_role_change", {
+        requestedRoleId: data.role_id, tenantId, operation: "update_user",
+      });
+      throw new Error("Vous ne pouvez pas modifier votre propre rôle.");
+    }
+    if (data.role_id) {
+      try {
+        await assertRoleInTenant(data.role_id, tenantId);
+      } catch (error) {
+        await logRejectedPrivilegeAttempt(admin.id, "role_not_allowed", {
+          targetUserId: data.id, requestedRoleId: data.role_id,
+          tenantId, operation: "update_user",
+        });
+        throw error;
+      }
+    }
 
     const { error } = await (supabaseAdmin as any)
       .from("profiles")

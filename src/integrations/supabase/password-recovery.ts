@@ -95,3 +95,10 @@ export function clearPasswordRecoveryContext(): void {
     sessionStorage.removeItem(RECOVERY_STORAGE_KEY);
   }
 }
+
+export function cleanPasswordRecoveryUrl(): void {
+  if (typeof window === "undefined") return;
+
+  const cleanUrl = new URL("/reset-password", window.location.origin);
+  window.history.replaceState(window.history.state, "", cleanUrl);
+}
