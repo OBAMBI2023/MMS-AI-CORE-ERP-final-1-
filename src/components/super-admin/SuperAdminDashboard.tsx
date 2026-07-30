@@ -54,7 +54,9 @@ import {
   manageTenantAiSubscription,
   manageTenantSubscription,
   adjustPartnerCredits,
+  purchasePartnerCreditPack,
   removePartnerOffer,
+  savePartnerCreditPack,
   savePartnerOffer,
   validatePartnerPayment,
   type AiSubscriptionStatus,
@@ -64,7 +66,13 @@ import {
   type SuperAdminTenant,
   type SuperAdminModulePack,
   type SuperAdminPartnerOffer,
+  type SuperAdminCreditPack,
+  type TenantDeletionJob,
 } from "@/lib/super-admin.server";
+import {
+  retryTenantDeletion,
+  startTenantDeletion,
+} from "@/lib/tenant-deletion.server";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,12 +129,15 @@ const emptyDashboard: SuperAdminDashboard = {
   modules: [],
   modulePacks: [],
   tenants: [],
+  deletionJobs: [],
   partnerCommerce: {
     offers: [],
     partners: [],
     subscriptions: [],
     payments: [],
     credits: [],
+    creditPacks: [],
+    creditPurchases: [],
     trials: [],
   },
 };
@@ -180,12 +191,15 @@ function normalizeDashboardData(
       modules: safeArray(tenant?.modules),
       aiUsageHistory: safeArray(tenant?.aiUsageHistory),
     })),
+    deletionJobs: safeArray(value.deletionJobs),
     partnerCommerce: {
       offers: safeArray(commerce.offers),
       partners: safeArray(commerce.partners),
       subscriptions: safeArray(commerce.subscriptions),
       payments: safeArray(commerce.payments),
       credits: safeArray(commerce.credits),
+      creditPacks: safeArray(commerce.creditPacks),
+      creditPurchases: safeArray(commerce.creditPurchases),
       trials: safeArray(commerce.trials),
     },
   };
@@ -227,7 +241,7 @@ const navItems = [
   { label: "Offres partenaires", icon: CreditCard, href: "/super-admin#offres-partenaires" },
   { label: "Partenaires", icon: Handshake, href: "/super-admin/partners" },
   { label: PLATFORM_BRANDING.products.ai, icon: Bot, href: "/super-admin/ia-platform" },
-  { label: "Utilisateurs", icon: Users, href: "#utilisateurs" },
+  { label: "Utilisateurs", icon: Users, href: "/super-admin/users" },
   { label: "Licences", icon: KeyRound, href: "#licences" },
   { label: "Activité", icon: Activity, href: "#activite" },
   { label: "Rapports", icon: FileBarChart, href: "#rapports" },
@@ -377,6 +391,14 @@ function PartnerOffersSection({
   const [offerActive, setOfferActive] = useState(true);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [creditPackOpen, setCreditPackOpen] = useState(false);
+  const [creditPurchaseOpen, setCreditPurchaseOpen] = useState(false);
+  const [editingCreditPack, setEditingCreditPack] = useState<SuperAdminCreditPack | null>(null);
+  const [creditPackName, setCreditPackName] = useState("");
+  const [creditPackPrice, setCreditPackPrice] = useState("0");
+  const [creditPackCount, setCreditPackCount] = useState("1");
+  const [creditPackActive, setCreditPackActive] = useState(true);
+  const [selectedCreditPackId, setSelectedCreditPackId] = useState("");
   const [partnerId, setPartnerId] = useState("");
   const [selectedOfferId, setSelectedOfferId] = useState("");
   const [amount, setAmount] = useState("");
@@ -441,12 +463,51 @@ function PartnerOffersSection({
     } finally { setSubmitting(false); }
   };
 
+  const openCreditPack = (pack?: SuperAdminCreditPack) => {
+    setEditingCreditPack(pack ?? null);
+    setCreditPackName(pack?.name ?? "");
+    setCreditPackPrice(String(pack?.price ?? 0));
+    setCreditPackCount(String(pack?.creditCount ?? 1));
+    setCreditPackActive(pack?.isActive ?? true);
+    setCreditPackOpen(true);
+  };
+
+  const saveCreditPack = async () => {
+    setSubmitting(true);
+    try {
+      await savePartnerCreditPack({ data: {
+        id: editingCreditPack?.id ?? null, name: creditPackName,
+        price: Number(creditPackPrice), creditCount: Number(creditPackCount),
+        isActive: creditPackActive,
+      } });
+      toast.success("Pack de crédits enregistré.");
+      window.location.reload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Enregistrement impossible.");
+    } finally { setSubmitting(false); }
+  };
+
+  const purchaseCreditPack = async () => {
+    setSubmitting(true);
+    try {
+      await purchasePartnerCreditPack({ data: {
+        partnerId, packId: selectedCreditPackId, reference, reason,
+      } });
+      toast.success("Crédits attribués au partenaire.");
+      window.location.reload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Attribution impossible.");
+    } finally { setSubmitting(false); }
+  };
+
   return (
     <section id="offres-partenaires" className="scroll-mt-24 space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h2 className="text-xl font-bold">Offres partenaires</h2><p className="text-sm text-muted-foreground">Abonnements, paiements et ledger de crédits réels.</p></div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setAdjustOpen(true)}>Ajuster les crédits</Button>
+          <Button variant="outline" onClick={() => setCreditPurchaseOpen(true)}>Attribuer un pack</Button>
+          <Button variant="outline" onClick={() => openCreditPack()}>Nouveau pack de crédits</Button>
           <Button variant="outline" onClick={() => setPaymentOpen(true)}>Valider un paiement</Button>
           <Button onClick={() => openOffer()}><Plus /> Nouvelle offre</Button>
         </div>
@@ -465,7 +526,22 @@ function PartnerOffersSection({
           </Card>
         ))}
       </div>
+      <div>
+        <h3 className="mb-3 text-sm font-semibold">Packs de crédits d’inscription</h3>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {commerce.creditPacks.map((pack) => (
+            <Card key={pack.id} className="p-5">
+              <div className="flex items-start justify-between gap-3"><h4 className="font-semibold">{pack.name}</h4><Badge variant={pack.isActive ? "default" : "secondary"}>{pack.isActive ? "Actif" : "Inactif"}</Badge></div>
+              <p className="mt-3 text-2xl font-bold">{pack.creditCount} crédits</p>
+              <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(pack.price)}</p>
+              <Button className="mt-4" size="sm" variant="outline" onClick={() => openCreditPack(pack)}>Modifier</Button>
+            </Card>
+          ))}
+          {!commerce.creditPacks.length && <Card className="p-5 text-sm text-muted-foreground">Aucun pack de crédits.</Card>}
+        </div>
+      </div>
       <div className="grid gap-5 xl:grid-cols-2">
+        <Card className="overflow-hidden xl:col-span-2"><div className="border-b p-4 font-semibold">Achats et attributions de packs ({commerce.creditPurchases.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Pack</TableHead><TableHead>Crédits</TableHead><TableHead>Montant</TableHead><TableHead>Référence</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{commerce.creditPurchases.map((purchase) => <TableRow key={purchase.id}><TableCell>{commerce.partners.find((partner) => partner.id === purchase.partner_id)?.name ?? purchase.partner_id}</TableCell><TableCell>{commerce.creditPacks.find((pack) => pack.id === purchase.credit_pack_id)?.name ?? "Pack"}</TableCell><TableCell className="font-semibold text-emerald-600">+{purchase.credits}</TableCell><TableCell>{formatCurrency(Number(purchase.amount))}</TableCell><TableCell>{purchase.reference}</TableCell><TableCell>{formatDate(purchase.created_at, true)}</TableCell></TableRow>)}</TableBody></Table></div></Card>
         <Card className="overflow-hidden"><div className="border-b p-4 font-semibold">Paiements ({commerce.payments.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Référence</TableHead><TableHead>Montant</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{commerce.payments.map((payment) => <TableRow key={payment.id}><TableCell>{commerce.partners.find((partner) => partner.id === payment.partner_id)?.name ?? payment.partner_id}</TableCell><TableCell>{payment.external_reference}</TableCell><TableCell>{formatCurrency(Number(payment.amount))}</TableCell><TableCell>{formatDate(payment.created_at, true)}</TableCell></TableRow>)}</TableBody></Table></div></Card>
         <Card className="overflow-hidden"><div className="border-b p-4 font-semibold">Crédits et débits ({commerce.credits.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Variation</TableHead><TableHead>Motif</TableHead><TableHead>Solde</TableHead></TableRow></TableHeader><TableBody>{commerce.credits.map((item) => <TableRow key={item.id}><TableCell>{commerce.partners.find((partner) => partner.id === item.partner_id)?.name ?? item.partner_id}</TableCell><TableCell className={item.credits > 0 ? "text-emerald-600" : "text-destructive"}>{item.credits > 0 ? "+" : ""}{item.credits}</TableCell><TableCell>{item.reason}</TableCell><TableCell>{item.balance_after}</TableCell></TableRow>)}</TableBody></Table></div></Card>
         <Card className="overflow-hidden xl:col-span-2"><div className="border-b p-4 font-semibold">Essais et activations ({commerce.trials.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Email</TableHead><TableHead>Statut</TableHead><TableHead>Début</TableHead><TableHead>Expiration</TableHead></TableRow></TableHeader><TableBody>{commerce.trials.map((trial) => <TableRow key={trial.id}><TableCell>{commerce.partners.find((partner) => partner.id === trial.partner_id)?.name ?? trial.partner_id}</TableCell><TableCell>{trial.client_email}</TableCell><TableCell>{trial.status}</TableCell><TableCell>{formatDate(trial.starts_at)}</TableCell><TableCell>{formatDate(trial.expires_at)}</TableCell></TableRow>)}</TableBody></Table></div></Card>
@@ -476,6 +552,8 @@ function PartnerOffersSection({
       <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent><DialogHeader><DialogTitle>Valider un paiement</DialogTitle><DialogDescription>La référence rend cette validation idempotente.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={partnerId} onValueChange={setPartnerId}><SelectTrigger><SelectValue placeholder="Partenaire" /></SelectTrigger><SelectContent>{commerce.partners.map((partner) => <SelectItem key={partner.id} value={partner.id}>{partner.name}</SelectItem>)}</SelectContent></Select><Select value={selectedOfferId} onValueChange={(value) => { setSelectedOfferId(value); setAmount(String(commerce.offers.find((offer) => offer.id === value)?.price ?? "")); }}><SelectTrigger><SelectValue placeholder="Offre" /></SelectTrigger><SelectContent>{commerce.offers.filter((offer) => offer.isActive).map((offer) => <SelectItem key={offer.id} value={offer.id}>{offer.name}</SelectItem>)}</SelectContent></Select><Input type="number" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Montant" /><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Référence externe unique" /><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Note (optionnelle)" /></div><DialogFooter><Button variant="outline" onClick={() => setPaymentOpen(false)}>Annuler</Button><Button disabled={submitting || !partnerId || !selectedOfferId || !reference} onClick={() => void validatePayment()}>Valider</Button></DialogFooter></DialogContent></Dialog>
 
       <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}><DialogContent><DialogHeader><DialogTitle>Ajustement manuel</DialogTitle><DialogDescription>Utilisez une valeur positive pour créditer, négative pour débiter.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={partnerId} onValueChange={setPartnerId}><SelectTrigger><SelectValue placeholder="Partenaire" /></SelectTrigger><SelectContent>{commerce.partners.map((partner) => <SelectItem key={partner.id} value={partner.id}>{partner.name} · {partner.creditBalance} crédits</SelectItem>)}</SelectContent></Select><Input type="number" value={adjustment} onChange={(event) => setAdjustment(event.target.value)} placeholder="Variation de crédits" /><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Motif obligatoire" /><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Référence (optionnelle)" /></div><DialogFooter><Button variant="outline" onClick={() => setAdjustOpen(false)}>Annuler</Button><Button disabled={submitting || !partnerId || !reason.trim() || Number(adjustment) === 0} onClick={() => void adjustCredits()}>Appliquer</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={creditPackOpen} onOpenChange={setCreditPackOpen}><DialogContent><DialogHeader><DialogTitle>{editingCreditPack ? "Modifier le pack" : "Créer un pack de crédits"}</DialogTitle><DialogDescription>Un crédit permet la création d’un tenant.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label>Nom</Label><Input value={creditPackName} onChange={(event) => setCreditPackName(event.target.value)} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Prix XOF</Label><Input type="number" min="0" value={creditPackPrice} onChange={(event) => setCreditPackPrice(event.target.value)} /></div><div className="space-y-2"><Label>Nombre de crédits</Label><Input type="number" min="1" value={creditPackCount} onChange={(event) => setCreditPackCount(event.target.value)} /></div></div><div className="flex items-center justify-between rounded-lg border p-3"><Label>Pack actif</Label><Switch checked={creditPackActive} onCheckedChange={setCreditPackActive} /></div></div><DialogFooter><Button variant="outline" onClick={() => setCreditPackOpen(false)}>Annuler</Button><Button disabled={submitting || !creditPackName.trim() || Number(creditPackCount) < 1} onClick={() => void saveCreditPack()}>Enregistrer</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={creditPurchaseOpen} onOpenChange={setCreditPurchaseOpen}><DialogContent><DialogHeader><DialogTitle>Acheter / attribuer des crédits</DialogTitle><DialogDescription>L’attribution crédite immédiatement et atomiquement le portefeuille du Partner.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={partnerId} onValueChange={setPartnerId}><SelectTrigger><SelectValue placeholder="Partenaire" /></SelectTrigger><SelectContent>{commerce.partners.map((partner) => <SelectItem key={partner.id} value={partner.id}>{partner.name} · solde {partner.creditBalance}</SelectItem>)}</SelectContent></Select><Select value={selectedCreditPackId} onValueChange={setSelectedCreditPackId}><SelectTrigger><SelectValue placeholder="Pack de crédits" /></SelectTrigger><SelectContent>{commerce.creditPacks.filter((pack) => pack.isActive).map((pack) => <SelectItem key={pack.id} value={pack.id}>{pack.name} · {pack.creditCount} crédits · {formatCurrency(pack.price)}</SelectItem>)}</SelectContent></Select><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Référence unique" /><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Note (optionnelle)" /></div><DialogFooter><Button variant="outline" onClick={() => setCreditPurchaseOpen(false)}>Annuler</Button><Button disabled={submitting || !partnerId || !selectedCreditPackId || !reference.trim()} onClick={() => void purchaseCreditPack()}>Attribuer</Button></DialogFooter></DialogContent></Dialog>
     </section>
   );
 }
@@ -648,12 +726,14 @@ function ModulePacksSection({
 
 function TenantTable({
   tenants,
+  deletionJobs,
   aiPlans,
   modulePacks,
   query,
   onQueryChange,
 }: {
   tenants: SuperAdminTenant[];
+  deletionJobs: TenantDeletionJob[];
   aiPlans: SuperAdminAiPlan[];
   modulePacks: SuperAdminModulePack[];
   query: string;
@@ -662,6 +742,54 @@ function TenantTable({
   const [selectedTenant, setSelectedTenant] = useState<SuperAdminTenant | null>(null);
   const [moduleTenant, setModuleTenant] = useState<SuperAdminTenant | null>(null);
   const [aiTenant, setAiTenant] = useState<SuperAdminTenant | null>(null);
+  const [deletionTenant, setDeletionTenant] = useState<SuperAdminTenant | null>(null);
+  const [confirmationSlug, setConfirmationSlug] = useState("");
+  const [deletionBusy, setDeletionBusy] = useState(false);
+  const router = useRouter();
+  const activeDeletionByTenant = useMemo(
+    () => new Map(
+      deletionJobs
+        .filter((job) => job.status !== "completed")
+        .map((job) => [job.tenantId, job]),
+    ),
+    [deletionJobs],
+  );
+  const deletionStatusLabels: Record<TenantDeletionJob["status"], string> = {
+    pending: "En attente",
+    running: "En cours",
+    partial: "Partiel",
+    failed: "Échoué",
+    completed: "Terminé",
+  };
+  const launchDeletion = async () => {
+    if (!deletionTenant || confirmationSlug !== deletionTenant.slug) return;
+    setDeletionBusy(true);
+    try {
+      await startTenantDeletion({
+        data: { tenantId: deletionTenant.id, slug: confirmationSlug },
+      });
+      toast.success("Suppression définitive terminée.");
+      setDeletionTenant(null);
+      setConfirmationSlug("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "La suppression a échoué.");
+    } finally {
+      setDeletionBusy(false);
+      await router.invalidate();
+    }
+  };
+  const retryDeletion = async (job: TenantDeletionJob) => {
+    setDeletionBusy(true);
+    try {
+      await retryTenantDeletion({ data: { jobId: job.id } });
+      toast.success("Suppression reprise avec succès.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "La nouvelle tentative a échoué.");
+    } finally {
+      setDeletionBusy(false);
+      await router.invalidate();
+    }
+  };
   const copyLoginUrl = async (tenant: SuperAdminTenant) => {
     const url = new URL(tenant.loginUrl, window.location.origin).toString();
     try {
@@ -761,7 +889,11 @@ function TenantTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
+                    {activeDeletionByTenant.has(tenant.id) ? (
+                      <Badge variant="destructive">
+                        {deletionStatusLabels[activeDeletionByTenant.get(tenant.id)!.status]}
+                      </Badge>
+                    ) : <Badge
                       className={cn(
                         "rounded-full border-0 px-2.5 font-medium",
                         isActive(tenant.status)
@@ -776,7 +908,7 @@ function TenantTable({
                         )}
                       />
                       {statusLabels[tenant.status] ?? tenant.status}
-                    </Badge>
+                    </Badge>}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{tenant.users}</TableCell>
                   <TableCell className="text-right tabular-nums">{tenant.sales}</TableCell>
@@ -841,6 +973,32 @@ function TenantTable({
                           <Bot />
                           Abonnement Assistant IA
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {activeDeletionByTenant.has(tenant.id) ? (
+                          <DropdownMenuItem
+                            disabled={
+                              deletionBusy ||
+                              !["failed", "partial"].includes(
+                                activeDeletionByTenant.get(tenant.id)!.status,
+                              )
+                            }
+                            onClick={() => void retryDeletion(activeDeletionByTenant.get(tenant.id)!)}
+                          >
+                            <Activity />
+                            Réessayer la suppression
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => {
+                              setConfirmationSlug("");
+                              setDeletionTenant(tenant);
+                            }}
+                          >
+                            <Trash2 />
+                            Supprimer définitivement
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -850,6 +1008,93 @@ function TenantTable({
           </Table>
         </div>
       )}
+      {deletionJobs.length > 0 && (
+        <div className="border-t border-border/70 p-5">
+          <h3 className="text-sm font-semibold">Suivi des suppressions</h3>
+          <div className="mt-3 space-y-2">
+            {deletionJobs.slice(0, 10).map((job) => (
+              <div
+                key={job.id}
+                className="flex flex-col gap-2 rounded-lg border p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{job.tenantName} ({job.tenantSlug})</p>
+                  <p className="text-xs text-muted-foreground">
+                    Étape : {job.currentStep} · tentative {job.attemptCount}
+                  </p>
+                  {job.lastError?.message && (
+                    <p className="mt-1 line-clamp-2 text-xs text-destructive">
+                      {job.lastError.message}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge variant={job.status === "completed" ? "secondary" : job.status === "running" ? "default" : "destructive"}>
+                    {deletionStatusLabels[job.status]}
+                  </Badge>
+                  {["failed", "partial"].includes(job.status) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={deletionBusy}
+                      onClick={() => void retryDeletion(job)}
+                    >
+                      Réessayer
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <Dialog
+        open={Boolean(deletionTenant)}
+        onOpenChange={(open) => {
+          if (!open && !deletionBusy) {
+            setDeletionTenant(null);
+            setConfirmationSlug("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Supprimer définitivement ce tenant ?</DialogTitle>
+            <DialogDescription>
+              Cette opération désactivera immédiatement le tenant, puis supprimera ses fichiers,
+              ses données et ses comptes. Saisissez exactement{" "}
+              <strong className="font-mono text-foreground">{deletionTenant?.slug}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={confirmationSlug}
+            onChange={(event) => setConfirmationSlug(event.target.value)}
+            placeholder="Slug du tenant"
+            autoComplete="off"
+            disabled={deletionBusy}
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={deletionBusy}
+              onClick={() => setDeletionTenant(null)}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                deletionBusy ||
+                !deletionTenant ||
+                confirmationSlug !== deletionTenant.slug
+              }
+              onClick={() => void launchDeletion()}
+            >
+              {deletionBusy ? "Suppression en cours…" : "Supprimer définitivement"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <SubscriptionDialog
         tenant={selectedTenant}
         open={Boolean(selectedTenant)}
@@ -1627,6 +1872,7 @@ export function SuperAdminDashboardView({
           />
           <TenantTable
             tenants={dashboard.tenants}
+            deletionJobs={dashboard.deletionJobs}
             aiPlans={dashboard.aiPlans}
             modulePacks={dashboard.modulePacks}
             query={tenantQuery}

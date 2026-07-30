@@ -10,6 +10,7 @@ import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDateTime } from "@/lib/mms/format";
 import { jsPDF } from "jspdf";
+import { downloadPdf } from "@/lib/mms/download-pdf";
 import {
   renderAchatsHeader,
   renderAchatsTable,
@@ -106,7 +107,7 @@ function AchatsPage() {
     renderAchatsTotals(doc, formatCurrency(total));
     renderPdfFooter(doc, tenantFromSettings(settings, logoUrl));
 
-    doc.save(`Achats_${new Date().toISOString().slice(0, 10)}.pdf`);
+    await downloadPdf(doc, `Achats_${new Date().toISOString().slice(0, 10)}.pdf`);
     toast.success("PDF généré.");
   };
 

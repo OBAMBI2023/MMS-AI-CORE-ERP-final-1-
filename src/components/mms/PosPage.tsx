@@ -45,7 +45,6 @@ import { useTenant } from "@/providers/TenantProvider";
 import { useCatalogItems } from "@/hooks/use-catalog-items";
 import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 import { PLATFORM_BRANDING } from "@/config/branding";
-import { BrandLogo } from "@/components/branding/BrandLogo";
 
 // ---------------- Types & catalogue ----------------
 type Category = string;
@@ -287,7 +286,7 @@ export function PosPage() {
         {/* Catalogue */}
         <section className="flex-1 flex flex-col min-h-0 min-w-0 border-b md:border-b-0 md:border-r border-border pb-36 md:pb-0">
           <header className="px-4 md:px-6 pt-4 md:pt-6 pb-4 border-b border-border">
-            <div className="flex items-center gap-2 mb-3 md:hidden">
+            <div className="mb-3 flex items-center md:hidden">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -309,11 +308,6 @@ export function PosPage() {
                   </div>
                 </SheetContent>
               </Sheet>
-              <BrandLogo
-                context="mobile"
-                src={logoUrl}
-                alt={`Logo ${settings?.company_name ?? "Mon Entreprise"}`}
-              />
             </div>
             <div className="flex items-baseline justify-between mb-3">
               <div>

@@ -37,6 +37,7 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { logAction } from "@/lib/audit.server";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
+import { downloadPdf } from "@/lib/mms/download-pdf";
 import {
   renderPdfFooter,
   renderPdfHeader,
@@ -134,7 +135,7 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     renderPdfTotalCard(doc, "Total des ventes", formatCurrency(total), finalY + 7);
     renderPdfFooter(doc, tenant);
 
-    doc.save("historique-ventes.pdf");
+    await downloadPdf(doc, "historique-ventes.pdf");
     toast.success("PDF généré");
   };
 
@@ -162,7 +163,7 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     renderPdfTotalCard(doc, "Total", formatCurrency(sale.total), finalY + 7);
     renderPdfFooter(doc, tenant);
 
-    doc.save(`ticket-${sale.number}.pdf`);
+    await downloadPdf(doc, `ticket-${sale.number}.pdf`);
     toast.success("Impression lancée");
   };
 

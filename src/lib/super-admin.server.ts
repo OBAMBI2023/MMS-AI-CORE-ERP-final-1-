@@ -47,6 +47,15 @@ type CreditTransactionRow = {
   id: string; partner_id: string; tenant_id: string | null; transaction_type: string;
   credits: number; balance_after: number; reason: string; reference: string | null; actor_id: string; created_at: string;
 };
+type CreditPackRow = {
+  id: string; name: string; price: number | string; credit_count: number;
+  is_active: boolean; created_at: string;
+};
+type CreditPurchaseRow = {
+  id: string; partner_id: string; credit_pack_id: string; credits: number;
+  amount: number | string; currency: string; reference: string; reason: string | null;
+  attributed_by: string; created_at: string;
+};
 type TrialUsageRow = {
   id: string; partner_id: string; tenant_id: string; client_email: string; status: string;
   starts_at: string; expires_at: string; created_by: string;
@@ -166,11 +175,27 @@ export type SuperAdminTenant = {
   aiUsageHistory: SuperAdminAiUsage[];
 };
 
+export type TenantDeletionJob = {
+  id: string;
+  tenantId: string;
+  tenantSlug: string;
+  tenantName: string;
+  status: "pending" | "running" | "partial" | "failed" | "completed";
+  currentStep: string;
+  attemptCount: number;
+  lastError: { step?: string; message?: string; at?: string } | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
 export type SuperAdminTenantModule = ModuleRow & { enabled: boolean };
 export type SuperAdminModulePack = ModulePackRow & { moduleIds: string[] };
 export type SuperAdminPartnerOffer = {
   id: string; name: string; price: number; includedTenantCredits: number; durationDays: number;
   modulePackId: string; maxTrials: number; trialDays: number; isActive: boolean;
+};
+export type SuperAdminCreditPack = {
+  id: string; name: string; price: number; creditCount: number; isActive: boolean;
 };
 
 export type SuperAdminDashboard = {
@@ -181,12 +206,15 @@ export type SuperAdminDashboard = {
   modules: ModuleRow[];
   modulePacks: SuperAdminModulePack[];
   tenants: SuperAdminTenant[];
+  deletionJobs: TenantDeletionJob[];
   partnerCommerce: {
     offers: SuperAdminPartnerOffer[];
     partners: { id: string; name: string; code: string; isActive: boolean; creditBalance: number }[];
     subscriptions: PartnerSubscriptionRow[];
     payments: PartnerPaymentRow[];
     credits: CreditTransactionRow[];
+    creditPacks: SuperAdminCreditPack[];
+    creditPurchases: CreditPurchaseRow[];
     trials: TrialUsageRow[];
   };
 };
@@ -279,6 +307,8 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       partnerSubscriptionRows,
       partnerPaymentRows,
       creditTransactionRows,
+      creditPackRows,
+      creditPurchaseRows,
       trialUsageRows,
     ] = await Promise.all([
       fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at"),
@@ -331,6 +361,8 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       fetchRows<PartnerSubscriptionRow>(supabaseAdmin, "partner_subscriptions", "id, partner_id, offer_id, status, starts_at, expires_at"),
       fetchRows<PartnerPaymentRow>(supabaseAdmin, "partner_payments", "id, partner_id, offer_id, amount, currency, status, external_reference, reason, validated_by, created_at"),
       fetchRows<CreditTransactionRow>(supabaseAdmin, "partner_credit_transactions", "id, partner_id, tenant_id, transaction_type, credits, balance_after, reason, reference, actor_id, created_at"),
+      fetchRows<CreditPackRow>(supabaseAdmin, "partner_credit_packs", "id, name, price, credit_count, is_active, created_at"),
+      fetchRows<CreditPurchaseRow>(supabaseAdmin, "partner_credit_purchases", "id, partner_id, credit_pack_id, credits, amount, currency, reference, reason, attributed_by, created_at"),
       fetchRows<TrialUsageRow>(supabaseAdmin, "partner_trial_usage", "id, partner_id, tenant_id, client_email, status, starts_at, expires_at, created_by"),
     ]);
     const subscriptionsByTenant = new Map(
@@ -491,6 +523,13 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       .sort((a, b) => a.name.localeCompare(b.name, "fr"));
     const tenantSales = saleRows.filter((sale) => sale.tenant_id);
 
+    const { data: deletionRows, error: deletionError } = await (supabaseAdmin as any)
+      .from("tenant_deletion_jobs")
+      .select("id, tenant_id, tenant_slug, tenant_name, status, current_step, attempt_count, last_error, created_at, completed_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (deletionError) throw new Error(formatSupabaseError(deletionError));
+
     return {
       kpis: {
         tenants: tenants.length,
@@ -529,6 +568,18 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       modules: moduleRows.sort((a, b) => a.sort_order - b.sort_order),
       modulePacks,
       tenants,
+      deletionJobs: (deletionRows ?? []).map((job: any) => ({
+        id: job.id,
+        tenantId: job.tenant_id,
+        tenantSlug: job.tenant_slug,
+        tenantName: job.tenant_name,
+        status: job.status,
+        currentStep: job.current_step,
+        attemptCount: job.attempt_count,
+        lastError: job.last_error,
+        createdAt: job.created_at,
+        completedAt: job.completed_at,
+      })),
       partnerCommerce: {
         offers: partnerOfferRows.map((offer) => ({
           id: offer.id, name: offer.name, price: Number(offer.price),
@@ -546,6 +597,11 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         subscriptions: partnerSubscriptionRows,
         payments: partnerPaymentRows,
         credits: creditTransactionRows,
+        creditPacks: creditPackRows.map((pack) => ({
+          id: pack.id, name: pack.name, price: Number(pack.price),
+          creditCount: pack.credit_count, isActive: pack.is_active,
+        })),
+        creditPurchases: creditPurchaseRows,
         trials: trialUsageRows,
       },
     };
@@ -675,6 +731,58 @@ export const adjustPartnerCredits = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(formatSupabaseError(error));
     return { balance: balance as number };
+  });
+
+export const savePartnerCreditPack = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    id: z.string().uuid().nullable(),
+    name: z.string().trim().min(1).max(120),
+    price: z.number().finite().nonnegative(),
+    creditCount: z.number().int().positive().max(1_000_000),
+    isActive: z.boolean(),
+  }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: packId, error } = await (supabaseAdmin as any).rpc(
+      "manage_partner_credit_pack",
+      {
+        requested_pack_id: data.id,
+        requested_name: data.name,
+        requested_price: data.price,
+        requested_credit_count: data.creditCount,
+        requested_is_active: data.isActive,
+        requested_actor_id: context.userId,
+      },
+    );
+    if (error) throw new Error(formatSupabaseError(error));
+    return { packId: packId as string };
+  });
+
+export const purchasePartnerCreditPack = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    partnerId: z.string().uuid(),
+    packId: z.string().uuid(),
+    reference: z.string().trim().min(1).max(160),
+    reason: z.string().trim().max(500),
+  }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: purchaseId, error } = await (supabaseAdmin as any).rpc(
+      "purchase_partner_credit_pack",
+      {
+        requested_partner_id: data.partnerId,
+        requested_pack_id: data.packId,
+        requested_reference: data.reference,
+        requested_reason: data.reason,
+        requested_actor_id: context.userId,
+      },
+    );
+    if (error) throw new Error(formatSupabaseError(error));
+    return { purchaseId: purchaseId as string };
   });
 
 export const assignModulePack = createServerFn({ method: "POST" })

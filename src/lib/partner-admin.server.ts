@@ -338,8 +338,12 @@ export const getPartnerDashboard = createServerFn({ method: "GET" })
         },
       } : null,
       totals: {
-        credited: creditTransactions.filter((item) => item.credits > 0).reduce((sum, item) => sum + item.credits, 0),
-        consumed: Math.abs(creditTransactions.filter((item) => item.credits < 0).reduce((sum, item) => sum + item.credits, 0)),
+        credited: creditTransactions
+          .filter((item) => ["payment_credit", "purchase_credit"].includes(item.transaction_type))
+          .reduce((sum, item) => sum + item.credits, 0),
+        consumed: Math.abs(creditTransactions
+          .filter((item) => item.transaction_type === "tenant_debit")
+          .reduce((sum, item) => sum + item.credits, 0)),
         activeTenants: tenants.filter((tenant) => tenant.subscription?.status === "active").length,
         trialsCreated: trialRows.length,
         activeTrials: trialRows.filter((trial) => trial.status === "active").length,
@@ -462,6 +466,59 @@ export const createPartnerTrial = createServerFn({ method: "POST" })
       if (rollbackError) {
         console.error("[PartnerTrial] Échec du rollback Auth", rollbackError);
       }
+      throw error;
+    }
+  });
+
+export const createPartnerTenant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(createPartnerTrialSchema)
+  .handler(async ({ context, data }) => {
+    await requirePartnerMembership(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const emailEnabled = ["1", "true", "yes"].includes(
+      (readEnvVar("PARTNER_TRIAL_EMAIL_ENABLED") ?? "").toLowerCase(),
+    );
+    const temporaryPassword = `${crypto.randomUUID()}Aa1!`;
+    const authResult = emailEnabled
+      ? await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+          data: { full_name: data.managerName, phone: data.phone },
+          redirectTo: `${readEnvVar("VITE_SITE_URL", "SITE_URL") ?? "http://localhost:3000"}/login`,
+        })
+      : await supabaseAdmin.auth.admin.createUser({
+          email: data.email,
+          password: temporaryPassword,
+          email_confirm: true,
+          user_metadata: { full_name: data.managerName, phone: data.phone },
+        });
+    if (authResult.error || !authResult.data.user) {
+      throw new Error(formatSupabaseError(authResult.error ?? new Error("Compte non créé")));
+    }
+
+    try {
+      const { data: tenantId, error } = await (supabaseAdmin as any).rpc(
+        "create_partner_paid_tenant",
+        {
+          requested_name: data.companyName,
+          requested_activity_profile_code: data.activityProfileCode,
+          requested_manager_name: data.managerName,
+          requested_phone: data.phone,
+          requested_email: data.email,
+          requested_city: data.city,
+          requested_admin_user_id: authResult.data.user.id,
+          requested_actor_id: context.userId,
+        },
+      );
+      if (error) throw new Error(formatSupabaseError(error));
+      return {
+        tenantId: tenantId as string,
+        emailSent: emailEnabled,
+        temporaryPassword: emailEnabled ? null : temporaryPassword,
+      };
+    } catch (error) {
+      const { error: rollbackError } =
+        await supabaseAdmin.auth.admin.deleteUser(authResult.data.user.id);
+      if (rollbackError) console.error("[PartnerTenant] Échec du rollback Auth", rollbackError);
       throw error;
     }
   });

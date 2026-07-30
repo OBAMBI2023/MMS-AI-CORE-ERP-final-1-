@@ -35,6 +35,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  createPartnerTenant,
   createPartnerTrial,
   type PartnerDashboard,
   type PartnerTenant,
@@ -122,6 +123,7 @@ export function PartnerAdminDashboardView({
   const [statusFilter, setStatusFilter] = useState("all");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [tenantDialogOpen, setTenantDialogOpen] = useState(false);
+  const [tenantMode, setTenantMode] = useState<"paid" | "trial">("paid");
   const [tenantName, setTenantName] = useState("");
   const [tenantEmail, setTenantEmail] = useState("");
   const [trialActivityProfile, setTrialActivityProfile] = useState("");
@@ -147,18 +149,21 @@ export function PartnerAdminDashboardView({
     if (!tenantDialogOpen) return;
     setSubmittingTenant(true);
     try {
-      const result = await createPartnerTrial({ data: {
+      const payload = {
         companyName: tenantName,
         activityProfileCode: trialActivityProfile,
         managerName: trialManager,
         phone: trialPhone,
         email: tenantEmail,
         city: trialCity,
-      } });
+      };
+      const result = tenantMode === "paid"
+        ? await createPartnerTenant({ data: payload })
+        : await createPartnerTrial({ data: payload });
       if (result.emailSent) {
-        toast.success("Essai créé. L’invitation a été envoyée par email.");
+        toast.success(`${tenantMode === "paid" ? "Tenant" : "Essai"} créé. L’invitation a été envoyée par email.`);
       } else {
-        toast.success(`Essai créé. Mot de passe temporaire : ${result.temporaryPassword}`, {
+        toast.success(`${tenantMode === "paid" ? "Tenant" : "Essai"} créé. Mot de passe temporaire : ${result.temporaryPassword}`, {
           duration: 20000,
         });
       }
@@ -372,6 +377,12 @@ export function PartnerAdminDashboardView({
               <Kpi icon={Activity} label="Taux de conversion" value={`${data.totals.conversionRate.toFixed(1)} %`} tone="blue" />
               <Kpi icon={WalletCards} label="Commissions générées" value={formatCurrency(data.totals.commissionsGenerated)} tone="gold" />
             </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Kpi icon={WalletCards} label="Solde de crédits" value={data.partner.creditBalance} tone="blue" />
+              <Kpi icon={Building2} label="Tenants encore créables" value={data.partner.creditBalance} tone="gold" />
+              <Kpi icon={Activity} label="Crédits consommés" value={data.totals.consumed} tone="blue" />
+              <Kpi icon={CheckCircle2} label="Total crédits achetés" value={data.totals.credited} tone="gold" />
+            </div>
           </section>
 
           <section className="grid gap-5 xl:grid-cols-3">
@@ -384,10 +395,18 @@ export function PartnerAdminDashboardView({
             </Panel>
             <Panel className="xl:col-span-2" title="Créer une entreprise" subtitle="Démarrez un essai selon la configuration de la plateforme">
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <Button onClick={() => setTenantDialogOpen(true)} disabled={!data.subscription}>
+                <Button onClick={() => { setTenantMode("paid"); setTenantDialogOpen(true); }} disabled={!data.subscription || data.partner.creditBalance === 0}>
+                  <Building2 /> Créer un tenant
+                </Button>
+                <Button onClick={() => { setTenantMode("trial"); setTenantDialogOpen(true); }} disabled={!data.subscription}>
                   <Clock3 /> Créer un essai gratuit
                 </Button>
               </div>
+              {data.partner.creditBalance === 0 && (
+                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  Votre solde est épuisé. Achetez un nouveau pack de crédits pour créer un tenant.
+                </p>
+              )}
             </Panel>
           </section>
 
@@ -465,7 +484,7 @@ export function PartnerAdminDashboardView({
                 description="Suivez uniquement les essais créés par votre espace partenaire."
                 count={data.trials.length}
               />
-              <Button onClick={() => setTenantDialogOpen(true)}>
+              <Button onClick={() => { setTenantMode("trial"); setTenantDialogOpen(true); }}>
                 <Clock3 /> Créer un essai
               </Button>
             </div>
@@ -726,8 +745,8 @@ export function PartnerAdminDashboardView({
       <Dialog open={tenantDialogOpen} onOpenChange={setTenantDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Créer un essai gratuit</DialogTitle>
-            <DialogDescription>Aucun crédit ne sera débité au démarrage.</DialogDescription>
+            <DialogTitle>{tenantMode === "paid" ? "Créer un tenant" : "Créer un essai gratuit"}</DialogTitle>
+            <DialogDescription>{tenantMode === "paid" ? "Un crédit sera débité uniquement après une création réussie." : "Aucun crédit ne sera débité au démarrage."}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">

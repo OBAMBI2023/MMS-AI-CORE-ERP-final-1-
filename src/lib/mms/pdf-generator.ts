@@ -8,6 +8,7 @@ import {
   renderSignatureAndStamp,
 } from "./pdf-template-engine";
 import { toast } from "sonner";
+import { downloadPdf } from "./download-pdf";
 
 export async function generateDevisPDF(
   quote: QuotationData,
@@ -55,7 +56,7 @@ export async function generateDevisPDF(
     const dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
     const filename = `DEV-${dateStr}-${quote.numero}.pdf`;
 
-    doc.save(filename);
+    await downloadPdf(doc, filename);
     toast.success("PDF généré avec succès.");
   } catch (error) {
     console.error("PDF generation failed:", error);

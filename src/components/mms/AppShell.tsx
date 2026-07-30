@@ -8,8 +8,6 @@ import { useState } from "react";
 import { UserMenu } from "./UserMenu";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useTheme } from "@/components/theme-provider";
-import { Skeleton } from "@/components/ui/skeleton";
-import { BrandLogo } from "@/components/branding/BrandLogo";
 import { SidebarCompanyHeader } from "./SidebarCompanyHeader";
 
 export function AppShell({
@@ -25,15 +23,14 @@ export function AppShell({
 }) {
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  const { settings, logoUrl, isLoading } = useCompanySettings();
-  const companyName = settings?.company_name ?? "Mon Entreprise";
+  const { logoUrl, isLoading } = useCompanySettings();
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="px-4 py-4 border-b border-border flex items-center justify-between gap-4 md:px-8 md:pt-6 md:pb-4">
-          <div className="flex items-center gap-4">
+        <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-4 sm:gap-4 md:px-8 md:pb-4 md:pt-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild className="md:hidden">
                 <Button variant="ghost" size="icon">
@@ -56,15 +53,6 @@ export function AppShell({
                 </div>
               </SheetContent>
             </Sheet>
-            {title !== "Dashboard" && (
-              <div className="flex h-12 w-[min(34vw,132px)] items-center sm:hidden">
-                {isLoading ? (
-                  <Skeleton className="h-11 w-11 rounded-xl" />
-                ) : (
-                  <BrandLogo context="mobile" src={logoUrl} alt={`Logo ${companyName}`} />
-                )}
-              </div>
-            )}
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold tracking-tight md:text-2xl">{title}</h1>
               {subtitle && (
@@ -73,7 +61,7 @@ export function AppShell({
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
             <Button
               variant="ghost"

@@ -4,6 +4,7 @@ import { AppShell } from "@/components/mms/AppShell";
 import { ResourceTable, type FieldDef, type ColumnDef } from "@/components/mms/ResourceTable";
 import { formatCurrency, formatDate, getCurrency } from "@/lib/mms/format";
 import { jsPDF } from "jspdf";
+import { downloadPdf } from "@/lib/mms/download-pdf";
 import {
   renderDepensesHeader,
   renderDepensesTable,
@@ -111,7 +112,7 @@ function DepensesPage() {
     renderDepensesTotals(doc, formatCurrency(total), 0);
     renderPdfFooter(doc, tenantFromSettings(settings, logoUrl));
 
-    doc.save(`Depenses_${new Date().toISOString().slice(0, 10)}.pdf`);
+    await downloadPdf(doc, `Depenses_${new Date().toISOString().slice(0, 10)}.pdf`);
     toast.success("PDF généré.");
   };
 

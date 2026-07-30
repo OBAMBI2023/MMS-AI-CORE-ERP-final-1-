@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
+import { downloadPdf } from "@/lib/mms/download-pdf";
 import {
   renderPdfFooter,
   renderPdfHeader,
@@ -406,7 +407,7 @@ function RapportsPage() {
     );
     renderPdfTotalCard(doc, "Résultat net", formatCurrency(report.target.netResult), finalY + 7);
     renderPdfFooter(doc, tenant);
-    doc.save(`Rapport_${companyName || "Entreprise"}_${month}_${year}.pdf`);
+    await downloadPdf(doc, `Rapport_${companyName || "Entreprise"}_${month}_${year}.pdf`);
     toast.success("Export PDF terminé.");
   };
 
