@@ -24,6 +24,7 @@ import { Loader2, Plus, User, Mail, Phone, Shield, Lock, Eye, EyeOff, Pencil } f
 import { createUser, updateUser } from "@/lib/user-management.server";
 import { useTenant } from "@/providers/TenantProvider";
 import { formatSupabaseError } from "@/lib/supabase-error";
+import { AvatarManager } from "@/components/mms/AvatarManager";
 
 export function UserFormDialog({ user }: { user?: any }) {
   const { profile, loading: tenantLoading } = useTenant();
@@ -176,6 +177,17 @@ export function UserFormDialog({ user }: { user?: any }) {
           </div>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
+          {isEdit && tenantId && (
+            <div className="border-b px-6 py-5">
+              <AvatarManager
+                userId={user.id}
+                tenantId={tenantId}
+                name={formData.full_name}
+                email={user.email}
+                avatarPath={user.avatar_url}
+              />
+            </div>
+          )}
           <div className="p-6 grid grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="space-y-1.5">

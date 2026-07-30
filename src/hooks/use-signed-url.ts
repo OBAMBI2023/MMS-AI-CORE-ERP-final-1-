@@ -6,7 +6,11 @@ type SignedUrlState = {
   url: string | null;
 };
 
-export function useSignedUrlState(path: string | null, bucket: string = "company-assets") {
+export function useSignedUrlState(
+  path: string | null,
+  bucket: string = "company-assets",
+  refreshKey: number = 0,
+) {
   const [state, setState] = useState<SignedUrlState>({ path: null, url: null });
 
   useEffect(() => {
@@ -24,7 +28,7 @@ export function useSignedUrlState(path: string | null, bucket: string = "company
     return () => {
       alive = false;
     };
-  }, [path, bucket]);
+  }, [path, bucket, refreshKey]);
 
   return {
     url: state.path === path ? state.url : null,
@@ -32,6 +36,10 @@ export function useSignedUrlState(path: string | null, bucket: string = "company
   };
 }
 
-export function useSignedUrl(path: string | null, bucket: string = "company-assets") {
-  return useSignedUrlState(path, bucket).url;
+export function useSignedUrl(
+  path: string | null,
+  bucket: string = "company-assets",
+  refreshKey: number = 0,
+) {
+  return useSignedUrlState(path, bucket, refreshKey).url;
 }

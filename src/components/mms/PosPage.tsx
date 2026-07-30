@@ -28,7 +28,13 @@ import {
   Wrench,
 } from "lucide-react";
 import { Sidebar } from "@/components/mms/Sidebar";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { SidebarContent } from "@/components/mms/SidebarContent";
 import { SidebarCompanyHeader } from "@/components/mms/SidebarCompanyHeader";
@@ -73,6 +79,7 @@ export function PosPage() {
   const [saleToEdit, setSaleToEdit] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileTicketOpen, setMobileTicketOpen] = useState(false);
   const queryClient = useQueryClient();
   const { profile, tenant, loading: tenantLoading } = useTenant();
 
@@ -169,6 +176,7 @@ export function PosPage() {
 
   const subTotal = cart.reduce((sum, i) => sum + i.qty * i.price, 0);
   const total = Math.max(0, subTotal - discount);
+  const itemCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
   const addToCart = (s: Service) => {
     if (s.type === "product" && s.stock !== null && s.stock < 1) {
@@ -265,6 +273,7 @@ export function PosPage() {
       client: client || "Client comptoir",
       cashier: "Bamba",
     };
+    setMobileTicketOpen(false);
     setCheckout(ticket);
     setSaving(false);
   };
@@ -276,7 +285,7 @@ export function PosPage() {
       </div>
       <main className="flex-1 flex flex-col md:flex-row min-h-0 min-w-0">
         {/* Catalogue */}
-        <section className="flex-1 flex flex-col min-h-0 min-w-0 border-b md:border-b-0 md:border-r border-border pb-[40vh] md:pb-0">
+        <section className="flex-1 flex flex-col min-h-0 min-w-0 border-b md:border-b-0 md:border-r border-border pb-36 md:pb-0">
           <header className="px-4 md:px-6 pt-4 md:pt-6 pb-4 border-b border-border">
             <div className="flex items-center gap-2 mb-3 md:hidden">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -456,7 +465,7 @@ export function PosPage() {
         </section>
 
         {/* Panier */}
-        <aside className="fixed bottom-0 left-0 w-full z-40 h-[45vh] md:relative md:bottom-auto md:left-auto md:w-[380px] md:h-auto shrink-0 flex flex-col bg-card border-t md:border-t-0 md:border-l border-border">
+        <aside className="hidden md:relative md:w-[380px] md:h-auto shrink-0 md:flex flex-col bg-card md:border-l border-border">
           <div className="px-4 md:px-5 pt-4 md:pt-6 pb-3 md:pb-4 border-b border-border">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-sm md:text-base">Ticket en cours</h2>
@@ -601,6 +610,205 @@ export function PosPage() {
           </div>
         </aside>
       </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+        <button
+          type="button"
+          disabled={cart.length === 0}
+          onClick={() => setMobileTicketOpen(true)}
+          className="mb-2 flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left disabled:opacity-50"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <ReceiptIcon className="h-4 w-4 text-primary" />
+            Voir le ticket
+          </span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {itemCount} {itemCount > 1 ? "articles" : "article"} • {formatCurrency(total)}
+          </span>
+        </button>
+        <button
+          type="button"
+          disabled={cart.length === 0 || saving || !canProcessSale}
+          onClick={() => setMobileTicketOpen(true)}
+          className="w-full rounded-xl bg-gradient-to-br from-primary to-primary-glow py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 transition disabled:opacity-40 disabled:shadow-none"
+        >
+          Encaisser {formatCurrency(total)}
+        </button>
+      </div>
+
+      <Sheet open={mobileTicketOpen} onOpenChange={setMobileTicketOpen}>
+        <SheetContent
+          side="bottom"
+          className="flex h-[90dvh] flex-col gap-0 rounded-t-3xl p-0 md:hidden"
+        >
+          <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-muted-foreground/30" />
+          <div className="border-b border-border px-4 pb-4 pt-3">
+            <SheetTitle>Ticket en cours</SheetTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {itemCount} {itemCount > 1 ? "articles" : "article"} • {formatCurrency(total)}
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="space-y-3">
+              {cart.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-border bg-card p-3">
+                  <div className="flex gap-3">
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-muted">
+                      {item.photoUrl ? (
+                        <img
+                          src={item.photoUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="grid h-full place-items-center text-muted-foreground">
+                          <ImageIcon className="h-6 w-6" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{item.name}</p>
+                          <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                            {item.type === "product" ? "Produit" : "Service"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={`Supprimer ${item.name}`}
+                          onClick={() => setQty(item.id, 0)}
+                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatCurrency(item.price)} / {item.unit}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                    <div className="inline-flex items-center overflow-hidden rounded-lg border border-border">
+                      <button
+                        type="button"
+                        aria-label={`Diminuer la quantité de ${item.name}`}
+                        onClick={() => setQty(item.id, item.qty - 1)}
+                        className="grid h-8 w-8 place-items-center hover:bg-muted"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="w-9 text-center text-sm font-medium">{item.qty}</span>
+                      <button
+                        type="button"
+                        aria-label={`Augmenter la quantité de ${item.name}`}
+                        onClick={() => setQty(item.id, item.qty + 1)}
+                        className="grid h-8 w-8 place-items-center hover:bg-muted"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-muted-foreground">Sous-total</p>
+                      <p className="text-sm font-bold text-primary">
+                        {formatCurrency(item.qty * item.price)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <label htmlFor="mobile-ticket-client" className="mb-1.5 block text-xs font-medium">
+                  Client
+                </label>
+                <input
+                  id="mobile-ticket-client"
+                  value={client}
+                  onChange={(event) => setClient(event.target.value)}
+                  placeholder="Nom du client (facultatif)"
+                  className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2.5 text-sm outline-none focus:border-primary/40"
+                />
+              </div>
+
+              <div className="space-y-2 rounded-2xl bg-muted/40 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Sous-total</span>
+                  <span className="font-medium">{formatCurrency(subTotal)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="mobile-ticket-discount" className="text-muted-foreground">
+                    Remise
+                  </label>
+                  <input
+                    id="mobile-ticket-discount"
+                    type="number"
+                    min={0}
+                    value={discount || ""}
+                    onChange={(event) =>
+                      setDiscount(Math.max(0, parseInt(event.target.value) || 0))
+                    }
+                    placeholder="0"
+                    className="w-28 rounded-lg border border-border bg-background px-2 py-1.5 text-right text-sm outline-none focus:border-primary/40"
+                  />
+                </div>
+                <div className="flex items-center justify-between border-t border-border pt-3">
+                  <span className="font-semibold">Total</span>
+                  <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium">Mode de paiement</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { m: "Espèces" as const, icon: Banknote },
+                    { m: "Wave" as const, icon: Smartphone },
+                    { m: "Orange Money" as const, icon: Wallet },
+                    { m: "Carte" as const, icon: CreditCard },
+                  ].map(({ m, icon: Icon }) => (
+                    <button
+                      type="button"
+                      key={m}
+                      onClick={() => setPayment(m)}
+                      className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-medium transition ${
+                        payment === m
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 border-t border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+            <SheetClose asChild>
+              <button
+                type="button"
+                className="rounded-xl border border-border px-3 py-3 text-sm font-semibold"
+              >
+                Continuer les achats
+              </button>
+            </SheetClose>
+            <button
+              type="button"
+              disabled={cart.length === 0 || saving || !canProcessSale}
+              onClick={validate}
+              className="rounded-xl bg-gradient-to-br from-primary to-primary-glow px-3 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/20 disabled:opacity-40"
+            >
+              {saving ? "Enregistrement..." : "Confirmer et encaisser"}
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <AnimatePresence>
         {checkout && (

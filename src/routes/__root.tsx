@@ -15,6 +15,7 @@ import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { hasPermission } from "@/lib/auth";
 import { routePermissions } from "@/lib/route-permissions";
+import { canAccessParties } from "@/lib/party-access";
 import { getRouteModule } from "@/lib/route-modules";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TenantProvider } from "@/providers/TenantProvider";
@@ -250,6 +251,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         let isAuthorized = roleName === "Administrateur";
         if (!isAuthorized) {
           isAuthorized = await hasPermission(session.user.id, requiredPermission);
+        }
+
+        if (location.pathname === "/clients" || location.pathname === "/fournisseurs") {
+          const permissions = isAuthorized ? [requiredPermission] : [];
+          isAuthorized = canAccessParties(roleName, permissions);
         }
 
         if (!isAuthorized) {

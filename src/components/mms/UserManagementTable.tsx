@@ -36,6 +36,7 @@ import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
 import { useTenant } from "@/providers/TenantProvider";
 import { formatSupabaseError } from "@/lib/supabase-error";
+import { ProfileAvatar } from "@/components/mms/ProfileAvatar";
 
 export function UserManagement() {
   const qc = useQueryClient();
@@ -54,7 +55,7 @@ export function UserManagement() {
     queryFn: async () => {
       if (!tenantId) return [];
       const { data, error } = await supabase.from("profiles").select(`
-          id, username, full_name, email, phone, status, last_login_at, created_at,
+          id, username, full_name, email, phone, status, last_login_at, created_at, avatar_url,
           roles(id, name)
         `).eq("tenant_id", tenantId);
       if (error) throw error;
@@ -130,7 +131,12 @@ export function UserManagement() {
           <TableBody>
             {users?.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.full_name}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <ProfileAvatar path={user.avatar_url} name={user.full_name} email={user.email} className="h-9 w-9" />
+                    <span>{user.full_name}</span>
+                  </div>
+                </TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{(user.roles as any)?.name}</TableCell>
                 <TableCell className="capitalize">

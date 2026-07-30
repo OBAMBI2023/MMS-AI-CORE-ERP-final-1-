@@ -13,10 +13,10 @@ const MODULE_MAP: Record<string, string> = {
   "Dashboard": "dashboard.view",
   "Ventes": "ventes.view",
   "Devis": "ventes.view",
-  "Clients": "clients.view",
+  "Clients": "parties.access",
   "Produits & Services": "ventes.view",
   "Achats": "achats.view",
-  "Fournisseurs": "achats.view",
+  "Fournisseurs": "parties.access",
   "Dépenses": "ventes.view",
   "Assistant IA": "assistant.use",
   "Paramètres": "settings.manage"
@@ -117,8 +117,6 @@ export function PermissionsTab() {
 
   if (rolesLoading || permsLoading) return <Loader2 className="animate-spin h-8 w-8 mx-auto my-10" />;
 
-  const adminRoleId = roles?.find(r => r.name === 'Administrateur')?.id;
-
   const togglePermission = (roleId: string, permId: string) => {
     setPermissionsState(prev => ({
       ...prev,
@@ -153,7 +151,11 @@ export function PermissionsTab() {
                                     <Switch
                                         checked={permissionsState[role.id]?.[perm.id]}
                                         onCheckedChange={() => togglePermission(role.id, perm.id)}
-                                        disabled={role.id === adminRoleId}
+                                        disabled={
+                                          ["Administrateur", "Manager", "Gérant"].includes(role.name) ||
+                                          (perm.code === "parties.access" &&
+                                            !["Administrateur", "Manager", "Gérant", "Comptable"].includes(role.name))
+                                        }
                                     />
                                 </TableCell>
                             ))}

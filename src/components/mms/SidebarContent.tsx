@@ -20,6 +20,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { routePermissions } from "@/lib/route-permissions";
 import { routeModules } from "@/lib/route-modules";
+import { canAccessParties } from "@/lib/party-access";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/app" },
@@ -49,6 +50,9 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
     if (isLoading || modulesQuery.isLoading) return false;
     const requiredModule = routeModules[it.to];
     if (requiredModule && !modulesQuery.data?.has(requiredModule)) return false;
+    if (it.to === "/clients" || it.to === "/fournisseurs") {
+      return canAccessParties(role, permissions);
+    }
     const requiredPermission = routePermissions[it.to];
     if (requiredPermission) {
       return permissions.includes(requiredPermission);

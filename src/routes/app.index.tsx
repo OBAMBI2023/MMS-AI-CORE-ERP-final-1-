@@ -51,11 +51,18 @@ import { DashboardEmptyState } from "@/components/mms/dashboard/DashboardEmptySt
 // import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/mms/format";
+import { usePermissions } from "@/hooks/use-permissions";
+import { canAccessParties } from "@/lib/party-access";
 
 const PIE_COLORS = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4", "#6366f1"];
 
 function Dashboard() {
   const { data, isLoading, error } = useDashboardData();
+  const permissionsQuery = usePermissions();
+  const canViewParties = canAccessParties(
+    permissionsQuery.data?.role,
+    permissionsQuery.data?.permissions,
+  );
   // TODO: Réactiver la recherche globale plus tard
   // const [searchOpen, setSearchOpen] = useState(false);
 
@@ -76,11 +83,6 @@ function Dashboard() {
     if (h < 18) return "Bon après-midi";
     return "Bonsoir";
   }, []);
-
-  const userName = useMemo(() => {
-    if (!data?.session) return "Utilisateur";
-    return data.session.full_name || "Utilisateur";
-  }, [data?.session]);
 
   const today = useMemo(
     () =>
@@ -104,7 +106,9 @@ function Dashboard() {
     { title: "Rapports", icon: BarChart3, route: "/rapports" },
     { title: "Paramètres", icon: Settings, route: "/parametres" },
     // { title: "Assistant IA", icon: Bot, route: "/assistant" },
-  ] as const;
+  ].filter(
+    (action) => canViewParties || (action.route !== "/clients" && action.route !== "/fournisseurs"),
+  );
 
   if (error) {
     return (
@@ -138,9 +142,16 @@ function Dashboard() {
         className="space-y-8 pb-4"
       >
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            {greeting}, {userName} 👋
-          </h1>
+          {isLoading || !data?.session ? (
+            <div
+              className="h-9 w-64 max-w-full animate-pulse rounded-lg bg-muted"
+              aria-label="Chargement du message d’accueil"
+            />
+          ) : (
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+              {greeting}, {data.session.displayName} 👋
+            </h1>
+          )}
           <p className="text-sm text-muted-foreground capitalize mt-1">{today}</p>
         </div>
 
@@ -193,26 +204,30 @@ function Dashboard() {
               spark={data.kpis.benefice.spark}
               accent="emerald"
             />
-            <DashboardKpiCard
-              index={4}
-              title="Clients"
-              value={String(data.kpis.clients.value)}
-              icon={Users}
-              route="/clients"
-              trend={data.kpis.clients.trend}
-              spark={data.kpis.clients.spark}
-              accent="sky"
-            />
-            <DashboardKpiCard
-              index={5}
-              title="Fournisseurs"
-              value={String(data.kpis.fournisseurs.value)}
-              icon={Truck}
-              route="/fournisseurs"
-              trend={data.kpis.fournisseurs.trend}
-              spark={data.kpis.fournisseurs.spark}
-              accent="violet"
-            />
+            {canViewParties && (
+              <>
+                <DashboardKpiCard
+                  index={4}
+                  title="Clients"
+                  value={String(data.kpis.clients.value)}
+                  icon={Users}
+                  route="/clients"
+                  trend={data.kpis.clients.trend}
+                  spark={data.kpis.clients.spark}
+                  accent="sky"
+                />
+                <DashboardKpiCard
+                  index={5}
+                  title="Fournisseurs"
+                  value={String(data.kpis.fournisseurs.value)}
+                  icon={Truck}
+                  route="/fournisseurs"
+                  trend={data.kpis.fournisseurs.trend}
+                  spark={data.kpis.fournisseurs.spark}
+                  accent="violet"
+                />
+              </>
+            )}
             <DashboardKpiCard
               index={6}
               title="Ventes"
@@ -491,8 +506,8 @@ function Dashboard() {
                     <TabsTrigger value="ventes">Ventes</TabsTrigger>
                     <TabsTrigger value="achats">Achats</TabsTrigger>
                     <TabsTrigger value="depenses">Dépenses</TabsTrigger>
-                    <TabsTrigger value="clients">Clients</TabsTrigger>
-                    <TabsTrigger value="fournisseurs">Fournisseurs</TabsTrigger>
+                    {canViewParties && <TabsTrigger value="clients">Clients</TabsTrigger>}
+                    {canViewParties && <TabsTrigger value="fournisseurs">Fournisseurs</TabsTrigger>}
                   </TabsList>
 
                   <TabsContent value="journal">
@@ -634,61 +649,65 @@ function Dashboard() {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="clients">
-                    {data.lists.clients.length === 0 ? (
-                      <DashboardEmptyState
-                        compact
-                        icon={Users}
-                        title="Aucun client enregistré"
-                        actionLabel="Ajouter un client"
-                        actionRoute="/clients"
-                      />
-                    ) : (
-                      <ul className="divide-y divide-border">
-                        {data.lists.clients.map((c) => (
-                          <li key={c.id}>
-                            <Link
-                              to="/clients"
-                              className="flex items-center justify-between gap-3 py-2.5 text-sm hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
-                            >
-                              <p className="font-medium truncate">{c.name}</p>
-                              <span className="shrink-0 text-xs text-muted-foreground">
-                                {formatDate(c.created_at)}
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </TabsContent>
+                  {canViewParties && (
+                    <TabsContent value="clients">
+                      {data.lists.clients.length === 0 ? (
+                        <DashboardEmptyState
+                          compact
+                          icon={Users}
+                          title="Aucun client enregistré"
+                          actionLabel="Ajouter un client"
+                          actionRoute="/clients"
+                        />
+                      ) : (
+                        <ul className="divide-y divide-border">
+                          {data.lists.clients.map((c) => (
+                            <li key={c.id}>
+                              <Link
+                                to="/clients"
+                                className="flex items-center justify-between gap-3 py-2.5 text-sm hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
+                              >
+                                <p className="font-medium truncate">{c.name}</p>
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                  {formatDate(c.created_at)}
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </TabsContent>
+                  )}
 
-                  <TabsContent value="fournisseurs">
-                    {data.lists.fournisseurs.length === 0 ? (
-                      <DashboardEmptyState
-                        compact
-                        icon={Truck}
-                        title="Aucun fournisseur enregistré"
-                        actionLabel="Ajouter un fournisseur"
-                        actionRoute="/fournisseurs"
-                      />
-                    ) : (
-                      <ul className="divide-y divide-border">
-                        {data.lists.fournisseurs.map((f) => (
-                          <li key={f.id}>
-                            <Link
-                              to="/fournisseurs"
-                              className="flex items-center justify-between gap-3 py-2.5 text-sm hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
-                            >
-                              <p className="font-medium truncate">{f.name}</p>
-                              <span className="shrink-0 text-xs text-muted-foreground">
-                                {formatDate(f.created_at)}
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </TabsContent>
+                  {canViewParties && (
+                    <TabsContent value="fournisseurs">
+                      {data.lists.fournisseurs.length === 0 ? (
+                        <DashboardEmptyState
+                          compact
+                          icon={Truck}
+                          title="Aucun fournisseur enregistré"
+                          actionLabel="Ajouter un fournisseur"
+                          actionRoute="/fournisseurs"
+                        />
+                      ) : (
+                        <ul className="divide-y divide-border">
+                          {data.lists.fournisseurs.map((f) => (
+                            <li key={f.id}>
+                              <Link
+                                to="/fournisseurs"
+                                className="flex items-center justify-between gap-3 py-2.5 text-sm hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
+                              >
+                                <p className="font-medium truncate">{f.name}</p>
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                  {formatDate(f.created_at)}
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </TabsContent>
+                  )}
                 </Tabs>
               </Card>
 

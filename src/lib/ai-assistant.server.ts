@@ -5,6 +5,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { readEnvVar } from "@/integrations/supabase/env";
 import { getAiProvider } from "@/lib/ai-providers.server";
+import { canAccessParties } from "@/lib/party-access";
 
 const readTools = [
   "revenue_today",
@@ -41,6 +42,7 @@ type Context = {
   userId: string;
   tenantId: string;
   roleId: string | null;
+  roleName: string | null;
   permissions: Set<string>;
   moduleEnabled: boolean;
   client: SupabaseClient<any>;
@@ -66,7 +68,7 @@ async function context(enforceAssistantAccess = true): Promise<Context> {
 
   const { data: profile, error: profileError } = await client
     .from("profiles")
-    .select("tenant_id, role_id")
+    .select("tenant_id, role_id, roles(name)")
     .eq("id", authData.user.id)
     .single();
   if (profileError || !profile?.tenant_id) throw new Error("Profil tenant introuvable.");
@@ -93,6 +95,7 @@ async function context(enforceAssistantAccess = true): Promise<Context> {
     userId: authData.user.id,
     tenantId: profile.tenant_id,
     roleId: profile.role_id,
+    roleName: (profile.roles as { name?: string } | null)?.name ?? null,
     permissions,
     moduleEnabled: Boolean(enabled),
     client,
@@ -118,6 +121,12 @@ const permissionByTool: Record<ReadTool | WriteTool, string> = {
 
 function requirePermission(ctx: Context, tool: ReadTool | WriteTool) {
   const permission = permissionByTool[tool];
+  if (
+    (tool === "top_customers" || tool === "create_client") &&
+    !canAccessParties(ctx.roleName, ctx.permissions)
+  ) {
+    throw new Error("Accès aux clients réservé aux rôles autorisés.");
+  }
   if (!ctx.permissions.has(permission)) {
     throw new Error(`Permission ${permission} requise pour cette opération.`);
   }

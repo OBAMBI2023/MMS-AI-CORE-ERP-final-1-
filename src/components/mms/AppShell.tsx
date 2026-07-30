@@ -56,13 +56,15 @@ export function AppShell({
                 </div>
               </SheetContent>
             </Sheet>
-            <div className="flex h-12 w-[min(34vw,132px)] items-center sm:hidden">
-              {isLoading ? (
-                <Skeleton className="h-11 w-11 rounded-xl" />
-              ) : (
-                <BrandLogo context="mobile" src={logoUrl} alt={`Logo ${companyName}`} />
-              )}
-            </div>
+            {title !== "Dashboard" && (
+              <div className="flex h-12 w-[min(34vw,132px)] items-center sm:hidden">
+                {isLoading ? (
+                  <Skeleton className="h-11 w-11 rounded-xl" />
+                ) : (
+                  <BrandLogo context="mobile" src={logoUrl} alt={`Logo ${companyName}`} />
+                )}
+              </div>
+            )}
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold tracking-tight md:text-2xl">{title}</h1>
               {subtitle && (

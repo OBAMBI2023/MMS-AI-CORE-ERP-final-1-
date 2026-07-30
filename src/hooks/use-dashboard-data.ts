@@ -12,6 +12,7 @@ import {
   parseISO,
 } from "date-fns";
 import { fr } from "date-fns/locale";
+import { resolveUserDisplayName } from "@/lib/user-display-name";
 
 export type SparkPoint = { label: string; value: number };
 export type MonthPoint = { label: string; ca: number; depenses: number; achats: number };
@@ -143,14 +144,15 @@ function groupSum<T>(
 export function useDashboardData() {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
+  const userId = profile?.id;
 
   return useQuery({
-    // The tenant belongs in the cache key as well as in every database query:
-    // otherwise data cached for one tenant can be rendered after an account switch.
-    queryKey: ["dashboard-data-v2", tenantId],
+    // Tenant and user both belong in the cache key: accounts in the same tenant
+    // must never render each other's cached session or greeting.
+    queryKey: ["dashboard-data-v3", tenantId, userId],
     queryFn: async () => {
-      if (!tenantId) {
-        throw new Error("Locataire introuvable");
+      if (!tenantId || !userId) {
+        throw new Error("Profil authentifié introuvable");
       }
 
       const [
@@ -447,6 +449,10 @@ export function useDashboardData() {
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       const session = sessionRes.data?.session ?? null;
+      if (!session || session.user.id !== userId) {
+        throw new Error("La session active ne correspond pas au profil chargé");
+      }
+      const metadata = session.user.user_metadata;
 
       return {
         kpis,
@@ -471,14 +477,20 @@ export function useDashboardData() {
         },
         session: session
           ? {
-              email: session.user?.email ?? "Utilisateur",
-              full_name: session.user?.user_metadata?.full_name ?? null,
-              lastSignInAt: session.user?.last_sign_in_at ?? null,
+              email: profile.email ?? session.user.email ?? "",
+              displayName: resolveUserDisplayName({
+                full_name: profile.full_name,
+                first_name: metadata?.first_name,
+                last_name: metadata?.last_name,
+                display_name: metadata?.display_name,
+                email: profile.email ?? session.user.email,
+              }),
+              lastSignInAt: session.user.last_sign_in_at ?? null,
             }
           : null,
       };
     },
-    enabled: !tenantLoading && Boolean(tenantId),
+    enabled: !tenantLoading && Boolean(tenantId) && Boolean(userId),
     staleTime: 30_000,
   });
 }
