@@ -47,7 +47,7 @@ function TrialSignupPage() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef<TurnstileHandle>(null);
   const submissionInFlightRef = useRef(false);
-  const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim();
   const handleTurnstileToken = useCallback((token: string) => setTurnstileToken(token), []);
   const {
     register,
@@ -116,7 +116,8 @@ function TrialSignupPage() {
               Créez votre espace entreprise.
             </h1>
             <p className="mt-4 leading-7 text-slate-300">
-              Accédez immédiatement à {PLATFORM_BRANDING.productName}, sans données fictives et sans carte bancaire.
+              Accédez immédiatement à {PLATFORM_BRANDING.productName}, sans données fictives et sans
+              carte bancaire.
             </p>
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300">
               Votre compte est administrateur de votre espace. Vos utilisateurs, rôles et données
@@ -201,7 +202,9 @@ function TrialSignupPage() {
                 />
               ) : (
                 <p role="alert" className="text-sm text-red-600">
-                  La protection anti-robot n'est pas configurée.
+                  {import.meta.env.DEV
+                    ? "Turnstile est indisponible en développement local : définissez VITE_TURNSTILE_SITE_KEY puis autorisez localhost et 192.168.1.66 dans le widget Cloudflare."
+                    : "La protection anti-robot n'est pas configurée."}
                 </p>
               )}
               <Button

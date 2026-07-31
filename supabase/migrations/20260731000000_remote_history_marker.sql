@@ -1,0 +1,2 @@
+-- History marker: this migration was already applied remotely before this
+-- checkout and its version must remain present for `supabase db push`.

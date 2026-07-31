@@ -4,6 +4,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { readEnvVar } from "./env";
+import { isAccessTokenRevoked, isProfileAccessBlocked } from "@/lib/profile-access";
 
 export class AuthHttpError extends Error {
   statusCode: 401 | 403;
@@ -106,6 +107,23 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
 
     if (!data.claims.sub) {
       throw new AuthHttpError(401, "Unauthorized: No user ID found in token");
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("status, sessions_revoked_at")
+      .eq("id", data.claims.sub)
+      .maybeSingle();
+    if (profileError) {
+      throw new AuthHttpError(403, "Impossible de vérifier l’accès à ce compte.");
+    }
+    if (isProfileAccessBlocked(profile?.status)) {
+      throw new AuthHttpError(403, "Ce compte est suspendu ou archivé.");
+    }
+
+    const issuedAt = typeof data.claims.iat === "number" ? data.claims.iat : null;
+    if (isAccessTokenRevoked(issuedAt, profile?.sessions_revoked_at)) {
+      throw new AuthHttpError(401, "Cette session a été révoquée. Veuillez vous reconnecter.");
     }
 
     return next({

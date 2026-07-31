@@ -82,7 +82,16 @@ async function verifyTurnstile(token: string, ipAddress: string): Promise<void> 
   const errorCodes = result["error-codes"] ?? [];
   if (!response.ok || !result.success) {
     const exactError = errorCodes.length > 0 ? errorCodes.join(", ") : `HTTP ${response.status}`;
+    if (errorCodes.includes("invalid-input-secret")) {
+      throw new Error(
+        "Cloudflare Turnstile : TURNSTILE_SECRET_KEY est invalide ou ne correspond pas au widget du frontend.",
+      );
+    }
     throw new Error(`Cloudflare Turnstile : ${exactError}`);
+  }
+
+  if (result.action && result.action !== "trial_signup") {
+    throw new Error("Cloudflare Turnstile : action de vérification inattendue.");
   }
 }
 
@@ -152,13 +161,16 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
     let workspaceCreated = false;
 
     try {
-      const { data: workspace, error: onboardingError } = await supabaseAdmin.rpc("create_trial_workspace", {
-        p_user_id: userId,
-        p_company_name: data.companyName,
-        p_full_name: data.fullName,
-        p_email: data.email,
-        p_phone: data.phone,
-      });
+      const { data: workspace, error: onboardingError } = await supabaseAdmin.rpc(
+        "create_trial_workspace",
+        {
+          p_user_id: userId,
+          p_company_name: data.companyName,
+          p_full_name: data.fullName,
+          p_email: data.email,
+          p_phone: data.phone,
+        },
+      );
 
       if (onboardingError) {
         logSupabaseError(onboardingError);
@@ -171,10 +183,12 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
       workspaceCreated = true;
 
       const isolatedAuth = createIsolatedAuthClient();
-      const { data: sessionData, error: sessionError } = await isolatedAuth.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
+      const { data: sessionData, error: sessionError } = await isolatedAuth.auth.signInWithPassword(
+        {
+          email: data.email,
+          password: data.password,
+        },
+      );
 
       if (sessionError || !sessionData.session) {
         if (sessionError) logSupabaseError(sessionError);

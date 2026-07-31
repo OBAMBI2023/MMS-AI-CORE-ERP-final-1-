@@ -210,11 +210,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("tenant_id")
+        .select("tenant_id, status")
         .eq("id", session.user.id)
         .single();
 
-      if (profileError || !profile?.tenant_id) {
+      if (
+        profileError ||
+        !profile?.tenant_id ||
+        profile.status === "suspended" ||
+        profile.status === "suspendu"
+      ) {
         throw redirect({ to: "/licence" });
       }
 

@@ -1690,6 +1690,7 @@ export type Database = {
           last_login_ip: string | null
           phone: string | null
           role_id: string | null
+          sessions_revoked_at: string | null
           status: string | null
           tenant_id: string | null
           updated_at: string
@@ -1705,6 +1706,7 @@ export type Database = {
           last_login_ip?: string | null
           phone?: string | null
           role_id?: string | null
+          sessions_revoked_at?: string | null
           status?: string | null
           tenant_id?: string | null
           updated_at?: string
@@ -1720,6 +1722,7 @@ export type Database = {
           last_login_ip?: string | null
           phone?: string | null
           role_id?: string | null
+          sessions_revoked_at?: string | null
           status?: string | null
           tenant_id?: string | null
           updated_at?: string

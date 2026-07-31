@@ -73,3 +73,23 @@ export const supabaseAdmin = new Proxy({} as ReturnType<typeof createSupabaseAdm
     return Reflect.get(_supabaseAdmin, prop, receiver);
   },
 });
+
+export async function revokeUserSessions(userId: string): Promise<void> {
+  const supabaseUrl = readEnvVar("VITE_SUPABASE_URL", "SUPABASE_URL");
+  const serviceRoleKey = readEnvVar("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing Supabase server credentials.");
+  }
+
+  const headers = new Headers({ apikey: serviceRoleKey });
+  if (!isNewSupabaseApiKey(serviceRoleKey)) {
+    headers.set("Authorization", `Bearer ${serviceRoleKey}`);
+  }
+  const response = await fetch(
+    `${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}/logout`,
+    { method: "POST", headers },
+  );
+  if (!response.ok) {
+    throw new Error("Impossible de révoquer les sessions de cet utilisateur.");
+  }
+}

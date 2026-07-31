@@ -1,12 +1,15 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
+const SCRIPT_ID = "cloudflare-turnstile-script";
 const SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "192.168.1.66"]);
 
 type TurnstileApi = {
   render: (
     container: HTMLElement,
     options: {
       sitekey: string;
+      action: string;
       callback: (token: string) => void;
       "expired-callback": () => void;
       "error-callback": (errorCode?: string) => void;
@@ -22,9 +25,55 @@ declare global {
   }
 }
 
-export type TurnstileHandle = {
-  reset: () => void;
-};
+let turnstileScriptPromise: Promise<TurnstileApi> | undefined;
+
+function loadTurnstile(): Promise<TurnstileApi> {
+  if (window.turnstile) return Promise.resolve(window.turnstile);
+  if (turnstileScriptPromise) return turnstileScriptPromise;
+
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    let script = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement("script");
+      script.id = SCRIPT_ID;
+      script.src = SCRIPT_URL;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+
+    const cleanup = () => {
+      script?.removeEventListener("load", handleLoad);
+      script?.removeEventListener("error", handleError);
+    };
+    const handleLoad = () => {
+      cleanup();
+      if (window.turnstile) resolve(window.turnstile);
+      else reject(new Error("L'API Turnstile n'est pas disponible après le chargement du script."));
+    };
+    const handleError = () => {
+      cleanup();
+      turnstileScriptPromise = undefined;
+      reject(new Error("Le script Cloudflare Turnstile est inaccessible."));
+    };
+
+    script.addEventListener("load", handleLoad, { once: true });
+    script.addEventListener("error", handleError, { once: true });
+  });
+  return turnstileScriptPromise;
+}
+
+function turnstileErrorMessage(code?: string): string {
+  if (code === "110200") {
+    return `Ce domaine (${window.location.hostname}) n'est pas autorisé par le widget Cloudflare Turnstile. Ajoutez-le dans la liste des noms d'hôte du widget.`;
+  }
+  const localHint = LOCAL_HOSTS.has(window.location.hostname)
+    ? " Vérifiez que ce domaine local est autorisé et que VITE_TURNSTILE_SITE_KEY désigne ce widget."
+    : "";
+  return `La protection anti-robot est indisponible${code ? ` (Cloudflare ${code})` : ""}.${localHint}`;
+}
+
+export type TurnstileHandle = { reset: () => void };
 
 export const Turnstile = forwardRef<
   TurnstileHandle,
@@ -43,9 +92,7 @@ export const Turnstile = forwardRef<
       reset: () => {
         onTokenChange("");
         setError("");
-        if (widgetIdRef.current && window.turnstile) {
-          window.turnstile.reset(widgetIdRef.current);
-        }
+        if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
       },
     }),
     [onTokenChange],
@@ -53,57 +100,44 @@ export const Turnstile = forwardRef<
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !siteKey) return;
+    if (!container || !siteKey.trim()) return;
 
-    let widgetId: string | undefined;
     let disposed = false;
-    const renderWidget = () => {
-      if (disposed || !window.turnstile || widgetId) return;
-      widgetId = window.turnstile.render(container, {
-        sitekey: siteKey,
-        callback: (token) => {
-          setError("");
-          onTokenChange(token);
-        },
-        "expired-callback": () => onTokenChange(""),
-        "error-callback": (code) => {
-          onTokenChange("");
-          setError(
-            code
-              ? `La protection anti-robot n'a pas pu se charger (Cloudflare ${code}).`
-              : "La protection anti-robot n'a pas pu se charger.",
-          );
-        },
+    setError("");
+    loadTurnstile()
+      .then((api) => {
+        if (disposed || widgetIdRef.current || !container.isConnected) return;
+        widgetIdRef.current = api.render(container, {
+          sitekey: siteKey.trim(),
+          action: "trial_signup",
+          callback: (token) => {
+            if (disposed) return;
+            setError("");
+            onTokenChange(token);
+          },
+          "expired-callback": () => !disposed && onTokenChange(""),
+          "error-callback": (code) => {
+            if (disposed) return;
+            onTokenChange("");
+            setError(turnstileErrorMessage(code));
+          },
+        });
+      })
+      .catch((loadError: unknown) => {
+        if (disposed) return;
+        const detail = loadError instanceof Error ? loadError.message : "Erreur inconnue.";
+        setError(
+          LOCAL_HOSTS.has(window.location.hostname)
+            ? `${detail} En développement local, vérifiez le réseau, le bloqueur de contenu et les domaines autorisés du widget.`
+            : detail,
+        );
       });
-      widgetIdRef.current = widgetId;
-    };
-
-    let script = document.querySelector<HTMLScriptElement>(`script[src="${SCRIPT_URL}"]`);
-    if (!script) {
-      script = document.createElement("script");
-      script.src = SCRIPT_URL;
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-    }
-
-    const handleScriptError = () =>
-      setError(
-        "Le script Cloudflare Turnstile est inaccessible. Vérifiez la CSP, le réseau ou le bloqueur de contenu.",
-      );
-
-    if (window.turnstile) renderWidget();
-    else {
-      script.addEventListener("load", renderWidget);
-      script.addEventListener("error", handleScriptError);
-    }
 
     return () => {
       disposed = true;
-      script?.removeEventListener("load", renderWidget);
-      script?.removeEventListener("error", handleScriptError);
-      if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
+      const widgetId = widgetIdRef.current;
       widgetIdRef.current = undefined;
+      if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
       onTokenChange("");
     };
   }, [siteKey, onTokenChange]);
