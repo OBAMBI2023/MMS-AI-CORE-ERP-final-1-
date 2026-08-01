@@ -13,8 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   cleanPasswordRecoveryUrl,
   clearPasswordRecoveryContext,
+  handlePasswordRecoveryCallback,
   hasValidPasswordRecoverySession,
 } from "@/integrations/supabase/password-recovery";
+import { sendPasswordRecoveryEmail } from "@/lib/password-recovery.server";
 
 const resetPasswordSchema = z
   .object({
@@ -80,7 +82,17 @@ function ResetPasswordPage() {
       }
     });
 
-    void verifySession("initial");
+    void (async () => {
+      const result = await handlePasswordRecoveryCallback();
+      if (!active) return;
+      // A clean reload has no callback, but retains both the verified Supabase
+      // session and the tab-scoped recovery marker.
+      await verifySession("initial");
+      if (result === "invalid" && active) {
+        setValidSession(false);
+        setCheckingLink(false);
+      }
+    })();
 
     return () => {
       active = false;
@@ -100,9 +112,9 @@ function ResetPasswordPage() {
       return;
     }
 
-    const redirectTo = new URL("/reset-password", window.location.origin).toString();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    if (error) {
+    try {
+      await sendPasswordRecoveryEmail({ data: { email } });
+    } catch (error) {
       console.error("[PasswordSetup] Échec du renvoi du lien :", error);
       setResendError("Le lien n’a pas pu être envoyé. Réessayez dans quelques instants.");
       setResending(false);

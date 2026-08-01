@@ -31,6 +31,7 @@ import { Route as EssaiGratuitRouteImport } from './routes/essai-gratuit'
 import { Route as DevisRouteImport } from './routes/devis'
 import { Route as DepensesRouteImport } from './routes/depenses'
 import { Route as DemoRouteImport } from './routes/demo'
+import { Route as DemandeEnAttenteRouteImport } from './routes/demande-en-attente'
 import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as CategoriesRouteImport } from './routes/categories'
 import { Route as AchatsRouteImport } from './routes/achats'
@@ -156,6 +157,11 @@ const DemoRoute = DemoRouteImport.update({
   path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DemandeEnAttenteRoute = DemandeEnAttenteRouteImport.update({
+  id: '/demande-en-attente',
+  path: '/demande-en-attente',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClientsRoute = ClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
@@ -233,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/achats': typeof AchatsRoute
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
+  '/demande-en-attente': typeof DemandeEnAttenteRoute
   '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
@@ -271,6 +278,7 @@ export interface FileRoutesByTo {
   '/achats': typeof AchatsRoute
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
+  '/demande-en-attente': typeof DemandeEnAttenteRoute
   '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
@@ -310,6 +318,7 @@ export interface FileRoutesById {
   '/achats': typeof AchatsRoute
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
+  '/demande-en-attente': typeof DemandeEnAttenteRoute
   '/demo': typeof DemoRoute
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
@@ -350,6 +359,7 @@ export interface FileRouteTypes {
     | '/achats'
     | '/categories'
     | '/clients'
+    | '/demande-en-attente'
     | '/demo'
     | '/depenses'
     | '/devis'
@@ -388,6 +398,7 @@ export interface FileRouteTypes {
     | '/achats'
     | '/categories'
     | '/clients'
+    | '/demande-en-attente'
     | '/demo'
     | '/depenses'
     | '/devis'
@@ -426,6 +437,7 @@ export interface FileRouteTypes {
     | '/achats'
     | '/categories'
     | '/clients'
+    | '/demande-en-attente'
     | '/demo'
     | '/depenses'
     | '/devis'
@@ -465,6 +477,7 @@ export interface RootRouteChildren {
   AchatsRoute: typeof AchatsRoute
   CategoriesRoute: typeof CategoriesRoute
   ClientsRoute: typeof ClientsRoute
+  DemandeEnAttenteRoute: typeof DemandeEnAttenteRoute
   DemoRoute: typeof DemoRoute
   DepensesRoute: typeof DepensesRoute
   DevisRoute: typeof DevisRoute
@@ -651,6 +664,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/demande-en-attente': {
+      id: '/demande-en-attente'
+      path: '/demande-en-attente'
+      fullPath: '/demande-en-attente'
+      preLoaderRoute: typeof DemandeEnAttenteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clients': {
       id: '/clients'
       path: '/clients'
@@ -774,6 +794,7 @@ const rootRouteChildren: RootRouteChildren = {
   AchatsRoute: AchatsRoute,
   CategoriesRoute: CategoriesRoute,
   ClientsRoute: ClientsRoute,
+  DemandeEnAttenteRoute: DemandeEnAttenteRoute,
   DemoRoute: DemoRoute,
   DepensesRoute: DepensesRoute,
   DevisRoute: DevisRoute,

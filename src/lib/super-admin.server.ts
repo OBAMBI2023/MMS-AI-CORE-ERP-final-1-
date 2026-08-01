@@ -3,15 +3,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TablesUpdate } from "@/integrations/supabase/types";
-import { formatSupabaseError } from "@/lib/supabase-error";
+import { extractErrorDiagnostic, formatSupabaseError, safeErrorMessage } from "@/lib/supabase-error";
+import { getPasswordRedirectUrl } from "@/lib/app-url.server";
+import { resendExistingAuthInvitation } from "@/lib/partner-invitation";
 
 type TenantRow = {
   id: string; name: string; slug: string; is_active: boolean; created_at: string;
   deleted_at: string | null; deletion_reason: string | null; suspended_at: string | null;
+  onboarding_status: string; activity: string | null; suggested_pack_code: string | null;
 };
 type PartnerTenantRow = { partner_id: string; tenant_id: string; assigned_at: string };
 type TenantMetricRow = {
+  id?: string;
   tenant_id: string | null;
+  email?: string | null;
+  role_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -182,7 +188,14 @@ export type SuperAdminTenant = {
   pack: SuperAdminModulePack | null;
   aiSubscription: SuperAdminAiSubscription | null;
   aiUsageHistory: SuperAdminAiUsage[];
+  adminUserId: string | null;
+  adminEmail: string | null;
+  invitationStatus: "sent" | "pending" | "activated" | "expired" | "unavailable";
+  onboardingStatus: string;
+  activity: string | null;
+  suggestedPackCode: string | null;
 };
+type RoleRow = { id: string; tenant_id: string; name: string };
 
 export type TenantDeletionJob = {
   id: string;
@@ -227,6 +240,26 @@ export type SuperAdminDashboard = {
     trials: TrialUsageRow[];
   };
 };
+
+export const activatePendingTrial = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    tenantId: z.string().uuid(), packId: z.string().uuid().nullable(),
+    moduleIds: z.array(z.string().uuid()).min(1),
+    billingCycle: z.enum(["monthly", "quarterly", "yearly"]),
+    durationDays: z.number().int().min(1).max(3650), amount: z.number().min(0),
+  }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any).rpc("activate_pending_trial", {
+      p_tenant_id: data.tenantId, p_actor_id: context.userId, p_pack_id: data.packId,
+      p_module_ids: data.moduleIds, p_billing_cycle: data.billingCycle,
+      p_duration_days: data.durationDays, p_amount: data.amount,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { ok: true as const };
+  });
 
 function latestDate(current: string | null, candidate?: string | null) {
   if (!candidate) return current;
@@ -331,6 +364,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
     const [
       tenantRows,
       profileRows,
+      roleRows,
       saleRows,
       clientRows,
       subscriptionRows,
@@ -352,8 +386,9 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       trialUsageRows,
       partnerTenantRows,
     ] = await Promise.all([
-      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at"),
-      fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "tenant_id, created_at, updated_at"),
+      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at, onboarding_status, activity, suggested_pack_code"),
+      fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "id, tenant_id, email, role_id, created_at, updated_at"),
+      fetchRows<RoleRow>(supabaseAdmin, "roles", "id, tenant_id, name"),
       fetchRows<SaleRow>(supabaseAdmin, "ventes", "tenant_id, total, created_at, updated_at"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "clients", "tenant_id, created_at, updated_at"),
       fetchRows<SubscriptionRow>(
@@ -410,6 +445,19 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
     const subscriptionsByTenant = new Map(
       subscriptionRows.map((subscription) => [subscription.tenant_id, subscription]),
     );
+    const { data: authUsersPage, error: authUsersError } =
+      await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (authUsersError) throw new Error(formatSupabaseError(authUsersError));
+    const authUsersById = new Map(authUsersPage.users.map((user) => [user.id, user]));
+    const rolesById = new Map(roleRows.map((role) => [role.id, role]));
+    const adminProfileByTenant = new Map<string, TenantMetricRow>();
+    for (const profile of profileRows) {
+      if (!profile.tenant_id || !profile.id) continue;
+      const role = profile.role_id ? rolesById.get(profile.role_id) : undefined;
+      if (role?.tenant_id === profile.tenant_id && role.name === "Administrateur") {
+        adminProfileByTenant.set(profile.tenant_id, profile);
+      }
+    }
     const aiSubscriptionsByTenant = new Map(
       aiSubscriptionRows.map((subscription) => [subscription.tenant_id, subscription]),
     );
@@ -518,6 +566,18 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           subscription?.status === "trial"
             ? subscription.trial_ends_at
             : (subscription?.ends_at ?? null);
+        const adminProfile = adminProfileByTenant.get(tenant.id);
+        const adminAuthUser = adminProfile?.id ? authUsersById.get(adminProfile.id) : undefined;
+        const invitationSentAt = adminAuthUser?.invited_at ?? adminAuthUser?.confirmation_sent_at;
+        const invitationStatus: SuperAdminTenant["invitationStatus"] = adminAuthUser?.confirmed_at
+          ? "activated"
+          : invitationSentAt && Date.now() - new Date(invitationSentAt).getTime() > 86_400_000
+            ? "expired"
+            : invitationSentAt
+              ? "pending"
+              : adminAuthUser
+                ? "sent"
+                : "unavailable";
         return {
           id: tenant.id,
           name: tenant.name,
@@ -589,6 +649,12 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
               errorMessage: usage.error_message,
               createdAt: usage.created_at,
             })),
+          adminUserId: adminProfile?.id ?? null,
+          adminEmail: adminProfile?.email ?? adminAuthUser?.email ?? null,
+          invitationStatus,
+          onboardingStatus: tenant.onboarding_status,
+          activity: tenant.activity,
+          suggestedPackCode: tenant.suggested_pack_code,
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name, "fr"));
@@ -676,6 +742,153 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         trials: trialUsageRows,
       },
     };
+  });
+
+const createInvitedTenantSchema = z.object({
+  companyName: z.string().trim().min(2).max(120),
+  adminEmail: z.string().trim().email().max(254),
+  billingCycle: z.enum(["monthly", "quarterly", "yearly"]),
+  durationDays: z.number().int().min(1).max(3650),
+  moduleIds: z.array(z.string().uuid()).max(100),
+});
+
+function logTenantInvitationBoundary(boundary: string, error: unknown, extra: Record<string, unknown> = {}) {
+  console.error(`[SuperAdminTenantInvitation] ${boundary}`, {
+    ...extractErrorDiagnostic(error),
+    ...extra,
+  }, error);
+}
+
+async function atTenantInvitationBoundary<T>(boundary: string, operation: () => T): Promise<Awaited<T>> {
+  try {
+    return await operation();
+  } catch (error) {
+    logTenantInvitationBoundary(boundary, error);
+    throw error;
+  }
+}
+
+function tenantInvitationMessage(error: unknown, boundary: string): string {
+  const diagnostic = extractErrorDiagnostic(error);
+  const searchable = [diagnostic.code, diagnostic.message, diagnostic.details, diagnostic.hint]
+    .filter(Boolean).join(" ").toLowerCase();
+  if (/already (been )?registered|already exists|email_exists|user.*exists|duplicate.*email/.test(searchable)) {
+    return "Cette adresse e-mail possède déjà un compte Auth. Utilisez une autre adresse ou renvoyez l’invitation existante.";
+  }
+  if (/rate.?limit|too many requests|email.*limit|over_email_send_rate_limit/.test(searchable)) {
+    return "La limite d’envoi des invitations a été atteinte. Patientez avant de réessayer.";
+  }
+  if (boundary === "redirection") return "La redirection de l’invitation est refusée ou mal configurée.";
+  if (boundary === "rpc") {
+    return `La création PostgreSQL du tenant a échoué : ${safeErrorMessage(error, "erreur RPC inconnue")}`;
+  }
+  return safeErrorMessage(error, "Impossible de créer le tenant par invitation.");
+}
+
+export const createInvitedTenant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(createInvitedTenantSchema)
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let invitedUserId: string | null = null;
+    let committed = false;
+    let boundary = "fonction serveur";
+    try {
+      boundary = "redirection";
+      let redirectTo: string;
+      try {
+        redirectTo = getPasswordRedirectUrl();
+      } catch (error) {
+        logTenantInvitationBoundary("Redirection refusée", error);
+        throw error;
+      }
+      boundary = "invitation Auth";
+      const invitation = await atTenantInvitationBoundary("Invitation Supabase Auth", () =>
+        supabaseAdmin.auth.admin.inviteUserByEmail(data.adminEmail, {
+        data: { full_name: data.adminEmail.split("@")[0] },
+        redirectTo,
+      }));
+      if (invitation.error || !invitation.data.user) {
+        const authError = invitation.error ?? new Error("Invitation non créée");
+        logTenantInvitationBoundary("Invitation Supabase Auth", authError);
+        throw authError;
+      }
+      invitedUserId = invitation.data.user.id;
+
+      boundary = "rpc";
+      const { data: tenantId, error } = await atTenantInvitationBoundary("RPC PostgreSQL", () => (supabaseAdmin as any).rpc(
+        "create_tenant_by_super_admin_invitation",
+        {
+          requested_company_name: data.companyName,
+          requested_admin_email: data.adminEmail,
+          requested_admin_user_id: invitedUserId,
+          requested_actor_id: context.userId,
+          requested_billing_cycle: data.billingCycle,
+          requested_duration_days: data.durationDays,
+          requested_module_ids: data.moduleIds,
+        },
+      ));
+      if (error) {
+        logTenantInvitationBoundary("RPC PostgreSQL", error, { invitedUserId });
+        throw error;
+      }
+      committed = true;
+      boundary = "finalisation Auth";
+      const { data: tenant, error: tenantError } = await atTenantInvitationBoundary(
+        "Finalisation Auth (lecture du tenant)",
+        () => supabaseAdmin.from("tenants").select("slug").eq("id", tenantId as string).single(),
+      );
+      if (tenantError) {
+        logTenantInvitationBoundary("Finalisation Auth (lecture du tenant)", tenantError, { tenantId });
+        throw tenantError;
+      }
+      const metadataUpdate = await atTenantInvitationBoundary("Finalisation Auth (métadonnées)", () =>
+        supabaseAdmin.auth.admin.updateUserById(invitedUserId!, {
+          user_metadata: { tenant_slug: tenant.slug },
+        }));
+      if (metadataUpdate.error) {
+        logTenantInvitationBoundary("Finalisation Auth (métadonnées)", metadataUpdate.error, { tenantId, invitedUserId });
+        throw metadataUpdate.error;
+      }
+      return { ok: true as const, tenantId: tenantId as string, loginUrl: `/login/${tenant.slug}` };
+    } catch (error) {
+      logTenantInvitationBoundary("Fonction serveur", error, { boundary, committed });
+      if (!committed && invitedUserId) {
+        const cleanup = await supabaseAdmin.auth.admin.deleteUser(invitedUserId);
+        if (cleanup.error) console.error("[SuperAdminTenantInvitation] Échec du nettoyage de l’invitation", cleanup.error);
+      }
+      return {
+        ok: false as const,
+        message: committed
+          ? "Le tenant a été créé, mais la finalisation de l’invitation a échoué. Actualisez la liste avant de réessayer."
+          : tenantInvitationMessage(error, boundary),
+      };
+    }
+  });
+
+export const resendSuperAdminTenantInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ tenantId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profiles, error } = await supabaseAdmin
+      .from("profiles")
+      .select("id, email, roles!inner(name, tenant_id)")
+      .eq("tenant_id", data.tenantId)
+      .eq("roles.name", "Administrateur")
+      .eq("roles.tenant_id", data.tenantId)
+      .limit(1);
+    if (error) throw new Error(formatSupabaseError(error));
+    const admin = profiles?.[0];
+    if (!admin?.id || !admin.email) throw new Error("Administrateur du tenant introuvable.");
+    await resendExistingAuthInvitation(supabaseAdmin.auth, {
+      userId: admin.id,
+      email: admin.email,
+      redirectTo: getPasswordRedirectUrl(),
+    });
+    return { sent: true };
   });
 
 const modulePackSchema = z.object({

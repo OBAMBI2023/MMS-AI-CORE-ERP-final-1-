@@ -9,22 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { sendPasswordRecoveryEmail } from "@/lib/password-recovery.server";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Adresse e-mail invalide"),
 });
 
 type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
-
-function getPasswordRecoveryRedirectUrl(): string {
-  const currentUrl = new URL(window.location.href);
-  if (currentUrl.protocol !== "http:" && currentUrl.protocol !== "https:") {
-    throw new Error("Origine de l’application non prise en charge");
-  }
-
-  return new URL("/reset-password", currentUrl.origin).toString();
-}
 
 export const Route = createFileRoute("/forgot-password")({
   component: ForgotPasswordPage,
@@ -42,9 +33,7 @@ function ForgotPasswordPage() {
   const sendResetEmail = async ({ email }: ForgotPasswordValues) => {
     setSubmitting(true);
     try {
-      const redirectTo = getPasswordRecoveryRedirectUrl();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-      if (error) console.error("Impossible d’envoyer l’e-mail de réinitialisation :", error);
+      await sendPasswordRecoveryEmail({ data: { email } });
     } catch (error) {
       console.error("Impossible d’envoyer l’e-mail de réinitialisation :", error);
     } finally {

@@ -25,7 +25,10 @@ import { getPlatformAdminAccess } from "@/lib/super-admin.server";
 import { getPartnerAdminAccess } from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { readEnvVar } from "@/integrations/supabase/env";
-import { handlePasswordRecoveryCallback } from "@/integrations/supabase/password-recovery";
+import { readRecoveryCallback } from "@/integrations/supabase/password-recovery-callback";
+import { isRecoveryRouteAllowed } from "@/integrations/supabase/password-recovery-callback";
+import { hasPasswordRecoveryContext } from "@/integrations/supabase/password-recovery";
+import { getTenantRouteAccess } from "@/lib/tenant-route-access.server";
 
 function getSiteOrigin() {
   const browserOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
@@ -38,13 +41,13 @@ function getSiteOrigin() {
     "VERCEL_PROJECT_PRODUCTION_URL",
     "VERCEL_URL",
   );
-  const candidate = browserOrigin ?? configuredOrigin ?? "http://localhost:3000";
+  const candidate = browserOrigin ?? configuredOrigin ?? "http://localhost";
   const absoluteCandidate = /^https?:\/\//i.test(candidate) ? candidate : `https://${candidate}`;
 
   try {
     return new URL(absoluteCandidate).origin;
   } catch {
-    return "http://localhost:3000";
+    return "http://localhost";
   }
 }
 
@@ -60,6 +63,10 @@ function isPartnerRoute(pathname: string) {
 
 function isLicenseRoute(pathname: string) {
   return pathname === "/licence";
+}
+
+function isPendingRoute(pathname: string) {
+  return pathname === "/demande-en-attente";
 }
 
 const publicRoutes = new Set([
@@ -143,13 +150,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       return;
     }
 
-    // Supabase may return recovery credentials on the configured Site URL
-    // (including in the hash). Normalize every recovery callback before the
-    // regular public/authenticated route guards can redirect elsewhere.
-    if (await handlePasswordRecoveryCallback()) {
-      if (location.pathname !== "/reset-password") {
-        throw redirect({ to: "/reset-password" });
-      }
+    // Supabase can consume an implicit hash as soon as its client is created.
+    // Move the untouched callback to its only authorized route first.
+    if (location.pathname !== "/reset-password" && readRecoveryCallback(window.location.href)) {
+      const target = `/reset-password${window.location.search}${window.location.hash}`;
+      window.location.replace(target);
+      return;
+    }
+
+    if (hasPasswordRecoveryContext() && !isRecoveryRouteAllowed(location.pathname)) {
+      throw redirect({ to: "/reset-password" });
+    }
+
+    // The reset page exclusively owns callback consumption. In particular, do
+    // not exchange or clean its one-time code/hash in the root guard.
+    if (location.pathname === "/reset-password") {
       return;
     }
 
@@ -169,6 +184,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     if (!session) {
       throw redirect({ to: "/login" });
     }
+
+    if (isPendingRoute(location.pathname)) return;
 
     if (session) {
       // La qualité de compte plateforme est vérifiée côté serveur avant toute
@@ -208,32 +225,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("tenant_id, status")
-        .eq("id", session.user.id)
-        .single();
-
-      if (
-        profileError ||
-        !profile?.tenant_id ||
-        profile.status === "suspended" ||
-        profile.status === "suspendu"
-      ) {
-        throw redirect({ to: "/licence" });
-      }
-
-      const { data: subscription, error: subscriptionError } = await supabase
-        .from("subscriptions")
-        .select("status")
-        .eq("tenant_id", profile.tenant_id)
-        .maybeSingle();
-
-      const subscriptionStatus = subscription ? String(subscription.status) : null;
-      const hasValidLicense = subscriptionStatus === "active" || subscriptionStatus === "trial";
-
-      if (subscriptionError || !hasValidLicense) {
-        throw redirect({ to: "/licence" });
+      const tenantAccess = await getTenantRouteAccess({ data: { pathname: location.pathname } });
+      if (!tenantAccess.allowed) {
+        if (["profile", "tenant", "license", "role"].includes(tenantAccess.reason)) {
+          throw redirect({ to: "/demande-en-attente" });
+        }
+        throw redirect({ to: "/403" });
       }
 
       const requiredModule = getRouteModule(location.pathname);
@@ -370,7 +367,7 @@ function RootComponent() {
       isPlatformRoute(location.pathname) || isPartnerRoute(location.pathname),
   });
   const isPublicArea = useLocation({
-    select: (location) => isPublicRoute(location.pathname),
+    select: (location) => isPublicRoute(location.pathname) || isPendingRoute(location.pathname),
   });
 
   useEffect(() => {

@@ -4,23 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import type { Json } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
-import { readEnvVar } from "@/integrations/supabase/env";
+import { getPasswordRedirectUrl } from "@/lib/app-url.server";
 import { resendExistingAuthInvitation } from "@/lib/partner-invitation";
 import { z } from "zod";
-
-function getInvitationRedirectUrl(): string {
-  const appUrl = readEnvVar("APP_URL");
-  if (!appUrl) {
-    throw new Error("APP_URL est requis pour construire l'URL de redirection de l'invitation.");
-  }
-
-  const redirectUrl = new URL("/reset-password", appUrl).toString();
-  console.info("[PartnerInvitation] URL de redirection construite", {
-    redirectUrl,
-    source: "APP_URL",
-  });
-  return redirectUrl;
-}
 
 export type PartnerTenant = {
   id: string;
@@ -97,6 +83,7 @@ export type AuthenticatedDestination =
   | "/super-admin"
   | "/partner"
   | "/app"
+  | "/demande-en-attente"
   | "/403";
 
 async function signCompanyAsset(
@@ -260,11 +247,12 @@ export const getAuthenticatedDestination = createServerFn({ method: "GET" })
 
     const { data: profile, error: profileError } = await context.supabase
       .from("profiles")
-      .select("id, tenant_id")
+      .select("id, tenant_id, status")
       .eq("id", context.userId)
       .maybeSingle();
     if (profileError) throw new Error(formatSupabaseError(profileError));
 
+    if (profile?.tenant_id && profile.status === "pending") return "/demande-en-attente";
     return profile?.tenant_id ? "/app" : "/403";
   });
 
@@ -531,7 +519,7 @@ export const createPartnerTrial = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await requirePartnerMembership(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const redirectTo = getInvitationRedirectUrl();
+    const redirectTo = getPasswordRedirectUrl();
     console.info("[PartnerInvitation] Envoi d'une invitation", { redirectTo });
     const authResult = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
       data: { full_name: data.managerName, phone: data.phone },
@@ -594,7 +582,7 @@ export const createPartnerTenant = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await requirePartnerMembership(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const redirectTo = getInvitationRedirectUrl();
+    const redirectTo = getPasswordRedirectUrl();
     console.info("[PartnerInvitation] Envoi d'une invitation", { redirectTo });
     const authResult = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
       data: { full_name: data.managerName, phone: data.phone },
@@ -675,7 +663,7 @@ export const resendPartnerTenantInvitation = createServerFn({ method: "POST" })
       throw new Error("Administrateur du tenant introuvable.");
     }
 
-    const redirectTo = getInvitationRedirectUrl();
+    const redirectTo = getPasswordRedirectUrl();
     console.info("[PartnerInvitation] Renvoi d'une invitation non consommée", {
       tenantId: data.tenantId,
       redirectTo,

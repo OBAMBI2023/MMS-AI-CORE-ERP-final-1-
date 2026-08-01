@@ -27,7 +27,7 @@ type LoginTenant = { id: string; name: string; logoUrl: string | null };
 const loginInputClassName =
   "login-field h-[60px] rounded-2xl border-slate-300 bg-white pl-12 pr-12 text-sm text-slate-900 caret-slate-900 shadow-sm shadow-slate-100 transition-all duration-200 placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-[#0F5BFF] focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-blue-500/10 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:caret-white dark:shadow-none dark:placeholder:text-slate-400 dark:hover:border-slate-500 dark:focus-visible:border-blue-400 dark:focus-visible:bg-slate-900 dark:focus-visible:ring-blue-400/20";
 
-async function getAuthenticatedHome(): Promise<"/app" | "/super-admin" | "/partner"> {
+async function getAuthenticatedHome(): Promise<"/app" | "/super-admin" | "/partner" | "/demande-en-attente"> {
   const destination = await getAuthenticatedDestination();
   return destination === "/403" ? "/app" : destination;
 }
@@ -117,6 +117,22 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
       if (error) {
         void logConnectionAttempt(values.email, "failure");
         throw error;
+      }
+
+      if (!data.session?.access_token || !data.session.refresh_token || !data.user) {
+        await supabase.auth.signOut();
+        void logConnectionAttempt(values.email, "failure");
+        throw new Error("La session de connexion est invalide. Veuillez réessayer.");
+      }
+
+      const {
+        data: { user: verifiedUser },
+        error: verificationError,
+      } = await supabase.auth.getUser(data.session.access_token);
+      if (verificationError || !verifiedUser || verifiedUser.id !== data.user.id) {
+        await supabase.auth.signOut();
+        void logConnectionAttempt(values.email, "failure");
+        throw new Error("La session de connexion n’a pas pu être vérifiée. Veuillez réessayer.");
       }
 
       if (tenantSlug) {

@@ -22,6 +22,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Mail,
   MoreHorizontal,
   Plus,
   ReceiptText,
@@ -60,6 +61,9 @@ import {
   savePartnerCreditPack,
   savePartnerOffer,
   validatePartnerPayment,
+  createInvitedTenant,
+  resendSuperAdminTenantInvitation,
+  activatePendingTrial,
   type AiSubscriptionStatus,
   type SubscriptionBillingCycle,
   type SuperAdminDashboard,
@@ -246,7 +250,7 @@ const navItems = [
   { label: "Journal", icon: ReceiptText, href: "#journal" },
 ] as const;
 
-function SidebarContent({ mobile = false }: { mobile?: boolean }) {
+function SidebarContent({ mobile = false, onCreateTenant }: { mobile?: boolean; onCreateTenant: () => void }) {
   const { pathname, hash } = useLocation();
   const isDashboardRoute = pathname === "/super-admin" || pathname === "/super-admin/";
 
@@ -291,8 +295,7 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
       <div className="space-y-3 border-t border-white/10 p-3">
         <Button
           className="h-10 w-full justify-start rounded-lg bg-white text-black shadow-[0_8px_30px_rgba(255,255,255,.08)] hover:bg-zinc-200"
-          disabled
-          title="Aucune action de création n'est configurée"
+          onClick={onCreateTenant}
         >
           <Plus className="size-4" />
           Créer un tenant
@@ -740,6 +743,7 @@ function TenantTable({
   const [moduleTenant, setModuleTenant] = useState<SuperAdminTenant | null>(null);
   const [aiTenant, setAiTenant] = useState<SuperAdminTenant | null>(null);
   const [deletionTenant, setDeletionTenant] = useState<SuperAdminTenant | null>(null);
+  const [activationTenant, setActivationTenant] = useState<SuperAdminTenant | null>(null);
   const [confirmationSlug, setConfirmationSlug] = useState("");
   const [deletionReason, setDeletionReason] = useState("");
   const [secondConfirmation, setSecondConfirmation] = useState(false);
@@ -817,6 +821,15 @@ function TenantTable({
       toast.success("Lien de connexion copié.");
     } catch {
       toast.error("Impossible de copier le lien de connexion.");
+    }
+  };
+  const resendInvitation = async (tenant: SuperAdminTenant) => {
+    try {
+      await resendSuperAdminTenantInvitation({ data: { tenantId: tenant.id } });
+      toast.success("Invitation renvoyée.");
+      await router.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible de renvoyer l’invitation.");
     }
   };
   const filtered = useMemo(() => {
@@ -908,6 +921,9 @@ function TenantTable({
                         >
                           {tenant.loginUrl}
                         </a>
+                        <Badge variant="outline" className="mt-1 text-[10px]">
+                          {{ sent: "Invitation envoyée", pending: "En attente d’activation", activated: "Compte activé", expired: "Invitation expirée", unavailable: "Statut indisponible" }[tenant.invitationStatus]}
+                        </Badge>
                       </div>
                     </div>
                   </TableCell>
@@ -989,9 +1005,14 @@ function TenantTable({
                       <DropdownMenuContent align="end" className="w-64 rounded-lg">
                         <DropdownMenuLabel>Actions du tenant</DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        {tenant.onboardingStatus === "pending_configuration" && <DropdownMenuItem onClick={() => setActivationTenant(tenant)}><ShieldCheck />Configurer et activer l’essai</DropdownMenuItem>}
                         <DropdownMenuItem onClick={() => void copyLoginUrl(tenant)}>
                           <ClipboardCopy />
                           Copier le lien de connexion
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled={!tenant.adminEmail || tenant.invitationStatus === "activated"} onClick={() => void resendInvitation(tenant)}>
+                          <Mail />
+                          Renvoyer l’invitation
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={!tenant.subscriptionId}
@@ -1196,6 +1217,7 @@ function TenantTable({
           if (!open) setAiTenant(null);
         }}
       />
+      <PendingActivationDialog tenant={activationTenant} packs={modulePacks} open={Boolean(activationTenant)} onOpenChange={(open) => { if (!open) setActivationTenant(null); }} />
     </Card>
   );
 }
@@ -1679,6 +1701,72 @@ function SubscriptionSummary({ data }: { data: SuperAdminDashboard["subscription
   );
 }
 
+function CreateTenantDialog({ open, onOpenChange, modules }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  modules: SuperAdminDashboard["modules"];
+}) {
+  const router = useRouter();
+  const [companyName, setCompanyName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [billingCycle, setBillingCycle] = useState<SubscriptionBillingCycle>("monthly");
+  const [durationDays, setDurationDays] = useState("30");
+  const [moduleIds, setModuleIds] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      const result = await createInvitedTenant({ data: {
+        companyName,
+        adminEmail,
+        billingCycle,
+        durationDays: Number(durationDays),
+        moduleIds,
+      } });
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Tenant créé et invitation envoyée.");
+      onOpenChange(false);
+      setCompanyName(""); setAdminEmail(""); setModuleIds([]);
+      await router.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible de créer le tenant.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogHeader>
+        <DialogTitle>Créer un tenant par invitation</DialogTitle>
+        <DialogDescription>Le client recevra un lien pour définir lui-même son mot de passe.</DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4">
+        <div className="space-y-2"><Label htmlFor="tenant-company">Entreprise</Label><Input id="tenant-company" value={companyName} onChange={(event) => setCompanyName(event.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="tenant-email">E-mail administrateur</Label><Input id="tenant-email" type="email" autoComplete="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} /></div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2"><Label>Offre</Label><Select value={billingCycle} onValueChange={(value) => setBillingCycle(value as SubscriptionBillingCycle)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="monthly">Mensuelle</SelectItem><SelectItem value="quarterly">Trimestrielle</SelectItem><SelectItem value="yearly">Annuelle</SelectItem></SelectContent></Select></div>
+          <div className="space-y-2"><Label htmlFor="tenant-duration">Durée (jours)</Label><Input id="tenant-duration" type="number" min="1" max="3650" value={durationDays} onChange={(event) => setDurationDays(event.target.value)} /></div>
+        </div>
+        <div className="space-y-2"><Label>Modules</Label><div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">{modules.filter((module) => module.is_active).map((module) => <label key={module.id} className="flex items-center gap-2 text-sm"><Checkbox checked={moduleIds.includes(module.id)} onCheckedChange={(checked) => setModuleIds((current) => checked ? [...current, module.id] : current.filter((id) => id !== module.id))} />{module.name}</label>)}</div></div>
+      </div>
+      <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Annuler</Button><Button onClick={() => void submit()} disabled={submitting || companyName.trim().length < 2 || !adminEmail.includes("@") || Number(durationDays) < 1}>{submitting ? "Création…" : "Créer et inviter"}</Button></DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}
+
+function PendingActivationDialog({ tenant, packs, open, onOpenChange }: { tenant: SuperAdminTenant | null; packs: SuperAdminModulePack[]; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const router = useRouter(); const [packId,setPackId]=useState<string>(""); const [moduleIds,setModuleIds]=useState<string[]>([]); const [cycle,setCycle]=useState<SubscriptionBillingCycle>("monthly"); const [days,setDays]=useState("3"); const [amount,setAmount]=useState("0"); const [busy,setBusy]=useState(false);
+  useEffect(()=>{if(!tenant)return;const suggested=packs.find(p=>p.code===tenant.suggestedPackCode);setPackId(suggested?.id??"");setModuleIds(suggested?.moduleIds??[]);},[tenant,packs]);
+  const choosePack=(id:string)=>{setPackId(id);setModuleIds(packs.find(p=>p.id===id)?.moduleIds??[])};
+  const submit=async()=>{if(!tenant)return;setBusy(true);try{await activatePendingTrial({data:{tenantId:tenant.id,packId:packId||null,moduleIds,billingCycle:cycle,durationDays:Number(days),amount:Number(amount)}});toast.success("Essai activé.");onOpenChange(false);await router.invalidate();}catch(e){toast.error(e instanceof Error?e.message:"Activation impossible.")}finally{setBusy(false)}};
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Configurer et activer {tenant?.name}</DialogTitle><DialogDescription>Activité : {tenant?.activity??"Non renseignée"}. L’essai commence à la validation.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label>Pack suggéré</Label><Select value={packId} onValueChange={choosePack}><SelectTrigger><SelectValue placeholder="Choisir un pack"/></SelectTrigger><SelectContent>{packs.filter(p=>p.is_active).map(p=><SelectItem key={p.id} value={p.id}>{p.name}{p.code===tenant?.suggestedPackCode?" — suggéré":""}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Modules</Label>{tenant?.modules.map(m=><label key={m.id} className="flex items-center gap-2 text-sm"><Checkbox checked={moduleIds.includes(m.id)} onCheckedChange={checked=>setModuleIds(v=>checked?[...v,m.id]:v.filter(id=>id!==m.id))}/>{m.name}</label>)}</div><div className="grid grid-cols-3 gap-3"><div><Label>Offre</Label><Select value={cycle} onValueChange={v=>setCycle(v as SubscriptionBillingCycle)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="monthly">Mensuelle</SelectItem><SelectItem value="quarterly">Trimestrielle</SelectItem><SelectItem value="yearly">Annuelle</SelectItem></SelectContent></Select></div><div><Label>Durée (jours)</Label><Input type="number" min="1" value={days} onChange={e=>setDays(e.target.value)}/></div><div><Label>Montant</Label><Input type="number" min="0" value={amount} onChange={e=>setAmount(e.target.value)}/></div></div></div><DialogFooter><Button variant="outline" onClick={()=>onOpenChange(false)}>Annuler</Button><Button disabled={busy||moduleIds.length===0||Number(days)<1} onClick={()=>void submit()}>{busy?"Activation…":"Valider et démarrer"}</Button></DialogFooter></DialogContent></Dialog>;
+}
+
 export function SuperAdminDashboardView({
   data,
   onSignOut,
@@ -1687,6 +1775,7 @@ export function SuperAdminDashboardView({
   onSignOut: () => Promise<void>;
 }) {
   const [tenantQuery, setTenantQuery] = useState("");
+  const [createTenantOpen, setCreateTenantOpen] = useState(false);
   const dashboard = useMemo(() => normalizeDashboardData(data), [data]);
   const tenantDistribution = [
     { name: "Actifs", value: dashboard.kpis.activeTenants, color: "#2563EB" },
@@ -1704,7 +1793,7 @@ export function SuperAdminDashboardView({
   return (
     <div className="min-h-screen bg-muted/30 text-foreground dark:bg-background">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] lg:block">
-        <SidebarContent />
+        <SidebarContent onCreateTenant={() => setCreateTenantOpen(true)} />
       </aside>
 
       <div className="lg:pl-[248px]">
@@ -1720,7 +1809,7 @@ export function SuperAdminDashboardView({
                 </SheetTrigger>
                 <SheetContent side="left" className="w-[280px] border-0 p-0 [&>button]:text-white">
                   <SheetTitle className="sr-only">Navigation Super Admin</SheetTitle>
-                  <SidebarContent mobile />
+                  <SidebarContent mobile onCreateTenant={() => setCreateTenantOpen(true)} />
                 </SheetContent>
               </Sheet>
               <BrandLogo context="mobile" className="sm:hidden" />
@@ -1958,6 +2047,7 @@ export function SuperAdminDashboardView({
           />
           <SubscriptionSummary data={dashboard.subscriptions} />
         </main>
+        <CreateTenantDialog open={createTenantOpen} onOpenChange={setCreateTenantOpen} modules={dashboard.modules} />
       </div>
     </div>
   );

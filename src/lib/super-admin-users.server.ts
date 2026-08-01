@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { formatSupabaseError } from "@/lib/supabase-error";
+import { getPasswordRedirectUrl } from "@/lib/app-url.server";
 
 const PAGE_SIZE = 30;
 const statusSchema = z.enum(["active", "suspended", "archived"]);
@@ -25,10 +26,6 @@ const mutationSchema = z.object({
 
 const resetPasswordSchema = z.object({
   userId: z.string().uuid(),
-  redirectTo: z.string().url().refine((value) => {
-    const url = new URL(value);
-    return ["http:", "https:"].includes(url.protocol) && url.pathname === "/reset-password";
-  }, "URL de redirection de réinitialisation invalide."),
 });
 
 type RelatedRow = { id: string; name: string };
@@ -338,7 +335,7 @@ export const sendSuperAdminPasswordReset = createServerFn({ method: "POST" })
 
     const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(
       authResult.user.email,
-      { redirectTo: data.redirectTo },
+      { redirectTo: getPasswordRedirectUrl() },
     );
     if (resetError) throw new Error(formatSupabaseError(resetError));
     await writeAudit(

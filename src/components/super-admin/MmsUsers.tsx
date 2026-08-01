@@ -98,7 +98,6 @@ export function MmsUsersView() {
       if (pending.action === "reset") {
         await sendSuperAdminPasswordReset({ data: {
           userId: pending.user.id,
-          redirectTo: new URL("/reset-password", window.location.origin).toString(),
         } });
         toast.success(`E-mail de réinitialisation envoyé à ${pending.user.email}.`);
       } else {

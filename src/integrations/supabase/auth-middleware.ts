@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { readEnvVar } from "./env";
 import { isAccessTokenRevoked, isProfileAccessBlocked } from "@/lib/profile-access";
+import { readBearerToken, readJwtIssuedAt } from "./auth-token";
 
 export class AuthHttpError extends Error {
   statusCode: 401 | 403;
@@ -77,7 +78,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       throw new AuthHttpError(401, "Unauthorized: Only Bearer tokens are supported");
     }
 
-    const token = authHeader.replace("Bearer ", "");
+    const token = readBearerToken(authHeader);
     if (!token) {
       throw new AuthHttpError(401, "Unauthorized: No token provided");
     }
@@ -100,19 +101,20 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       },
     });
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
+    // Validate against this project's Auth server. This verifies the JWT and
+    // guarantees that the configured URL/key accept the project-issued token.
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
+    if (error || !user) {
       throw new AuthHttpError(401, "Unauthorized: Invalid token");
-    }
-
-    if (!data.claims.sub) {
-      throw new AuthHttpError(401, "Unauthorized: No user ID found in token");
     }
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("status, sessions_revoked_at")
-      .eq("id", data.claims.sub)
+      .eq("id", user.id)
       .maybeSingle();
     if (profileError) {
       throw new AuthHttpError(403, "Impossible de vérifier l’accès à ce compte.");
@@ -121,7 +123,8 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       throw new AuthHttpError(403, "Ce compte est suspendu ou archivé.");
     }
 
-    const issuedAt = typeof data.claims.iat === "number" ? data.claims.iat : null;
+    // The payload is inspected only after getUser(token) authenticated it.
+    const issuedAt = readJwtIssuedAt(token);
     if (isAccessTokenRevoked(issuedAt, profile?.sessions_revoked_at)) {
       throw new AuthHttpError(401, "Cette session a été révoquée. Veuillez vous reconnecter.");
     }
@@ -129,8 +132,8 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
     return next({
       context: {
         supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
+        userId: user.id,
+        user,
       },
     });
   },

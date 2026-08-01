@@ -9,11 +9,12 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "test": "node --test src/lib/catalog-settings.test.ts src/lib/preserve-auth-session.test.ts src/lib/tenant-login-access.test.ts src/lib/partner-invitation.test.ts src/lib/company-assets-security.test.ts src/lib/signed-url-lease.test.ts src/lib/profile-access.test.ts scripts/migrate-legacy-company-assets.test.mjs",
+    "test": "node --test src/integrations/supabase/auth-token.test.ts src/lib/catalog-settings.test.ts src/lib/preserve-auth-session.test.ts src/lib/tenant-login-access.test.ts src/lib/partner-invitation.test.ts src/lib/company-assets-security.test.ts src/lib/signed-url-lease.test.ts src/lib/profile-access.test.ts src/lib/supabase-error.test.ts src/lib/tenant-route-access.test.ts src/lib/tenant-rpc-security.test.ts src/lib/public-trial-policy.test.ts src/lib/privileged-route-guards.test.ts src/integrations/supabase/password-recovery.test.ts scripts/migrate-legacy-company-assets.test.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@getbrevo/brevo": "^6.0.2",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -80,7 +81,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "eslint": "^9.32.0",
+    "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
     "eslint-plugin-react-hooks": "^5.2.0",
