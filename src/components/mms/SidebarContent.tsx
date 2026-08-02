@@ -19,6 +19,7 @@ import {
   ContactRound,
   ChartNoAxesCombined,
   Settings2,
+  Wrench,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -47,6 +48,7 @@ const items = [
   { icon: Hotel, label: "Tableau de bord", to: "/hotel" },
   { icon: CalendarDays, label: "Réservations", to: "/hotel/reservations" },
   { icon: BedDouble, label: "Logements", to: "/hotel/chambres" },
+  { icon: Wrench, label: "Prestataires", to: "/hotel/prestataires" },
   { icon: ContactRound, label: "Voyageurs", to: "/hotel/voyageurs" },
   { icon: ChartNoAxesCombined, label: "Rapports", to: "/hotel/rapports" },
   { icon: Settings2, label: "Paramètres", to: "/hotel/parametres" },
@@ -57,11 +59,23 @@ const hotelPaths = new Set([
   "/hotel/reservations",
   "/hotel/logements",
   "/hotel/chambres",
+  "/hotel/prestataires",
   "/hotel/voyageurs",
   "/depenses",
   "/hotel/rapports",
   "/hotel/parametres",
 ]);
+
+const hotelNavigationOrder = [
+  "/hotel",
+  "/hotel/reservations",
+  "/hotel/chambres",
+  "/hotel/voyageurs",
+  "/hotel/prestataires",
+  "/depenses",
+  "/hotel/rapports",
+  "/hotel/parametres",
+] as const;
 
 export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -87,6 +101,10 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
       return role === "Administrateur" || permissions.includes(requiredPermission);
     }
     return true;
+  }).sort((left, right) => {
+    if (!isHotel) return 0;
+    return hotelNavigationOrder.indexOf(left.to as (typeof hotelNavigationOrder)[number]) -
+      hotelNavigationOrder.indexOf(right.to as (typeof hotelNavigationOrder)[number]);
   });
 
   return (
@@ -94,6 +112,7 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
       {filteredItems.map((it, idx) => {
         const active =
           pathname === it.to ||
+          (it.to !== "/hotel" && pathname.startsWith(`${it.to}/`)) ||
           (it.to === "/parametres" && pathname.startsWith("/settings/"));
 
         return (
