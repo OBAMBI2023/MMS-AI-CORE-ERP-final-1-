@@ -48,5 +48,6 @@ export function usePermissions() {
       };
     },
     enabled: !loading && Boolean(tenantId),
+    staleTime: 5 * 60_000,
   });
 }

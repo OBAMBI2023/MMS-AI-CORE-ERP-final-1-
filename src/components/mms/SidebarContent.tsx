@@ -100,6 +100,7 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
           <Link
             key={`${it.label}-${idx}`}
             to={it.to}
+            preload="intent"
             onClick={onItemClick}
             className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/75 transition-colors hover:text-white ${isHotel ? "hover:bg-white/5" : ""}`}
           >

@@ -17,12 +17,14 @@ test("un utilisateur tenant ne suffit pas pour les routes platform ou partner", 
 });
 
 test("le garde plateforme est résolu avant tout accès tenant", () => {
-  const platformGuard = rootRoute.indexOf("await getPlatformAdminAccess()");
-  const tenantGuard = rootRoute.indexOf("await getTenantRouteAccess(");
+  const platformGuard = rootRoute.indexOf('["route-access", identityKey, "platform-admin"]');
+  const tenantGuard = rootRoute.indexOf('["route-access", identityKey, "tenant", location.pathname]');
 
   assert.notEqual(platformGuard, -1);
   assert.notEqual(tenantGuard, -1);
   assert.ok(platformGuard < tenantGuard);
+  assert.match(rootRoute, /queryFn: getPlatformAdminAccess/);
+  assert.match(rootRoute, /queryFn: \(\) => getTenantRouteAccess/);
   assert.match(
     rootRoute,
     /if \(isPlatformAdmin\) \{[\s\S]*if \(!isPlatformRoute\(location\.pathname\)[\s\S]*return;[\s\S]*const \{ isPartnerAdmin \}/,

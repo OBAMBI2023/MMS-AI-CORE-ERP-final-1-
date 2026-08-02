@@ -13,9 +13,6 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { hasPermission } from "@/lib/auth";
-import { routePermissions } from "@/lib/route-permissions";
-import { canAccessParties } from "@/lib/party-access";
 import { getRouteModule } from "@/lib/route-modules";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TenantProvider } from "@/providers/TenantProvider";
@@ -144,8 +141,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+const ACCESS_STALE_TIME = 60_000;
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async ({ location, context }) => {
     if (typeof window === "undefined") {
       return;
     }
@@ -185,7 +184,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     if (session) {
       // La qualité de compte plateforme est vérifiée côté serveur avant toute
       // lecture de profil, de tenant ou de permission RBAC.
-      const { isPlatformAdmin } = await getPlatformAdminAccess();
+      const identityKey = session.user.id;
+      const { isPlatformAdmin } = await context.queryClient.ensureQueryData({
+        queryKey: ["route-access", identityKey, "platform-admin"],
+        queryFn: getPlatformAdminAccess,
+        staleTime: ACCESS_STALE_TIME,
+      });
       if (isPlatformAdmin) {
         const catalogTenantId = new URLSearchParams(location.searchStr).get("tenantId");
         const isTenantCatalogView =
@@ -200,7 +204,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         return;
       }
 
-      const { isPartnerAdmin } = await getPartnerAdminAccess();
+      const { isPartnerAdmin } = await context.queryClient.ensureQueryData({
+        queryKey: ["route-access", identityKey, "partner-admin"],
+        queryFn: getPartnerAdminAccess,
+        staleTime: ACCESS_STALE_TIME,
+      });
       if (isPartnerAdmin) {
         if (!isPartnerRoute(location.pathname)) {
           throw redirect({ to: "/partner" });
@@ -220,7 +228,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         return;
       }
 
-      const tenantAccess = await getTenantRouteAccess({ data: { pathname: location.pathname } });
+      const tenantAccess = await context.queryClient.ensureQueryData({
+        queryKey: ["route-access", identityKey, "tenant", location.pathname],
+        queryFn: () => getTenantRouteAccess({ data: { pathname: location.pathname } }),
+        staleTime: ACCESS_STALE_TIME,
+      });
       if (!tenantAccess.allowed) {
         if (tenantAccess.reason === "license") {
           throw redirect({ to: "/abonnement-expire" });
@@ -244,57 +256,39 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
       const requiredModule = getRouteModule(location.pathname);
       if (requiredModule) {
-        const { data: moduleEnabled, error: moduleError } = await supabase.rpc(
-          "current_user_module_enabled",
-          { requested_code: requiredModule },
-        );
+        const { moduleEnabled, moduleError } = await context.queryClient.ensureQueryData({
+          queryKey: ["route-access", identityKey, "module", requiredModule],
+          queryFn: async () => {
+            const { data, error } = await supabase.rpc("current_user_module_enabled", {
+              requested_code: requiredModule,
+            });
+            return { moduleEnabled: data, moduleError: error };
+          },
+          staleTime: ACCESS_STALE_TIME,
+        });
         if (moduleError || !moduleEnabled) {
           throw redirect({ to: "/403" });
         }
       }
 
       if (["/stock", "/achats", "/fournisseurs"].includes(location.pathname)) {
-        const { data: catalogRouteAllowed, error: catalogRouteError } = await supabase.rpc(
-          "current_user_catalog_route_enabled",
-          { requested_path: location.pathname },
-        );
+        const { catalogRouteAllowed, catalogRouteError } = await context.queryClient.ensureQueryData({
+          queryKey: ["route-access", identityKey, "catalog", location.pathname],
+          queryFn: async () => {
+            const { data, error } = await supabase.rpc("current_user_catalog_route_enabled", {
+              requested_path: location.pathname,
+            });
+            return { catalogRouteAllowed: data, catalogRouteError: error };
+          },
+          staleTime: ACCESS_STALE_TIME,
+        });
         if (catalogRouteError || !catalogRouteAllowed) {
           throw redirect({ to: "/403" });
         }
       }
 
-      const requiredPermission =
-        tenantAccess.platformType === "HOTEL" && location.pathname === "/depenses"
-          ? "hotel.expenses.view"
-          : routePermissions[location.pathname];
-      if (requiredPermission) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("roles(name)")
-          .eq("id", session.user.id)
-          .single();
-
-        const roleName = profile?.roles?.name;
-
-        // Logic fix:
-        // Use the new permission-based check to verify if the user has the required permission.
-        // Admins are always authorized.
-        let isAuthorized = roleName === "Administrateur";
-        if (!isAuthorized) {
-          isAuthorized = await hasPermission(session.user.id, requiredPermission);
-        }
-
-        if (location.pathname === "/clients" || location.pathname === "/fournisseurs") {
-          const permissions = isAuthorized ? [requiredPermission] : [];
-          isAuthorized = canAccessParties(roleName, permissions);
-        }
-
-        if (!isAuthorized) {
-          // Ne pas renvoyer vers le Dashboard : un rôle sans dashboard.view
-          // y serait immédiatement refusé et provoquerait une boucle.
-          throw redirect({ to: "/403" });
-        }
-      }
+      // The server decision already checked the permission against the
+      // tenant-scoped role; repeating it here caused two extra reads.
     }
   },
   head: () => ({
@@ -381,13 +375,18 @@ function RootComponent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
+      if (["SIGNED_OUT", "USER_UPDATED"].includes(event)) {
+        // A user metadata update may represent a real tenant switch. Clear all
+        // cached tenant data so no query without a tenant key can leak across.
+        queryClient.clear();
+      }
       if (event === "SIGNED_OUT" && !isPublicRoute(window.location.pathname)) {
         navigate({ to: "/login", replace: true });
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

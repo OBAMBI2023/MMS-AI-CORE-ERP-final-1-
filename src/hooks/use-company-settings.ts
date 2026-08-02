@@ -17,6 +17,7 @@ export function useCompanySettings(tenantId?: string | null) {
       return data;
     },
     enabled: resolvedTenantId !== null,
+    staleTime: 5 * 60_000,
   });
 
   const { url: logoUrl, isLoading: logoLoading } = useSignedUrlState(

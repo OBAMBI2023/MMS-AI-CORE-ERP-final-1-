@@ -3,6 +3,7 @@ import { ArrowUpRight, ArrowDownRight, Minus, type LucideIcon } from "lucide-rea
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import type { SparkPoint } from "@/hooks/use-dashboard-data";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 
 export type KpiAccent =
   "primary" | "emerald" | "amber" | "violet" | "sky" | "rose" | "indigo" | "cyan";
@@ -81,7 +82,7 @@ export function DashboardKpiCard({
       whileHover={{ y: -3 }}
       className="h-full"
     >
-      <a href={route} className="block h-full group">
+      <Link to={route} preload="intent" className="block h-full group">
         <div className="relative h-full overflow-hidden rounded-2xl border border-border bg-card p-5 transition-shadow group-hover:shadow-lg group-hover:shadow-black/5">
           <div
             className={cn(
@@ -134,7 +135,7 @@ export function DashboardKpiCard({
             )}
           </div>
         </div>
-      </a>
+      </Link>
     </motion.div>
   );
 }

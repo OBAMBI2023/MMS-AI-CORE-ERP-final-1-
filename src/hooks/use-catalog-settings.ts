@@ -37,5 +37,6 @@ export function useCatalogSettings(requestedTenantId?: string) {
       return ensureCatalogSettings({ data: { tenantId } });
     },
     enabled: Boolean(tenantId) && (Boolean(requestedTenantId) || !loading),
+    staleTime: 5 * 60_000,
   });
 }

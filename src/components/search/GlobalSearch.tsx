@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { SearchModule } from "@/types/search";
+import { useNavigate } from "@tanstack/react-router";
 
 export function GlobalSearch({
   open,
@@ -31,6 +32,7 @@ export function GlobalSearch({
   onOpenChange: (open: boolean) => void;
 }) {
   const { query, setQuery, results, isLoading, history, clearHistory } = useGlobalSearch();
+  const navigate = useNavigate();
 
   const iconMap: Record<SearchModule, ReactElement> = {
     Clients: <Users className="h-4 w-4" />,
@@ -61,7 +63,7 @@ export function GlobalSearch({
 
   const go = (url: string) => {
     onOpenChange(false);
-    window.location.href = url;
+    void navigate({ to: url });
   };
 
   return (
