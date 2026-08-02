@@ -11,5 +11,6 @@ export interface Tenant {
   id: string;
   name?: string | null;
   business_activity?: string | null;
+  platform_type?: "ERP" | "HOTEL";
   [column: string]: unknown;
 }

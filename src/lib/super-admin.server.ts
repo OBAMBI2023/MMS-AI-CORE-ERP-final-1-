@@ -272,25 +272,29 @@ function remainingDays(end: string | null) {
   return Math.max(0, Math.ceil((new Date(end).getTime() - Date.now()) / 86_400_000));
 }
 
-async function assertSuperAdmin(supabase: SupabaseClient, userId: string) {
-  const { data, error } = await supabase
+async function readPlatformAdminMembership(userId: string) {
+  // Authentication and account status have already been validated by
+  // requireSupabaseAuth. Use the server-only client for this global membership
+  // lookup so access to the platform portal never depends on tenant RLS.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
     .from("platform_admins")
     .select("user_id")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) throw new Error(formatSupabaseError(error));
+  return data;
+}
+
+async function assertSuperAdmin(_supabase: SupabaseClient, userId: string) {
+  const data = await readPlatformAdminMembership(userId);
   if (!data) throw new Error("Accès refusé : super administrateur de plateforme requis.");
 }
 
 export const getPlatformAdminAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ isPlatformAdmin: boolean }> => {
-    const { data, error } = await context.supabase
-      .from("platform_admins")
-      .select("user_id")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    if (error) throw new Error(formatSupabaseError(error));
+    const data = await readPlatformAdminMembership(context.userId);
     return { isPlatformAdmin: Boolean(data) };
   });
 
@@ -746,6 +750,8 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
 
 const createInvitedTenantSchema = z.object({
   companyName: z.string().trim().min(2).max(120),
+  adminName: z.string().trim().min(2).max(120),
+  platformType: z.enum(["ERP", "HOTEL"]).default("ERP"),
   adminEmail: z.string().trim().email().max(254),
   billingCycle: z.enum(["monthly", "quarterly", "yearly"]),
   durationDays: z.number().int().min(1).max(3650),
@@ -806,7 +812,7 @@ export const createInvitedTenant = createServerFn({ method: "POST" })
       boundary = "invitation Auth";
       const invitation = await atTenantInvitationBoundary("Invitation Supabase Auth", () =>
         supabaseAdmin.auth.admin.inviteUserByEmail(data.adminEmail, {
-        data: { full_name: data.adminEmail.split("@")[0] },
+        data: { full_name: data.adminName },
         redirectTo,
       }));
       if (invitation.error || !invitation.data.user) {
@@ -817,13 +823,15 @@ export const createInvitedTenant = createServerFn({ method: "POST" })
       invitedUserId = invitation.data.user.id;
 
       boundary = "rpc";
-      const { data: tenantId, error } = await atTenantInvitationBoundary("RPC PostgreSQL", () => (supabaseAdmin as any).rpc(
-        "create_tenant_by_super_admin_invitation",
+      const { data: atomicResult, error } = await atTenantInvitationBoundary("RPC PostgreSQL atomique", () => (supabaseAdmin as any).rpc(
+        "create_invited_tenant_atomic",
         {
           requested_company_name: data.companyName,
+          requested_admin_name: data.adminName,
           requested_admin_email: data.adminEmail,
           requested_admin_user_id: invitedUserId,
           requested_actor_id: context.userId,
+          requested_platform_type: data.platformType,
           requested_billing_cycle: data.billingCycle,
           requested_duration_days: data.durationDays,
           requested_module_ids: data.moduleIds,
@@ -833,30 +841,40 @@ export const createInvitedTenant = createServerFn({ method: "POST" })
         logTenantInvitationBoundary("RPC PostgreSQL", error, { invitedUserId });
         throw error;
       }
+      // A successful RPC means every SQL write has committed atomically. From
+      // this point onward the Auth identity must never be deleted as cleanup.
       committed = true;
-      boundary = "finalisation Auth";
-      const { data: tenant, error: tenantError } = await atTenantInvitationBoundary(
-        "Finalisation Auth (lecture du tenant)",
-        () => supabaseAdmin.from("tenants").select("slug").eq("id", tenantId as string).single(),
-      );
-      if (tenantError) {
-        logTenantInvitationBoundary("Finalisation Auth (lecture du tenant)", tenantError, { tenantId });
-        throw tenantError;
+      const tenantId = atomicResult?.tenantId;
+      const tenantSlug = atomicResult?.slug;
+      if (!z.string().uuid().safeParse(tenantId).success || typeof tenantSlug !== "string" || !tenantSlug) {
+        console.error("[SuperAdminTenantInvitation] ERREUR CRITIQUE: résultat RPC invalide", { invitedUserId, atomicResult });
+        throw new Error("La transaction a retourné un résultat invalide.");
       }
+      boundary = "finalisation Auth";
       const metadataUpdate = await atTenantInvitationBoundary("Finalisation Auth (métadonnées)", () =>
         supabaseAdmin.auth.admin.updateUserById(invitedUserId!, {
-          user_metadata: { tenant_slug: tenant.slug },
+          user_metadata: { tenant_slug: tenantSlug },
         }));
       if (metadataUpdate.error) {
         logTenantInvitationBoundary("Finalisation Auth (métadonnées)", metadataUpdate.error, { tenantId, invitedUserId });
         throw metadataUpdate.error;
       }
-      return { ok: true as const, tenantId: tenantId as string, loginUrl: `/login/${tenant.slug}` };
+      return { ok: true as const, tenantId: tenantId as string, loginUrl: `/login/${tenantSlug}` };
     } catch (error) {
       logTenantInvitationBoundary("Fonction serveur", error, { boundary, committed });
       if (!committed && invitedUserId) {
-        const cleanup = await supabaseAdmin.auth.admin.deleteUser(invitedUserId);
-        if (cleanup.error) console.error("[SuperAdminTenantInvitation] Échec du nettoyage de l’invitation", cleanup.error);
+        const { data: unexpectedProfile, error: verificationError } = await supabaseAdmin
+          .from("profiles").select("tenant_id").eq("id", invitedUserId).maybeSingle();
+        if (verificationError || unexpectedProfile?.tenant_id) {
+          console.error("[SuperAdminTenantInvitation] ERREUR CRITIQUE: données SQL détectées après échec RPC; utilisateur Auth conservé", {
+            invitedUserId,
+            tenantId: unexpectedProfile?.tenant_id ?? null,
+            verificationError: verificationError ? extractErrorDiagnostic(verificationError) : null,
+          });
+        } else {
+          const cleanup = await supabaseAdmin.auth.admin.deleteUser(invitedUserId);
+          if (cleanup.error) console.error("[SuperAdminTenantInvitation] Échec du nettoyage de l’invitation", cleanup.error);
+        }
       }
       return {
         ok: false as const,

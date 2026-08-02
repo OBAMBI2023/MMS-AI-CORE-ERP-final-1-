@@ -1708,7 +1708,9 @@ function CreateTenantDialog({ open, onOpenChange, modules }: {
 }) {
   const router = useRouter();
   const [companyName, setCompanyName] = useState("");
+  const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [platformType, setPlatformType] = useState<"ERP" | "HOTEL">("ERP");
   const [billingCycle, setBillingCycle] = useState<SubscriptionBillingCycle>("monthly");
   const [durationDays, setDurationDays] = useState("30");
   const [moduleIds, setModuleIds] = useState<string[]>([]);
@@ -1719,6 +1721,8 @@ function CreateTenantDialog({ open, onOpenChange, modules }: {
     try {
       const result = await createInvitedTenant({ data: {
         companyName,
+        adminName,
+        platformType,
         adminEmail,
         billingCycle,
         durationDays: Number(durationDays),
@@ -1730,7 +1734,7 @@ function CreateTenantDialog({ open, onOpenChange, modules }: {
       }
       toast.success("Tenant créé et invitation envoyée.");
       onOpenChange(false);
-      setCompanyName(""); setAdminEmail(""); setModuleIds([]);
+      setCompanyName(""); setAdminName(""); setAdminEmail(""); setModuleIds([]);
       await router.invalidate();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impossible de créer le tenant.");
@@ -1747,14 +1751,16 @@ function CreateTenantDialog({ open, onOpenChange, modules }: {
       </DialogHeader>
       <div className="space-y-4">
         <div className="space-y-2"><Label htmlFor="tenant-company">Entreprise</Label><Input id="tenant-company" value={companyName} onChange={(event) => setCompanyName(event.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="tenant-admin-name">Nom de l’administrateur</Label><Input id="tenant-admin-name" value={adminName} onChange={(event) => setAdminName(event.target.value)} /></div>
         <div className="space-y-2"><Label htmlFor="tenant-email">E-mail administrateur</Label><Input id="tenant-email" type="email" autoComplete="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} /></div>
+        <div className="space-y-2"><Label>Plateforme</Label><Select value={platformType} onValueChange={(value) => setPlatformType(value as "ERP" | "HOTEL")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ERP">ERP Entreprise</SelectItem><SelectItem value="HOTEL">Hôtel &amp; Résidences</SelectItem></SelectContent></Select></div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2"><Label>Offre</Label><Select value={billingCycle} onValueChange={(value) => setBillingCycle(value as SubscriptionBillingCycle)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="monthly">Mensuelle</SelectItem><SelectItem value="quarterly">Trimestrielle</SelectItem><SelectItem value="yearly">Annuelle</SelectItem></SelectContent></Select></div>
           <div className="space-y-2"><Label htmlFor="tenant-duration">Durée (jours)</Label><Input id="tenant-duration" type="number" min="1" max="3650" value={durationDays} onChange={(event) => setDurationDays(event.target.value)} /></div>
         </div>
         <div className="space-y-2"><Label>Modules</Label><div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">{modules.filter((module) => module.is_active).map((module) => <label key={module.id} className="flex items-center gap-2 text-sm"><Checkbox checked={moduleIds.includes(module.id)} onCheckedChange={(checked) => setModuleIds((current) => checked ? [...current, module.id] : current.filter((id) => id !== module.id))} />{module.name}</label>)}</div></div>
       </div>
-      <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Annuler</Button><Button onClick={() => void submit()} disabled={submitting || companyName.trim().length < 2 || !adminEmail.includes("@") || Number(durationDays) < 1}>{submitting ? "Création…" : "Créer et inviter"}</Button></DialogFooter>
+      <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Annuler</Button><Button onClick={() => void submit()} disabled={submitting || companyName.trim().length < 2 || adminName.trim().length < 2 || !adminEmail.includes("@") || Number(durationDays) < 1}>{submitting ? "Création…" : "Créer et inviter"}</Button></DialogFooter>
     </DialogContent>
   </Dialog>;
 }

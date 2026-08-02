@@ -31,16 +31,16 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
       if (/already|registered|exists/i.test(authError?.message ?? "")) throw new Error("Cette adresse e-mail est déjà utilisée.");
       throw new Error("Impossible de créer le compte pour le moment.");
     }
-    const { data: tenantId, error } = await (supabaseAdmin as any).rpc("create_pending_trial_request", {
+    const { data: tenantId, error } = await (supabaseAdmin as any).rpc("create_public_trial_workspace", {
       p_user_id: created.user.id, p_company_name: data.companyName, p_full_name: data.adminName,
-      p_activity: data.activity, p_email: data.email, p_phone: data.phone,
+      p_email: data.email, p_phone: data.phone, p_platform_type: data.platformType,
     });
     if (error) {
       await supabaseAdmin.auth.admin.deleteUser(created.user.id);
-      if (error.code === "23505") throw new Error("Cette entreprise ou cette adresse e-mail possède déjà une demande.");
+      if (error.code === "23505") throw new Error(error.message || "Un essai existe déjà pour cet e-mail ou ce téléphone.");
       throw new Error(error.message || "Impossible de créer la demande.");
     }
     const { data: session, error: sessionError } = await supabaseAdmin.auth.signInWithPassword({ email: data.email, password: data.password });
-    if (sessionError || !session.session) throw new Error("Demande créée. Connectez-vous pour suivre sa validation.");
-    return { ok: true as const, tenantId, accessToken: session.session.access_token, refreshToken: session.session.refresh_token };
+    if (sessionError || !session.session) throw new Error("Espace créé. Connectez-vous pour continuer.");
+    return { ok: true as const, tenantId, platformType: data.platformType, accessToken: session.session.access_token, refreshToken: session.session.refresh_token };
   });

@@ -62,7 +62,7 @@ function isPartnerRoute(pathname: string) {
 }
 
 function isLicenseRoute(pathname: string) {
-  return pathname === "/licence";
+  return pathname === "/licence" || pathname === "/abonnement-expire";
 }
 
 function isPendingRoute(pathname: string) {
@@ -172,11 +172,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       data: { session },
     } = await supabase.auth.getSession();
 
-    console.log("DEBUG: beforeLoad session check:", {
-      path: location.pathname,
-      session: !!session,
-    });
-
     if (isPublicRoute(location.pathname)) {
       return;
     }
@@ -227,10 +222,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
       const tenantAccess = await getTenantRouteAccess({ data: { pathname: location.pathname } });
       if (!tenantAccess.allowed) {
+        if (tenantAccess.reason === "license") {
+          throw redirect({ to: "/abonnement-expire" });
+        }
         if (["profile", "tenant", "license", "role"].includes(tenantAccess.reason)) {
           throw redirect({ to: "/demande-en-attente" });
         }
         throw redirect({ to: "/403" });
+      }
+
+      const isHotelPath =
+        location.pathname === "/hotel" ||
+        location.pathname.startsWith("/hotel/") ||
+        location.pathname === "/depenses";
+      if (tenantAccess.platformType === "HOTEL" && !isHotelPath) {
+        throw redirect({ to: "/hotel" });
+      }
+      if (tenantAccess.platformType === "ERP" && location.pathname.startsWith("/hotel")) {
+        throw redirect({ to: "/app" });
       }
 
       const requiredModule = getRouteModule(location.pathname);
@@ -278,11 +287,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         }
 
         if (!isAuthorized) {
-          console.log("DEBUG: Access denied for", {
-            role: roleName,
-            path: location.pathname,
-            requiredPermission,
-          });
           // Ne pas renvoyer vers le Dashboard : un rôle sans dashboard.view
           // y serait immédiatement refusé et provoquerait une boucle.
           throw redirect({ to: "/403" });

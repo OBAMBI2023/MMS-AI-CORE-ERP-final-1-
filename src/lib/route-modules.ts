@@ -15,6 +15,12 @@ export const routeModules: Record<string, string> = {
   "/settings/catalogue": "settings",
   "/settings/users": "users",
   "/utilisateurs": "users",
+  "/hotel/reservations": "hotel_reservations",
+  "/hotel/logements": "hotel_rooms",
+  "/hotel/voyageurs": "hotel_guests",
+  "/hotel/rapports": "hotel_reports",
+  "/hotel/parametres": "hotel_settings",
+  "/hotel": "hotel_dashboard",
 };
 
 export function getRouteModule(pathname: string) {

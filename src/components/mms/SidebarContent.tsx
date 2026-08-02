@@ -13,6 +13,12 @@ import {
   Boxes,
   Tags,
   Bot,
+  Hotel,
+  CalendarDays,
+  BedDouble,
+  ContactRound,
+  ChartNoAxesCombined,
+  Settings2,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -22,6 +28,7 @@ import { routeModules } from "@/lib/route-modules";
 import { canAccessParties } from "@/lib/party-access";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { catalogRouteEnabled } from "@/lib/catalog-settings";
+import { useTenant } from "@/providers/TenantProvider";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/app" },
@@ -37,18 +44,37 @@ const items = [
   { icon: Receipt, label: "Dépenses", to: "/depenses" },
   { icon: TrendingUp, label: "Rapports", to: "/rapports" },
   { icon: Settings, label: "Paramètres", to: "/parametres" },
+  { icon: Hotel, label: "Tableau de bord Hôtel", to: "/hotel" },
+  { icon: CalendarDays, label: "Réservations", to: "/hotel/reservations" },
+  { icon: BedDouble, label: "Chambres et logements", to: "/hotel/logements" },
+  { icon: ContactRound, label: "Clients / Voyageurs", to: "/hotel/voyageurs" },
+  { icon: ChartNoAxesCombined, label: "Rapports Hôtel", to: "/hotel/rapports" },
+  { icon: Settings2, label: "Paramètres Hôtel", to: "/hotel/parametres" },
 ] as const;
+
+const hotelPaths = new Set([
+  "/hotel",
+  "/hotel/reservations",
+  "/hotel/logements",
+  "/hotel/voyageurs",
+  "/depenses",
+  "/hotel/rapports",
+  "/hotel/parametres",
+]);
 
 export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data, isLoading } = usePermissions();
   const modulesQuery = useTenantModules();
   const catalogSettingsQuery = useCatalogSettings();
+  const { tenant } = useTenant();
+  const isHotel = tenant?.platform_type === "HOTEL";
   const permissions = data?.permissions || [];
   const role = data?.role;
 
   const filteredItems = items.filter((it) => {
     if (isLoading || modulesQuery.isLoading || catalogSettingsQuery.isLoading) return false;
+    if (isHotel !== hotelPaths.has(it.to)) return false;
     if (!catalogRouteEnabled(catalogSettingsQuery.data, it.to)) return false;
     const requiredModule = routeModules[it.to];
     if (requiredModule && !modulesQuery.data?.has(requiredModule)) return false;

@@ -9,6 +9,8 @@ import { UserMenu } from "./UserMenu";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useTheme } from "@/components/theme-provider";
 import { SidebarCompanyHeader } from "./SidebarCompanyHeader";
+import { useTenant } from "@/providers/TenantProvider";
+import { Hotel } from "lucide-react";
 
 export function AppShell({
   title,
@@ -24,12 +26,14 @@ export function AppShell({
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { logoUrl, isLoading } = useCompanySettings();
+  const { tenant } = useTenant();
+  const isHotel = tenant?.platform_type === "HOTEL";
 
   return (
-    <div className="flex h-screen w-full bg-background text-foreground">
+    <div className={`flex h-screen w-full text-foreground ${isHotel ? "bg-gradient-to-br from-amber-50/70 via-background to-emerald-50/60 dark:from-amber-950/10 dark:to-emerald-950/10" : "bg-background"}`}>
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-4 sm:gap-4 md:px-8 md:pb-4 md:pt-6">
+        <header className={`flex items-center justify-between gap-2 border-b px-4 py-4 sm:gap-4 md:px-8 md:pb-4 md:pt-6 ${isHotel ? "border-amber-200/60 bg-background/80 backdrop-blur-xl" : "border-border"}`}>
           <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild className="md:hidden">
@@ -54,6 +58,7 @@ export function AppShell({
               </SheetContent>
             </Sheet>
             <div className="hidden sm:block">
+              {isHotel && <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-400"><Hotel className="h-3.5 w-3.5" /> Hôtel &amp; Résidences</div>}
               <h1 className="text-xl font-bold tracking-tight md:text-2xl">{title}</h1>
               {subtitle && (
                 <p className="text-xs text-muted-foreground mt-1 md:text-sm">{subtitle}</p>

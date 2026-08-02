@@ -46,8 +46,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     try {
       // profiles/tenants are not present in the currently generated Database type.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      console.info("[TenantProvider] user.id", session.user.id);
-
       const profileResult = await (supabase as any)
         .from("profiles")
         .select("id, email, full_name, tenant_id, role_id, avatar_url")
@@ -55,8 +53,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       const { data: profileData, error: profileError, status: profileStatus } = profileResult;
 
-      console.info("[TenantProvider] Résultat complet de la requête profiles", profileResult);
-      console.info("[TenantProvider] Code HTTP Supabase profiles", profileStatus);
       if (profileError) {
         console.error("[TenantProvider] Erreur Supabase profiles", {
           code: profileError.code,
@@ -68,13 +64,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       const sessionTenant =
         session.user.app_metadata?.tenant_id ?? session.user.user_metadata?.tenant_id ?? null;
-      console.info("[TenantProvider] Résolution du tenant authentifié", {
-        user_id: session.user.id,
-        tenant_id: profileData?.tenant_id ?? null,
-        profile_tenant_id: profileData?.tenant_id ?? null,
-        session_tenant: sessionTenant,
-      });
-
       if (sequence !== loadSequence.current) return null;
       if (profileError || !profileData || !profileData.tenant_id) {
         const reason = profileError

@@ -1,0 +1,11 @@
+BEGIN;
+SELECT plan(7);
+SELECT has_function('public','get_hotel_report_export_data',ARRAY[]::text[]);
+SELECT ok(NOT has_function_privilege('anon','public.get_hotel_report_export_data()','EXECUTE'),'anonymous export is denied');
+SELECT ok(has_function_privilege('authenticated','public.get_hotel_report_export_data()','EXECUTE'),'authenticated callers reach guarded export');
+SELECT matches(pg_get_functiondef('public.get_hotel_report_export_data()'::regprocedure),'hotel.reports.export','export permission is mandatory');
+SELECT matches(pg_get_functiondef('public.get_hotel_report_export_data()'::regprocedure),'hotel_reports','reports module is mandatory');
+SELECT matches(pg_get_functiondef('public.get_hotel_report_export_data()'::regprocedure),'balance.tenant_id = target_tenant_id','reservations are tenant scoped');
+SELECT matches(pg_get_functiondef('public.get_hotel_report_export_data()'::regprocedure),'expense.tenant_id = target_tenant_id','expenses are tenant scoped');
+SELECT * FROM finish();
+ROLLBACK;

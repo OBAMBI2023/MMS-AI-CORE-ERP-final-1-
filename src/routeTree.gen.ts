@@ -9,172 +9,54 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VentesRouteImport } from './routes/ventes'
-import { Route as UtilisateursRouteImport } from './routes/utilisateurs'
-import { Route as TarifsRouteImport } from './routes/tarifs'
-import { Route as SuperAdminRouteImport } from './routes/super-admin'
-import { Route as StockRouteImport } from './routes/stock'
-import { Route as ServicesRouteImport } from './routes/services'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as RapportsRouteImport } from './routes/rapports'
-import { Route as PartnerLoginRouteImport } from './routes/partner-login'
-import { Route as PartnerAdminRouteImport } from './routes/partner-admin'
-import { Route as PartnerRouteImport } from './routes/partner'
-import { Route as ParametresRouteImport } from './routes/parametres'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as LicenceRouteImport } from './routes/licence'
-import { Route as JournalRouteImport } from './routes/journal'
-import { Route as FournisseursRouteImport } from './routes/fournisseurs'
-import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as FonctionnalitesRouteImport } from './routes/fonctionnalites'
-import { Route as EssaiGratuitRouteImport } from './routes/essai-gratuit'
-import { Route as DevisRouteImport } from './routes/devis'
-import { Route as DepensesRouteImport } from './routes/depenses'
-import { Route as DemoRouteImport } from './routes/demo'
-import { Route as DemandeEnAttenteRouteImport } from './routes/demande-en-attente'
-import { Route as ClientsRouteImport } from './routes/clients'
-import { Route as CategoriesRouteImport } from './routes/categories'
-import { Route as AchatsRouteImport } from './routes/achats'
-import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as R403RouteImport } from './routes/403'
+import { Route as AbonnementExpireRouteImport } from './routes/abonnement-expire'
+import { Route as AchatsRouteImport } from './routes/achats'
+import { Route as CategoriesRouteImport } from './routes/categories'
+import { Route as ClientsRouteImport } from './routes/clients'
+import { Route as DemandeEnAttenteRouteImport } from './routes/demande-en-attente'
+import { Route as DemoRouteImport } from './routes/demo'
+import { Route as DepensesRouteImport } from './routes/depenses'
+import { Route as DevisRouteImport } from './routes/devis'
+import { Route as EssaiGratuitRouteImport } from './routes/essai-gratuit'
+import { Route as FonctionnalitesRouteImport } from './routes/fonctionnalites'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as FournisseursRouteImport } from './routes/fournisseurs'
+import { Route as HotelRouteImport } from './routes/hotel'
+import { Route as JournalRouteImport } from './routes/journal'
+import { Route as LicenceRouteImport } from './routes/licence'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ParametresRouteImport } from './routes/parametres'
+import { Route as PartnerRouteImport } from './routes/partner'
+import { Route as PartnerAdminRouteImport } from './routes/partner-admin'
+import { Route as PartnerLoginRouteImport } from './routes/partner-login'
+import { Route as RapportsRouteImport } from './routes/rapports'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ServicesRouteImport } from './routes/services'
+import { Route as StockRouteImport } from './routes/stock'
+import { Route as SuperAdminRouteImport } from './routes/super-admin'
+import { Route as TarifsRouteImport } from './routes/tarifs'
+import { Route as UtilisateursRouteImport } from './routes/utilisateurs'
+import { Route as VentesRouteImport } from './routes/ventes'
 import { Route as AppIndexRouteImport } from './routes/app.index'
-import { Route as SuperAdminUsersRouteImport } from './routes/super-admin.users'
-import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
-import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.ia-platform'
-import { Route as SettingsUsersRouteImport } from './routes/settings.users'
-import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
-import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
-import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as AppSplatRouteImport } from './routes/app.$'
+import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
+import { Route as HotelLogementsRouteImport } from './routes/hotel.logements'
+import { Route as HotelParametresRouteImport } from './routes/hotel.parametres'
+import { Route as HotelRapportsRouteImport } from './routes/hotel.rapports'
+import { Route as HotelReservationsRouteImport } from './routes/hotel.reservations'
+import { Route as HotelVoyageursRouteImport } from './routes/hotel.voyageurs'
+import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
+import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
+import { Route as SettingsUsersRouteImport } from './routes/settings.users'
+import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.ia-platform'
+import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
+import { Route as SuperAdminUsersRouteImport } from './routes/super-admin.users'
 
-const VentesRoute = VentesRouteImport.update({
-  id: '/ventes',
-  path: '/ventes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UtilisateursRoute = UtilisateursRouteImport.update({
-  id: '/utilisateurs',
-  path: '/utilisateurs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TarifsRoute = TarifsRouteImport.update({
-  id: '/tarifs',
-  path: '/tarifs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SuperAdminRoute = SuperAdminRouteImport.update({
-  id: '/super-admin',
-  path: '/super-admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const StockRoute = StockRouteImport.update({
-  id: '/stock',
-  path: '/stock',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ServicesRoute = ServicesRouteImport.update({
-  id: '/services',
-  path: '/services',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RapportsRoute = RapportsRouteImport.update({
-  id: '/rapports',
-  path: '/rapports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PartnerLoginRoute = PartnerLoginRouteImport.update({
-  id: '/partner-login',
-  path: '/partner-login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PartnerAdminRoute = PartnerAdminRouteImport.update({
-  id: '/partner-admin',
-  path: '/partner-admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PartnerRoute = PartnerRouteImport.update({
-  id: '/partner',
-  path: '/partner',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ParametresRoute = ParametresRouteImport.update({
-  id: '/parametres',
-  path: '/parametres',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LicenceRoute = LicenceRouteImport.update({
-  id: '/licence',
-  path: '/licence',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const JournalRoute = JournalRouteImport.update({
-  id: '/journal',
-  path: '/journal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FournisseursRoute = FournisseursRouteImport.update({
-  id: '/fournisseurs',
-  path: '/fournisseurs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
-  id: '/forgot-password',
-  path: '/forgot-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FonctionnalitesRoute = FonctionnalitesRouteImport.update({
-  id: '/fonctionnalites',
-  path: '/fonctionnalites',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EssaiGratuitRoute = EssaiGratuitRouteImport.update({
-  id: '/essai-gratuit',
-  path: '/essai-gratuit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DevisRoute = DevisRouteImport.update({
-  id: '/devis',
-  path: '/devis',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DepensesRoute = DepensesRouteImport.update({
-  id: '/depenses',
-  path: '/depenses',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoRoute = DemoRouteImport.update({
-  id: '/demo',
-  path: '/demo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemandeEnAttenteRoute = DemandeEnAttenteRouteImport.update({
-  id: '/demande-en-attente',
-  path: '/demande-en-attente',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ClientsRoute = ClientsRouteImport.update({
-  id: '/clients',
-  path: '/clients',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CategoriesRoute = CategoriesRouteImport.update({
-  id: '/categories',
-  path: '/categories',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AchatsRoute = AchatsRouteImport.update({
-  id: '/achats',
-  path: '/achats',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const R403Route = R403RouteImport.update({
@@ -182,9 +64,144 @@ const R403Route = R403RouteImport.update({
   path: '/403',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AbonnementExpireRoute = AbonnementExpireRouteImport.update({
+  id: '/abonnement-expire',
+  path: '/abonnement-expire',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AchatsRoute = AchatsRouteImport.update({
+  id: '/achats',
+  path: '/achats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriesRoute = CategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsRoute = ClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemandeEnAttenteRoute = DemandeEnAttenteRouteImport.update({
+  id: '/demande-en-attente',
+  path: '/demande-en-attente',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoRoute = DemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DepensesRoute = DepensesRouteImport.update({
+  id: '/depenses',
+  path: '/depenses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevisRoute = DevisRouteImport.update({
+  id: '/devis',
+  path: '/devis',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EssaiGratuitRoute = EssaiGratuitRouteImport.update({
+  id: '/essai-gratuit',
+  path: '/essai-gratuit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FonctionnalitesRoute = FonctionnalitesRouteImport.update({
+  id: '/fonctionnalites',
+  path: '/fonctionnalites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FournisseursRoute = FournisseursRouteImport.update({
+  id: '/fournisseurs',
+  path: '/fournisseurs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HotelRoute = HotelRouteImport.update({
+  id: '/hotel',
+  path: '/hotel',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JournalRoute = JournalRouteImport.update({
+  id: '/journal',
+  path: '/journal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LicenceRoute = LicenceRouteImport.update({
+  id: '/licence',
+  path: '/licence',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParametresRoute = ParametresRouteImport.update({
+  id: '/parametres',
+  path: '/parametres',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerRoute = PartnerRouteImport.update({
+  id: '/partner',
+  path: '/partner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerAdminRoute = PartnerAdminRouteImport.update({
+  id: '/partner-admin',
+  path: '/partner-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerLoginRoute = PartnerLoginRouteImport.update({
+  id: '/partner-login',
+  path: '/partner-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RapportsRoute = RapportsRouteImport.update({
+  id: '/rapports',
+  path: '/rapports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServicesRoute = ServicesRouteImport.update({
+  id: '/services',
+  path: '/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StockRoute = StockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminRoute = SuperAdminRouteImport.update({
+  id: '/super-admin',
+  path: '/super-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TarifsRoute = TarifsRouteImport.update({
+  id: '/tarifs',
+  path: '/tarifs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UtilisateursRoute = UtilisateursRouteImport.update({
+  id: '/utilisateurs',
+  path: '/utilisateurs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VentesRoute = VentesRouteImport.update({
+  id: '/ventes',
+  path: '/ventes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -192,34 +209,9 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/app/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SuperAdminUsersRoute = SuperAdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => SuperAdminRoute,
-} as any)
-const SuperAdminPartnersRoute = SuperAdminPartnersRouteImport.update({
-  id: '/partners',
-  path: '/partners',
-  getParentRoute: () => SuperAdminRoute,
-} as any)
-const SuperAdminIaPlatformRoute = SuperAdminIaPlatformRouteImport.update({
-  id: '/ia-platform',
-  path: '/ia-platform',
-  getParentRoute: () => SuperAdminRoute,
-} as any)
-const SettingsUsersRoute = SettingsUsersRouteImport.update({
-  id: '/settings/users',
-  path: '/settings/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsCatalogueRoute = SettingsCatalogueRouteImport.update({
-  id: '/settings/catalogue',
-  path: '/settings/catalogue',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginSlugRoute = LoginSlugRouteImport.update({
-  id: '/login_/$slug',
-  path: '/login/$slug',
+const AppSplatRoute = AppSplatRouteImport.update({
+  id: '/app/$',
+  path: '/app/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppAssistantIaRoute = AppAssistantIaRouteImport.update({
@@ -227,15 +219,66 @@ const AppAssistantIaRoute = AppAssistantIaRouteImport.update({
   path: '/app/assistant-ia',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppSplatRoute = AppSplatRouteImport.update({
-  id: '/app/$',
-  path: '/app/$',
+const HotelLogementsRoute = HotelLogementsRouteImport.update({
+  id: '/logements',
+  path: '/logements',
+  getParentRoute: () => HotelRoute,
+} as any)
+const HotelParametresRoute = HotelParametresRouteImport.update({
+  id: '/parametres',
+  path: '/parametres',
+  getParentRoute: () => HotelRoute,
+} as any)
+const HotelRapportsRoute = HotelRapportsRouteImport.update({
+  id: '/rapports',
+  path: '/rapports',
+  getParentRoute: () => HotelRoute,
+} as any)
+const HotelReservationsRoute = HotelReservationsRouteImport.update({
+  id: '/reservations',
+  path: '/reservations',
+  getParentRoute: () => HotelRoute,
+} as any)
+const HotelVoyageursRoute = HotelVoyageursRouteImport.update({
+  id: '/voyageurs',
+  path: '/voyageurs',
+  getParentRoute: () => HotelRoute,
+} as any)
+const LoginSlugRoute = LoginSlugRouteImport.update({
+  id: '/login_/$slug',
+  path: '/login/$slug',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsCatalogueRoute = SettingsCatalogueRouteImport.update({
+  id: '/settings/catalogue',
+  path: '/settings/catalogue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsUsersRoute = SettingsUsersRouteImport.update({
+  id: '/settings/users',
+  path: '/settings/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminIaPlatformRoute = SuperAdminIaPlatformRouteImport.update({
+  id: '/ia-platform',
+  path: '/ia-platform',
+  getParentRoute: () => SuperAdminRoute,
+} as any)
+const SuperAdminPartnersRoute = SuperAdminPartnersRouteImport.update({
+  id: '/partners',
+  path: '/partners',
+  getParentRoute: () => SuperAdminRoute,
+} as any)
+const SuperAdminUsersRoute = SuperAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => SuperAdminRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/403': typeof R403Route
+  '/abonnement-expire': typeof AbonnementExpireRoute
   '/achats': typeof AchatsRoute
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
@@ -247,6 +290,7 @@ export interface FileRoutesByFullPath {
   '/fonctionnalites': typeof FonctionnalitesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/hotel': typeof HotelRouteWithChildren
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
@@ -264,6 +308,11 @@ export interface FileRoutesByFullPath {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel/logements': typeof HotelLogementsRoute
+  '/hotel/parametres': typeof HotelParametresRoute
+  '/hotel/rapports': typeof HotelRapportsRoute
+  '/hotel/reservations': typeof HotelReservationsRoute
+  '/hotel/voyageurs': typeof HotelVoyageursRoute
   '/login/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
@@ -275,6 +324,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/403': typeof R403Route
+  '/abonnement-expire': typeof AbonnementExpireRoute
   '/achats': typeof AchatsRoute
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
@@ -286,6 +336,7 @@ export interface FileRoutesByTo {
   '/fonctionnalites': typeof FonctionnalitesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/hotel': typeof HotelRouteWithChildren
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
@@ -303,6 +354,11 @@ export interface FileRoutesByTo {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel/logements': typeof HotelLogementsRoute
+  '/hotel/parametres': typeof HotelParametresRoute
+  '/hotel/rapports': typeof HotelRapportsRoute
+  '/hotel/reservations': typeof HotelReservationsRoute
+  '/hotel/voyageurs': typeof HotelVoyageursRoute
   '/login/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
@@ -315,6 +371,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/403': typeof R403Route
+  '/abonnement-expire': typeof AbonnementExpireRoute
   '/achats': typeof AchatsRoute
   '/categories': typeof CategoriesRoute
   '/clients': typeof ClientsRoute
@@ -326,6 +383,7 @@ export interface FileRoutesById {
   '/fonctionnalites': typeof FonctionnalitesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/hotel': typeof HotelRouteWithChildren
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
@@ -343,6 +401,11 @@ export interface FileRoutesById {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel/logements': typeof HotelLogementsRoute
+  '/hotel/parametres': typeof HotelParametresRoute
+  '/hotel/rapports': typeof HotelRapportsRoute
+  '/hotel/reservations': typeof HotelReservationsRoute
+  '/hotel/voyageurs': typeof HotelVoyageursRoute
   '/login_/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
@@ -356,6 +419,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/403'
+    | '/abonnement-expire'
     | '/achats'
     | '/categories'
     | '/clients'
@@ -367,6 +431,7 @@ export interface FileRouteTypes {
     | '/fonctionnalites'
     | '/forgot-password'
     | '/fournisseurs'
+    | '/hotel'
     | '/journal'
     | '/licence'
     | '/login'
@@ -384,6 +449,11 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel/logements'
+    | '/hotel/parametres'
+    | '/hotel/rapports'
+    | '/hotel/reservations'
+    | '/hotel/voyageurs'
     | '/login/$slug'
     | '/settings/catalogue'
     | '/settings/users'
@@ -395,6 +465,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/403'
+    | '/abonnement-expire'
     | '/achats'
     | '/categories'
     | '/clients'
@@ -406,6 +477,7 @@ export interface FileRouteTypes {
     | '/fonctionnalites'
     | '/forgot-password'
     | '/fournisseurs'
+    | '/hotel'
     | '/journal'
     | '/licence'
     | '/login'
@@ -423,6 +495,11 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel/logements'
+    | '/hotel/parametres'
+    | '/hotel/rapports'
+    | '/hotel/reservations'
+    | '/hotel/voyageurs'
     | '/login/$slug'
     | '/settings/catalogue'
     | '/settings/users'
@@ -434,6 +511,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/403'
+    | '/abonnement-expire'
     | '/achats'
     | '/categories'
     | '/clients'
@@ -445,6 +523,7 @@ export interface FileRouteTypes {
     | '/fonctionnalites'
     | '/forgot-password'
     | '/fournisseurs'
+    | '/hotel'
     | '/journal'
     | '/licence'
     | '/login'
@@ -462,6 +541,11 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel/logements'
+    | '/hotel/parametres'
+    | '/hotel/rapports'
+    | '/hotel/reservations'
+    | '/hotel/voyageurs'
     | '/login_/$slug'
     | '/settings/catalogue'
     | '/settings/users'
@@ -474,6 +558,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R403Route: typeof R403Route
+  AbonnementExpireRoute: typeof AbonnementExpireRoute
   AchatsRoute: typeof AchatsRoute
   CategoriesRoute: typeof CategoriesRoute
   ClientsRoute: typeof ClientsRoute
@@ -485,6 +570,7 @@ export interface RootRouteChildren {
   FonctionnalitesRoute: typeof FonctionnalitesRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   FournisseursRoute: typeof FournisseursRoute
+  HotelRoute: typeof HotelRouteWithChildren
   JournalRoute: typeof JournalRoute
   LicenceRoute: typeof LicenceRoute
   LoginRoute: typeof LoginRoute
@@ -510,186 +596,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/ventes': {
-      id: '/ventes'
-      path: '/ventes'
-      fullPath: '/ventes'
-      preLoaderRoute: typeof VentesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/utilisateurs': {
-      id: '/utilisateurs'
-      path: '/utilisateurs'
-      fullPath: '/utilisateurs'
-      preLoaderRoute: typeof UtilisateursRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tarifs': {
-      id: '/tarifs'
-      path: '/tarifs'
-      fullPath: '/tarifs'
-      preLoaderRoute: typeof TarifsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/super-admin': {
-      id: '/super-admin'
-      path: '/super-admin'
-      fullPath: '/super-admin'
-      preLoaderRoute: typeof SuperAdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/stock': {
-      id: '/stock'
-      path: '/stock'
-      fullPath: '/stock'
-      preLoaderRoute: typeof StockRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/services': {
-      id: '/services'
-      path: '/services'
-      fullPath: '/services'
-      preLoaderRoute: typeof ServicesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/rapports': {
-      id: '/rapports'
-      path: '/rapports'
-      fullPath: '/rapports'
-      preLoaderRoute: typeof RapportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/partner-login': {
-      id: '/partner-login'
-      path: '/partner-login'
-      fullPath: '/partner-login'
-      preLoaderRoute: typeof PartnerLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/partner-admin': {
-      id: '/partner-admin'
-      path: '/partner-admin'
-      fullPath: '/partner-admin'
-      preLoaderRoute: typeof PartnerAdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/partner': {
-      id: '/partner'
-      path: '/partner'
-      fullPath: '/partner'
-      preLoaderRoute: typeof PartnerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/parametres': {
-      id: '/parametres'
-      path: '/parametres'
-      fullPath: '/parametres'
-      preLoaderRoute: typeof ParametresRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/licence': {
-      id: '/licence'
-      path: '/licence'
-      fullPath: '/licence'
-      preLoaderRoute: typeof LicenceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/journal': {
-      id: '/journal'
-      path: '/journal'
-      fullPath: '/journal'
-      preLoaderRoute: typeof JournalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fournisseurs': {
-      id: '/fournisseurs'
-      path: '/fournisseurs'
-      fullPath: '/fournisseurs'
-      preLoaderRoute: typeof FournisseursRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-password': {
-      id: '/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof ForgotPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fonctionnalites': {
-      id: '/fonctionnalites'
-      path: '/fonctionnalites'
-      fullPath: '/fonctionnalites'
-      preLoaderRoute: typeof FonctionnalitesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/essai-gratuit': {
-      id: '/essai-gratuit'
-      path: '/essai-gratuit'
-      fullPath: '/essai-gratuit'
-      preLoaderRoute: typeof EssaiGratuitRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/devis': {
-      id: '/devis'
-      path: '/devis'
-      fullPath: '/devis'
-      preLoaderRoute: typeof DevisRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/depenses': {
-      id: '/depenses'
-      path: '/depenses'
-      fullPath: '/depenses'
-      preLoaderRoute: typeof DepensesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo': {
-      id: '/demo'
-      path: '/demo'
-      fullPath: '/demo'
-      preLoaderRoute: typeof DemoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demande-en-attente': {
-      id: '/demande-en-attente'
-      path: '/demande-en-attente'
-      fullPath: '/demande-en-attente'
-      preLoaderRoute: typeof DemandeEnAttenteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/clients': {
-      id: '/clients'
-      path: '/clients'
-      fullPath: '/clients'
-      preLoaderRoute: typeof ClientsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/categories': {
-      id: '/categories'
-      path: '/categories'
-      fullPath: '/categories'
-      preLoaderRoute: typeof CategoriesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/achats': {
-      id: '/achats'
-      path: '/achats'
-      fullPath: '/achats'
-      preLoaderRoute: typeof AchatsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/403': {
@@ -699,11 +610,200 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof R403RouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/abonnement-expire': {
+      id: '/abonnement-expire'
+      path: '/abonnement-expire'
+      fullPath: '/abonnement-expire'
+      preLoaderRoute: typeof AbonnementExpireRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/achats': {
+      id: '/achats'
+      path: '/achats'
+      fullPath: '/achats'
+      preLoaderRoute: typeof AchatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/categories': {
+      id: '/categories'
+      path: '/categories'
+      fullPath: '/categories'
+      preLoaderRoute: typeof CategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients': {
+      id: '/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof ClientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demande-en-attente': {
+      id: '/demande-en-attente'
+      path: '/demande-en-attente'
+      fullPath: '/demande-en-attente'
+      preLoaderRoute: typeof DemandeEnAttenteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo': {
+      id: '/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/depenses': {
+      id: '/depenses'
+      path: '/depenses'
+      fullPath: '/depenses'
+      preLoaderRoute: typeof DepensesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/devis': {
+      id: '/devis'
+      path: '/devis'
+      fullPath: '/devis'
+      preLoaderRoute: typeof DevisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/essai-gratuit': {
+      id: '/essai-gratuit'
+      path: '/essai-gratuit'
+      fullPath: '/essai-gratuit'
+      preLoaderRoute: typeof EssaiGratuitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fonctionnalites': {
+      id: '/fonctionnalites'
+      path: '/fonctionnalites'
+      fullPath: '/fonctionnalites'
+      preLoaderRoute: typeof FonctionnalitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fournisseurs': {
+      id: '/fournisseurs'
+      path: '/fournisseurs'
+      fullPath: '/fournisseurs'
+      preLoaderRoute: typeof FournisseursRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hotel': {
+      id: '/hotel'
+      path: '/hotel'
+      fullPath: '/hotel'
+      preLoaderRoute: typeof HotelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/journal': {
+      id: '/journal'
+      path: '/journal'
+      fullPath: '/journal'
+      preLoaderRoute: typeof JournalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/licence': {
+      id: '/licence'
+      path: '/licence'
+      fullPath: '/licence'
+      preLoaderRoute: typeof LicenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parametres': {
+      id: '/parametres'
+      path: '/parametres'
+      fullPath: '/parametres'
+      preLoaderRoute: typeof ParametresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner': {
+      id: '/partner'
+      path: '/partner'
+      fullPath: '/partner'
+      preLoaderRoute: typeof PartnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner-admin': {
+      id: '/partner-admin'
+      path: '/partner-admin'
+      fullPath: '/partner-admin'
+      preLoaderRoute: typeof PartnerAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner-login': {
+      id: '/partner-login'
+      path: '/partner-login'
+      fullPath: '/partner-login'
+      preLoaderRoute: typeof PartnerLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rapports': {
+      id: '/rapports'
+      path: '/rapports'
+      fullPath: '/rapports'
+      preLoaderRoute: typeof RapportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/services': {
+      id: '/services'
+      path: '/services'
+      fullPath: '/services'
+      preLoaderRoute: typeof ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stock': {
+      id: '/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin': {
+      id: '/super-admin'
+      path: '/super-admin'
+      fullPath: '/super-admin'
+      preLoaderRoute: typeof SuperAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tarifs': {
+      id: '/tarifs'
+      path: '/tarifs'
+      fullPath: '/tarifs'
+      preLoaderRoute: typeof TarifsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/utilisateurs': {
+      id: '/utilisateurs'
+      path: '/utilisateurs'
+      fullPath: '/utilisateurs'
+      preLoaderRoute: typeof UtilisateursRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ventes': {
+      id: '/ventes'
+      path: '/ventes'
+      fullPath: '/ventes'
+      preLoaderRoute: typeof VentesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/': {
@@ -713,46 +813,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/super-admin/users': {
-      id: '/super-admin/users'
-      path: '/users'
-      fullPath: '/super-admin/users'
-      preLoaderRoute: typeof SuperAdminUsersRouteImport
-      parentRoute: typeof SuperAdminRoute
-    }
-    '/super-admin/partners': {
-      id: '/super-admin/partners'
-      path: '/partners'
-      fullPath: '/super-admin/partners'
-      preLoaderRoute: typeof SuperAdminPartnersRouteImport
-      parentRoute: typeof SuperAdminRoute
-    }
-    '/super-admin/ia-platform': {
-      id: '/super-admin/ia-platform'
-      path: '/ia-platform'
-      fullPath: '/super-admin/ia-platform'
-      preLoaderRoute: typeof SuperAdminIaPlatformRouteImport
-      parentRoute: typeof SuperAdminRoute
-    }
-    '/settings/users': {
-      id: '/settings/users'
-      path: '/settings/users'
-      fullPath: '/settings/users'
-      preLoaderRoute: typeof SettingsUsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/catalogue': {
-      id: '/settings/catalogue'
-      path: '/settings/catalogue'
-      fullPath: '/settings/catalogue'
-      preLoaderRoute: typeof SettingsCatalogueRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login_/$slug': {
-      id: '/login_/$slug'
-      path: '/login/$slug'
-      fullPath: '/login/$slug'
-      preLoaderRoute: typeof LoginSlugRouteImport
+    '/app/$': {
+      id: '/app/$'
+      path: '/app/$'
+      fullPath: '/app/$'
+      preLoaderRoute: typeof AppSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/assistant-ia': {
@@ -762,15 +827,103 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAssistantIaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/app/$': {
-      id: '/app/$'
-      path: '/app/$'
-      fullPath: '/app/$'
-      preLoaderRoute: typeof AppSplatRouteImport
+    '/hotel/logements': {
+      id: '/hotel/logements'
+      path: '/logements'
+      fullPath: '/hotel/logements'
+      preLoaderRoute: typeof HotelLogementsRouteImport
+      parentRoute: typeof HotelRoute
+    }
+    '/hotel/parametres': {
+      id: '/hotel/parametres'
+      path: '/parametres'
+      fullPath: '/hotel/parametres'
+      preLoaderRoute: typeof HotelParametresRouteImport
+      parentRoute: typeof HotelRoute
+    }
+    '/hotel/rapports': {
+      id: '/hotel/rapports'
+      path: '/rapports'
+      fullPath: '/hotel/rapports'
+      preLoaderRoute: typeof HotelRapportsRouteImport
+      parentRoute: typeof HotelRoute
+    }
+    '/hotel/reservations': {
+      id: '/hotel/reservations'
+      path: '/reservations'
+      fullPath: '/hotel/reservations'
+      preLoaderRoute: typeof HotelReservationsRouteImport
+      parentRoute: typeof HotelRoute
+    }
+    '/hotel/voyageurs': {
+      id: '/hotel/voyageurs'
+      path: '/voyageurs'
+      fullPath: '/hotel/voyageurs'
+      preLoaderRoute: typeof HotelVoyageursRouteImport
+      parentRoute: typeof HotelRoute
+    }
+    '/login_/$slug': {
+      id: '/login_/$slug'
+      path: '/login/$slug'
+      fullPath: '/login/$slug'
+      preLoaderRoute: typeof LoginSlugRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/settings/catalogue': {
+      id: '/settings/catalogue'
+      path: '/settings/catalogue'
+      fullPath: '/settings/catalogue'
+      preLoaderRoute: typeof SettingsCatalogueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/users': {
+      id: '/settings/users'
+      path: '/settings/users'
+      fullPath: '/settings/users'
+      preLoaderRoute: typeof SettingsUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/ia-platform': {
+      id: '/super-admin/ia-platform'
+      path: '/ia-platform'
+      fullPath: '/super-admin/ia-platform'
+      preLoaderRoute: typeof SuperAdminIaPlatformRouteImport
+      parentRoute: typeof SuperAdminRoute
+    }
+    '/super-admin/partners': {
+      id: '/super-admin/partners'
+      path: '/partners'
+      fullPath: '/super-admin/partners'
+      preLoaderRoute: typeof SuperAdminPartnersRouteImport
+      parentRoute: typeof SuperAdminRoute
+    }
+    '/super-admin/users': {
+      id: '/super-admin/users'
+      path: '/users'
+      fullPath: '/super-admin/users'
+      preLoaderRoute: typeof SuperAdminUsersRouteImport
+      parentRoute: typeof SuperAdminRoute
     }
   }
 }
+
+interface HotelRouteChildren {
+  HotelLogementsRoute: typeof HotelLogementsRoute
+  HotelParametresRoute: typeof HotelParametresRoute
+  HotelRapportsRoute: typeof HotelRapportsRoute
+  HotelReservationsRoute: typeof HotelReservationsRoute
+  HotelVoyageursRoute: typeof HotelVoyageursRoute
+}
+
+const HotelRouteChildren: HotelRouteChildren = {
+  HotelLogementsRoute: HotelLogementsRoute,
+  HotelParametresRoute: HotelParametresRoute,
+  HotelRapportsRoute: HotelRapportsRoute,
+  HotelReservationsRoute: HotelReservationsRoute,
+  HotelVoyageursRoute: HotelVoyageursRoute,
+}
+
+const HotelRouteWithChildren = HotelRoute._addFileChildren(HotelRouteChildren)
 
 interface SuperAdminRouteChildren {
   SuperAdminIaPlatformRoute: typeof SuperAdminIaPlatformRoute
@@ -791,6 +944,7 @@ const SuperAdminRouteWithChildren = SuperAdminRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R403Route: R403Route,
+  AbonnementExpireRoute: AbonnementExpireRoute,
   AchatsRoute: AchatsRoute,
   CategoriesRoute: CategoriesRoute,
   ClientsRoute: ClientsRoute,
@@ -802,6 +956,7 @@ const rootRouteChildren: RootRouteChildren = {
   FonctionnalitesRoute: FonctionnalitesRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   FournisseursRoute: FournisseursRoute,
+  HotelRoute: HotelRouteWithChildren,
   JournalRoute: JournalRoute,
   LicenceRoute: LicenceRoute,
   LoginRoute: LoginRoute,

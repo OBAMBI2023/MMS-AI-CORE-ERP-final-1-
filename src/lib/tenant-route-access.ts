@@ -5,6 +5,7 @@ export type TenantAccessFacts = {
   tenantExists: boolean;
   tenantActive: boolean;
   tenantDeleted: boolean;
+  platformType?: "ERP" | "HOTEL";
   licenseStatus: string | null;
   licenseExpiresAt: string | null;
   roleName: string | null;
@@ -12,7 +13,7 @@ export type TenantAccessFacts = {
 };
 
 export type TenantAccessDecision =
-  | { allowed: true; tenantId: string; roleName: string }
+  | { allowed: true; tenantId: string; roleName: string; platformType: "ERP" | "HOTEL" }
   | { allowed: false; reason: "profile" | "tenant" | "license" | "role" | "permission" };
 
 export function decideTenantRouteAccess(
@@ -32,5 +33,10 @@ export function decideTenantRouteAccess(
   if (permissionRequired && facts.roleName !== "Administrateur" && !facts.hasPermission) {
     return { allowed: false, reason: "permission" };
   }
-  return { allowed: true, tenantId: facts.tenantId, roleName: facts.roleName };
+  return {
+    allowed: true,
+    tenantId: facts.tenantId,
+    roleName: facts.roleName,
+    platformType: facts.platformType === "HOTEL" ? "HOTEL" : "ERP",
+  };
 }

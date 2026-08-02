@@ -1,0 +1,18 @@
+BEGIN;
+SELECT plan(14);
+SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid='public.hotel_reservations'::regclass),'reservations RLS enabled');
+SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid='public.hotel_rooms'::regclass),'rooms RLS enabled');
+SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid='public.hotel_guests'::regclass),'guests RLS enabled');
+SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid='public.hotel_settings'::regclass),'settings RLS enabled');
+SELECT is((SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='hotel_reservations' AND cmd='ALL'),0::bigint,'no broad reservation policy');
+SELECT is((SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='hotel_reservations' AND cmd IN('SELECT','INSERT','UPDATE','DELETE')),4::bigint,'reservation policies split by operation');
+SELECT is((SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='hotel_rooms' AND cmd IN('SELECT','INSERT','UPDATE','DELETE')),4::bigint,'room policies split by operation');
+SELECT is((SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='hotel_guests' AND cmd IN('SELECT','INSERT','UPDATE','DELETE')),4::bigint,'guest policies split by operation');
+SELECT is((SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='hotel_settings' AND cmd IN('SELECT','INSERT','UPDATE','DELETE')),4::bigint,'settings policies split by operation');
+SELECT matches((SELECT qual FROM pg_policies WHERE schemaname='public' AND tablename='hotel_rooms' AND cmd='SELECT'),'hotel_permission_for','room SELECT checks permission');
+SELECT matches((SELECT with_check FROM pg_policies WHERE schemaname='public' AND tablename='hotel_rooms' AND cmd='INSERT'),'hotel_permission_for','room INSERT checks permission');
+SELECT matches((SELECT with_check FROM pg_policies WHERE schemaname='public' AND tablename='hotel_rooms' AND cmd='UPDATE'),'hotel_permission_for','room UPDATE checks permission');
+SELECT matches(pg_get_functiondef('public.set_authenticated_hotel_tenant()'::regprocedure),'modification de tenant_id est interdite','tenant mutation rejected');
+SELECT ok(NOT has_function_privilege('anon','public.hotel_permission_for(uuid,text,text)','EXECUTE'),'anonymous cannot call HOTEL authorization helper');
+SELECT * FROM finish();
+ROLLBACK;

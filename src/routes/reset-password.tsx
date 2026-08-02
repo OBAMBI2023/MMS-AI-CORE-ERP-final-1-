@@ -173,6 +173,23 @@ function ResetPasswordPage() {
         if (tenant?.slug) tenantSlug = tenant.slug;
       }
     }
+    const { data: activation, error: activationError } = await (supabase as any).rpc(
+      "activate_invited_tenant_after_password",
+    );
+    if (activationError) {
+      console.error("[PasswordSetup] Échec de l’activation du tenant invité", activationError);
+      setServerError("Le mot de passe est défini, mais l’activation du tenant a échoué.");
+      setSubmitting(false);
+      return;
+    }
+    if (activation?.activated) {
+      cleanPasswordRecoveryUrl();
+      clearPasswordRecoveryContext();
+      setSubmitting(false);
+      setCompleted(true);
+      window.location.replace(activation.platformType === "HOTEL" ? "/hotel" : "/app");
+      return;
+    }
     const loginPath = tenantSlug ? `/login/${encodeURIComponent(tenantSlug)}` : "/login";
     setTenantLoginPath(loginPath);
     cleanPasswordRecoveryUrl();
