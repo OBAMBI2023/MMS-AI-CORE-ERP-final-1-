@@ -4,17 +4,21 @@ import { useTenant } from "@/providers/TenantProvider";
 
 type ModuleRelation = { code: string } | { code: string }[] | null;
 
+export const tenantModulesQueryKey = (tenantId: string | undefined) =>
+  ["tenant-modules", tenantId] as const;
+
 export function useTenantModules() {
   const { profile, loading } = useTenant();
   const tenantId = profile?.tenant_id;
 
   return useQuery({
-    queryKey: ["tenant-modules", tenantId],
+    queryKey: tenantModulesQueryKey(tenantId),
     queryFn: async () => {
       if (!tenantId) return new Set<string>();
       const { data, error } = await supabase
         .from("tenant_modules")
         .select("enabled, erp_modules!inner(code)")
+        .eq("tenant_id", tenantId)
         .eq("enabled", true);
 
       if (error) throw error;
@@ -28,6 +32,8 @@ export function useTenantModules() {
       );
     },
     enabled: !loading && Boolean(tenantId),
-    staleTime: 5 * 60_000,
+    staleTime: 0,
+    refetchOnWindowFocus: "always",
+    refetchInterval: 30_000,
   });
 }

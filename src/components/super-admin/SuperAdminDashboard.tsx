@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useLocation, useRouter } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -75,6 +76,7 @@ import {
   type TenantDeletionJob,
 } from "@/lib/super-admin.server";
 import { cn } from "@/lib/utils";
+import { tenantModulesQueryKey } from "@/hooks/use-tenant-modules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -749,6 +751,11 @@ function TenantTable({
   const [secondConfirmation, setSecondConfirmation] = useState(false);
   const [deletionBusy, setDeletionBusy] = useState(false);
   const router = useRouter();
+  useEffect(() => {
+    if (!moduleTenant) return;
+    const refreshedTenant = tenants.find((item) => item.id === moduleTenant.id);
+    if (refreshedTenant && refreshedTenant !== moduleTenant) setModuleTenant(refreshedTenant);
+  }, [tenants, moduleTenant]);
   const activeDeletionByTenant = useMemo(
     () => new Map(
       deletionJobs
@@ -1021,7 +1028,10 @@ function TenantTable({
                           <KeyRound />
                           Gérer la licence
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setModuleTenant(tenant)}>
+                        <DropdownMenuItem
+                          disabled={tenant.platformType !== "HOTEL"}
+                          onClick={() => setModuleTenant(tenant)}
+                        >
                           <Gauge />
                           Gérer les modules
                         </DropdownMenuItem>
@@ -1401,12 +1411,15 @@ function TenantModulesDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const [pendingModule, setPendingModule] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [pendingModules, setPendingModules] = useState<Set<string>>(() => new Set());
+  const [modules, setModules] = useState<SuperAdminTenant["modules"]>([]);
   const [selectedPackId, setSelectedPackId] = useState("");
   const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     setSelectedPackId(tenant?.pack?.id ?? "");
+    setModules(tenant?.modules ?? []);
   }, [tenant]);
 
   const applyPack = async () => {
@@ -1426,20 +1439,33 @@ function TenantModulesDialog({
 
   const toggleModule = async (moduleId: string, enabled: boolean) => {
     if (!tenant) return;
-    setPendingModule(moduleId);
+    const previousEnabled = modules.find((module) => module.id === moduleId)?.enabled ?? !enabled;
+    setPendingModules((current) => new Set(current).add(moduleId));
+    setModules((current) => current.map((module) =>
+      module.id === moduleId ? { ...module, enabled } : module
+    ));
     try {
       await manageTenantModule({
         data: { tenantId: tenant.id, moduleId, enabled },
       });
       toast.success(enabled ? "Module activé." : "Module désactivé.");
-      onOpenChange(false);
+      await queryClient.invalidateQueries({ queryKey: tenantModulesQueryKey(tenant.id) });
       await router.invalidate();
     } catch (error) {
+      setModules((current) => current.map((module) =>
+        module.id === moduleId ? { ...module, enabled: previousEnabled } : module
+      ));
       toast.error(
-        error instanceof Error ? error.message : "Impossible de mettre à jour le module.",
+        error instanceof Error
+          ? `Impossible de mettre à jour le module : ${error.message}. L’état précédent a été restauré.`
+          : "Impossible de mettre à jour le module. L’état précédent a été restauré.",
       );
     } finally {
-      setPendingModule(null);
+      setPendingModules((current) => {
+        const next = new Set(current);
+        next.delete(moduleId);
+        return next;
+      });
     }
   };
 
@@ -1460,7 +1486,7 @@ function TenantModulesDialog({
                 <SelectValue placeholder="Sélectionner un pack" />
               </SelectTrigger>
               <SelectContent>
-                {packs.filter((pack) => pack.is_active).map((pack) => (
+                {packs.filter((pack) => pack.is_active && pack.code === "hotel").map((pack) => (
                   <SelectItem key={pack.id} value={pack.id}>{pack.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -1478,17 +1504,22 @@ function TenantModulesDialog({
           </p>
         </div>
         <div className="max-h-[60vh] space-y-2 overflow-y-auto py-2">
-          {!tenant?.modules.length ? (
+          {!modules.length ? (
             <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
               Aucun module disponible pour ce tenant.
             </p>
-          ) : tenant.modules.map((module) => (
+          ) : modules.map((module) => (
             <div
               key={module.id}
               className="flex items-center justify-between gap-4 rounded-lg border border-border p-3"
             >
               <div className="min-w-0">
-                <Label htmlFor={`module-${module.id}`}>{module.name}</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor={`module-${module.id}`}>{module.name}</Label>
+                  <Badge variant={module.enabled ? "default" : "secondary"}>
+                    {module.enabled ? "Actif" : "Inactif"}
+                  </Badge>
+                </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {module.description ?? module.code}
                 </p>
@@ -1496,7 +1527,7 @@ function TenantModulesDialog({
               <Switch
                 id={`module-${module.id}`}
                 checked={module.enabled}
-                disabled={pendingModule !== null}
+                disabled={pendingModules.has(module.id)}
                 onCheckedChange={(enabled) => toggleModule(module.id, enabled)}
                 aria-label={`${module.enabled ? "Désactiver" : "Activer"} ${module.name}`}
               />

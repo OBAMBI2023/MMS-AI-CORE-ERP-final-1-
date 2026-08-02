@@ -264,7 +264,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
             });
             return { moduleEnabled: data, moduleError: error };
           },
-          staleTime: ACCESS_STALE_TIME,
+          // Module assignments can be changed while the tenant is connected.
+          // Recheck on every direct navigation instead of trusting the access cache.
+          staleTime: 0,
         });
         if (moduleError || !moduleEnabled) {
           throw redirect({ to: "/403" });

@@ -6,11 +6,13 @@ import type { TablesUpdate } from "@/integrations/supabase/types";
 import { extractErrorDiagnostic, formatSupabaseError, safeErrorMessage } from "@/lib/supabase-error";
 import { getPasswordRedirectUrl } from "@/lib/app-url.server";
 import { resendExistingAuthInvitation } from "@/lib/partner-invitation";
+import { executeManageHotelTenantModule } from "@/lib/hotel-module-management";
 
 type TenantRow = {
   id: string; name: string; slug: string; is_active: boolean; created_at: string;
   deleted_at: string | null; deletion_reason: string | null; suspended_at: string | null;
   onboarding_status: string; activity: string | null; suggested_pack_code: string | null;
+  platform_type: "ERP" | "HOTEL";
 };
 type PartnerTenantRow = { partner_id: string; tenant_id: string; assigned_at: string };
 type TenantMetricRow = {
@@ -194,6 +196,7 @@ export type SuperAdminTenant = {
   onboardingStatus: string;
   activity: string | null;
   suggestedPackCode: string | null;
+  platformType: "ERP" | "HOTEL";
 };
 type RoleRow = { id: string; tenant_id: string; name: string };
 
@@ -390,7 +393,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       trialUsageRows,
       partnerTenantRows,
     ] = await Promise.all([
-      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at, onboarding_status, activity, suggested_pack_code"),
+      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at, onboarding_status, activity, suggested_pack_code, platform_type"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "id, tenant_id, email, role_id, created_at, updated_at"),
       fetchRows<RoleRow>(supabaseAdmin, "roles", "id, tenant_id, name"),
       fetchRows<SaleRow>(supabaseAdmin, "ventes", "tenant_id, total, created_at, updated_at"),
@@ -586,6 +589,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug,
+          platformType: tenant.platform_type,
           loginUrl: `/login/${tenant.slug}`,
           status: tenant.deleted_at
             ? "deleted"
@@ -616,7 +620,10 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           daysRemaining: remainingDays(subscriptionEnd),
           lastActivityAt: latestDate(tenantMetrics.lastActivityAt, tenant.created_at),
           modules: moduleRows
-            .filter((module) => module.is_active)
+            .filter((module) => module.is_active && (
+              tenant.platform_type !== "HOTEL" ||
+              modulePacks.find((pack) => pack.code === "hotel")?.moduleIds.includes(module.id)
+            ))
             .map((module) => ({
               ...module,
               enabled: tenantModuleState.get(`${tenant.id}:${module.id}`) ?? false,
@@ -1111,20 +1118,9 @@ const manageTenantModuleSchema = z.object({
 export const manageTenantModule = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(manageTenantModuleSchema)
-  .handler(async ({ context, data }) => {
-    await assertSuperAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("tenant_modules").upsert(
-      {
-        tenant_id: data.tenantId,
-        module_id: data.moduleId,
-        enabled: data.enabled,
-      },
-      { onConflict: "tenant_id,module_id" },
-    );
-    if (error) throw new Error(formatSupabaseError(error));
-    return { success: true };
-  });
+  .handler(({ context, data }) =>
+    executeManageHotelTenantModule(context, data, assertSuperAdmin),
+  );
 
 const manageSubscriptionSchema = z.object({
   tenantId: z.string().uuid(),

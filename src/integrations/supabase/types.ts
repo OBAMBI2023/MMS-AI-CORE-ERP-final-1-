@@ -3747,6 +3747,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      manage_hotel_tenant_module: {
+        Args: {
+          requested_actor_id: string
+          requested_enabled: boolean
+          requested_module_id: string
+          requested_tenant_id: string
+        }
+        Returns: undefined
+      }
       manage_module_pack: {
         Args: {
           requested_code: string
