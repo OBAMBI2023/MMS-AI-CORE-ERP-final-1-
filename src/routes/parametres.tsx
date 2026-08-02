@@ -1,1269 +1,293 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PLATFORM_BRANDING } from "@/config/branding";
-import { BrandLogo } from "@/components/branding/BrandLogo";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import {
   Building2,
+  Check,
   FileText,
-  Receipt,
-  FileSignature,
-  Users,
-  Shield,
-  Sparkles,
-  Upload,
-  Trash2,
-  Save,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Eye,
-  EyeOff,
-  Download,
-  Upload as UploadIcon,
-  RotateCcw,
-  DatabaseBackup,
   Image as ImageIcon,
-  Phone,
-  Mail,
-  Globe,
-  MapPin,
-  KeyRound,
-  Percent,
-  Boxes,
-  Landmark,
-  Plug,
-  ClipboardList,
+  Loader2,
+  LockKeyhole,
+  ReceiptText,
+  Save,
+  ShieldCheck,
+  Trash2,
+  Upload,
 } from "lucide-react";
+import { toast } from "sonner";
+
+import { BrandLogo } from "@/components/branding/BrandLogo";
 import { AppShell } from "@/components/mms/AppShell";
-import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import type { Tables } from "@/integrations/supabase/types";
-import { AuditCenter } from "@/components/mms/AuditCenter";
-// import { PermissionsTab } from "@/components/mms/PermissionsTab";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PLATFORM_BRANDING } from "@/config/branding";
 import { useSignedUrl } from "@/hooks/use-signed-url";
-import { useTenant } from "@/providers/TenantProvider";
-import { useCatalogSettings } from "@/hooks/use-catalog-settings";
-import type { CatalogSettings } from "@/lib/catalog-settings";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import { configureCurrency } from "@/lib/mms/format";
+import { useTenant } from "@/providers/TenantProvider";
 
-// Assuming AiSettings is available in the scope or imported.
-// Since the original file didn't import it, I'll assume it's part of the type definition context
-// or I need to handle it. Given the context, I'll keep the type as is.
-type AiSettings = {
-  openai_key: string | null;
-  gemini_key: string | null;
-  claude_key: string | null;
-  ai_model: string | null;
-  ai_temperature: number | null;
-  ai_max_tokens: number | null;
-  ai_enabled: boolean | null;
-};
-
-type Parametres = Tables<"parametres"> & AiSettings;
+type Parametres = Tables<"parametres">;
+type CompanyForm = Pick<Parametres, "company_name" | "currency" | "rccm" | "tax_regime" | "logo_url">;
 
 const BUCKET = "company-assets";
-const MAX_MB = 2;
-const ACCEPTED = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml"];
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
+const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml"];
 
 export const Route = createFileRoute("/parametres")({
   component: ParametresPage,
   head: () => ({
     meta: [
       { title: `Paramètres — ${PLATFORM_BRANDING.productName}` },
-      { name: "description", content: "Centre de configuration de l'entreprise." },
+      { name: "description", content: "Informations et identité de votre entreprise." },
     ],
   }),
 });
 
-// Mock helpers for missing imports in the provided file
-async function getAiSettings() {
-  return {};
-}
-async function saveAiSettings(_: { data: Partial<AiSettings> }) {
-  return {};
-}
-
-function formatSupabaseError(error: unknown): string {
-  const e = error as { code?: string; message?: string; details?: string; hint?: string };
-  return [
-    e.code && `code: ${e.code}`,
-    e.message && `message: ${e.message}`,
-    e.details && `details: ${e.details}`,
-    e.hint && `hint: ${e.hint}`,
-  ]
-    .filter(Boolean)
-    .join(" | ");
-}
-
-function cleanBusinessSector(value: string | null | undefined): string | null {
-  const cleaned = value?.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
-  return cleaned || null;
+function formatError(error: unknown) {
+  const value = error as { message?: string };
+  return value?.message || "Une erreur inattendue est survenue.";
 }
 
 function ParametresPage() {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
-  const catalogSettingsQuery = useCatalogSettings();
-  const AI_FIELD_NAMES = [
-    "openai_key",
-    "gemini_key",
-    "claude_key",
-    "ai_model",
-    "ai_temperature",
-    "ai_max_tokens",
-    "ai_enabled",
-  ] as const;
+  const [section, setSection] = useState<"company" | "roles">("company");
+  const [form, setForm] = useState<CompanyForm | null>(null);
 
-  function splitPatch(patch: Partial<Parametres>) {
-    const aiPatch: Partial<AiSettings> = {};
-    const paramPatch: Partial<Tables<"parametres">> = {};
-    for (const [key, value] of Object.entries(patch)) {
-      if ((AI_FIELD_NAMES as readonly string[]).includes(key)) {
-        (aiPatch as Record<string, unknown>)[key] = value;
-      } else {
-        (paramPatch as Record<string, unknown>)[key] = value;
-      }
-    }
-    return { aiPatch, paramPatch };
-  }
-
-  const { data, isLoading, error: queryError } = useQuery({
+  const settingsQuery = useQuery({
     queryKey: ["parametres", tenantId],
+    enabled: !tenantLoading && Boolean(tenantId),
     queryFn: async () => {
-      if (!tenantId) throw new Error("Locataire introuvable");
-      let { data: params, error } = await (supabase.from("parametres") as any)
-        .select("*")
+      if (!tenantId) throw new Error("Aucun tenant associé à ce compte.");
+      const { data, error } = await supabase
+        .from("parametres")
+        .select("id, company_name, currency, rccm, tax_regime, logo_url, decimals")
         .eq("tenant_id", tenantId)
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-
-      if (!params) {
-        // No settings exist, create default
-        const { data: newParams, error: insertError } = await (supabase.from(
-          "parametres",
-        ) as any)
-          .insert({
-            tenant_id: tenantId,
-            company_name: "Nouvelle Entreprise",
-            currency: "XOF",
-            quote_prefix: "DEV-",
-            invoice_prefix: "FAC-",
-            receipt_prefix: "REC-",
-            date_format: "dd/MM/yyyy",
-            decimals: 0,
-          })
-          .select()
-          .single();
-        if (insertError) throw insertError;
-        params = newParams;
-      }
-
-      const aiSettings = await getAiSettings();
-      return { ...params, ...aiSettings } as Parametres;
+      if (!data) throw new Error("Les paramètres de ce tenant sont introuvables.");
+      return data;
     },
-    enabled: !tenantLoading && Boolean(tenantId),
   });
 
-  const [form, setForm] = useState<Partial<Parametres>>({});
-  const initialized = useRef(false);
   useEffect(() => {
-    if (data && !initialized.current) {
-      setForm(data);
-      initialized.current = true;
-    }
-  }, [data]);
+    if (!settingsQuery.data) return;
+    setForm({
+      company_name: settingsQuery.data.company_name,
+      currency: settingsQuery.data.currency,
+      rccm: settingsQuery.data.rccm,
+      tax_regime: settingsQuery.data.tax_regime,
+      logo_url: settingsQuery.data.logo_url,
+    });
+  }, [settingsQuery.data]);
 
-  const update = <K extends keyof Parametres>(key: K, value: Parametres[K] | null) =>
-    setForm((s) => ({ ...s, [key]: value as Parametres[K] }));
-
-  const save = useMutation({
-    mutationFn: async (patch: Partial<Parametres>) => {
-      if (!data?.id) throw new Error("Enregistrement introuvable");
-      if (!tenantId) throw new Error("Locataire introuvable");
-      const { aiPatch, paramPatch } = splitPatch(patch);
-      const tasks: Promise<unknown>[] = [];
-      if (Object.keys(paramPatch).length > 0) {
-        tasks.push(
-          (supabase
-            .from("parametres")
-            .update(paramPatch) as any)
-            .eq("id", data.id)
-            .eq("tenant_id", tenantId)
-            .then(({ error }: { error: Error | null }) => {
-              if (error) throw error;
-            }),
-        );
-      }
-      if (Object.keys(aiPatch).length > 0) {
-        tasks.push(saveAiSettings({ data: aiPatch }));
-      }
-      await Promise.all(tasks);
+  const saveMutation = useMutation({
+    mutationFn: async (values: CompanyForm) => {
+      if (!tenantId || !settingsQuery.data?.id) throw new Error("Tenant introuvable.");
+      const payload = {
+        company_name: values.company_name.trim(),
+        currency: values.currency,
+        rccm: values.rccm?.trim() || null,
+        tax_regime: values.tax_regime?.trim() || null,
+        logo_url: values.logo_url,
+      };
+      const { error } = await supabase
+        .from("parametres")
+        .update(payload)
+        .eq("id", settingsQuery.data.id)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      return payload;
     },
-    onSuccess: () => {
-      configureCurrency(form.currency, form.decimals);
-      toast.success("Paramètres enregistrés");
-      qc.invalidateQueries({ queryKey: ["parametres"] });
+    onSuccess: async (saved) => {
+      configureCurrency(saved.currency, settingsQuery.data?.decimals);
+      await queryClient.invalidateQueries({ queryKey: ["parametres", tenantId] });
+      toast.success("Informations de l’entreprise enregistrées");
     },
-    onError: (error: unknown) => {
-      console.error("Échec de l'enregistrement des paramètres", error);
-      toast.error(formatSupabaseError(error) || "Erreur Supabase inconnue");
-    },
+    onError: (error) => toast.error(formatError(error)),
   });
 
-  const saveAll = () => {
-    const businessSector = cleanBusinessSector(form.business_sector);
-    const cleanedForm = { ...form, business_sector: businessSector };
-    setForm(cleanedForm);
-    save.mutate(cleanedForm);
-  };
+  const update = <K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) =>
+    setForm((current) => (current ? { ...current, [key]: value } : current));
+
+  const loading = tenantLoading || settingsQuery.isLoading;
 
   return (
     <AppShell
       title="Paramètres"
-      subtitle="Centre de configuration de l'entreprise"
-      actions={
-        <Button onClick={saveAll} disabled={save.isPending || isLoading} className="gap-2">
-          {save.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
+      subtitle="Gérez les informations publiques de votre entreprise"
+      actions={section === "company" && form ? (
+        <Button
+          className="gap-2"
+          disabled={saveMutation.isPending || !form.company_name.trim()}
+          onClick={() => saveMutation.mutate(form)}
+        >
+          {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Enregistrer
         </Button>
-      }
+      ) : undefined}
     >
-      {tenantLoading || isLoading ? (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="mb-6 flex items-center gap-2 rounded-xl border bg-card p-1.5 shadow-sm">
+          <NavButton active={section === "company"} onClick={() => setSection("company")} icon={<Building2 className="h-4 w-4" />}>
+            Entreprise
+          </NavButton>
+          <NavButton active={section === "roles"} onClick={() => setSection("roles")} icon={<LockKeyhole className="h-4 w-4" />}>
+            Rôles et permissions
+            <Badge variant="secondary" className="ml-1 hidden rounded-full text-[10px] sm:inline-flex">Bientôt</Badge>
+          </NavButton>
         </div>
-      ) : queryError || !tenantId ? (
-        <div className="text-sm text-destructive">
-          {queryError
-            ? formatSupabaseError(queryError)
-            : "Aucun locataire associé à ce compte."}
-        </div>
-      ) : !data ? (
-        <div className="text-sm text-destructive">Paramètres introuvables.</div>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
-          <div className="min-w-0">
-            <Tabs defaultValue="general">
-              <TabsList className="mb-6 flex flex-wrap h-auto p-1 bg-muted/60 rounded-xl">
-                <TabTrig value="general" icon={<Building2 className="h-4 w-4" />}>
-                  Général
-                </TabTrig>
-                <TabTrig value="organization" icon={<FileText className="h-4 w-4" />}>
-                  Organisation
-                </TabTrig>
-                <TabTrig value="catalogue" icon={<Boxes className="h-4 w-4" />}>
-                  Catalogue
-                </TabTrig>
-                <Link
-                  to="/settings/users"
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-1 text-sm font-medium text-muted-foreground transition-all hover:bg-background hover:text-foreground"
-                >
-                  <Users className="h-4 w-4" />
-                  <span className="hidden sm:inline">Utilisateurs</span>
-                </Link>
-                <TabTrig value="finances" icon={<Landmark className="h-4 w-4" />}>
-                  Finances
-                </TabTrig>
-                <TabTrig value="documents" icon={<FileSignature className="h-4 w-4" />}>
-                  Documents
-                </TabTrig>
-                <TabTrig value="integrations" icon={<Plug className="h-4 w-4" />}>
-                  Intégrations
-                </TabTrig>
-                <TabTrig value="security" icon={<Shield className="h-4 w-4" />}>
-                  Sécurité
-                </TabTrig>
-                <TabTrig value="audit" icon={<ClipboardList className="h-4 w-4" />}>
-                  Journal d’audit
-                </TabTrig>
-              </TabsList>
 
-              <TabsContent value="general">
-                <GeneralTab form={form} update={update} settingsId={data.id} onSave={save.mutate} />
-              </TabsContent>
-              <TabsContent value="organization">
-                <LegalTab form={form} update={update} />
-              </TabsContent>
-              <TabsContent value="catalogue">
-                <CatalogueSummaryCard
-                  settings={catalogSettingsQuery.data}
-                  isLoading={catalogSettingsQuery.isLoading}
-                  hasError={catalogSettingsQuery.isError}
-                />
-              </TabsContent>
-              <TabsContent value="finances">
-                <BillingTab form={form} update={update} />
-              </TabsContent>
-              <TabsContent value="documents">
-                <DocumentsTab
-                  form={form}
-                  update={update}
-                  settingsId={data.id}
-                  onSave={save.mutate}
-                />
-              </TabsContent>
-              <TabsContent value="integrations">
-                <Card
-                  title="Intégrations"
-                  description="Connectez et configurez les services externes de votre organisation."
-                  icon={<Plug className="h-4 w-4" />}
-                >
-                  <p className="text-sm text-muted-foreground">
-                    Les intégrations disponibles apparaîtront ici lorsqu’elles seront activées.
-                  </p>
-                </Card>
-              </TabsContent>
-              <TabsContent value="security">
-                <SecurityTab />
-              </TabsContent>
-              <TabsContent value="audit">
-                <AuditCenter />
-              </TabsContent>
-            </Tabs>
+        {loading ? (
+          <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" /> Chargement des paramètres…
           </div>
-
-          <aside className="space-y-6">
-            <CompanyPreview form={form} />
-            <ConfigStatus form={form} />
-            <QuickActions
-              form={form}
-              settingsId={data.id}
-              tenantId={tenantId}
-              refetch={() => qc.invalidateQueries({ queryKey: ["parametres"] })}
-            />
-          </aside>
-        </div>
-      )}
+        ) : settingsQuery.error || !tenantId || !form ? (
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive">
+            {formatError(settingsQuery.error || new Error("Aucun tenant associé à ce compte."))}
+          </div>
+        ) : section === "company" ? (
+          <CompanySection
+            form={form}
+            tenantId={tenantId}
+            settingsId={settingsQuery.data!.id}
+            update={update}
+            onLogoSaved={(logoUrl) => saveMutation.mutate({ ...form, logo_url: logoUrl })}
+          />
+        ) : (
+          <ComingSoon />
+        )}
+      </div>
     </AppShell>
   );
 }
 
-function CatalogueSummaryCard({
-  settings,
-  isLoading,
-  hasError,
-}: {
-  settings?: CatalogSettings;
-  isLoading: boolean;
-  hasError: boolean;
-}) {
-  const modeLabels: Record<CatalogSettings["catalog_mode"], string> = {
-    products: "Produits uniquement",
-    services: "Services uniquement",
-    mixed: "Produits + Services",
-  };
-  const productAllowed = settings?.catalog_mode !== "services";
-  const serviceAllowed = settings?.catalog_mode !== "products";
-  const options = settings
-    ? [
-        { label: "Mode", value: modeLabels[settings.catalog_mode], enabled: true },
-        { label: "Stock", enabled: productAllowed && settings.stock_enabled },
-        { label: "Achats", enabled: productAllowed && settings.purchases_enabled },
-        { label: "Fournisseurs", enabled: productAllowed && settings.suppliers_enabled },
-        {
-          label: "Produits en vente",
-          enabled: productAllowed && settings.products_in_sales_enabled,
-        },
-        {
-          label: "Services en vente",
-          enabled: serviceAllowed && settings.services_in_sales_enabled,
-        },
-        {
-          label: "Codes catalogue",
-          enabled: productAllowed && settings.catalog_codes_enabled,
-        },
-      ]
-    : [];
-
+function NavButton({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="mb-6 rounded-2xl border border-border bg-card shadow-sm">
-      <header className="flex flex-col gap-4 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
-            <Boxes className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="font-semibold">Catalogue</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {settings
-                ? modeLabels[settings.catalog_mode]
-                : "Produits, services et options commerciales"}
-            </p>
-          </div>
-        </div>
-        <Button asChild size="sm" className="w-full sm:w-auto">
-          <Link to="/settings/catalogue">Configurer</Link>
-        </Button>
-      </header>
-      <div className="p-5 sm:p-6">
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Chargement des paramètres actifs…
-          </div>
-        ) : hasError || !settings ? (
-          <p className="text-sm text-muted-foreground">
-            Le résumé du catalogue est momentanément indisponible.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {options.map((option) => (
-              <Badge
-                key={option.label}
-                variant="outline"
-                className="gap-1.5 rounded-full bg-background px-3 py-1.5 font-medium"
-              >
-                <CheckCircle2
-                  className={
-                    option.enabled
-                      ? "h-3.5 w-3.5 text-emerald-600"
-                      : "h-3.5 w-3.5 text-muted-foreground/60"
-                  }
-                />
-                <span>{option.label}</span>
-                <span className="font-normal text-muted-foreground">
-                  {option.value ?? (option.enabled ? "Activé" : "Désactivé")}
-                </span>
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function TabTrig({
-  value,
-  icon,
-  children,
-}: {
-  value: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <TabsTrigger
-      value={value}
-      className="gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors sm:flex-none ${active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
     >
-      {icon}
-      <span className="hidden sm:inline">{children}</span>
-    </TabsTrigger>
+      {icon}{children}
+    </button>
   );
 }
 
-function Card({
-  title,
-  description,
-  icon,
-  children,
-}: {
-  title: string;
-  description?: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm">
-      <header className="px-6 py-4 border-b border-border flex items-start gap-3">
-        {icon && <div className="mt-0.5 p-2 rounded-lg bg-primary/10 text-primary">{icon}</div>}
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-base">{title}</h2>
-          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
-        </div>
-      </header>
-      <div className="p-6">{children}</div>
-    </section>
-  );
-}
-
-function Field({
-  label,
-  required,
-  children,
-  hint,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-muted-foreground">
-        {label}
-        {required && <span className="text-destructive ml-0.5">*</span>}
-      </Label>
-      {children}
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
-function GeneralTab({
-  form,
-  update,
-  settingsId,
-  onSave,
-}: {
-  form: Partial<Parametres>;
-  update: <K extends keyof Parametres>(k: K, v: Parametres[K] | null) => void;
+function CompanySection({ form, tenantId, settingsId, update, onLogoSaved }: {
+  form: CompanyForm;
+  tenantId: string;
   settingsId: string;
-  onSave: (patch: Partial<Parametres>) => void;
+  update: <K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) => void;
+  onLogoSaved: (path: string | null) => void;
 }) {
   return (
-    <div className="space-y-6">
-      <Card
-        title="Logo de l'entreprise"
-        description="PNG, JPG ou SVG — 2 Mo max."
-        icon={<ImageIcon className="h-4 w-4" />}
-      >
-        <FileUploader
-          currentPath={form.logo_url ?? null}
-          folder="logo"
-          settingsId={settingsId}
-          onChange={(path) => {
-            update("logo_url", path);
-            onSave({ logo_url: path });
-          }}
-        />
-      </Card>
-
-      <Card title="Coordonnées" icon={<Building2 className="h-4 w-4" />}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Raison sociale" required>
-            <Input
-              value={form.company_name ?? ""}
-              onChange={(e) => update("company_name", e.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Secteur d’activité" hint="Champ facultatif">
-            <Input
-              value={form.business_sector ?? ""}
-              maxLength={100}
-              placeholder="Ex. Imprimerie, Restaurant, Décoration…"
-              onChange={(e) => update("business_sector", e.target.value || null)}
-            />
-          </Field>
-          <Field label="Téléphone">
-            <Input
-              value={form.phone ?? ""}
-              onChange={(e) => update("phone", e.target.value || null)}
-            />
-          </Field>
-          <Field label="WhatsApp">
-            <Input
-              value={form.whatsapp ?? ""}
-              onChange={(e) => update("whatsapp", e.target.value || null)}
-            />
-          </Field>
-          <Field label="Email">
-            <Input
-              type="email"
-              value={form.email ?? ""}
-              onChange={(e) => update("email", e.target.value || null)}
-            />
-          </Field>
-          <Field label="Site web">
-            <Input
-              placeholder="https://…"
-              value={form.website ?? ""}
-              onChange={(e) => update("website", e.target.value || null)}
-            />
-          </Field>
-          <Field label="Ville">
-            <Input
-              value={form.city ?? ""}
-              onChange={(e) => update("city", e.target.value || null)}
-            />
-          </Field>
-          <Field label="Pays">
-            <Input
-              value={form.country ?? ""}
-              onChange={(e) => update("country", e.target.value || null)}
-            />
-          </Field>
-          <div className="md:col-span-2">
-            <Field label="Adresse">
-              <Textarea
-                rows={2}
-                value={form.address ?? ""}
-                onChange={(e) => update("address", e.target.value || null)}
-              />
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="space-y-6">
+        <Panel title="Identité visuelle" description="Ce logo apparaîtra automatiquement sur vos documents." icon={<ImageIcon className="h-5 w-5" />}>
+          <LogoUploader currentPath={form.logo_url} tenantId={tenantId} settingsId={settingsId} onChange={(path) => { update("logo_url", path); onLogoSaved(path); }} />
+        </Panel>
+        <Panel title="Informations de l’entreprise" description="Les informations légales et financières utilisées sur vos documents." icon={<Building2 className="h-5 w-5" />}>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Nom de l’entreprise" required className="sm:col-span-2">
+              <Input value={form.company_name} onChange={(event) => update("company_name", event.target.value)} placeholder="Nom de votre entreprise" />
+            </Field>
+            <Field label="Devise" required>
+              <Select value={form.currency === "FCFA" ? "XOF" : form.currency} onValueChange={(value) => update("currency", value)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="XOF">Franc CFA (XOF)</SelectItem>
+                  <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                  <SelectItem value="USD">Dollar américain (USD)</SelectItem>
+                  <SelectItem value="GBP">Livre sterling (GBP)</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="RCCM">
+              <Input value={form.rccm ?? ""} onChange={(event) => update("rccm", event.target.value)} placeholder="CI-ABJ-01-2026-B00-00000" />
+            </Field>
+            <Field label="Régime d’imposition" className="sm:col-span-2">
+              <Select value={form.tax_regime ?? "unset"} onValueChange={(value) => update("tax_regime", value === "unset" ? null : value)}>
+                <SelectTrigger><SelectValue placeholder="Sélectionner un régime" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unset">Non renseigné</SelectItem>
+                  <SelectItem value="Réel normal">Réel normal</SelectItem>
+                  <SelectItem value="Réel simplifié">Réel simplifié</SelectItem>
+                  <SelectItem value="Taxe d’État de l’entreprenant">Taxe d’État de l’entreprenant</SelectItem>
+                  <SelectItem value="Microentreprise">Microentreprise</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
           </div>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function LegalTab({
-  form,
-  update,
-}: {
-  form: Partial<Parametres>;
-  update: <K extends keyof Parametres>(k: K, v: Parametres[K] | null) => void;
-}) {
-  return (
-    <Card title="Informations légales" icon={<FileText className="h-4 w-4" />}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="RCCM">
-          <Input value={form.rccm ?? ""} onChange={(e) => update("rccm", e.target.value || null)} />
-        </Field>
-        <Field label="Numéro fiscal (NIF)">
-          <Input
-            value={form.tax_number ?? ""}
-            onChange={(e) => update("tax_number", e.target.value || null)}
-          />
-        </Field>
-        <Field label="Régime fiscal">
-          <Select
-            value={form.tax_regime ?? undefined}
-            onValueChange={(v) => update("tax_regime", v)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Sélectionner…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Réel">Régime du réel</SelectItem>
-              <SelectItem value="Simplifié">Régime simplifié</SelectItem>
-              <SelectItem value="Micro-entreprise">Micro-entreprise</SelectItem>
-              <SelectItem value="Non assujetti">Non assujetti</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="Taux TVA (%)" hint="Laisser vide si non applicable">
-          <div className="relative">
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={form.vat_rate ?? ""}
-              onChange={(e) =>
-                update("vat_rate", e.target.value === "" ? null : Number(e.target.value))
-              }
-            />
-            <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          </div>
-        </Field>
+        </Panel>
       </div>
-    </Card>
-  );
-}
-
-function BillingTab({
-  form,
-  update,
-}: {
-  form: Partial<Parametres>;
-  update: <K extends keyof Parametres>(k: K, v: Parametres[K] | null) => void;
-}) {
-  return (
-    <Card title="Facturation" icon={<Receipt className="h-4 w-4" />}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Devise">
-          <Select value={form.currency === "FCFA" ? "XOF" : (form.currency ?? "XOF")} onValueChange={(v) => update("currency", v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="XOF">XOF</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
-              <SelectItem value="EUR">EUR</SelectItem>
-              <SelectItem value="MAD">MAD</SelectItem>
-              <SelectItem value="GBP">GBP (£)</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="Décimales">
-          <Input
-            type="number"
-            min="0"
-            max="4"
-            value={form.decimals ?? 0}
-            onChange={(e) => update("decimals", Number(e.target.value))}
-          />
-        </Field>
-        <Field label="Préfixe devis">
-          <Input
-            value={form.quote_prefix ?? ""}
-            onChange={(e) => update("quote_prefix", e.target.value)}
-          />
-        </Field>
-        <Field label="Préfixe facture">
-          <Input
-            value={form.invoice_prefix ?? ""}
-            onChange={(e) => update("invoice_prefix", e.target.value)}
-          />
-        </Field>
-        <Field label="Préfixe reçu">
-          <Input
-            value={form.receipt_prefix ?? ""}
-            onChange={(e) => update("receipt_prefix", e.target.value)}
-          />
-        </Field>
-        <Field label="Format de date">
-          <Select
-            value={form.date_format ?? "dd/MM/yyyy"}
-            onValueChange={(v) => update("date_format", v)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dd/MM/yyyy">31/12/2026</SelectItem>
-              <SelectItem value="MM/dd/yyyy">12/31/2026</SelectItem>
-              <SelectItem value="yyyy-MM-dd">2026-12-31</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
-    </Card>
-  );
-}
-
-function DocumentsTab({
-  form,
-  update,
-  settingsId,
-  onSave,
-}: {
-  form: Partial<Parametres>;
-  update: <K extends keyof Parametres>(k: K, v: Parametres[K] | null) => void;
-  settingsId: string;
-  onSave: (patch: Partial<Parametres>) => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card
-        title="Signature"
-        description="Image de la signature du responsable."
-        icon={<FileSignature className="h-4 w-4" />}
-      >
-        <FileUploader
-          currentPath={form.signature_url ?? null}
-          folder="signature"
-          settingsId={settingsId}
-          onChange={(path) => {
-            update("signature_url", path);
-            onSave({ signature_url: path });
-          }}
-        />
-      </Card>
-      <Card
-        title="Cachet / Tampon"
-        description="Image du cachet officiel."
-        icon={<FileSignature className="h-4 w-4" />}
-      >
-        <FileUploader
-          currentPath={form.stamp_url ?? null}
-          folder="stamp"
-          settingsId={settingsId}
-          onChange={(path) => {
-            update("stamp_url", path);
-            onSave({ stamp_url: path });
-          }}
-        />
-      </Card>
+      <CompanyPreview form={form} />
     </div>
   );
 }
 
-import { changePassword } from "@/lib/security.server";
-// ... (rest of imports)
-
-// ... (ParametresPage component remains unchanged, assuming I only change SecurityTab)
-
-function SecurityTab() {
-  const [currentPwd, setCurrentPwd] = useState("");
-  const [newPwd, setNewPwd] = useState("");
-  const [confirmPwd, setConfirmPwd] = useState("");
-
-  const changing = useMutation({
-    mutationFn: async () => {
-      // Validation
-      if (!currentPwd) throw new Error("Mot de passe actuel requis");
-      if (newPwd.length < 8)
-        throw new Error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
-      if (newPwd !== confirmPwd)
-        throw new Error("La confirmation ne correspond pas au nouveau mot de passe.");
-
-      // Verify current password
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user || !user.email) throw new Error("Utilisateur non authentifié.");
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPwd,
-      });
-      if (signInError) throw new Error("Mot de passe actuel incorrect.");
-
-      // Update password using server function
-      await changePassword({ data: { newPassword: newPwd } });
-    },
-    onSuccess: () => {
-      toast.success("Votre mot de passe a été modifié avec succès.");
-      setCurrentPwd("");
-      setNewPwd("");
-      setConfirmPwd("");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <div className="space-y-6">
-      <Card title="Mot de passe" icon={<KeyRound className="h-4 w-4" />}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Mot de passe actuel" required>
-            <Input
-              type="password"
-              value={currentPwd}
-              onChange={(e) => setCurrentPwd(e.target.value)}
-            />
-          </Field>
-          <div /> {/* Spacer */}
-          <Field label="Nouveau mot de passe" required>
-            <Input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
-          </Field>
-          <Field label="Confirmer le nouveau mot de passe" required>
-            <Input
-              type="password"
-              value={confirmPwd}
-              onChange={(e) => setConfirmPwd(e.target.value)}
-            />
-          </Field>
-        </div>
-        <div className="mt-4">
-          <Button
-            onClick={() => changing.mutate()}
-            disabled={changing.isPending || !currentPwd || !newPwd || !confirmPwd}
-          >
-            {changing.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            Changer le mot de passe
-          </Button>
-        </div>
-      </Card>
-      {/* ... rest of the component */}
-    </div>
-  );
+function Panel({ title, description, icon, children }: { title: string; description: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return <section className="overflow-hidden rounded-2xl border bg-card shadow-sm"><header className="flex gap-3 border-b px-5 py-4 sm:px-6"><div className="rounded-xl bg-primary/10 p-2.5 text-primary">{icon}</div><div><h2 className="font-semibold">{title}</h2><p className="mt-0.5 text-sm text-muted-foreground">{description}</p></div></header><div className="p-5 sm:p-6">{children}</div></section>;
 }
 
-function FileUploader({
-  currentPath,
-  folder,
-  settingsId,
-  onChange,
-}: {
-  currentPath: string | null;
-  folder: string;
-  settingsId: string;
-  onChange: (path: string | null) => void;
-}) {
-  const { profile } = useTenant();
-  const tenantId = profile?.tenant_id;
-  const [dragging, setDragging] = useState(false);
-  const [busy, setBusy] = useState(false);
+function Field({ label, required, className = "", children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
+  return <div className={`space-y-2 ${className}`}><Label>{label}{required && <span className="ml-1 text-destructive">*</span>}</Label>{children}</div>;
+}
+
+function LogoUploader({ currentPath, tenantId, settingsId, onChange }: { currentPath: string | null; tenantId: string; settingsId: string; onChange: (path: string | null) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const previewUrl = useSignedUrl(currentPath);
+  const [busy, setBusy] = useState(false);
 
-  const handleFile = useCallback(
-    async (file: File) => {
-      if (!ACCEPTED.includes(file.type)) return toast.error("Format non supporté (PNG, JPG, SVG)");
-      if (file.size > MAX_MB * 1024 * 1024) return toast.error(`Taille max ${MAX_MB} Mo`);
-      setBusy(true);
-      try {
-        if (!tenantId) throw new Error("Tenant courant introuvable");
-        const ext = file.name.split(".").pop() || "png";
-        const path = `${tenantId}/${folder}/${settingsId}-${Date.now()}.${ext}`;
-        const { error } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, file, { upsert: false, contentType: file.type });
-        if (error) throw error;
-        onChange(path);
-        toast.success("Fichier téléversé");
-      } catch (e) {
-        toast.error(formatSupabaseError(e) || "Erreur Supabase inconnue");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [currentPath, folder, settingsId, onChange, tenantId],
-  );
+  const upload = async (file: File) => {
+    if (!ACCEPTED_TYPES.includes(file.type)) return toast.error("Format non pris en charge. Utilisez PNG, JPG ou SVG.");
+    if (file.size > MAX_FILE_SIZE) return toast.error("Le logo ne doit pas dépasser 2 Mo.");
+    setBusy(true);
+    try {
+      const extension = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${tenantId}/logo/${settingsId}-${Date.now()}.${extension}`;
+      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw error;
+      onChange(path);
+      if (currentPath) await supabase.storage.from(BUCKET).remove([currentPath]);
+      toast.success(currentPath ? "Logo remplacé" : "Logo importé");
+    } catch (error) { toast.error(formatError(error)); } finally { setBusy(false); }
+  };
 
   const remove = async () => {
     if (!currentPath) return;
     setBusy(true);
     try {
-      await supabase.storage.from(BUCKET).remove([currentPath]);
+      const { error } = await supabase.storage.from(BUCKET).remove([currentPath]);
+      if (error) throw error;
       onChange(null);
-      toast.success("Fichier supprimé");
-    } finally {
-      setBusy(false);
-    }
+      toast.success("Logo supprimé");
+    } catch (error) { toast.error(formatError(error)); } finally { setBusy(false); }
   };
 
   return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragging(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) handleFile(file);
-      }}
-      className={`relative rounded-xl border-2 border-dashed transition-colors p-6 flex flex-col items-center justify-center gap-3 text-center ${
-        dragging ? "border-primary bg-primary/5" : "border-border bg-muted/20"
-      }`}
-    >
-      {previewUrl ? (
-        <div className="flex flex-col items-center gap-3 w-full">
-          <div className="h-28 w-28 rounded-xl border border-border bg-background flex items-center justify-center overflow-hidden">
-            <img src={previewUrl} alt="aperçu" className="max-h-full max-w-full object-contain" />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => inputRef.current?.click()}
-              disabled={busy}
-              className="gap-2"
-            >
-              <Upload className="h-3.5 w-3.5" /> Remplacer
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={remove}
-              disabled={busy}
-              className="gap-2 text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Supprimer
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-          </div>
-          <div>
-            <p className="text-sm font-medium">Glissez un fichier ici</p>
-            <p className="text-xs text-muted-foreground mt-1">PNG, JPG, SVG — max {MAX_MB} Mo</p>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => inputRef.current?.click()}
-            disabled={busy}
-          >
-            Choisir un fichier
-          </Button>
-        </>
-      )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPTED.join(",")}
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleFile(f);
-          e.target.value = "";
-        }}
-      />
+    <div className="flex flex-col items-center gap-5 rounded-xl border border-dashed bg-muted/20 p-6 sm:flex-row sm:text-left">
+      <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-background shadow-sm">
+        {busy ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : previewUrl ? <BrandLogo context="dashboard" src={previewUrl} alt="Logo de l’entreprise" /> : <Building2 className="h-9 w-9 text-muted-foreground/60" />}
+      </div>
+      <div className="flex-1 text-center sm:text-left"><p className="font-medium">Logo de l’entreprise</p><p className="mt-1 text-sm text-muted-foreground">PNG, JPG ou SVG · 2 Mo maximum</p><div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start"><Button type="button" variant="outline" size="sm" className="gap-2" disabled={busy} onClick={() => inputRef.current?.click()}><Upload className="h-4 w-4" />{currentPath ? "Remplacer" : "Importer"}</Button>{currentPath && <Button type="button" variant="ghost" size="sm" className="gap-2 text-destructive hover:text-destructive" disabled={busy} onClick={remove}><Trash2 className="h-4 w-4" />Supprimer</Button>}</div></div>
+      <input ref={inputRef} type="file" className="hidden" accept={ACCEPTED_TYPES.join(",")} onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ""; }} />
     </div>
   );
 }
 
-function CompanyPreview({ form }: { form: Partial<Parametres> }) {
-  const logo = useSignedUrl(form.logo_url ?? null);
-  return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-      <div className="h-20 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent" />
-      <div className="px-5 pb-5 -mt-10">
-        <div className="flex size-20 items-center justify-center overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
-          {logo ? (
-            <BrandLogo context="dashboard" src={logo} alt="Logo de l’entreprise" />
-          ) : (
-            <Building2 className="h-8 w-8 text-muted-foreground" />
-          )}
-        </div>
-        <h3 className="mt-3 font-semibold text-lg leading-tight truncate">
-          {form.company_name || "Nom de l'entreprise"}
-        </h3>
-        {form.trade_name && <p className="text-xs text-muted-foreground">{form.trade_name}</p>}
-        <div className="mt-4 space-y-2 text-sm">
-          {form.address && (
-            <Line icon={<MapPin className="h-3.5 w-3.5" />}>
-              {form.address}
-              {form.city ? `, ${form.city}` : ""}
-            </Line>
-          )}
-          {form.phone && <Line icon={<Phone className="h-3.5 w-3.5" />}>{form.phone}</Line>}
-          {form.email && <Line icon={<Mail className="h-3.5 w-3.5" />}>{form.email}</Line>}
-          {form.website && <Line icon={<Globe className="h-3.5 w-3.5" />}>{form.website}</Line>}
-        </div>
-        <Separator className="my-4" />
-        <dl className="grid grid-cols-2 gap-3 text-xs">
-          <Meta label="RCCM" value={form.rccm} />
-          <Meta label="NIF" value={form.tax_number} />
-          <Meta label="TVA" value={form.vat_rate != null ? `${form.vat_rate}%` : null} />
-          <Meta label="Devise" value={form.currency} />
-        </dl>
-      </div>
-    </section>
-  );
+function CompanyPreview({ form }: { form: CompanyForm }) {
+  const logo = useSignedUrl(form.logo_url);
+  const usages = [{ icon: FileText, label: "Factures PDF" }, { icon: ReceiptText, label: "Reçus" }, { icon: ShieldCheck, label: "Rapports" }, { icon: Building2, label: "Documents imprimés" }];
+  return <aside className="h-fit overflow-hidden rounded-2xl border bg-card shadow-sm lg:sticky lg:top-6"><div className="h-24 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent" /><div className="-mt-12 px-5 pb-5"><div className="flex size-24 items-center justify-center overflow-hidden rounded-2xl border bg-background p-2 shadow-sm">{logo ? <BrandLogo context="dashboard" src={logo} alt="Logo" /> : <Building2 className="h-9 w-9 text-muted-foreground" />}</div><h3 className="mt-4 truncate text-lg font-semibold">{form.company_name || "Votre entreprise"}</h3><p className="text-sm text-muted-foreground">{form.currency}{form.rccm ? ` · ${form.rccm}` : ""}</p><div className="my-5 h-px bg-border" /><p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Utilisé automatiquement sur</p><ul className="space-y-3">{usages.map(({ icon: Icon, label }) => <li key={label} className="flex items-center gap-3 text-sm"><span className="rounded-lg bg-primary/10 p-1.5 text-primary"><Icon className="h-4 w-4" /></span>{label}<Check className="ml-auto h-4 w-4 text-emerald-600" /></li>)}</ul></div></aside>;
 }
 
-function Line({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-2 text-muted-foreground">
-      <span className="mt-0.5">{icon}</span>
-      <span className="text-foreground truncate">{children}</span>
-    </div>
-  );
-}
-function Meta({ label, value }: { label: string; value?: string | number | null }) {
-  return (
-    <div>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-medium mt-0.5">
-        {value || <span className="text-muted-foreground">—</span>}
-      </dd>
-    </div>
-  );
-}
-
-function ConfigStatus({ form }: { form: Partial<Parametres> }) {
-  const items = useMemo(
-    () => [
-      { label: "Informations générales", ok: !!(form.company_name && form.phone && form.email) },
-      { label: "Logo", ok: !!form.logo_url },
-      { label: "Informations légales", ok: !!(form.rccm || form.tax_number) },
-      { label: "TVA", ok: form.vat_rate != null },
-      { label: "Facturation", ok: !!(form.currency && form.invoice_prefix) },
-      { label: "Administrateur", ok: true },
-      { label: "Sauvegarde", ok: false },
-    ],
-    [form],
-  );
-  const done = items.filter((i) => i.ok).length;
-  const pct = Math.round((done / items.length) * 100);
-  return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-sm">Configuration</h3>
-        <Badge variant="secondary">
-          {done}/{items.length}
-        </Badge>
-      </div>
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-4">
-        <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      <ul className="space-y-2">
-        {items.map((i) => (
-          <li key={i.label} className="flex items-center gap-2 text-sm">
-            {i.ok ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            ) : (
-              <AlertCircle className="h-4 w-4 text-amber-500" />
-            )}
-            <span className={i.ok ? "" : "text-muted-foreground"}>{i.label}</span>
-            <span className="ml-auto text-[11px] text-muted-foreground">
-              {i.ok ? "Configuré" : "À compléter"}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function QuickActions({
-  form,
-  settingsId,
-  tenantId,
-  refetch,
-}: {
-  form: Partial<Parametres>;
-  settingsId: string;
-  tenantId: string;
-  refetch: () => void;
-}) {
-  const fileInput = useRef<HTMLInputElement>(null);
-
-  const exportCfg = () => {
-    const blob = new Blob([JSON.stringify(form, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `parametres-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Configuration exportée");
-  };
-
-  const importCfg = async (file: File) => {
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text);
-      const { id, created_at, updated_at, ...clean } = parsed;
-      void id;
-      void created_at;
-      void updated_at;
-      const aiPatch: Record<string, unknown> = {};
-      const paramPatch: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(clean)) {
-        if (
-          [
-            "openai_key",
-            "gemini_key",
-            "claude_key",
-            "ai_model",
-            "ai_temperature",
-            "ai_max_tokens",
-            "ai_enabled",
-          ].includes(key)
-        )
-          aiPatch[key] = value;
-        else paramPatch[key] = value;
-      }
-      if (Object.keys(paramPatch).length > 0) {
-        const { error } = await ((supabase.from("parametres") as any).update(paramPatch) as any)
-          .eq("id", settingsId)
-          .eq("tenant_id", tenantId);
-        if (error) throw error;
-      }
-      if (Object.keys(aiPatch).length > 0) {
-        await saveAiSettings({ data: aiPatch });
-      }
-      configureCurrency(
-        typeof paramPatch.currency === "string" ? paramPatch.currency : form.currency,
-        typeof paramPatch.decimals === "number" ? paramPatch.decimals : form.decimals,
-      );
-      refetch();
-      toast.success("Configuration importée");
-    } catch (e) {
-      toast.error(formatSupabaseError(e) || "Erreur Supabase inconnue");
-    }
-  };
-
-  const reset = async () => {
-    if (!confirm("Réinitialiser tous les paramètres aux valeurs par défaut ?")) return;
-    const { error } = await (supabase
-      .from("parametres")
-      .update({
-        trade_name: null,
-        address: null,
-        city: null,
-        country: null,
-        phone: null,
-        whatsapp: null,
-        email: null,
-        website: null,
-        rccm: null,
-        tax_number: null,
-        tax_regime: null,
-        vat_rate: null,
-        currency: "XOF",
-        quote_prefix: "DEV-",
-        invoice_prefix: "FAC-",
-        receipt_prefix: "REC-",
-        decimals: 0,
-        date_format: "dd/MM/yyyy",
-        logo_url: null,
-        signature_url: null,
-        stamp_url: null,
-      }) as any)
-      .eq("id", settingsId)
-      .eq("tenant_id", tenantId);
-    if (error) return toast.error(formatSupabaseError(error));
-    configureCurrency("XOF", 0);
-    try {
-      await saveAiSettings({
-        data: { openai_key: null, gemini_key: null, claude_key: null, ai_model: null },
-      });
-    } catch (e) {
-      toast.error(formatSupabaseError(e) || "Erreur Supabase inconnue");
-    }
-    refetch();
-    toast.success("Paramètres réinitialisés");
-  };
-
-  const backup = () => {
-    exportCfg();
-    toast.success("Sauvegarde créée");
-  };
-
-  return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm p-5">
-      <h3 className="font-semibold text-sm mb-3">Actions rapides</h3>
-      <div className="grid grid-cols-1 gap-2">
-        <Button variant="outline" size="sm" className="justify-start gap-2" onClick={exportCfg}>
-          <Download className="h-4 w-4" /> Exporter la configuration
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="justify-start gap-2"
-          onClick={() => fileInput.current?.click()}
-        >
-          <UploadIcon className="h-4 w-4" /> Importer une configuration
-        </Button>
-        <Button variant="outline" size="sm" className="justify-start gap-2" onClick={backup}>
-          <DatabaseBackup className="h-4 w-4" /> Créer une sauvegarde
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="justify-start gap-2 text-destructive hover:text-destructive"
-          onClick={reset}
-        >
-          <RotateCcw className="h-4 w-4" /> Réinitialiser les paramètres
-        </Button>
-      </div>
-      <input
-        ref={fileInput}
-        type="file"
-        accept="application/json"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) importCfg(f);
-          e.target.value = "";
-        }}
-      />
-    </section>
-  );
+function ComingSoon() {
+  return <section className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border bg-card px-6 text-center shadow-sm"><div className="mb-5 rounded-2xl bg-primary/10 p-4 text-primary"><LockKeyhole className="h-9 w-9" /></div><Badge variant="secondary" className="mb-3 rounded-full">Bientôt disponible</Badge><h2 className="text-xl font-semibold">Rôles et permissions</h2><p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Cette fonctionnalité sera disponible prochainement.</p></section>;
 }

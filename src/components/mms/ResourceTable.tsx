@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, X, Loader2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Loader2, FilePlus2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
 import { useTenant } from "@/providers/TenantProvider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { generateSafeId } from "@/lib/uuid";
 
 // Dynamic table access — cast client so table names typed as string are accepted.
 const db = supabase as unknown as {
@@ -26,7 +28,8 @@ const db = supabase as unknown as {
   };
 };
 
-export type FieldType = "text" | "textarea" | "number" | "email" | "tel" | "date" | "select";
+export type FieldType =
+  "text" | "textarea" | "number" | "email" | "tel" | "date" | "select" | "image";
 
 export interface FieldDef {
   name: string;
@@ -55,8 +58,20 @@ export interface ResourceTableProps<T extends { id: string }> {
   orderBy?: { column: string; ascending?: boolean };
   defaultValues?: Partial<T>;
   renderActions?: (data: T[]) => ReactNode;
+  renderRowActions?: (row: T) => ReactNode;
   deletePermission?: string;
   entityName?: string;
+  createFields?: FieldDef[];
+  prepareCreatePayload?: (values: Record<string, unknown>) => Record<string, unknown>;
+  prepareEditValues?: (row: T) => Record<string, unknown>;
+  prepareEditPayload?: (values: Record<string, unknown>) => Record<string, unknown>;
+  selectable?: boolean;
+  renderSelectionActions?: (selected: T[], clear: () => void) => ReactNode;
+  imageStorage?: { bucket: string; folder: string };
+  deleteRow?: (row: T) => Promise<void>;
+  deleteErrorMessage?: string;
+  filterRows?: (row: T) => boolean;
+  hideDeleteAction?: boolean;
 }
 
 export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
@@ -72,14 +87,30 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
     orderBy,
     defaultValues = {},
     renderActions,
+    renderRowActions,
     deletePermission,
     entityName,
+    createFields,
+    prepareCreatePayload,
+    prepareEditValues,
+    prepareEditPayload,
+    selectable = false,
+    renderSelectionActions,
+    imageStorage,
+    deleteRow,
+    deleteErrorMessage,
+    filterRows,
+    hideDeleteAction = false,
   } = props;
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<T | null>(null);
   const [creating, setCreating] = useState(false);
-  const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const { data: userData } = useQuery({
+    queryKey: ["user"],
+    queryFn: () => supabase.auth.getUser(),
+  });
   const permissionsQuery = usePermissions();
   const { roleId } = permissionsQuery.data || { roleId: null };
   const userId = userData?.data?.user?.id;
@@ -101,18 +132,36 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return data;
-    return data.filter((row) =>
+    const visible = filterRows ? data.filter(filterRows) : data;
+    if (!s) return visible;
+    return visible.filter((row) =>
       searchFields.some((f) =>
         String(row[f] ?? "")
           .toLowerCase()
           .includes(s),
       ),
     );
-  }, [data, q, searchFields]);
+  }, [data, q, searchFields, filterRows]);
+  const selected = useMemo(
+    () => data.filter((row) => selectedIds.has(row.id)),
+    [data, selectedIds],
+  );
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((row) => selectedIds.has(row.id));
+  const toggle = (id: string) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const delMut = useMutation({
     mutationFn: async (row: T) => {
+      if (deleteRow) {
+        await deleteRow(row);
+        return row;
+      }
       const { error } = await db.from(table).delete().eq("id", row.id);
       if (error) throw error;
       return row;
@@ -124,7 +173,8 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
       toast.success(`${singular} supprimé`);
       qc.invalidateQueries({ queryKey: [table] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(deleteErrorMessage ?? e.message ?? `Impossible de supprimer ce ${singular.toLowerCase()}.`),
   });
 
   return (
@@ -140,14 +190,15 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
           />
         </div>
         <div className="flex items-center gap-3">
+          {renderSelectionActions?.(selected, () => setSelectedIds(new Set()))}
           {renderActions && renderActions(filtered)}
           {canCreate && (
-              <button
-                onClick={() => setCreating(true)}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-              >
-                <Plus className="h-4 w-4" /> Nouveau {singular.toLowerCase()}
-              </button>
+            <button
+              onClick={() => setCreating(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> Nouveau {singular.toLowerCase()}
+            </button>
           )}
         </div>
       </div>
@@ -156,19 +207,36 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
         <table className="w-full text-sm min-w-max">
           <thead className="bg-muted/40 text-muted-foreground text-xs uppercase tracking-wide">
             <tr>
+              {selectable && (
+                <th className="w-12 px-4 py-3">
+                  <Checkbox
+                    aria-label="Tout sélectionner"
+                    checked={allFilteredSelected}
+                    onCheckedChange={() =>
+                      setSelectedIds((current) => {
+                        const next = new Set(current);
+                        filtered.forEach((row) =>
+                          allFilteredSelected ? next.delete(row.id) : next.add(row.id),
+                        );
+                        return next;
+                      })
+                    }
+                  />
+                </th>
+              )}
               {columns.map((c, i) => (
                 <th key={i} className={`text-left px-4 py-3 font-medium ${c.className ?? ""}`}>
                   {c.header}
                 </th>
               ))}
-              <th className="w-24" />
+              <th className="w-24 px-4 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
                 <td
-                  colSpan={columns.length + 1}
+                  colSpan={columns.length + 1 + (selectable ? 1 : 0)}
                   className="text-center py-12 text-muted-foreground"
                 >
                   <Loader2 className="h-5 w-5 animate-spin mx-auto" />
@@ -177,7 +245,7 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
             ) : filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length + 1}
+                  colSpan={columns.length + 1 + (selectable ? 1 : 0)}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Aucun {plural.toLowerCase()} {q ? "trouvé" : "pour l'instant"}.
@@ -189,6 +257,15 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
                   key={row.id}
                   className="border-t border-border hover:bg-muted/30 transition-colors"
                 >
+                  {selectable && (
+                    <td className="px-4 py-3">
+                      <Checkbox
+                        aria-label={`Sélectionner ${String(row.name ?? row.first_name ?? singular)}`}
+                        checked={selectedIds.has(row.id)}
+                        onCheckedChange={() => toggle(row.id)}
+                      />
+                    </td>
+                  )}
                   {columns.map((c, i) => (
                     <td key={i} className={`px-4 py-3 ${c.className ?? ""}`}>
                       {c.cell(row)}
@@ -205,7 +282,8 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
                           <Pencil className="h-4 w-4" />
                         </button>
                       )}
-                      {canDelete && (
+                      {renderRowActions?.(row)}
+                      {canDelete && !hideDeleteAction && (
                         <button
                           onClick={() => {
                             if (confirm(`Supprimer ce ${singular.toLowerCase()} ?`))
@@ -232,7 +310,14 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
             table={table}
             singular={singular}
             fields={fields}
-            initial={editing ?? (defaultValues as Partial<T>)}
+            createFields={createFields}
+            prepareCreatePayload={prepareCreatePayload}
+            initial={
+              editing ? (prepareEditValues?.(editing) ?? editing) : (defaultValues as Partial<T>)
+            }
+            editingId={editing?.id}
+            prepareEditPayload={prepareEditPayload}
+            imageStorage={imageStorage}
             onClose={() => {
               setCreating(false);
               setEditing(null);
@@ -248,44 +333,58 @@ function ResourceFormDialog<T extends { id: string }>({
   table,
   singular,
   fields,
+  createFields,
+  prepareCreatePayload,
+  prepareEditPayload,
+  editingId,
   initial,
   onClose,
+  imageStorage,
 }: {
   table: string;
   singular: string;
   fields: FieldDef[];
+  createFields?: FieldDef[];
+  prepareCreatePayload?: (values: Record<string, unknown>) => Record<string, unknown>;
+  prepareEditPayload?: (values: Record<string, unknown>) => Record<string, unknown>;
+  editingId?: string;
   initial: Partial<T> | T;
   onClose: () => void;
+  imageStorage?: { bucket: string; folder: string };
 }) {
   const qc = useQueryClient();
   const { profile } = useTenant();
-  const isEdit = Boolean((initial as T).id);
+  const isEdit = Boolean(editingId);
+  const activeFields = isEdit ? fields : (createFields ?? fields);
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     const base: Record<string, unknown> = {};
-    for (const f of fields) base[f.name] = (initial as Record<string, unknown>)[f.name] ?? "";
+    for (const f of activeFields) base[f.name] = (initial as Record<string, unknown>)[f.name] ?? "";
     return base;
   });
 
   const saveMut = useMutation({
     mutationFn: async () => {
       const payload: Record<string, unknown> = {};
-      for (const f of fields) {
+      for (const f of activeFields) {
         let v = values[f.name];
         if (f.type === "number") v = v === "" || v === null ? null : Number(v);
         if (v === "") v = null;
         payload[f.name] = v;
       }
+      const finalPayload =
+        isEdit && prepareEditPayload
+          ? prepareEditPayload(payload)
+          : !isEdit && prepareCreatePayload
+            ? prepareCreatePayload(payload)
+            : payload;
       if (isEdit) {
-        const { error } = await db
-          .from(table)
-          .update(payload)
-          .eq("id", (initial as T).id);
+        const { error } = await db.from(table).update(finalPayload).eq("id", editingId);
         if (error) throw error;
       } else {
         if (profile?.tenant_id) {
-            payload.tenant_id = profile.tenant_id;
+          finalPayload.tenant_id = profile.tenant_id;
         }
-        const { error } = await db.from(table).insert(payload);
+        const { error } = await db.from(table).insert(finalPayload);
         if (error) throw error;
       }
     },
@@ -312,7 +411,7 @@ function ResourceFormDialog<T extends { id: string }>({
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
-          for (const f of fields) {
+          for (const f of activeFields) {
             if (f.required && !values[f.name]) {
               toast.error(`Le champ « ${f.label} » est requis`);
               return;
@@ -331,7 +430,7 @@ function ResourceFormDialog<T extends { id: string }>({
           </button>
         </div>
         <div className="p-6 grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
-          {fields.map((f) => {
+          {activeFields.map((f) => {
             const span =
               (f.colSpan ?? (f.type === "textarea" ? 2 : 1)) === 2 ? "col-span-2" : "col-span-1";
             const commonProps = {
@@ -350,7 +449,13 @@ function ResourceFormDialog<T extends { id: string }>({
                   {f.label}
                   {f.required && <span className="text-destructive"> *</span>}
                 </span>
-                {f.type === "textarea" ? (
+                {f.type === "image" ? (
+                  <ImageField
+                    value={String(values[f.name] ?? "")}
+                    onChange={(value) => setValues((s) => ({ ...s, [f.name]: value }))}
+                    storage={imageStorage}
+                  />
+                ) : f.type === "textarea" ? (
                   <textarea rows={3} {...commonProps} />
                 ) : f.type === "select" ? (
                   <select {...commonProps}>
@@ -387,5 +492,105 @@ function ResourceFormDialog<T extends { id: string }>({
         </div>
       </motion.form>
     </motion.div>
+  );
+}
+
+export function ImageField({
+  value,
+  onChange,
+  storage,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  storage?: { bucket: string; folder: string };
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { profile } = useTenant();
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const select = async (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      toast.error("Veuillez sélectionner une image ou un PDF.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Le document ne doit pas dépasser 5 Mo.");
+      return;
+    }
+    if (storage) {
+      if (!profile?.tenant_id) return toast.error("Établissement introuvable.");
+      setUploading(true);
+      try {
+        const extension = file.type === "application/pdf" ? "pdf" :
+          file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+        const path = `${profile.tenant_id}/${storage.folder}/${generateSafeId()}.${extension}`;
+        const { error } = await supabase.storage
+          .from(storage.bucket)
+          .upload(path, file, { contentType: file.type });
+        if (error) throw error;
+        setSelectedName(file.name);
+        setPreview(file.type.startsWith("image/") ? URL.createObjectURL(file) : null);
+        onChange(path);
+      } catch {
+        toast.error("Impossible de préparer le fichier. Veuillez réessayer.");
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => onChange(String(reader.result ?? ""));
+    reader.onerror = () => toast.error("Impossible de lire cette image.");
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="space-y-3">
+      {value && (preview || value.startsWith("data:image/")) && (
+        <div className="relative overflow-hidden rounded-xl border border-border bg-muted/40">
+          <img
+            src={preview ?? value}
+            alt="Aperçu de la pièce d'identité"
+            className="h-40 w-full object-contain"
+          />
+          <button
+            type="button"
+            onClick={() => { onChange(""); setPreview(null); setSelectedName(null); }}
+            className="absolute right-2 top-2 rounded-lg bg-background/90 p-2 text-destructive shadow"
+            aria-label="Retirer le document"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {value && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm">
+          <span className="truncate">{selectedName ?? value.split("/").pop()}</span>
+          <button type="button" className="text-destructive hover:underline" onClick={() => { onChange(""); setPreview(null); setSelectedName(null); }}>Retirer</button>
+        </div>
+      )}
+      <div>
+        <button
+          disabled={uploading}
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+        >
+          <FilePlus2 className="h-4 w-4" /> {uploading ? "Ajout…" : "Ajouter une pièce d’identité"}
+        </button>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*,application/pdf"
+        className="sr-only"
+        onChange={(e) => {
+          select(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+    </div>
   );
 }

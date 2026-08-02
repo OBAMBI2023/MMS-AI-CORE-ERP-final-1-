@@ -37,7 +37,7 @@ export function PermissionsTab() {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
   
-  const { data: roles, isLoading: rolesLoading } = useQuery({
+  const { data: roles, isLoading: rolesLoading, error: rolesError } = useQuery({
     queryKey: ["roles", tenantId],
     queryFn: async () => {
       if (!tenantId) return [];
@@ -51,7 +51,7 @@ export function PermissionsTab() {
     enabled: !tenantLoading && Boolean(tenantId),
   });
 
-  const { data: allPermissions, isLoading: permsLoading } = useQuery({
+  const { data: allPermissions, isLoading: permsLoading, error: permissionsError } = useQuery({
     queryKey: ["permissions"],
     queryFn: async () => {
       const { data, error } = await supabase.from("permissions").select("*");
@@ -116,6 +116,9 @@ export function PermissionsTab() {
   });
 
   if (rolesLoading || permsLoading) return <Loader2 className="animate-spin h-8 w-8 mx-auto my-10" />;
+  if (rolesError || permissionsError) {
+    return <p className="text-sm text-destructive">{formatSupabaseError(rolesError ?? permissionsError)}</p>;
+  }
 
   const togglePermission = (roleId: string, permId: string) => {
     setPermissionsState(prev => ({
@@ -152,7 +155,7 @@ export function PermissionsTab() {
                                         checked={permissionsState[role.id]?.[perm.id]}
                                         onCheckedChange={() => togglePermission(role.id, perm.id)}
                                         disabled={
-                                          ["Administrateur", "Manager", "Gérant"].includes(role.name) ||
+                                          role.name === "Administrateur" ||
                                           (perm.code === "parties.access" &&
                                             !["Administrateur", "Manager", "Gérant", "Comptable"].includes(role.name))
                                         }

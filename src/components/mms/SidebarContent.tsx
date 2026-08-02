@@ -44,18 +44,19 @@ const items = [
   { icon: Receipt, label: "Dépenses", to: "/depenses" },
   { icon: TrendingUp, label: "Rapports", to: "/rapports" },
   { icon: Settings, label: "Paramètres", to: "/parametres" },
-  { icon: Hotel, label: "Tableau de bord Hôtel", to: "/hotel" },
+  { icon: Hotel, label: "Tableau de bord", to: "/hotel" },
   { icon: CalendarDays, label: "Réservations", to: "/hotel/reservations" },
-  { icon: BedDouble, label: "Chambres et logements", to: "/hotel/logements" },
-  { icon: ContactRound, label: "Clients / Voyageurs", to: "/hotel/voyageurs" },
-  { icon: ChartNoAxesCombined, label: "Rapports Hôtel", to: "/hotel/rapports" },
-  { icon: Settings2, label: "Paramètres Hôtel", to: "/hotel/parametres" },
+  { icon: BedDouble, label: "Logements", to: "/hotel/chambres" },
+  { icon: ContactRound, label: "Voyageurs", to: "/hotel/voyageurs" },
+  { icon: ChartNoAxesCombined, label: "Rapports", to: "/hotel/rapports" },
+  { icon: Settings2, label: "Paramètres", to: "/hotel/parametres" },
 ] as const;
 
 const hotelPaths = new Set([
   "/hotel",
   "/hotel/reservations",
   "/hotel/logements",
+  "/hotel/chambres",
   "/hotel/voyageurs",
   "/depenses",
   "/hotel/rapports",
@@ -100,17 +101,17 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
             key={`${it.label}-${idx}`}
             to={it.to}
             onClick={onItemClick}
-            className="relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/75 transition-colors hover:text-white"
+            className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/75 transition-colors hover:text-white ${isHotel ? "hover:bg-white/5" : ""}`}
           >
             {active && (
               <motion.div
                 layoutId="sidebar-active"
-                className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary to-primary-glow shadow-lg shadow-primary/40"
+                className={`absolute inset-0 rounded-xl ${isHotel ? "bg-[#C9A227] shadow-lg shadow-black/10" : "bg-gradient-to-r from-primary to-primary-glow shadow-lg shadow-primary/40"}`}
                 transition={{ type: "spring", stiffness: 380, damping: 32 }}
               />
             )}
-            <it.icon className={`relative h-[18px] w-[18px] ${active ? "text-white" : ""}`} />
-            <span className={`relative ${active ? "text-white" : ""}`}>
+            <it.icon className={`relative h-[18px] w-[18px] ${active ? (isHotel ? "text-[#0F172A]" : "text-white") : ""}`} />
+            <span className={`relative ${active ? (isHotel ? "text-[#0F172A]" : "text-white") : ""}`}>
               {it.to === "/services"
                 ? catalogSettingsQuery.data?.catalog_mode === "products"
                   ? "Produits"

@@ -50,7 +50,7 @@ export function UserManagement() {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, error: usersError } = useQuery({
     queryKey: ["users", tenantId],
     queryFn: async () => {
       if (!tenantId) return [];
@@ -109,6 +109,10 @@ export function UserManagement() {
         <Loader2 className="animate-spin h-8 w-8" />
       </div>
     );
+
+  if (usersError) {
+    return <p className="text-sm text-destructive">{formatSupabaseError(usersError)}</p>;
+  }
 
   return (
     <div className="space-y-4">

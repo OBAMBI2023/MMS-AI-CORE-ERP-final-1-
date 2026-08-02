@@ -66,8 +66,9 @@ export function UserFormDialog({ user }: { user?: any }) {
       if (!tenantId) return [];
       const { data, error } = await supabase
         .from("roles")
-        .select("id, name")
-        .eq("tenant_id", tenantId);
+        .select("id, name, role_permissions(permissions(code, description))")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true);
       if (error) throw error;
       return data;
     },
@@ -253,6 +254,18 @@ export function UserFormDialog({ user }: { user?: any }) {
                     ))}
                   </SelectContent>
                 </Select>
+                {formData.role_id && (
+                  <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    <p className="mb-2 font-medium text-foreground">Permissions héritées</p>
+                    <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
+                      {(roles?.find((role) => role.id === formData.role_id)?.role_permissions ?? []).map((item: any) => (
+                        <span key={item.permissions.code} className="rounded bg-background px-2 py-1 ring-1 ring-border">
+                          {item.permissions.description || item.permissions.code}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               {!isEdit && (
                 <>

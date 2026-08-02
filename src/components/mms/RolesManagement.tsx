@@ -15,12 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Copy, Loader2, Plus, Pencil, Power, Trash2 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
 import { useTenant } from "@/providers/TenantProvider";
 import { formatSupabaseError } from "@/lib/supabase-error";
+import { deleteTenantRole, duplicateTenantRole, saveTenantRole, setTenantRoleActive } from "@/lib/role-management.server";
 
 export function RolesManagement() {
   const qc = useQueryClient();
@@ -32,7 +33,7 @@ export function RolesManagement() {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
 
-  const { data: roles, isLoading } = useQuery({
+  const { data: roles, isLoading, error: rolesError } = useQuery({
     queryKey: ["roles", tenantId],
     queryFn: async () => {
       if (!tenantId) return [];
@@ -46,7 +47,7 @@ export function RolesManagement() {
     enabled: !tenantLoading && Boolean(tenantId),
   });
 
-  const { data: allPermissions } = useQuery({
+  const { data: allPermissions, error: permissionsError } = useQuery({
     queryKey: ["permissions"],
     queryFn: async () => {
       const { data, error } = await supabase.from("permissions").select("*");
@@ -56,18 +57,7 @@ export function RolesManagement() {
   });
 
   const deleteRole = useMutation({
-    mutationFn: async (role: any) => {
-      if (!tenantId || role.tenant_id !== tenantId) {
-        throw new Error("Ce rôle n'appartient pas au tenant actif.");
-      }
-      const { error } = await supabase
-        .from("roles")
-        .delete()
-        .eq("id", role.id)
-        .eq("tenant_id", tenantId);
-      if (error) throw error;
-      return role;
-    },
+    mutationFn: async (role: any) => { await deleteTenantRole({ data: { id: role.id } }); return role; },
     onSuccess: async (role) => {
       if (userId) {
         await logAction(userId, roleId ?? null, "delete", "roles", { role_name: role.name });
@@ -77,8 +67,21 @@ export function RolesManagement() {
     },
     onError: (error) => toast.error(formatSupabaseError(error)),
   });
+  const duplicateRole = useMutation({
+    mutationFn: (id: string) => duplicateTenantRole({ data: { id } }),
+    onSuccess: () => { toast.success("Rôle dupliqué"); qc.invalidateQueries({ queryKey: ["roles", tenantId] }); },
+    onError: (error) => toast.error(formatSupabaseError(error)),
+  });
+  const toggleRole = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => setTenantRoleActive({ data: { id, active } }),
+    onSuccess: () => { toast.success("Statut du rôle mis à jour"); qc.invalidateQueries({ queryKey: ["roles", tenantId] }); },
+    onError: (error) => toast.error(formatSupabaseError(error)),
+  });
 
   if (isLoading) return <Loader2 className="animate-spin h-8 w-8 mx-auto my-10" />;
+  if (rolesError || permissionsError) {
+    return <p className="text-sm text-destructive">{formatSupabaseError(rolesError ?? permissionsError)}</p>;
+  }
 
   return (
     <div className="space-y-6">
@@ -93,12 +96,14 @@ export function RolesManagement() {
             className="p-4 border border-border rounded-xl bg-card flex items-center justify-between shadow-sm"
           >
             <div>
-              <h3 className="font-semibold text-base">{role.name}</h3>
+              <h3 className="font-semibold text-base">{role.name} {role.is_active === false && <span className="text-xs text-muted-foreground">(désactivé)</span>}</h3>
               <p className="text-sm text-muted-foreground">{role.description}</p>
             </div>
             <div className="flex gap-1">
               <RoleDialog role={role} permissions={allPermissions || []} tenantId={tenantId} />
-              {canDeleteRole && (
+              {role.name !== "Administrateur" && <Button variant="ghost" size="sm" title="Dupliquer" onClick={() => duplicateRole.mutate(role.id)}><Copy className="h-4 w-4" /></Button>}
+              {role.name !== "Administrateur" && <Button variant="ghost" size="sm" title={role.is_active === false ? "Activer" : "Désactiver"} onClick={() => toggleRole.mutate({ id: role.id, active: role.is_active === false })}><Power className="h-4 w-4" /></Button>}
+              {canDeleteRole && role.name !== "Administrateur" && (
                 <Button
                     variant="ghost"
                     size="sm"
@@ -148,45 +153,7 @@ function RoleDialog({
   const saveRole = useMutation({
     mutationFn: async () => {
       if (!tenantId) throw new Error("Aucun tenant actif.");
-      if (role) {
-        if (role.tenant_id !== tenantId) {
-          throw new Error("Ce rôle n'appartient pas au tenant actif.");
-        }
-        const { error: roleError } = await supabase
-          .from("roles")
-          .update({ name, description })
-          .eq("id", role.id)
-          .eq("tenant_id", tenantId);
-        if (roleError) throw roleError;
-
-        const { error: deleteError } = await supabase
-          .from("role_permissions")
-          .delete()
-          .eq("role_id", role.id);
-        if (deleteError) throw deleteError;
-        if (selectedPermissions.length > 0) {
-          const { error } = await supabase
-            .from("role_permissions")
-            .insert(selectedPermissions.map((pid) => ({ role_id: role.id, permission_id: pid })));
-          if (error) throw error;
-        }
-      } else {
-        const { data: newRole, error: roleError } = await supabase
-          .from("roles")
-          .insert({ name, description, tenant_id: tenantId })
-          .select()
-          .single();
-        if (roleError) throw roleError;
-
-        if (selectedPermissions.length > 0) {
-          const { error } = await supabase
-            .from("role_permissions")
-            .insert(
-              selectedPermissions.map((pid) => ({ role_id: newRole.id, permission_id: pid })),
-            );
-          if (error) throw error;
-        }
-      }
+      await saveTenantRole({ data: { id: role?.id, name, description, permissionIds: selectedPermissions } });
     },
     onSuccess: () => {
       toast.success("Rôle enregistré");
@@ -268,6 +235,7 @@ function RoleDialog({
                     <div key={p.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={p.id}
+                        disabled={role?.name === "Administrateur"}
                         checked={
                           Array.isArray(selectedPermissions) && selectedPermissions.includes(p.id)
                         }

@@ -1776,25 +1776,28 @@ export type Database = {
         ]
       }
       roles: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
+          Row: {
+            created_at: string
+            description: string | null
+            id: string
+            is_active: boolean
+            name: string
           tenant_id: string
         }
         Insert: {
           created_at?: string
-          description?: string | null
-          id?: string
-          name: string
+            description?: string | null
+            id?: string
+            is_active?: boolean
+            name: string
           tenant_id: string
         }
         Update: {
           created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
+            description?: string | null
+            id?: string
+            is_active?: boolean
+            name?: string
           tenant_id?: string
         }
         Relationships: [

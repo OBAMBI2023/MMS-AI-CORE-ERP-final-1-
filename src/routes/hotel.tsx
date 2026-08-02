@@ -1,1 +1,9 @@
-import {createFileRoute} from "@tanstack/react-router";import {HotelDashboardPage} from "@/components/hotel/HotelPages";export const Route=createFileRoute("/hotel")({component:HotelDashboardPage});
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/hotel")({
+  component: HotelLayout,
+});
+
+function HotelLayout() {
+  return <Outlet />;
+}

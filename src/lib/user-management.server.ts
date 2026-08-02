@@ -5,11 +5,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { logAction } from "@/lib/audit.server";
 import { formatSupabaseError } from "@/lib/supabase-error";
 
-const TENANT_ROLE_NAMES = [
-  "Administrateur", "Gérant", "Manager", "Comptable",
-  "Commercial", "Caissier", "Employé",
-] as const;
-
 async function logRejectedPrivilegeAttempt(
   actorId: string,
   reason: string,
@@ -45,7 +40,7 @@ async function getAdminTenantContext() {
 async function assertProfileInTenant(profileId: string, tenantId: string) {
   const { data, error } = await (supabaseAdmin as any)
     .from("profiles")
-    .select("id, name")
+    .select("id")
     .eq("id", profileId)
     .eq("tenant_id", tenantId)
     .single();
@@ -57,13 +52,13 @@ async function assertProfileInTenant(profileId: string, tenantId: string) {
 async function assertRoleInTenant(roleId: string, tenantId: string) {
   const { data, error } = await (supabaseAdmin as any)
     .from("roles")
-    .select("id")
+    .select("id, is_active")
     .eq("id", roleId)
     .eq("tenant_id", tenantId)
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
-  if (!data || !TENANT_ROLE_NAMES.includes(data.name)) {
+  if (!data || data.is_active === false) {
     throw new Error("Le rôle sélectionné n'est pas autorisé dans ce tenant.");
   }
 }
@@ -219,6 +214,7 @@ export const toggleStatus = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().uuid(), status: z.enum(["actif", "suspendu"]) }))
   .handler(async ({ data }) => {
     const { user: admin, tenantId } = await getAdminTenantContext();
+    if (admin.id === data.id) throw new Error("Vous ne pouvez pas désactiver votre propre compte administrateur.");
     await assertProfileInTenant(data.id, tenantId);
 
     const { error } = await (supabaseAdmin as any)
