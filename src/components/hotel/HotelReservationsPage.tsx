@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Check,
   ChevronsUpDown,
+  FileDown,
   List,
   MoreVertical,
   Pencil,
@@ -57,6 +58,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { useCompanySettings } from "@/hooks/use-company-settings";
+import { createHotelInvoicePdf } from "@/lib/mms/hotel-invoice-pdf";
+import { downloadPdf } from "@/lib/mms/download-pdf";
 
 const db = supabase as any;
 const statuses = [
@@ -91,6 +95,7 @@ const emptyForm = {
 export function HotelReservationsPage() {
   const qc = useQueryClient();
   const { profile } = useTenant();
+  const { settings, logoUrl } = useCompanySettings(profile?.tenant_id);
   const [form, setForm] = useState(emptyForm);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -105,7 +110,7 @@ export function HotelReservationsPage() {
     enabled: Boolean(profile?.tenant_id),
     queryFn: async () => {
       const tenantId = profile!.tenant_id;
-      const [r, g, rooms] = await Promise.all([
+      const [r, g, rooms, companions] = await Promise.all([
         db
           .from("hotel_reservation_balances")
           .select("*")
@@ -113,12 +118,16 @@ export function HotelReservationsPage() {
           .order("check_in", { ascending: false }),
         db
           .from("hotel_guests")
-          .select("id,first_name,last_name,phone,email")
+          .select("id,first_name,last_name,phone,email,identity_document_path,identity_number,identity_type")
           .eq("tenant_id", tenantId),
         db.from("hotel_rooms").select("id,number,rate,status").eq("tenant_id", tenantId),
+        db
+          .from("hotel_guest_companions")
+          .select("reservation_id,full_name")
+          .eq("tenant_id", tenantId),
       ]);
-      for (const result of [r, g, rooms]) if (result.error) throw result.error;
-      return { reservations: r.data ?? [], guests: g.data ?? [], rooms: rooms.data ?? [] };
+      for (const result of [r, g, rooms, companions]) if (result.error) throw result.error;
+      return { reservations: r.data ?? [], guests: g.data ?? [], rooms: rooms.data ?? [], companions: companions.data ?? [] };
     },
   });
 
@@ -266,6 +275,43 @@ export function HotelReservationsPage() {
       notes: r.notes ?? "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const downloadReservationPdf = async (reservation: any) => {
+    try {
+      const guest: any = guests.get(reservation.guest_id);
+      const room: any = rooms.get(reservation.room_id);
+      const pdf = await createHotelInvoicePdf(
+        {
+          id: reservation.id,
+          check_in: reservation.check_in,
+          check_out: reservation.check_out,
+          nights: Number(reservation.nights ?? 0),
+          nightly_rate: Number(reservation.nightly_rate ?? 0),
+          discount: Number(reservation.discount ?? 0),
+          grand_total: Number(reservation.grand_total ?? 0),
+          paid_total: Number(reservation.paid_total ?? 0),
+          balance_due: Number(reservation.balance_due ?? 0),
+          status: reservation.status,
+          guestName: guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL,
+          guestPhone: guest?.phone,
+          companions: (data?.companions ?? [])
+            .filter((companion: any) => companion.reservation_id === reservation.id)
+            .map((companion: any) => companion.full_name),
+          identityProvided: Boolean(
+            guest?.identity_document_path || guest?.identity_number || guest?.identity_type,
+          ),
+          roomNumber: room?.number ?? "—",
+          notes: reservation.notes,
+        },
+        settings,
+        logoUrl,
+      );
+      await downloadPdf(pdf.doc, pdf.filename);
+      toast.success("Fiche de réservation téléchargée.");
+    } catch (error) {
+      console.error("Échec de la génération de la fiche de réservation PDF", error);
+      toast.error("Impossible de générer la fiche PDF de cette réservation.");
+    }
   };
   return (
     <AppShell title="Réservations" subtitle="Liste, planning, arrivées et départs">
@@ -448,6 +494,7 @@ export function HotelReservationsPage() {
             requestDelete={setDeleting}
             canUpdate={canUpdate}
             canDelete={canDelete}
+            downloadPdf={downloadReservationPdf}
             changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
           />
         )}
@@ -674,6 +721,7 @@ function ReservationTable({
   requestDelete,
   canUpdate,
   canDelete,
+  downloadPdf,
   changeStatus,
 }: any) {
   return (
@@ -721,8 +769,7 @@ function ReservationTable({
                 <td className="font-medium">{formatCurrency(Number(r.balance_due ?? 0))}</td>
                 <td className="text-right">
                   <div className="flex justify-end gap-1">
-                    {(canUpdate || canDelete) && (
-                      <DropdownMenu>
+                    <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             size="icon"
@@ -739,9 +786,12 @@ function ReservationTable({
                               <Pencil /> Modifier la réservation
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
+                            <FileDown /> Télécharger la fiche PDF
+                          </DropdownMenuItem>
                           {canDelete && (
                             <>
-                              {canUpdate && <DropdownMenuSeparator />}
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
                                 onSelect={() => requestDelete(r)}
@@ -752,7 +802,6 @@ function ReservationTable({
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    )}
                     {["pending", "confirmed"].includes(r.status) && (
                       <Button
                         size="sm"

@@ -1,7 +1,17 @@
 import { jsPDF } from "jspdf";
-import { PdfLayoutEngine } from "./PdfLayoutEngine";
 import { PDF_COLORS } from "./PdfTheme";
-import { createHotelPdf, finishHotelPdf, formatHotelPdfAmount, formatHotelPdfDate, safeHotelPdfNumber } from "./hotel-pdf-engine";
+import {
+  createHotelPdf,
+  formatHotelPdfDate,
+  safeHotelPdfNumber,
+  safeHotelPdfText,
+} from "./hotel-pdf-engine";
+import {
+  formatMoney,
+  reservationDiscountAmount,
+  reservationPaymentStatus,
+} from "./hotel-reservation-pdf-values";
+export { formatMoney } from "./hotel-reservation-pdf-values";
 
 export type HotelInvoiceData = {
   id: string;
@@ -13,94 +23,151 @@ export type HotelInvoiceData = {
   grand_total: number;
   paid_total: number;
   balance_due: number;
+  status: string;
   guestName: string;
   guestPhone?: string | null;
+  companions?: string[];
+  identityProvided?: boolean;
   roomNumber: string;
+  notes?: string | null;
 };
 
-type InvoiceTotalRow = { label: string; value: string; status?: boolean };
+const MARGIN = 12;
+const CONTENT_WIDTH = 210 - MARGIN * 2;
+export const formatDate = (value: unknown) => {
+  const formatted = formatHotelPdfDate(value);
+  return /(?:â|Ã|undefined|null|NaN)/i.test(formatted) ? "—" : formatted;
+};
 
-function fitRightAlignedText(
+function text(value: unknown, fallback = "—") {
+  const plain = safeHotelPdfText(value, fallback)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]+);?/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain || fallback;
+}
+
+type Detail = [label: string, value: string];
+
+function informationBlock(
   doc: jsPDF,
-  text: string,
-  rightX: number,
-  baselineY: number,
-  maxWidth: number,
-  initialFontSize: number,
+  title: string,
+  rows: Detail[],
+  x: number,
+  y: number,
+  width: number,
 ) {
-  let fontSize = initialFontSize;
-  doc.setCharSpace(0);
-  doc.setFontSize(fontSize);
-  while (fontSize > 6 && doc.getTextWidth(text) > maxWidth) {
-    fontSize -= 0.25;
-    doc.setFontSize(fontSize);
-  }
-  doc.text(text, rightX, baselineY, { align: "right" });
-}
-
-function renderHotelInvoiceTotals(doc: jsPDF, rows: InvoiceTotalRow[], requestedY: number) {
-  const blockWidth = 82;
-  const rowHeight = 8;
-  const blockHeight = rows.length * rowHeight;
-  let y = requestedY;
-  if (y + blockHeight > doc.internal.pageSize.getHeight() - 26) {
-    doc.addPage();
-    y = 20;
-  }
-
-  const x = doc.internal.pageSize.getWidth() - 12 - blockWidth;
-  const padding = 4;
-  const contentWidth = blockWidth - padding * 2;
-  const statusValueWidth = contentWidth * 0.45;
-  const amountValueWidth = 38;
-  const valueRightX = x + blockWidth - padding;
-
-  rows.forEach((row, index) => {
-    const rowY = y + index * rowHeight;
-    const isStatus = row.status === true;
-    doc.setFillColor(...(isStatus ? PDF_COLORS.primary : PDF_COLORS.surface));
-    doc.setDrawColor(...(isStatus ? PDF_COLORS.primary : PDF_COLORS.line));
-    doc.roundedRect(x, rowY, blockWidth, rowHeight, isStatus ? 2 : 0.8, isStatus ? 2 : 0.8, "FD");
-    doc.setCharSpace(0);
-    doc.setFont("helvetica", isStatus ? "bold" : "normal");
-    doc.setFontSize(isStatus ? 8.5 : 8);
-    doc.setTextColor(...(isStatus ? ([255, 255, 255] as [number, number, number]) : PDF_COLORS.text));
-    doc.text(row.label.toUpperCase(), x + padding, rowY + 5.3, {
-      maxWidth: isStatus ? contentWidth * 0.51 : contentWidth - amountValueWidth - 3,
-    });
-    fitRightAlignedText(
-      doc,
-      row.value,
-      valueRightX,
-      rowY + 5.3,
-      isStatus ? statusValueWidth : amountValueWidth,
-      isStatus ? 8.5 : 8,
-    );
-  });
-
-  return y + blockHeight;
-}
-
-function renderSignatureArea(doc: jsPDF, requestedY: number) {
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const height = 34;
-  let y = requestedY;
-  if (y + height > pageHeight - 24) {
-    doc.addPage();
-    y = 20;
-  }
-  const width = 72;
-  const x = pageWidth - 12 - width;
+  const rowHeight = 10;
+  const height = 12 + rows.length * rowHeight;
   doc.setDrawColor(...PDF_COLORS.line);
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(x, y, width, height, 2, 2, "FD");
-  doc.setTextColor(...PDF_COLORS.primary);
+  doc.roundedRect(x, y, width, height, 2.5, 2.5, "FD");
+  doc.setFillColor(...PDF_COLORS.primary);
+  doc.roundedRect(x, y, width, 10, 2.5, 2.5, "F");
+  doc.rect(x, y + 7, width, 3, "F");
+  doc.setFillColor(...PDF_COLORS.secondary);
+  doc.rect(x, y, 2.5, 10, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.text("SIGNATURE / CACHET", x + width / 2, y + 7, { align: "center" });
+  doc.setFontSize(9);
+  doc.setTextColor(255, 255, 255);
+  doc.text(title.toUpperCase(), x + 7, y + 6.7);
+  rows.forEach(([label, value], index) => {
+    const rowY = y + 12 + index * rowHeight;
+    if (index) {
+      doc.setDrawColor(...PDF_COLORS.line);
+      doc.line(x + 5, rowY, x + width - 5, rowY);
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.2);
+    doc.setTextColor(...PDF_COLORS.muted);
+    doc.text(label, x + 5, rowY + 6.2, { maxWidth: width * 0.42 });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.2);
+    doc.setTextColor(...PDF_COLORS.text);
+    doc.text(text(value), x + width - 5, rowY + 6.2, { align: "right", maxWidth: width * 0.54 });
+  });
+  return y + height;
+}
+
+export function reservationFinancialRows(invoice: HotelInvoiceData): Detail[] {
+  const discount = reservationDiscountAmount(invoice.discount);
+  return [
+    ...(discount ? ([["Remise", discount]] as Detail[]) : []),
+    ["Montant total", formatMoney(invoice.grand_total)],
+    ["Avance versée", formatMoney(invoice.paid_total)],
+    ["Solde restant", formatMoney(Math.max(0, safeHotelPdfNumber(invoice.balance_due)))],
+  ];
+}
+
+function finances(doc: jsPDF, invoice: HotelInvoiceData, y: number) {
+  const rows = reservationFinancialRows(invoice);
+  const width = 96;
+  const x = 210 - MARGIN - width;
+  const rowHeight = 11;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...PDF_COLORS.primary);
+  doc.text("SITUATION FINANCIÈRE", x, y + 5);
   doc.setDrawColor(...PDF_COLORS.secondary);
-  doc.line(x + 9, y + height - 7, x + width - 9, y + height - 7);
+  doc.setLineWidth(0.6);
+  doc.line(x, y + 8, x + width, y + 8);
+  rows.forEach(([label, amount], index) => {
+    const rowY = y + 11 + index * rowHeight;
+    const emphasized = label === "Montant total" || label === "Solde restant";
+    doc.setFont("helvetica", emphasized ? "bold" : "normal");
+    doc.setFontSize(emphasized ? 9 : 8.2);
+    doc.setTextColor(...PDF_COLORS.text);
+    doc.text(label, x, rowY + 6.5);
+    doc.text(amount, x + width, rowY + 6.5, { align: "right", maxWidth: 46 });
+    doc.setDrawColor(...PDF_COLORS.line);
+    doc.setLineWidth(0.2);
+    doc.line(x, rowY + rowHeight, x + width, rowY + rowHeight);
+  });
+  const paid = safeHotelPdfNumber(invoice.paid_total);
+  const balance = Math.max(0, safeHotelPdfNumber(invoice.balance_due));
+  const payment = reservationPaymentStatus(paid, balance);
+  const badgeColor: [number, number, number] =
+    payment === "Soldé"
+      ? [36, 122, 72]
+      : payment === "Non payé"
+        ? [151, 55, 55]
+        : PDF_COLORS.secondary;
+  const badgeY = y + 15 + rows.length * rowHeight;
+  doc.setFillColor(...badgeColor);
+  doc.roundedRect(x + width - 48, badgeY, 48, 9, 4.5, 4.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(payment.toUpperCase(), x + width - 24, badgeY + 6, { align: "center", maxWidth: 43 });
+  return badgeY + 9;
+}
+
+function signatures(doc: jsPDF, y: number) {
+  const gap = 6;
+  const width = (CONTENT_WIDTH - gap * 2) / 3;
+  ["Signature client", "Signature réception", "Cachet"].forEach((label, index) => {
+    const x = MARGIN + index * (width + gap);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_COLORS.primary);
+    doc.text(label.toUpperCase(), x + width / 2, y, { align: "center" });
+    doc.setDrawColor(...PDF_COLORS.secondary);
+    doc.setLineWidth(0.35);
+    doc.line(x + 5, y + 24, x + width - 5, y + 24);
+  });
+}
+
+function footer(doc: jsPDF, reference: string) {
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(...PDF_COLORS.secondary);
+  doc.setLineWidth(0.4);
+  doc.line(MARGIN, height - 15, width - MARGIN, height - 15);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.8);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.text(reference, width / 2, height - 9, { align: "center" });
 }
 
 export async function createHotelInvoicePdf(
@@ -108,61 +175,44 @@ export async function createHotelInvoicePdf(
   settings?: Record<string, unknown> | null,
   logoUrl?: string | null,
 ) {
-  const number = `HOT-${invoice.id.replace(/-/g, "").slice(0, 10).toUpperCase()}`;
-  const { doc, tenant, y: headerY } = await createHotelPdf("Réservation", settings, logoUrl, [
-    { label: "Numéro", value: number },
-    { label: "Date", value: formatHotelPdfDate(new Date()) },
+  const reference = `HOT-${text(invoice.id, "RESERVATION")
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(0, 10)
+    .toUpperCase()}`;
+  const { doc, y: headerY } = await createHotelPdf("Fiche de réservation", settings, logoUrl, [
+    { label: "Référence", value: reference },
+    { label: "Date d’émission", value: formatDate(new Date()) },
   ]);
-  let y = headerY;
-  y = PdfLayoutEngine.contact(
+  const gap = 5;
+  const blockWidth = (CONTENT_WIDTH - gap) / 2;
+  const y = headerY + 2;
+  const clientBottom = informationBlock(
     doc,
-    { heading: "Client", name: invoice.guestName, phone: invoice.guestPhone },
-    y + 4,
-  );
-  y = PdfLayoutEngine.section(doc, "Détails du séjour", y + 7);
-  y = PdfLayoutEngine.table(
-    doc,
-    ["Logement", "Arrivée", "Départ", "Nuits", "Tarif / nuit"],
+    "Client",
     [
-      [
-        invoice.roomNumber,
-        formatHotelPdfDate(invoice.check_in),
-        formatHotelPdfDate(invoice.check_out),
-        safeHotelPdfNumber(invoice.nights),
-        formatHotelPdfAmount(invoice.nightly_rate),
-      ],
+      ["Nom du client", text(invoice.guestName)],
+      ["Téléphone", text(invoice.guestPhone)],
     ],
-    y + 2,
-    {
-      columnStyles: {
-        1: { halign: "center" },
-        2: { halign: "center" },
-        3: { halign: "center" },
-        4: { halign: "right" },
-      },
-    },
+    MARGIN,
+    y,
+    blockWidth,
   );
-  const paidTotal = safeHotelPdfNumber(invoice.paid_total);
-  const paymentStatus =
-    safeHotelPdfNumber(invoice.balance_due) <= 0
-      ? "Payée"
-      : paidTotal > 0
-        ? "Partiellement payée"
-        : "Non payée";
-  const totalsY = renderHotelInvoiceTotals(
+  const stayBottom = informationBlock(
     doc,
+    "Séjour",
     [
-      { label: "Sous-total", value: formatHotelPdfAmount(safeHotelPdfNumber(invoice.nights) * safeHotelPdfNumber(invoice.nightly_rate)) },
-      { label: "Remise", value: formatHotelPdfAmount(invoice.discount) },
-      { label: "Avance", value: formatHotelPdfAmount(paidTotal) },
-      { label: "Total", value: formatHotelPdfAmount(invoice.grand_total) },
-      { label: "Montant payé", value: formatHotelPdfAmount(paidTotal) },
-      { label: "Solde restant", value: formatHotelPdfAmount(Math.max(0, safeHotelPdfNumber(invoice.balance_due))) },
-      { label: "Statut du paiement", value: paymentStatus, status: true },
+      ["Logement", text(invoice.roomNumber)],
+      ["Date d’arrivée", formatDate(invoice.check_in)],
+      ["Date de départ", formatDate(invoice.check_out)],
+      ["Nombre de nuits", String(safeHotelPdfNumber(invoice.nights))],
+      ["Tarif par nuit", formatMoney(invoice.nightly_rate)],
     ],
-    y + 8,
+    MARGIN + blockWidth + gap,
+    y,
+    blockWidth,
   );
-  renderSignatureArea(doc, totalsY + 10);
-  finishHotelPdf(doc, tenant);
-  return { doc, number, filename: `reservation-${number}.pdf` };
+  const financialBottom = finances(doc, invoice, Math.max(clientBottom, stayBottom) + 9);
+  signatures(doc, financialBottom + 18);
+  footer(doc, reference);
+  return { doc, number: reference, filename: `reservation-${reference}.pdf` };
 }

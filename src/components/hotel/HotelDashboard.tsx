@@ -110,10 +110,6 @@ export function HotelDashboard({ data }: { data?: HotelData }) {
   const todayRevenue = paymentRevenue(today);
   const totalExpenses = expenses.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
   const occupancy = rooms.length ? Math.round((occupied / rooms.length) * 100) : 0;
-  const pendingReservations = reservations.filter((item) => item.status === "pending").length;
-  const pendingPayments = reservations.filter(
-    (item) => Number(item.balance_due ?? 0) > 0 && !["cancelled", "no_show"].includes(item.status),
-  ).length;
   const adr = occupied ? todayRevenue / occupied : 0;
   const revPar = rooms.length ? todayRevenue / rooms.length : 0;
   const history = useMemo(
@@ -168,8 +164,6 @@ export function HotelDashboard({ data }: { data?: HotelData }) {
     ["Départs du jour", departures.length, "check-out prévus", CalendarClock, "violet"],
     ["Taux d’occupation", `${occupancy}%`, "performance du jour", Users, "rose"],
     ["Revenus aujourd’hui", formatCurrency(todayRevenue), "encaissé", CircleDollarSign, "gold"],
-    ["Réservations en attente", pendingReservations, "à confirmer", CalendarClock, "violet"],
-    ["Paiements en attente", pendingPayments, "soldes à encaisser", Receipt, "rose"],
   ] as const;
   const quickActions = [
     ["Nouvelle réservation", "/hotel/reservations", CalendarCheck],
@@ -209,7 +203,7 @@ export function HotelDashboard({ data }: { data?: HotelData }) {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4 2xl:grid-cols-8">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {cards.map(([label, value, note, Icon, tone]) => (
           <div
             key={label}
