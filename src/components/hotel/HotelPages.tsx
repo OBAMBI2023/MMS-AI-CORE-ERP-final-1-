@@ -15,6 +15,8 @@ import { createXlsx } from "@/lib/mms/xlsx-export";
 import { Archive, Printer, Trash2 } from "lucide-react";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { GuestDocumentsDownload } from "@/components/hotel/GuestDocumentsDownload";
+import { createHotelListPdf } from "@/lib/mms/hotel-pdf-engine";
+import { downloadPdf } from "@/lib/mms/download-pdf";
 import { useTenant } from "@/providers/TenantProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -143,7 +145,7 @@ function GuestRemovalAction({ row, hasHistory }: { row: Row; hasHistory: boolean
 }
 
 export function HotelGuestsPage() {
-  const { companyName } = useCompanySettings();
+  const { companyName, settings, logoUrl } = useCompanySettings();
   const { tenant } = useTenant();
   const reservationGuests = useQuery({
     queryKey: ["hotel-guest-reservation-links"],
@@ -192,9 +194,21 @@ export function HotelGuestsPage() {
     { header: "Nom complet", cell: (r) => `${r.first_name} ${r.last_name}` },
     { header: "Téléphone", cell: (r) => String(r.phone ?? "—") },
   ];
-  const print = (rows: Row[]) => {
+  const print = async (rows: Row[]) => {
     try {
-      printGuestList(rows, tenant?.name?.trim() || companyName);
+      const pdf = await createHotelListPdf({
+        title: "Liste des voyageurs",
+        filename: `voyageurs-${new Date().toISOString().slice(0, 10)}.pdf`,
+        head: ["Nom complet", "Téléphone", "Pièce d’identité"],
+        body: rows.map((row) => [
+          `${String(row.first_name ?? "")} ${String(row.last_name ?? "")}`.trim(),
+          row.phone as string,
+          row.identity_document_path ? "Document disponible" : "Non fourni",
+        ]),
+        settings: { ...settings, company_name: tenant?.name?.trim() || companyName },
+        logoUrl,
+      });
+      await downloadPdf(pdf.doc, pdf.filename);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impression impossible.");
     }

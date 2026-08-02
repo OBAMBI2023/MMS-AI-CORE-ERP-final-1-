@@ -7,6 +7,7 @@ import {
   Eye,
   ImagePlus,
   Loader2,
+  MoreVertical,
   Pencil,
   Plus,
   Search,
@@ -14,12 +15,20 @@ import {
   Trash2,
   Users,
   Wrench,
+  FileText,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/mms/AppShell";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +51,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { useTenant } from "@/providers/TenantProvider";
 import { formatCurrency, formatDate } from "@/lib/mms/format";
+import { useCompanySettings } from "@/hooks/use-company-settings";
+import { createHotelListPdf, formatHotelPdfAmount } from "@/lib/mms/hotel-pdf-engine";
+import { downloadPdf } from "@/lib/mms/download-pdf";
 
 type RoomStatus = "available" | "occupied" | "cleaning" | "maintenance" | "out_of_service";
 type HotelRoom = {
@@ -120,6 +132,7 @@ export function HotelRoomsPage() {
   const navigate = useNavigate();
   const { profile } = useTenant();
   const tenantId = profile?.tenant_id;
+  const { settings, logoUrl } = useCompanySettings(tenantId);
   const canCreate = useActionPermission("hotel.rooms.create");
   const canUpdate = useActionPermission("hotel.rooms.update");
   const canDelete = useActionPermission("hotel.rooms.delete");
@@ -249,13 +262,33 @@ export function HotelRoomsPage() {
     setEditing(room);
     setFormOpen(true);
   };
+  const exportRooms = async () => {
+    const pdf = await createHotelListPdf({
+      title: "Liste des logements",
+      filename: `logements-${new Date().toISOString().slice(0, 10)}.pdf`,
+      head: ["Logement", "Type", "Capacité", "Tarif / nuit", "Statut"],
+      body: rooms.map((room) => [
+        room.number,
+        room.hotel_room_types?.name,
+        room.capacity,
+        formatHotelPdfAmount(room.rate),
+        activeReservationRoomIds.has(room.id) ? "Réservé" : (statusMeta[room.status as RoomStatus]?.label ?? room.status),
+      ]),
+      settings,
+      logoUrl,
+    });
+    await downloadPdf(pdf.doc, pdf.filename);
+  };
 
   return (
     <AppShell
       title="Logements"
       subtitle="Gérez vos chambres et résidences avec élégance."
-      actions={
-        canCreate ? (
+      actions={<div className="flex flex-wrap gap-2">
+        <Button variant="outline" disabled={!rooms.length} onClick={() => void exportRooms()}>
+          <FileText className="size-4" /> Exporter PDF
+        </Button>
+        {canCreate ? (
           <Button
             onClick={openCreate}
             className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]"
@@ -263,8 +296,8 @@ export function HotelRoomsPage() {
             <Plus className="size-4" />
             Ajouter un logement
           </Button>
-        ) : null
-      }
+        ) : null}
+      </div>}
     >
       <section className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
         {([
@@ -456,13 +489,44 @@ function RoomThumbnail({ room, image }: { room: HotelRoom; image?: string }) {
 
 type ManageRoomProps = { room: HotelRoom; image?: string; reserved: boolean; canUpdate: boolean; canDelete: boolean; onView: () => void; onEdit: () => void; onReserve: () => void; onBlock: () => void; onDelete: () => void };
 function RoomActions({ canUpdate, canDelete, onView, onEdit, onReserve, onDelete }: Omit<ManageRoomProps, "image" | "reserved">) {
-  const button = "inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground";
-  return <div className="flex flex-wrap items-center gap-1">
-    <button className={button} onClick={onView}><Eye className="size-3.5" />Voir</button>
-    {canUpdate && <button className={button} onClick={onEdit}><Pencil className="size-3.5" />Modifier</button>}
-    <button className={button} onClick={onReserve}><CalendarPlus className="size-3.5" />Réserver</button>
-    {canDelete && <button className={`${button} hover:text-destructive`} onClick={onDelete}><Trash2 className="size-3.5" />Supprimer</button>}
-  </div>;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8 text-[#102A43] hover:bg-[#B89236]/10 hover:text-[#9D7927] dark:text-[#E2C66E]"
+          aria-label="Plus d’actions"
+        >
+          <MoreVertical className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuItem onSelect={onView}>
+          <Eye className="size-4" /> Voir le logement
+        </DropdownMenuItem>
+        {canUpdate && (
+          <DropdownMenuItem onSelect={onEdit}>
+            <Pencil className="size-4" /> Modifier
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={onReserve}>
+          <CalendarPlus className="size-4" /> Créer une réservation
+        </DropdownMenuItem>
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={onDelete}
+            >
+              <Trash2 className="size-4" /> Supprimer
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function RoomRow(props: ManageRoomProps) {

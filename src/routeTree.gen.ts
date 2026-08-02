@@ -46,6 +46,7 @@ import { Route as HotelIndexRouteImport } from './routes/hotel.index'
 import { Route as HotelChambresRouteImport } from './routes/hotel.chambres'
 import { Route as HotelLogementsRouteImport } from './routes/hotel.logements'
 import { Route as HotelParametresRouteImport } from './routes/hotel.parametres'
+import { Route as HotelPrestatairesRouteImport } from './routes/hotel.prestataires'
 import { Route as HotelRapportsRouteImport } from './routes/hotel.rapports'
 import { Route as HotelReservationsRouteImport } from './routes/hotel.reservations'
 import { Route as HotelVoyageursRouteImport } from './routes/hotel.voyageurs'
@@ -241,6 +242,11 @@ const HotelParametresRoute = HotelParametresRouteImport.update({
   path: '/parametres',
   getParentRoute: () => HotelRoute,
 } as any)
+const HotelPrestatairesRoute = HotelPrestatairesRouteImport.update({
+  id: '/prestataires',
+  path: '/prestataires',
+  getParentRoute: () => HotelRoute,
+} as any)
 const HotelRapportsRoute = HotelRapportsRouteImport.update({
   id: '/rapports',
   path: '/rapports',
@@ -323,6 +329,7 @@ export interface FileRoutesByFullPath {
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
+  '/hotel/prestataires': typeof HotelPrestatairesRoute
   '/hotel/rapports': typeof HotelRapportsRoute
   '/hotel/reservations': typeof HotelReservationsRoute
   '/hotel/voyageurs': typeof HotelVoyageursRoute
@@ -370,6 +377,7 @@ export interface FileRoutesByTo {
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
+  '/hotel/prestataires': typeof HotelPrestatairesRoute
   '/hotel/rapports': typeof HotelRapportsRoute
   '/hotel/reservations': typeof HotelReservationsRoute
   '/hotel/voyageurs': typeof HotelVoyageursRoute
@@ -419,6 +427,7 @@ export interface FileRoutesById {
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
+  '/hotel/prestataires': typeof HotelPrestatairesRoute
   '/hotel/rapports': typeof HotelRapportsRoute
   '/hotel/reservations': typeof HotelReservationsRoute
   '/hotel/voyageurs': typeof HotelVoyageursRoute
@@ -469,6 +478,7 @@ export interface FileRouteTypes {
     | '/hotel/chambres'
     | '/hotel/logements'
     | '/hotel/parametres'
+    | '/hotel/prestataires'
     | '/hotel/rapports'
     | '/hotel/reservations'
     | '/hotel/voyageurs'
@@ -516,6 +526,7 @@ export interface FileRouteTypes {
     | '/hotel/chambres'
     | '/hotel/logements'
     | '/hotel/parametres'
+    | '/hotel/prestataires'
     | '/hotel/rapports'
     | '/hotel/reservations'
     | '/hotel/voyageurs'
@@ -564,6 +575,7 @@ export interface FileRouteTypes {
     | '/hotel/chambres'
     | '/hotel/logements'
     | '/hotel/parametres'
+    | '/hotel/prestataires'
     | '/hotel/rapports'
     | '/hotel/reservations'
     | '/hotel/voyageurs'
@@ -877,6 +889,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelParametresRouteImport
       parentRoute: typeof HotelRoute
     }
+    '/hotel/prestataires': {
+      id: '/hotel/prestataires'
+      path: '/prestataires'
+      fullPath: '/hotel/prestataires'
+      preLoaderRoute: typeof HotelPrestatairesRouteImport
+      parentRoute: typeof HotelRoute
+    }
     '/hotel/rapports': {
       id: '/hotel/rapports'
       path: '/rapports'
@@ -947,6 +966,7 @@ interface HotelRouteChildren {
   HotelChambresRoute: typeof HotelChambresRoute
   HotelLogementsRoute: typeof HotelLogementsRoute
   HotelParametresRoute: typeof HotelParametresRoute
+  HotelPrestatairesRoute: typeof HotelPrestatairesRoute
   HotelRapportsRoute: typeof HotelRapportsRoute
   HotelReservationsRoute: typeof HotelReservationsRoute
   HotelVoyageursRoute: typeof HotelVoyageursRoute
@@ -957,6 +977,7 @@ const HotelRouteChildren: HotelRouteChildren = {
   HotelChambresRoute: HotelChambresRoute,
   HotelLogementsRoute: HotelLogementsRoute,
   HotelParametresRoute: HotelParametresRoute,
+  HotelPrestatairesRoute: HotelPrestatairesRoute,
   HotelRapportsRoute: HotelRapportsRoute,
   HotelReservationsRoute: HotelReservationsRoute,
   HotelVoyageursRoute: HotelVoyageursRoute,

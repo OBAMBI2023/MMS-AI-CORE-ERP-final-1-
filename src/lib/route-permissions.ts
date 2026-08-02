@@ -21,6 +21,7 @@ export const routePermissions: Record<string, string> = {
   "/hotel/chambres": "hotel.rooms.view",
   "/hotel/guests": "hotel.guests.view",
   "/hotel/voyageurs": "hotel.guests.view",
+  "/hotel/prestataires": "hotel.maintenance.view",
   "/hotel/expenses": "hotel.expenses.view",
   "/hotel/reports": "hotel.reports.view",
   "/hotel/rapports": "hotel.reports.view",

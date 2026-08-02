@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -13,6 +11,9 @@ import { useTenant } from "@/providers/TenantProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/mms/format";
 import { sanitizeCsvCell } from "@/lib/hotel-reports-csv";
+import { useCompanySettings } from "@/hooks/use-company-settings";
+import { createHotelPdf, finishHotelPdf, formatHotelPdfAmount, formatHotelPdfDate, hotelPdfTable } from "@/lib/mms/hotel-pdf-engine";
+import { downloadPdf } from "@/lib/mms/download-pdf";
 
 type PeriodKey = "today" | "last7" | "month" | "previousMonth" | "year" | "custom";
 type DataRow = Record<string, any>;
@@ -71,6 +72,7 @@ function useReportData(tenantId?: string) {
 
 export function HotelReportsPage() {
   const { profile } = useTenant(); const tenantId = profile?.tenant_id;
+  const { settings, logoUrl } = useCompanySettings(tenantId);
   const query = useReportData(tenantId); const canExport = useActionPermission("hotel.reports.export");
   const today = dateKey(new Date());
   const [period, setPeriod] = useState<PeriodKey>("month");
@@ -92,15 +94,17 @@ export function HotelReportsPage() {
     ];
     download(csv(rows), "text/csv;charset=utf-8", `rapport-hotel-${range.from}-${range.to}.csv`);
   };
-  const exportPdf = () => {
-    if (!canExport) return; const doc = new jsPDF({ orientation: "landscape" });
-    doc.setFillColor(15, 23, 42); doc.rect(0, 0, 297, 30, "F"); doc.setTextColor(255); doc.setFontSize(20); doc.text("SAOVIA · Rapport Hôtel", 14, 18);
-    doc.setTextColor(30); doc.setFontSize(10); doc.text(`Période : ${formatDate(range.from)} au ${formatDate(range.to)}`, 14, 39);
-    autoTable(doc, { startY: 45, head: [["Revenus", "Dépenses", "Résultat net", "Occupation", "Réservations", "Nuitées", "Solde", "Panier moyen"]], body: [[formatCurrency(report.paid), formatCurrency(report.expenses), formatCurrency(report.net), `${report.occupancy.toFixed(1)} %`, report.reservationCount, report.nights, formatCurrency(report.due), formatCurrency(report.averageBasket)]], headStyles: { fillColor: [201, 162, 39] } });
-    autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 10, head: [["Logement", "Réservations", "Nuitées", "Occupation", "Revenus", "Solde"]], body: report.roomPerformance.map((row: DataRow) => [row.name, row.reservations, row.nights, `${row.occupancy.toFixed(1)} %`, formatCurrency(row.revenue), formatCurrency(row.due)]), headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 } });
-    doc.addPage(); doc.setFontSize(14); doc.text("Derniers encaissements", 14, 16);
-    autoTable(doc, { startY: 22, head: [["Date", "Client", "Réservation", "Montant", "Mode"]], body: report.recentPayments.map((row: DataRow) => [formatDate(row.date), row.client, row.reservation, formatCurrency(row.amount), row.method]), headStyles: { fillColor: [15, 23, 42] } });
-    doc.save(`rapport-hotel-${range.from}-${range.to}.pdf`);
+  const exportPdf = async () => {
+    if (!canExport) return;
+    const { doc, tenant, y } = await createHotelPdf("Rapport Hôtel", settings, logoUrl, [
+      { label: "Du", value: formatHotelPdfDate(range.from) }, { label: "Au", value: formatHotelPdfDate(range.to) },
+      { label: "Réservations", value: String(report.reservationCount) }, { label: "Occupation", value: `${report.occupancy.toFixed(1)} %` },
+    ], "landscape");
+    let nextY = hotelPdfTable(doc, ["Revenus", "Dépenses", "Résultat net", "Nuitées", "Solde", "Panier moyen"], [[formatHotelPdfAmount(report.paid), formatHotelPdfAmount(report.expenses), formatHotelPdfAmount(report.net), report.nights, formatHotelPdfAmount(report.due), formatHotelPdfAmount(report.averageBasket)]], y + 2);
+    nextY = hotelPdfTable(doc, ["Logement", "Réservations", "Nuitées", "Occupation", "Revenus", "Solde"], report.roomPerformance.map((row: DataRow) => [row.name, row.reservations, row.nights, `${Number(row.occupancy || 0).toFixed(1)} %`, formatHotelPdfAmount(row.revenue), formatHotelPdfAmount(row.due)]), nextY + 8);
+    hotelPdfTable(doc, ["Date", "Client", "Réservation", "Montant", "Mode"], report.recentPayments.map((row: DataRow) => [formatHotelPdfDate(row.date), row.client, row.reservation, formatHotelPdfAmount(row.amount), row.method]), nextY + 8);
+    finishHotelPdf(doc, tenant);
+    await downloadPdf(doc, `rapport-hotel-${range.from}-${range.to}.pdf`);
   };
   const actions = canExport ? <div className="flex flex-wrap gap-2 print:hidden"><Action onClick={exportPdf} icon={Download}>PDF</Action><Action onClick={exportCsv} icon={Download}>CSV</Action><Action onClick={() => window.print()} icon={Printer}>Imprimer</Action></div> : undefined;
 

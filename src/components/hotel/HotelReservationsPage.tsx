@@ -4,12 +4,12 @@ import {
   CalendarDays,
   Check,
   ChevronsUpDown,
-  Download,
-  FileText,
   List,
+  MoreVertical,
+  Pencil,
   Plus,
-  Printer,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
@@ -39,10 +39,24 @@ import {
 } from "@/components/ui/command";
 import { ImageField } from "@/components/mms/ResourceTable";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useCompanySettings } from "@/hooks/use-company-settings";
-import { createHotelInvoicePdf, type HotelInvoiceData } from "@/lib/mms/hotel-invoice-pdf";
-import { downloadPdf } from "@/lib/mms/download-pdf";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useActionPermission } from "@/hooks/use-action-permission";
 
 const db = supabase as any;
 const statuses = [
@@ -69,6 +83,7 @@ const emptyForm = {
   check_out: "",
   nightly_rate: "",
   discount: "0",
+  advance: "0",
   status: "confirmed",
   notes: "",
 };
@@ -81,19 +96,26 @@ export function HotelReservationsPage() {
   const [filter, setFilter] = useState("all");
   const [view, setView] = useState<"list" | "calendar">("list");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const { settings, logoUrl } = useCompanySettings();
-  const [invoicePreview, setInvoicePreview] = useState<{
-    url: string;
-    pdf: Awaited<ReturnType<typeof createHotelInvoicePdf>>;
-  } | null>(null);
+  const [deleting, setDeleting] = useState<any | null>(null);
+  const canUpdate = useActionPermission("hotel.reservations.update");
+  const canDelete = useActionPermission("hotel.reservations.delete");
 
   const { data } = useQuery({
-    queryKey: ["hotel-reservations"],
+    queryKey: ["hotel-reservations", profile?.tenant_id],
+    enabled: Boolean(profile?.tenant_id),
     queryFn: async () => {
+      const tenantId = profile!.tenant_id;
       const [r, g, rooms] = await Promise.all([
-        db.from("hotel_reservation_balances").select("*").order("check_in", { ascending: false }),
-        db.from("hotel_guests").select("id,first_name,last_name,phone,email"),
-        db.from("hotel_rooms").select("id,number,rate,status"),
+        db
+          .from("hotel_reservation_balances")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .order("check_in", { ascending: false }),
+        db
+          .from("hotel_guests")
+          .select("id,first_name,last_name,phone,email")
+          .eq("tenant_id", tenantId),
+        db.from("hotel_rooms").select("id,number,rate,status").eq("tenant_id", tenantId),
       ]);
       for (const result of [r, g, rooms]) if (result.error) throw result.error;
       return { reservations: r.data ?? [], guests: g.data ?? [], rooms: rooms.data ?? [] };
@@ -101,7 +123,7 @@ export function HotelReservationsPage() {
   });
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["hotel-reservations"] });
+    qc.invalidateQueries({ queryKey: ["hotel-reservations", profile?.tenant_id] });
     qc.invalidateQueries({ queryKey: ["hotel-overview"] });
   };
   const save = useMutation({
@@ -109,17 +131,57 @@ export function HotelReservationsPage() {
       if (!profile?.tenant_id) throw new Error("Tenant introuvable");
       if (!form.guest_id)
         throw new Error("Sélectionnez un client existant ou créez un nouveau client.");
+      const advance = Number(form.advance || 0);
+      const totals = hotelStayTotals(
+        form.check_in,
+        form.check_out,
+        Number(form.nightly_rate),
+        Number(form.discount),
+      );
+      if (!Number.isFinite(advance) || advance < 0)
+        throw new Error("L’avance ne peut pas être négative.");
+      if (advance > totals.grandTotal)
+        throw new Error("L’avance ne peut pas dépasser le montant total.");
+      const previousAdvance = editingId
+        ? Number(data?.reservations.find((r: any) => r.id === editingId)?.paid_total ?? 0)
+        : 0;
+      if (advance < previousAdvance)
+        throw new Error(
+          "L’avance ne peut pas être réduite afin de conserver l’historique des paiements.",
+        );
+      const { advance: _advance, ...reservationForm } = form;
       const payload = {
-        ...form,
+        ...reservationForm,
         tenant_id: profile.tenant_id,
         nightly_rate: Number(form.nightly_rate),
         discount: Number(form.discount),
         notes: form.notes || null,
       };
       const result = editingId
-        ? await db.from("hotel_reservations").update(payload).eq("id", editingId)
-        : await db.from("hotel_reservations").insert(payload);
+        ? await db
+            .from("hotel_reservations")
+            .update(payload)
+            .eq("tenant_id", profile.tenant_id)
+            .eq("id", editingId)
+            .select("id")
+            .single()
+        : await db.from("hotel_reservations").insert(payload).select("id").single();
       if (result.error) throw result.error;
+      const paymentToAdd = advance - previousAdvance;
+      if (paymentToAdd > 0) {
+        const payment = await db
+          .from("hotel_reservation_payments")
+          .insert({
+            tenant_id: profile.tenant_id,
+            reservation_id: result.data.id,
+            amount: paymentToAdd,
+            method: "Avance",
+            notes: editingId
+              ? "Complément d’avance depuis la réservation"
+              : "Avance à la réservation",
+          });
+        if (payment.error) throw payment.error;
+      }
     },
     onSuccess: () => {
       toast.success(editingId ? "Réservation mise à jour" : "Réservation créée");
@@ -137,11 +199,33 @@ export function HotelReservationsPage() {
 
   const changeStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await db.from("hotel_reservations").update({ status }).eq("id", id);
+      if (!profile?.tenant_id) throw new Error("Tenant introuvable");
+      const { error } = await db
+        .from("hotel_reservations")
+        .update({ status })
+        .eq("tenant_id", profile.tenant_id)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Statut mis à jour");
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteReservation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!profile?.tenant_id) throw new Error("Tenant introuvable");
+      const { error } = await db
+        .from("hotel_reservations")
+        .delete()
+        .eq("tenant_id", profile.tenant_id)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Réservation supprimée");
+      setDeleting(null);
       refresh();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -165,6 +249,9 @@ export function HotelReservationsPage() {
     Number(form.nightly_rate || 0),
     Number(form.discount || 0),
   );
+  const advance = Number(form.advance || 0);
+  const remainingBalance = total - advance;
+  const invalidAdvance = !Number.isFinite(advance) || advance < 0 || advance > total;
   const edit = (r: any) => {
     setEditingId(r.id);
     setForm({
@@ -174,34 +261,12 @@ export function HotelReservationsPage() {
       check_out: r.check_out,
       nightly_rate: String(r.nightly_rate),
       discount: String(r.discount ?? 0),
+      advance: String(r.paid_total ?? 0),
       status: r.status,
       notes: r.notes ?? "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const previewInvoice = async (r: any) => {
-    const guest: any = guests.get(r.guest_id),
-      room: any = rooms.get(r.room_id);
-    const value: HotelInvoiceData = {
-      ...r,
-      guestName: guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL,
-      guestPhone: guest?.phone,
-      roomNumber: String(room?.number ?? "—"),
-      nights: Number(r.nights),
-      nightly_rate: Number(r.nightly_rate),
-      discount: Number(r.discount ?? 0),
-      grand_total: Number(r.grand_total ?? 0),
-      paid_total: Number(r.paid_total ?? 0),
-      balance_due: Number(r.balance_due ?? 0),
-    };
-    const pdf = await createHotelInvoicePdf(value, settings, logoUrl);
-    setInvoicePreview({ pdf, url: URL.createObjectURL(pdf.doc.output("blob")) });
-  };
-  const closeInvoice = () => {
-    if (invoicePreview) URL.revokeObjectURL(invoicePreview.url);
-    setInvoicePreview(null);
-  };
-
   return (
     <AppShell title="Réservations" subtitle="Liste, planning, arrivées et départs">
       <section className="hotel-panel mb-5">
@@ -285,6 +350,23 @@ export function HotelReservationsPage() {
               onChange={(e) => setForm({ ...form, discount: e.target.value })}
             />
           </Field>
+          <Field label="Avance versée">
+            <Input
+              type="number"
+              min="0"
+              max={total}
+              value={form.advance}
+              onChange={(e) => setForm({ ...form, advance: e.target.value })}
+            />
+          </Field>
+          <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Total</span>
+            <b className="block">{formatCurrency(total)}</b>
+          </div>
+          <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Solde restant</span>
+            <b className="block">{formatCurrency(Math.max(0, remainingBalance))}</b>
+          </div>
           <Field label="Statut">
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
               <SelectTrigger>
@@ -302,7 +384,7 @@ export function HotelReservationsPage() {
           <div className="flex items-end">
             <Button
               className="w-full"
-              disabled={save.isPending || !form.room_id || nights < 1}
+              disabled={save.isPending || !form.room_id || nights < 1 || invalidAdvance}
               onClick={() => save.mutate()}
             >
               {save.isPending
@@ -363,52 +445,34 @@ export function HotelReservationsPage() {
             guests={guests}
             rooms={rooms}
             edit={edit}
-            invoice={previewInvoice}
+            requestDelete={setDeleting}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
             changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
           />
         )}
       </section>
-      <Dialog
-        open={!!invoicePreview}
-        onOpenChange={(open) => {
-          if (!open) closeInvoice();
-        }}
-      >
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Aperçu de la facture</DialogTitle>
-          </DialogHeader>
-          {invoicePreview && (
-            <>
-              <iframe
-                title="Aperçu de la facture PDF"
-                src={invoicePreview.url}
-                className="h-[65vh] w-full rounded-md border"
-              />
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    invoicePreview.pdf.doc.autoPrint();
-                    window.open(invoicePreview.pdf.doc.output("bloburl"), "_blank");
-                  }}
-                >
-                  <Printer className="mr-2 size-4" />
-                  Imprimer
-                </Button>
-                <Button
-                  onClick={() =>
-                    void downloadPdf(invoicePreview.pdf.doc, invoicePreview.pdf.filename)
-                  }
-                >
-                  <Download className="mr-2 size-4" />
-                  Télécharger PDF
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette réservation ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. La réservation et ses données associées seront supprimées.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteReservation.isPending}
+              onClick={() => deleting && deleteReservation.mutate(deleting.id)}
+            >
+              <Trash2 className="size-4" />
+              {deleteReservation.isPending ? "Suppression…" : "Supprimer définitivement"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
@@ -602,16 +666,35 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     </div>
   );
 }
-function ReservationTable({ rows, guests, rooms, edit, invoice, changeStatus }: any) {
+function ReservationTable({
+  rows,
+  guests,
+  rooms,
+  edit,
+  requestDelete,
+  canUpdate,
+  canDelete,
+  changeStatus,
+}: any) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[900px] text-sm">
+      <table className="w-full min-w-[820px] table-fixed text-sm">
+        <colgroup>
+          <col className="w-[18%]" />
+          <col className="w-[10%]" />
+          <col className="w-[21%]" />
+          <col className="w-[12%]" />
+          <col className="w-[13%]" />
+          <col className="w-[13%]" />
+          <col className="w-[13%]" />
+        </colgroup>
         <thead>
           <tr className="border-b text-left text-xs uppercase text-slate-400">
             <th className="p-3">Client</th>
             <th>Chambre</th>
             <th>Séjour</th>
             <th>Statut</th>
+            <th>Avance</th>
             <th>Solde</th>
             <th className="text-right">Actions</th>
           </tr>
@@ -622,7 +705,7 @@ function ReservationTable({ rows, guests, rooms, edit, invoice, changeStatus }: 
               room = rooms.get(r.room_id);
             return (
               <tr key={r.id} className="border-b">
-                <td className="p-3 font-medium">
+                <td className="truncate p-3 font-medium">
                   {g ? `${g.first_name} ${g.last_name}` : WALK_IN_LABEL}
                 </td>
                 <td>N° {room?.number ?? "—"}</td>
@@ -634,15 +717,42 @@ function ReservationTable({ rows, guests, rooms, edit, invoice, changeStatus }: 
                     {statusLabel[r.status] ?? r.status}
                   </span>
                 </td>
+                <td className="font-medium">{formatCurrency(Number(r.paid_total ?? 0))}</td>
                 <td className="font-medium">{formatCurrency(Number(r.balance_due ?? 0))}</td>
-                <td>
+                <td className="text-right">
                   <div className="flex justify-end gap-1">
-                    <Button size="sm" variant="outline" onClick={() => void invoice(r)}>
-                      <FileText className="mr-1 size-4" /> Facture PDF
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => edit(r)}>
-                      Modifier
-                    </Button>
+                    {(canUpdate || canDelete) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-8"
+                            aria-label="Plus d’actions"
+                          >
+                            <MoreVertical className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-56">
+                          {canUpdate && (
+                            <DropdownMenuItem onSelect={() => edit(r)}>
+                              <Pencil /> Modifier la réservation
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <>
+                              {canUpdate && <DropdownMenuSeparator />}
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onSelect={() => requestDelete(r)}
+                              >
+                                <Trash2 /> Supprimer la réservation
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                     {["pending", "confirmed"].includes(r.status) && (
                       <Button
                         size="sm"
@@ -678,7 +788,7 @@ function ReservationTable({ rows, guests, rooms, edit, invoice, changeStatus }: 
           })}
           {!rows.length && (
             <tr>
-              <td colSpan={6} className="py-12 text-center text-slate-400">
+              <td colSpan={7} className="py-12 text-center text-slate-400">
                 Aucune réservation trouvée.
               </td>
             </tr>
