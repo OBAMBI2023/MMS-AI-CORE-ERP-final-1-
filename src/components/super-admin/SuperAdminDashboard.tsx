@@ -8,6 +8,7 @@ import {
   BarChart3,
   Bell,
   Bot,
+  Boxes,
   Building2,
   CalendarClock,
   ClipboardCopy,
@@ -80,6 +81,8 @@ import {
 } from "@/lib/super-admin.server";
 import { cn } from "@/lib/utils";
 import { tenantModulesQueryKey } from "@/hooks/use-tenant-modules";
+import { TenantModulesManager } from "@/components/super-admin/TenantModulesManager";
+import { testOrangeSmsConnection } from "@/lib/hotel-sms.server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -243,6 +246,7 @@ const cycleLabels: Record<SubscriptionBillingCycle, string> = {
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/super-admin#dashboard" },
   { label: "Tenants", icon: Building2, href: "/super-admin#tenants" },
+  { label: "Modules", icon: Boxes, href: "/super-admin/modules" },
   { label: "Packs de modules", icon: Layers3, href: "/super-admin#packs-modules" },
   { label: "Offres partenaires", icon: CreditCard, href: "/super-admin#offres-partenaires" },
   { label: "Partenaires", icon: Handshake, href: "/super-admin/partners" },
@@ -255,7 +259,13 @@ const navItems = [
   { label: "Journal", icon: ReceiptText, href: "#journal" },
 ] as const;
 
-function SidebarContent({ mobile = false, onCreateTenant }: { mobile?: boolean; onCreateTenant: () => void }) {
+export function SuperAdminSidebar({
+  mobile = false,
+  onCreateTenant,
+}: {
+  mobile?: boolean;
+  onCreateTenant?: () => void;
+}) {
   const { pathname, hash } = useLocation();
   const isDashboardRoute = pathname === "/super-admin" || pathname === "/super-admin/";
 
@@ -301,6 +311,7 @@ function SidebarContent({ mobile = false, onCreateTenant }: { mobile?: boolean; 
         <Button
           className="h-10 w-full justify-start rounded-lg bg-white text-black shadow-[0_8px_30px_rgba(255,255,255,.08)] hover:bg-zinc-200"
           onClick={onCreateTenant}
+          disabled={!onCreateTenant}
         >
           <Plus className="size-4" />
           Créer un tenant
@@ -428,44 +439,68 @@ function PartnerOffersSection({
   const saveOffer = async () => {
     setSubmitting(true);
     try {
-      await savePartnerOffer({ data: {
-        id: editing?.id ?? null, name, price: Number(price),
-        includedTenantCredits: Number(credits), durationDays: Number(duration),
-        modulePackId: packId, maxTrials: Number(maxTrials), trialDays: Number(trialDays),
-        isActive: offerActive,
-      } });
+      await savePartnerOffer({
+        data: {
+          id: editing?.id ?? null,
+          name,
+          price: Number(price),
+          includedTenantCredits: Number(credits),
+          durationDays: Number(duration),
+          modulePackId: packId,
+          maxTrials: Number(maxTrials),
+          trialDays: Number(trialDays),
+          isActive: offerActive,
+        },
+      });
       toast.success("Offre enregistrée.");
       window.location.reload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Enregistrement impossible.");
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const validatePayment = async () => {
     setSubmitting(true);
     try {
-      await validatePartnerPayment({ data: {
-        partnerId, offerId: selectedOfferId, amount: Number(amount),
-        currency: "XOF", reference, reason,
-      } });
+      await validatePartnerPayment({
+        data: {
+          partnerId,
+          offerId: selectedOfferId,
+          amount: Number(amount),
+          currency: "XOF",
+          reference,
+          reason,
+        },
+      });
       toast.success("Paiement validé et crédits attribués.");
       window.location.reload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Validation impossible.");
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const adjustCredits = async () => {
     setSubmitting(true);
     try {
-      await adjustPartnerCredits({ data: {
-        partnerId, credits: Number(adjustment), reason, reference,
-      } });
+      await adjustPartnerCredits({
+        data: {
+          partnerId,
+          credits: Number(adjustment),
+          reason,
+          reference,
+        },
+      });
       toast.success("Solde ajusté.");
       window.location.reload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Ajustement impossible.");
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openCreditPack = (pack?: SuperAdminCreditPack) => {
@@ -480,41 +515,69 @@ function PartnerOffersSection({
   const saveCreditPack = async () => {
     setSubmitting(true);
     try {
-      await savePartnerCreditPack({ data: {
-        id: editingCreditPack?.id ?? null, name: creditPackName,
-        price: Number(creditPackPrice), creditCount: Number(creditPackCount),
-        isActive: creditPackActive,
-      } });
+      await savePartnerCreditPack({
+        data: {
+          id: editingCreditPack?.id ?? null,
+          name: creditPackName,
+          price: Number(creditPackPrice),
+          creditCount: Number(creditPackCount),
+          isActive: creditPackActive,
+        },
+      });
       toast.success("Pack de crédits enregistré.");
       window.location.reload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Enregistrement impossible.");
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const purchaseCreditPack = async () => {
     setSubmitting(true);
     try {
-      await purchasePartnerCreditPack({ data: {
-        partnerId, packId: selectedCreditPackId, reference, reason,
-      } });
+      await purchasePartnerCreditPack({
+        data: {
+          partnerId,
+          packId: selectedCreditPackId,
+          reference,
+          reason,
+        },
+      });
       toast.success("Crédits attribués au partenaire.");
       window.location.reload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Attribution impossible.");
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <section id="offres-partenaires" className="scroll-mt-24 space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div><h2 className="text-xl font-bold">Offres partenaires</h2><p className="text-sm text-muted-foreground">Abonnements, paiements et ledger de crédits réels.</p></div>
+        <div>
+          <h2 className="text-xl font-bold">Offres partenaires</h2>
+          <p className="text-sm text-muted-foreground">
+            Abonnements, paiements et ledger de crédits réels.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setAdjustOpen(true)}>Ajuster les crédits</Button>
-          <Button variant="outline" onClick={() => setCreditPurchaseOpen(true)}>Attribuer un pack</Button>
-          <Button variant="outline" onClick={() => openCreditPack()}>Nouveau pack de crédits</Button>
-          <Button variant="outline" onClick={() => setPaymentOpen(true)}>Valider un paiement</Button>
-          <Button onClick={() => openOffer()}><Plus /> Nouvelle offre</Button>
+          <Button variant="outline" onClick={() => setAdjustOpen(true)}>
+            Ajuster les crédits
+          </Button>
+          <Button variant="outline" onClick={() => setCreditPurchaseOpen(true)}>
+            Attribuer un pack
+          </Button>
+          <Button variant="outline" onClick={() => openCreditPack()}>
+            Nouveau pack de crédits
+          </Button>
+          <Button variant="outline" onClick={() => setPaymentOpen(true)}>
+            Valider un paiement
+          </Button>
+          <Button onClick={() => openOffer()}>
+            <Plus /> Nouvelle offre
+          </Button>
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -522,43 +585,530 @@ function PartnerOffersSection({
           <Card className="p-5 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
             Aucune offre partenaire enregistrée.
           </Card>
-        ) : commerce.offers.map((offer) => (
-          <Card key={offer.id} className="p-5">
-            <div className="flex items-start justify-between gap-3"><h3 className="font-semibold">{offer.name}</h3><Badge variant={offer.isActive ? "default" : "secondary"}>{offer.isActive ? "Active" : "Inactive"}</Badge></div>
-            <p className="mt-3 text-2xl font-bold">{formatCurrency(offer.price)}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{offer.includedTenantCredits} crédits · {offer.durationDays} jours · {offer.maxTrials} essais de {offer.trialDays} jours</p>
-            <div className="mt-4 flex gap-2"><Button size="sm" variant="outline" onClick={() => openOffer(offer)}>Modifier</Button><Button size="sm" variant="ghost" onClick={async () => { try { await removePartnerOffer({ data: { offerId: offer.id } }); window.location.reload(); } catch (error) { toast.error(error instanceof Error ? error.message : "Suppression impossible."); } }}><Trash2 className="text-destructive" /></Button></div>
-          </Card>
-        ))}
+        ) : (
+          commerce.offers.map((offer) => (
+            <Card key={offer.id} className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-semibold">{offer.name}</h3>
+                <Badge variant={offer.isActive ? "default" : "secondary"}>
+                  {offer.isActive ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+              <p className="mt-3 text-2xl font-bold">{formatCurrency(offer.price)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {offer.includedTenantCredits} crédits · {offer.durationDays} jours ·{" "}
+                {offer.maxTrials} essais de {offer.trialDays} jours
+              </p>
+              <div className="mt-4 flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => openOffer(offer)}>
+                  Modifier
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    try {
+                      await removePartnerOffer({ data: { offerId: offer.id } });
+                      window.location.reload();
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error ? error.message : "Suppression impossible.",
+                      );
+                    }
+                  }}
+                >
+                  <Trash2 className="text-destructive" />
+                </Button>
+              </div>
+            </Card>
+          ))
+        )}
       </div>
       <div>
         <h3 className="mb-3 text-sm font-semibold">Packs de crédits d’inscription</h3>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {commerce.creditPacks.map((pack) => (
             <Card key={pack.id} className="p-5">
-              <div className="flex items-start justify-between gap-3"><h4 className="font-semibold">{pack.name}</h4><Badge variant={pack.isActive ? "default" : "secondary"}>{pack.isActive ? "Actif" : "Inactif"}</Badge></div>
+              <div className="flex items-start justify-between gap-3">
+                <h4 className="font-semibold">{pack.name}</h4>
+                <Badge variant={pack.isActive ? "default" : "secondary"}>
+                  {pack.isActive ? "Actif" : "Inactif"}
+                </Badge>
+              </div>
               <p className="mt-3 text-2xl font-bold">{pack.creditCount} crédits</p>
               <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(pack.price)}</p>
-              <Button className="mt-4" size="sm" variant="outline" onClick={() => openCreditPack(pack)}>Modifier</Button>
+              <Button
+                className="mt-4"
+                size="sm"
+                variant="outline"
+                onClick={() => openCreditPack(pack)}
+              >
+                Modifier
+              </Button>
             </Card>
           ))}
-          {!commerce.creditPacks.length && <Card className="p-5 text-sm text-muted-foreground">Aucun pack de crédits.</Card>}
+          {!commerce.creditPacks.length && (
+            <Card className="p-5 text-sm text-muted-foreground">Aucun pack de crédits.</Card>
+          )}
         </div>
       </div>
       <div className="grid gap-5 xl:grid-cols-2">
-        <Card className="overflow-hidden xl:col-span-2"><div className="border-b p-4 font-semibold">Achats et attributions de packs ({commerce.creditPurchases.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Pack</TableHead><TableHead>Crédits</TableHead><TableHead>Montant</TableHead><TableHead>Référence</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{commerce.creditPurchases.map((purchase) => <TableRow key={purchase.id}><TableCell>{commerce.partners.find((partner) => partner.id === purchase.partner_id)?.name ?? purchase.partner_id}</TableCell><TableCell>{commerce.creditPacks.find((pack) => pack.id === purchase.credit_pack_id)?.name ?? "Pack"}</TableCell><TableCell className="font-semibold text-emerald-600">+{purchase.credits}</TableCell><TableCell>{formatCurrency(Number(purchase.amount))}</TableCell><TableCell>{purchase.reference}</TableCell><TableCell>{formatDate(purchase.created_at, true)}</TableCell></TableRow>)}</TableBody></Table></div></Card>
-        <Card className="overflow-hidden"><div className="border-b p-4 font-semibold">Paiements ({commerce.payments.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Référence</TableHead><TableHead>Montant</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{commerce.payments.map((payment) => <TableRow key={payment.id}><TableCell>{commerce.partners.find((partner) => partner.id === payment.partner_id)?.name ?? payment.partner_id}</TableCell><TableCell>{payment.external_reference}</TableCell><TableCell>{formatCurrency(Number(payment.amount))}</TableCell><TableCell>{formatDate(payment.created_at, true)}</TableCell></TableRow>)}</TableBody></Table></div></Card>
-        <Card className="overflow-hidden"><div className="border-b p-4 font-semibold">Crédits et débits ({commerce.credits.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Variation</TableHead><TableHead>Motif</TableHead><TableHead>Solde</TableHead></TableRow></TableHeader><TableBody>{commerce.credits.map((item) => <TableRow key={item.id}><TableCell>{commerce.partners.find((partner) => partner.id === item.partner_id)?.name ?? item.partner_id}</TableCell><TableCell className={item.credits > 0 ? "text-emerald-600" : "text-destructive"}>{item.credits > 0 ? "+" : ""}{item.credits}</TableCell><TableCell>{item.reason}</TableCell><TableCell>{item.balance_after}</TableCell></TableRow>)}</TableBody></Table></div></Card>
-        <Card className="overflow-hidden xl:col-span-2"><div className="border-b p-4 font-semibold">Essais et activations ({commerce.trials.length})</div><div className="max-h-80 overflow-auto"><Table><TableHeader><TableRow><TableHead>Partenaire</TableHead><TableHead>Email</TableHead><TableHead>Statut</TableHead><TableHead>Début</TableHead><TableHead>Expiration</TableHead></TableRow></TableHeader><TableBody>{commerce.trials.map((trial) => <TableRow key={trial.id}><TableCell>{commerce.partners.find((partner) => partner.id === trial.partner_id)?.name ?? trial.partner_id}</TableCell><TableCell>{trial.client_email}</TableCell><TableCell>{trial.status}</TableCell><TableCell>{formatDate(trial.starts_at)}</TableCell><TableCell>{formatDate(trial.expires_at)}</TableCell></TableRow>)}</TableBody></Table></div></Card>
+        <Card className="overflow-hidden xl:col-span-2">
+          <div className="border-b p-4 font-semibold">
+            Achats et attributions de packs ({commerce.creditPurchases.length})
+          </div>
+          <div className="max-h-80 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Partenaire</TableHead>
+                  <TableHead>Pack</TableHead>
+                  <TableHead>Crédits</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Référence</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {commerce.creditPurchases.map((purchase) => (
+                  <TableRow key={purchase.id}>
+                    <TableCell>
+                      {commerce.partners.find((partner) => partner.id === purchase.partner_id)
+                        ?.name ?? purchase.partner_id}
+                    </TableCell>
+                    <TableCell>
+                      {commerce.creditPacks.find((pack) => pack.id === purchase.credit_pack_id)
+                        ?.name ?? "Pack"}
+                    </TableCell>
+                    <TableCell className="font-semibold text-emerald-600">
+                      +{purchase.credits}
+                    </TableCell>
+                    <TableCell>{formatCurrency(Number(purchase.amount))}</TableCell>
+                    <TableCell>{purchase.reference}</TableCell>
+                    <TableCell>{formatDate(purchase.created_at, true)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+        <Card className="overflow-hidden">
+          <div className="border-b p-4 font-semibold">Paiements ({commerce.payments.length})</div>
+          <div className="max-h-80 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Partenaire</TableHead>
+                  <TableHead>Référence</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {commerce.payments.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>
+                      {commerce.partners.find((partner) => partner.id === payment.partner_id)
+                        ?.name ?? payment.partner_id}
+                    </TableCell>
+                    <TableCell>{payment.external_reference}</TableCell>
+                    <TableCell>{formatCurrency(Number(payment.amount))}</TableCell>
+                    <TableCell>{formatDate(payment.created_at, true)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+        <Card className="overflow-hidden">
+          <div className="border-b p-4 font-semibold">
+            Crédits et débits ({commerce.credits.length})
+          </div>
+          <div className="max-h-80 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Partenaire</TableHead>
+                  <TableHead>Variation</TableHead>
+                  <TableHead>Motif</TableHead>
+                  <TableHead>Solde</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {commerce.credits.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      {commerce.partners.find((partner) => partner.id === item.partner_id)?.name ??
+                        item.partner_id}
+                    </TableCell>
+                    <TableCell
+                      className={item.credits > 0 ? "text-emerald-600" : "text-destructive"}
+                    >
+                      {item.credits > 0 ? "+" : ""}
+                      {item.credits}
+                    </TableCell>
+                    <TableCell>{item.reason}</TableCell>
+                    <TableCell>{item.balance_after}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+        <Card className="overflow-hidden xl:col-span-2">
+          <div className="border-b p-4 font-semibold">
+            Essais et activations ({commerce.trials.length})
+          </div>
+          <div className="max-h-80 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Partenaire</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Début</TableHead>
+                  <TableHead>Expiration</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {commerce.trials.map((trial) => (
+                  <TableRow key={trial.id}>
+                    <TableCell>
+                      {commerce.partners.find((partner) => partner.id === trial.partner_id)?.name ??
+                        trial.partner_id}
+                    </TableCell>
+                    <TableCell>{trial.client_email}</TableCell>
+                    <TableCell>{trial.status}</TableCell>
+                    <TableCell>{formatDate(trial.starts_at)}</TableCell>
+                    <TableCell>{formatDate(trial.expires_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
       </div>
 
-      <Dialog open={offerOpen} onOpenChange={setOfferOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{editing ? "Modifier l’offre" : "Créer une offre"}</DialogTitle></DialogHeader><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2 sm:col-span-2"><Label>Nom</Label><Input value={name} onChange={(event) => setName(event.target.value)} /></div><div className="space-y-2"><Label>Prix XOF</Label><Input type="number" min="0" value={price} onChange={(event) => setPrice(event.target.value)} /></div><div className="space-y-2"><Label>Crédits inclus</Label><Input type="number" min="0" value={credits} onChange={(event) => setCredits(event.target.value)} /></div><div className="space-y-2"><Label>Durée (jours)</Label><Input type="number" min="1" value={duration} onChange={(event) => setDuration(event.target.value)} /></div><div className="space-y-2"><Label>Pack</Label><Select value={packId} onValueChange={setPackId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{packs.map((pack) => <SelectItem key={pack.id} value={pack.id}>{pack.name}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Essais maximum</Label><Input type="number" min="0" value={maxTrials} onChange={(event) => setMaxTrials(event.target.value)} /></div><div className="space-y-2"><Label>Durée essai (jours)</Label><Input type="number" min="0" value={trialDays} onChange={(event) => setTrialDays(event.target.value)} /></div><div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2"><Label>Offre active</Label><Switch checked={offerActive} onCheckedChange={setOfferActive} /></div></div><DialogFooter><Button variant="outline" onClick={() => setOfferOpen(false)}>Annuler</Button><Button disabled={submitting || !name || !packId} onClick={() => void saveOffer()}>Enregistrer</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={offerOpen} onOpenChange={setOfferOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier l’offre" : "Créer une offre"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Nom</Label>
+              <Input value={name} onChange={(event) => setName(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Prix XOF</Label>
+              <Input
+                type="number"
+                min="0"
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Crédits inclus</Label>
+              <Input
+                type="number"
+                min="0"
+                value={credits}
+                onChange={(event) => setCredits(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Durée (jours)</Label>
+              <Input
+                type="number"
+                min="1"
+                value={duration}
+                onChange={(event) => setDuration(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Pack</Label>
+              <Select value={packId} onValueChange={setPackId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {packs.map((pack) => (
+                    <SelectItem key={pack.id} value={pack.id}>
+                      {pack.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Essais maximum</Label>
+              <Input
+                type="number"
+                min="0"
+                value={maxTrials}
+                onChange={(event) => setMaxTrials(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Durée essai (jours)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={trialDays}
+                onChange={(event) => setTrialDays(event.target.value)}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2">
+              <Label>Offre active</Label>
+              <Switch checked={offerActive} onCheckedChange={setOfferActive} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOfferOpen(false)}>
+              Annuler
+            </Button>
+            <Button disabled={submitting || !name || !packId} onClick={() => void saveOffer()}>
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent><DialogHeader><DialogTitle>Valider un paiement</DialogTitle><DialogDescription>La référence rend cette validation idempotente.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={partnerId} onValueChange={setPartnerId}><SelectTrigger><SelectValue placeholder="Partenaire" /></SelectTrigger><SelectContent>{commerce.partners.map((partner) => <SelectItem key={partner.id} value={partner.id}>{partner.name}</SelectItem>)}</SelectContent></Select><Select value={selectedOfferId} onValueChange={(value) => { setSelectedOfferId(value); setAmount(String(commerce.offers.find((offer) => offer.id === value)?.price ?? "")); }}><SelectTrigger><SelectValue placeholder="Offre" /></SelectTrigger><SelectContent>{commerce.offers.filter((offer) => offer.isActive).map((offer) => <SelectItem key={offer.id} value={offer.id}>{offer.name}</SelectItem>)}</SelectContent></Select><Input type="number" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Montant" /><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Référence externe unique" /><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Note (optionnelle)" /></div><DialogFooter><Button variant="outline" onClick={() => setPaymentOpen(false)}>Annuler</Button><Button disabled={submitting || !partnerId || !selectedOfferId || !reference} onClick={() => void validatePayment()}>Valider</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Valider un paiement</DialogTitle>
+            <DialogDescription>La référence rend cette validation idempotente.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={partnerId} onValueChange={setPartnerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Partenaire" />
+              </SelectTrigger>
+              <SelectContent>
+                {commerce.partners.map((partner) => (
+                  <SelectItem key={partner.id} value={partner.id}>
+                    {partner.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedOfferId}
+              onValueChange={(value) => {
+                setSelectedOfferId(value);
+                setAmount(String(commerce.offers.find((offer) => offer.id === value)?.price ?? ""));
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Offre" />
+              </SelectTrigger>
+              <SelectContent>
+                {commerce.offers
+                  .filter((offer) => offer.isActive)
+                  .map((offer) => (
+                    <SelectItem key={offer.id} value={offer.id}>
+                      {offer.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              placeholder="Montant"
+            />
+            <Input
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              placeholder="Référence externe unique"
+            />
+            <Textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Note (optionnelle)"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              disabled={submitting || !partnerId || !selectedOfferId || !reference}
+              onClick={() => void validatePayment()}
+            >
+              Valider
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}><DialogContent><DialogHeader><DialogTitle>Ajustement manuel</DialogTitle><DialogDescription>Utilisez une valeur positive pour créditer, négative pour débiter.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={partnerId} onValueChange={setPartnerId}><SelectTrigger><SelectValue placeholder="Partenaire" /></SelectTrigger><SelectContent>{commerce.partners.map((partner) => <SelectItem key={partner.id} value={partner.id}>{partner.name} · {partner.creditBalance} crédits</SelectItem>)}</SelectContent></Select><Input type="number" value={adjustment} onChange={(event) => setAdjustment(event.target.value)} placeholder="Variation de crédits" /><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Motif obligatoire" /><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Référence (optionnelle)" /></div><DialogFooter><Button variant="outline" onClick={() => setAdjustOpen(false)}>Annuler</Button><Button disabled={submitting || !partnerId || !reason.trim() || Number(adjustment) === 0} onClick={() => void adjustCredits()}>Appliquer</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={creditPackOpen} onOpenChange={setCreditPackOpen}><DialogContent><DialogHeader><DialogTitle>{editingCreditPack ? "Modifier le pack" : "Créer un pack de crédits"}</DialogTitle><DialogDescription>Un crédit permet la création d’un tenant.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label>Nom</Label><Input value={creditPackName} onChange={(event) => setCreditPackName(event.target.value)} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Prix XOF</Label><Input type="number" min="0" value={creditPackPrice} onChange={(event) => setCreditPackPrice(event.target.value)} /></div><div className="space-y-2"><Label>Nombre de crédits</Label><Input type="number" min="1" value={creditPackCount} onChange={(event) => setCreditPackCount(event.target.value)} /></div></div><div className="flex items-center justify-between rounded-lg border p-3"><Label>Pack actif</Label><Switch checked={creditPackActive} onCheckedChange={setCreditPackActive} /></div></div><DialogFooter><Button variant="outline" onClick={() => setCreditPackOpen(false)}>Annuler</Button><Button disabled={submitting || !creditPackName.trim() || Number(creditPackCount) < 1} onClick={() => void saveCreditPack()}>Enregistrer</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={creditPurchaseOpen} onOpenChange={setCreditPurchaseOpen}><DialogContent><DialogHeader><DialogTitle>Acheter / attribuer des crédits</DialogTitle><DialogDescription>L’attribution crédite immédiatement et atomiquement le portefeuille du Partner.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={partnerId} onValueChange={setPartnerId}><SelectTrigger><SelectValue placeholder="Partenaire" /></SelectTrigger><SelectContent>{commerce.partners.map((partner) => <SelectItem key={partner.id} value={partner.id}>{partner.name} · solde {partner.creditBalance}</SelectItem>)}</SelectContent></Select><Select value={selectedCreditPackId} onValueChange={setSelectedCreditPackId}><SelectTrigger><SelectValue placeholder="Pack de crédits" /></SelectTrigger><SelectContent>{commerce.creditPacks.filter((pack) => pack.isActive).map((pack) => <SelectItem key={pack.id} value={pack.id}>{pack.name} · {pack.creditCount} crédits · {formatCurrency(pack.price)}</SelectItem>)}</SelectContent></Select><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Référence unique" /><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Note (optionnelle)" /></div><DialogFooter><Button variant="outline" onClick={() => setCreditPurchaseOpen(false)}>Annuler</Button><Button disabled={submitting || !partnerId || !selectedCreditPackId || !reference.trim()} onClick={() => void purchaseCreditPack()}>Attribuer</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajustement manuel</DialogTitle>
+            <DialogDescription>
+              Utilisez une valeur positive pour créditer, négative pour débiter.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={partnerId} onValueChange={setPartnerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Partenaire" />
+              </SelectTrigger>
+              <SelectContent>
+                {commerce.partners.map((partner) => (
+                  <SelectItem key={partner.id} value={partner.id}>
+                    {partner.name} · {partner.creditBalance} crédits
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              value={adjustment}
+              onChange={(event) => setAdjustment(event.target.value)}
+              placeholder="Variation de crédits"
+            />
+            <Textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Motif obligatoire"
+            />
+            <Input
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              placeholder="Référence (optionnelle)"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdjustOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              disabled={submitting || !partnerId || !reason.trim() || Number(adjustment) === 0}
+              onClick={() => void adjustCredits()}
+            >
+              Appliquer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={creditPackOpen} onOpenChange={setCreditPackOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingCreditPack ? "Modifier le pack" : "Créer un pack de crédits"}
+            </DialogTitle>
+            <DialogDescription>Un crédit permet la création d’un tenant.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nom</Label>
+              <Input
+                value={creditPackName}
+                onChange={(event) => setCreditPackName(event.target.value)}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Prix XOF</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={creditPackPrice}
+                  onChange={(event) => setCreditPackPrice(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Nombre de crédits</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={creditPackCount}
+                  onChange={(event) => setCreditPackCount(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <Label>Pack actif</Label>
+              <Switch checked={creditPackActive} onCheckedChange={setCreditPackActive} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditPackOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              disabled={submitting || !creditPackName.trim() || Number(creditPackCount) < 1}
+              onClick={() => void saveCreditPack()}
+            >
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={creditPurchaseOpen} onOpenChange={setCreditPurchaseOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Acheter / attribuer des crédits</DialogTitle>
+            <DialogDescription>
+              L’attribution crédite immédiatement et atomiquement le portefeuille du Partner.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={partnerId} onValueChange={setPartnerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Partenaire" />
+              </SelectTrigger>
+              <SelectContent>
+                {commerce.partners.map((partner) => (
+                  <SelectItem key={partner.id} value={partner.id}>
+                    {partner.name} · solde {partner.creditBalance}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedCreditPackId} onValueChange={setSelectedCreditPackId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pack de crédits" />
+              </SelectTrigger>
+              <SelectContent>
+                {commerce.creditPacks
+                  .filter((pack) => pack.isActive)
+                  .map((pack) => (
+                    <SelectItem key={pack.id} value={pack.id}>
+                      {pack.name} · {pack.creditCount} crédits · {formatCurrency(pack.price)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Input
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              placeholder="Référence unique"
+            />
+            <Textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Note (optionnelle)"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditPurchaseOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              disabled={submitting || !partnerId || !selectedCreditPackId || !reference.trim()}
+              onClick={() => void purchaseCreditPack()}
+            >
+              Attribuer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -630,44 +1180,54 @@ function ModulePacksSection({
         <div>
           <h2 className="text-lg font-semibold">Packs de modules</h2>
           <p className="text-sm text-muted-foreground">
-            Regroupez les modules {PLATFORM_BRANDING.shortName} et attribuez-les depuis la fiche d’un tenant.
+            Regroupez les modules {PLATFORM_BRANDING.shortName} et attribuez-les depuis la fiche
+            d’un tenant.
           </p>
         </div>
-        <Button onClick={() => openEditor()}><Plus /> Nouveau pack</Button>
+        <Button onClick={() => openEditor()}>
+          <Plus /> Nouveau pack
+        </Button>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {packs.length === 0 ? (
           <Card className="p-5 text-sm text-muted-foreground md:col-span-2 xl:col-span-4">
             Aucun pack de modules enregistré.
           </Card>
-        ) : packs.map((pack) => (
-          <Card key={pack.id} className="flex flex-col rounded-xl border-border/70 p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950">
-                <Layers3 className="size-5" />
+        ) : (
+          packs.map((pack) => (
+            <Card key={pack.id} className="flex flex-col rounded-xl border-border/70 p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950">
+                  <Layers3 className="size-5" />
+                </div>
+                <Badge variant={pack.is_active ? "default" : "secondary"}>
+                  {pack.is_active ? "Actif" : "Inactif"}
+                </Badge>
               </div>
-              <Badge variant={pack.is_active ? "default" : "secondary"}>
-                {pack.is_active ? "Actif" : "Inactif"}
-              </Badge>
-            </div>
-            <h3 className="mt-4 font-semibold">{pack.name}</h3>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{pack.code}</p>
-            <p className="mt-3 min-h-10 text-sm text-muted-foreground">
-              {pack.description ?? "Aucune description"}
-            </p>
-            <p className="mt-3 text-xs font-medium">
-              {pack.moduleIds.length} module{pack.moduleIds.length > 1 ? "s" : ""}
-            </p>
-            <div className="mt-4 flex gap-2 border-t pt-4">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => openEditor(pack)}>
-                <Pencil /> Modifier
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => void remove(pack)}>
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
-            </div>
-          </Card>
-        ))}
+              <h3 className="mt-4 font-semibold">{pack.name}</h3>
+              <p className="mt-1 font-mono text-xs text-muted-foreground">{pack.code}</p>
+              <p className="mt-3 min-h-10 text-sm text-muted-foreground">
+                {pack.description ?? "Aucune description"}
+              </p>
+              <p className="mt-3 text-xs font-medium">
+                {pack.moduleIds.length} module{pack.moduleIds.length > 1 ? "s" : ""}
+              </p>
+              <div className="mt-4 flex gap-2 border-t pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => openEditor(pack)}
+                >
+                  <Pencil /> Modifier
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => void remove(pack)}>
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </div>
+            </Card>
+          ))
+        )}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -681,15 +1241,27 @@ function ModulePacksSection({
           <div className="grid min-w-0 flex-1 gap-4 overflow-x-hidden overflow-y-auto px-4 py-2 sm:grid-cols-2 sm:px-6">
             <div className="space-y-2">
               <Label htmlFor="pack-name">Nom</Label>
-              <Input id="pack-name" value={name} onChange={(event) => setName(event.target.value)} />
+              <Input
+                id="pack-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pack-code">Code</Label>
-              <Input id="pack-code" value={code} onChange={(event) => setCode(event.target.value.toLowerCase())} />
+              <Input
+                id="pack-code"
+                value={code}
+                onChange={(event) => setCode(event.target.value.toLowerCase())}
+              />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="pack-description">Description</Label>
-              <Textarea id="pack-description" value={description} onChange={(event) => setDescription(event.target.value)} />
+              <Textarea
+                id="pack-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
             </div>
             <div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2">
               <Label htmlFor="pack-active">Pack actif</Label>
@@ -699,12 +1271,17 @@ function ModulePacksSection({
               <Label>Modules inclus</Label>
               <div className="grid max-h-64 gap-2 overflow-y-auto rounded-lg border p-3 sm:grid-cols-2">
                 {modules.map((module) => (
-                  <label key={module.id} className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-muted">
+                  <label
+                    key={module.id}
+                    className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-muted"
+                  >
                     <Checkbox
                       checked={moduleIds.includes(module.id)}
                       onCheckedChange={(checked) =>
                         setModuleIds((current) =>
-                          checked ? [...current, module.id] : current.filter((id) => id !== module.id),
+                          checked
+                            ? [...current, module.id]
+                            : current.filter((id) => id !== module.id),
                         )
                       }
                     />
@@ -718,8 +1295,13 @@ function ModulePacksSection({
             </div>
           </div>
           <DialogFooter className="sticky bottom-0 shrink-0 gap-2 border-t bg-background px-4 py-4 sm:px-6">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button disabled={submitting || !name.trim() || !code.trim()} onClick={() => void submit()}>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              disabled={submitting || !name.trim() || !code.trim()}
+              onClick={() => void submit()}
+            >
               {submitting ? "Enregistrement…" : "Enregistrer"}
             </Button>
           </DialogFooter>
@@ -760,11 +1342,10 @@ function TenantTable({
     if (refreshedTenant && refreshedTenant !== moduleTenant) setModuleTenant(refreshedTenant);
   }, [tenants, moduleTenant]);
   const activeDeletionByTenant = useMemo(
-    () => new Map(
-      deletionJobs
-        .filter((job) => job.status !== "completed")
-        .map((job) => [job.tenantId, job]),
-    ),
+    () =>
+      new Map(
+        deletionJobs.filter((job) => job.status !== "completed").map((job) => [job.tenantId, job]),
+      ),
     [deletionJobs],
   );
   const deletionStatusLabels: Record<TenantDeletionJob["status"], string> = {
@@ -816,7 +1397,13 @@ function TenantTable({
           reason: `${action} décidé depuis le Super Admin`,
         },
       });
-      toast.success(action === "suspend" ? "Tenant suspendu." : action === "restore" ? "Tenant restauré." : "Tenant réactivé.");
+      toast.success(
+        action === "suspend"
+          ? "Tenant suspendu."
+          : action === "restore"
+            ? "Tenant restauré."
+            : "Tenant réactivé.",
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "La nouvelle tentative a échoué.");
     } finally {
@@ -846,8 +1433,8 @@ function TenantTable({
     const normalized = query.trim().toLocaleLowerCase("fr");
     if (!normalized) return tenants;
     return tenants.filter((tenant) =>
-      [tenant.name, tenant.status, tenant.plan ?? "", tenant.pack?.name ?? "", tenant.id].some((value) =>
-        value.toLocaleLowerCase("fr").includes(normalized),
+      [tenant.name, tenant.status, tenant.plan ?? "", tenant.pack?.name ?? "", tenant.id].some(
+        (value) => value.toLocaleLowerCase("fr").includes(normalized),
       ),
     );
   }, [query, tenants]);
@@ -932,7 +1519,15 @@ function TenantTable({
                           {tenant.loginUrl}
                         </a>
                         <Badge variant="outline" className="mt-1 text-[10px]">
-                          {{ sent: "Invitation envoyée", pending: "En attente d’activation", activated: "Compte activé", expired: "Invitation expirée", unavailable: "Statut indisponible" }[tenant.invitationStatus]}
+                          {
+                            {
+                              sent: "Invitation envoyée",
+                              pending: "En attente d’activation",
+                              activated: "Compte activé",
+                              expired: "Invitation expirée",
+                              unavailable: "Statut indisponible",
+                            }[tenant.invitationStatus]
+                          }
                         </Badge>
                       </div>
                     </div>
@@ -943,7 +1538,9 @@ function TenantTable({
                         <p className="font-medium">{tenant.partner.name}</p>
                         <p className="text-xs text-muted-foreground">{tenant.partner.code}</p>
                       </div>
-                    ) : <span className="text-muted-foreground">Direct</span>}
+                    ) : (
+                      <span className="text-muted-foreground">Direct</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {tenant.deletedAt ? (
@@ -952,22 +1549,24 @@ function TenantTable({
                       <Badge variant="destructive">
                         {deletionStatusLabels[activeDeletionByTenant.get(tenant.id)!.status]}
                       </Badge>
-                    ) : <Badge
-                      className={cn(
-                        "rounded-full border-0 px-2.5 font-medium",
-                        isActive(tenant.status)
-                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-50"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-100",
-                      )}
-                    >
-                      <span
+                    ) : (
+                      <Badge
                         className={cn(
-                          "mr-1.5 size-1.5 rounded-full",
-                          isActive(tenant.status) ? "bg-emerald-500" : "bg-slate-400",
+                          "rounded-full border-0 px-2.5 font-medium",
+                          isActive(tenant.status)
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-50"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-100",
                         )}
-                      />
-                      {statusLabels[tenant.status] ?? tenant.status}
-                    </Badge>}
+                      >
+                        <span
+                          className={cn(
+                            "mr-1.5 size-1.5 rounded-full",
+                            isActive(tenant.status) ? "bg-emerald-500" : "bg-slate-400",
+                          )}
+                        />
+                        {statusLabels[tenant.status] ?? tenant.status}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{tenant.users}</TableCell>
                   <TableCell className="text-right tabular-nums">{tenant.sales}</TableCell>
@@ -987,7 +1586,9 @@ function TenantTable({
                     )}
                   </TableCell>
                   <TableCell>{tenant.partnerOffer?.name ?? "—"}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatDate(tenant.createdAt)}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {formatDate(tenant.createdAt)}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">
                     <div>{formatDate(tenant.subscriptionEnd)}</div>
                     {tenant.daysRemaining !== null && (
@@ -1015,12 +1616,20 @@ function TenantTable({
                       <DropdownMenuContent align="end" className="w-64 rounded-lg">
                         <DropdownMenuLabel>Actions du tenant</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {tenant.onboardingStatus === "pending_configuration" && <DropdownMenuItem onClick={() => setActivationTenant(tenant)}><ShieldCheck />Configurer et activer l’essai</DropdownMenuItem>}
+                        {tenant.onboardingStatus === "pending_configuration" && (
+                          <DropdownMenuItem onClick={() => setActivationTenant(tenant)}>
+                            <ShieldCheck />
+                            Configurer et activer l’essai
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => void copyLoginUrl(tenant)}>
                           <ClipboardCopy />
                           Copier le lien de connexion
                         </DropdownMenuItem>
-                        <DropdownMenuItem disabled={!tenant.adminEmail || tenant.invitationStatus === "activated"} onClick={() => void resendInvitation(tenant)}>
+                        <DropdownMenuItem
+                          disabled={!tenant.adminEmail || tenant.invitationStatus === "activated"}
+                          onClick={() => void resendInvitation(tenant)}
+                        >
                           <Mail />
                           Renvoyer l’invitation
                         </DropdownMenuItem>
@@ -1038,18 +1647,16 @@ function TenantTable({
                           <Gauge />
                           Gérer les modules
                         </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setAiTenant(tenant)}>
-                            <Bot />
-                            Abonnement Assistant IA
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <a
-                              href={`/settings/catalogue?tenantId=${encodeURIComponent(tenant.id)}`}
-                            >
-                              <Settings />
-                              Configurer le catalogue
-                            </a>
-                          </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAiTenant(tenant)}>
+                          <Bot />
+                          Abonnement Assistant IA
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <a href={`/settings/catalogue?tenantId=${encodeURIComponent(tenant.id)}`}>
+                            <Settings />
+                            Configurer le catalogue
+                          </a>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {tenant.deletedAt ? (
                           <DropdownMenuItem onClick={() => void changeLifecycle(tenant, "restore")}>
@@ -1057,7 +1664,9 @@ function TenantTable({
                             Restaurer
                           </DropdownMenuItem>
                         ) : tenant.suspendedAt || tenant.status === "suspended" ? (
-                          <DropdownMenuItem onClick={() => void changeLifecycle(tenant, "reactivate")}>
+                          <DropdownMenuItem
+                            onClick={() => void changeLifecycle(tenant, "reactivate")}
+                          >
                             <Activity />
                             Réactiver
                           </DropdownMenuItem>
@@ -1075,24 +1684,28 @@ function TenantTable({
                                 activeDeletionByTenant.get(tenant.id)!.status,
                               )
                             }
-                            onClick={() => void retryDeletion(activeDeletionByTenant.get(tenant.id)!)}
+                            onClick={() =>
+                              void retryDeletion(activeDeletionByTenant.get(tenant.id)!)
+                            }
                           >
                             <Activity />
                             Réessayer la suppression
                           </DropdownMenuItem>
-                        ) : !tenant.deletedAt && (
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => {
-                              setConfirmationSlug("");
-                              setDeletionReason("");
-                              setSecondConfirmation(false);
-                              setDeletionTenant(tenant);
-                            }}
-                          >
-                            <Trash2 />
-                            Supprimer logiquement
-                          </DropdownMenuItem>
+                        ) : (
+                          !tenant.deletedAt && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => {
+                                setConfirmationSlug("");
+                                setDeletionReason("");
+                                setSecondConfirmation(false);
+                                setDeletionTenant(tenant);
+                              }}
+                            >
+                              <Trash2 />
+                              Supprimer logiquement
+                            </DropdownMenuItem>
+                          )
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -1113,7 +1726,9 @@ function TenantTable({
                 className="flex flex-col gap-2 rounded-lg border p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{job.tenantName} ({job.tenantSlug})</p>
+                  <p className="truncate font-medium">
+                    {job.tenantName} ({job.tenantSlug})
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     Étape : {job.currentStep} · tentative {job.attemptCount}
                   </p>
@@ -1124,7 +1739,15 @@ function TenantTable({
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <Badge variant={job.status === "completed" ? "secondary" : job.status === "running" ? "default" : "destructive"}>
+                  <Badge
+                    variant={
+                      job.status === "completed"
+                        ? "secondary"
+                        : job.status === "running"
+                          ? "default"
+                          : "destructive"
+                    }
+                  >
                     {deletionStatusLabels[job.status]}
                   </Badge>
                   {["failed", "partial"].includes(job.status) && (
@@ -1157,8 +1780,8 @@ function TenantTable({
             <DialogTitle>Supprimer logiquement ce tenant ?</DialogTitle>
             <DialogDescription>
               Le tenant sera désactivé et masqué des listes actives. Ses profils, rôles,
-              abonnements, crédits, transactions, ventes, devis, fichiers et données métier
-              seront audités puis conservés pour permettre une restauration. Saisissez exactement{" "}
+              abonnements, crédits, transactions, ventes, devis, fichiers et données métier seront
+              audités puis conservés pour permettre une restauration. Saisissez exactement{" "}
               <strong className="font-mono text-foreground">{deletionTenant?.name}</strong>.
             </DialogDescription>
           </DialogHeader>
@@ -1230,7 +1853,14 @@ function TenantTable({
           if (!open) setAiTenant(null);
         }}
       />
-      <PendingActivationDialog tenant={activationTenant} packs={modulePacks} open={Boolean(activationTenant)} onOpenChange={(open) => { if (!open) setActivationTenant(null); }} />
+      <PendingActivationDialog
+        tenant={activationTenant}
+        packs={modulePacks}
+        open={Boolean(activationTenant)}
+        onOpenChange={(open) => {
+          if (!open) setActivationTenant(null);
+        }}
+      />
     </Card>
   );
 }
@@ -1251,7 +1881,8 @@ function AiSubscriptionDialog({
   const router = useRouter();
   const subscription = tenant?.aiSubscription;
   const [action, setAction] = useState<AiSubscriptionAction>("activate");
-  const [activationStatus, setActivationStatus] = useState<Extract<AiSubscriptionStatus, "active" | "trial">>("active");
+  const [activationStatus, setActivationStatus] =
+    useState<Extract<AiSubscriptionStatus, "active" | "trial">>("active");
   const [planCode, setPlanCode] = useState("");
   const [quota, setQuota] = useState("");
   const [days, setDays] = useState("30");
@@ -1314,21 +1945,42 @@ function AiSubscriptionDialog({
         </DialogHeader>
 
         <div className="grid gap-3 rounded-lg border p-4 text-sm sm:grid-cols-2">
-          <div>Statut : <strong>{subscription?.status ?? "Aucun abonnement"}</strong></div>
-          <div>Plan : <strong>{subscription?.planCode ?? "—"}</strong></div>
           <div>
-            Consommation : <strong>{subscription ? `${subscription.requestsUsed} / ${subscription.monthlyRequestLimit}` : "—"}</strong>
+            Statut : <strong>{subscription?.status ?? "Aucun abonnement"}</strong>
           </div>
-          <div>Expiration : <strong>{formatDate(subscription?.expiresAt ?? null)}</strong></div>
+          <div>
+            Plan : <strong>{subscription?.planCode ?? "—"}</strong>
+          </div>
+          <div>
+            Consommation :{" "}
+            <strong>
+              {subscription
+                ? `${subscription.requestsUsed} / ${subscription.monthlyRequestLimit}`
+                : "—"}
+            </strong>
+          </div>
+          <div>
+            Expiration : <strong>{formatDate(subscription?.expiresAt ?? null)}</strong>
+          </div>
           <div className="sm:col-span-2">
-            Période : <strong>{subscription ? `${formatDate(subscription.currentPeriodStart)} → ${formatDate(subscription.currentPeriodEnd)}` : "—"}</strong>
+            Période :{" "}
+            <strong>
+              {subscription
+                ? `${formatDate(subscription.currentPeriodStart)} → ${formatDate(subscription.currentPeriodEnd)}`
+                : "—"}
+            </strong>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="ai-action">Action</Label>
-            <select id="ai-action" value={action} onChange={(event) => setAction(event.target.value as AiSubscriptionAction)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <select
+              id="ai-action"
+              value={action}
+              onChange={(event) => setAction(event.target.value as AiSubscriptionAction)}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            >
               <option value="activate">Activer</option>
               <option value="update">Modifier plan/quota</option>
               <option value="renew">Renouveler</option>
@@ -1340,7 +1992,12 @@ function AiSubscriptionDialog({
           {action === "activate" && (
             <div className="space-y-2">
               <Label htmlFor="ai-status">Type d’activation</Label>
-              <select id="ai-status" value={activationStatus} onChange={(event) => setActivationStatus(event.target.value as "active" | "trial")} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              <select
+                id="ai-status"
+                value={activationStatus}
+                onChange={(event) => setActivationStatus(event.target.value as "active" | "trial")}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              >
                 <option value="active">Actif</option>
                 <option value="trial">Essai</option>
               </select>
@@ -1348,26 +2005,47 @@ function AiSubscriptionDialog({
           )}
           <div className="space-y-2">
             <Label htmlFor="ai-plan">Plan</Label>
-            <select id="ai-plan" value={planCode} onChange={(event) => {
-              const code = event.target.value;
-              setPlanCode(code);
-              const plan = plans.find((item) => item.code === code);
-              if (!subscription && plan?.monthlyRequestLimit) setQuota(String(plan.monthlyRequestLimit));
-            }} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <select
+              id="ai-plan"
+              value={planCode}
+              onChange={(event) => {
+                const code = event.target.value;
+                setPlanCode(code);
+                const plan = plans.find((item) => item.code === code);
+                if (!subscription && plan?.monthlyRequestLimit)
+                  setQuota(String(plan.monthlyRequestLimit));
+              }}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            >
               <option value="">Sélectionner</option>
               {plans.map((plan) => (
-                <option key={plan.code} value={plan.code}>{plan.name}{plan.enabled ? "" : " (désactivé)"}</option>
+                <option key={plan.code} value={plan.code}>
+                  {plan.name}
+                  {plan.enabled ? "" : " (désactivé)"}
+                </option>
               ))}
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="ai-quota">Quota mensuel</Label>
-            <Input id="ai-quota" type="number" min={1} value={quota} onChange={(event) => setQuota(event.target.value)} />
+            <Input
+              id="ai-quota"
+              type="number"
+              min={1}
+              value={quota}
+              onChange={(event) => setQuota(event.target.value)}
+            />
           </div>
           {["activate", "renew", "extend"].includes(action) && (
             <div className="space-y-2">
               <Label htmlFor="ai-days">Durée en jours</Label>
-              <Input id="ai-days" type="number" min={1} value={days} onChange={(event) => setDays(event.target.value)} />
+              <Input
+                id="ai-days"
+                type="number"
+                min={1}
+                value={days}
+                onChange={(event) => setDays(event.target.value)}
+              />
             </div>
           )}
         </div>
@@ -1377,11 +2055,20 @@ function AiSubscriptionDialog({
           <div className="max-h-52 overflow-auto rounded-lg border">
             {tenant?.aiUsageHistory.length ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Tool</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Tokens</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Tool</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="text-right">Tokens</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {tenant.aiUsageHistory.map((usage) => (
                     <TableRow key={usage.id}>
-                      <TableCell className="whitespace-nowrap text-xs">{formatDate(usage.createdAt, true)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {formatDate(usage.createdAt, true)}
+                      </TableCell>
                       <TableCell>{usage.toolName ?? usage.requestType}</TableCell>
                       <TableCell>{usage.status}</TableCell>
                       <TableCell className="text-right">{usage.totalTokens ?? "—"}</TableCell>
@@ -1389,13 +2076,19 @@ function AiSubscriptionDialog({
                   ))}
                 </TableBody>
               </Table>
-            ) : <p className="p-4 text-sm text-muted-foreground">Aucun appel IA enregistré.</p>}
+            ) : (
+              <p className="p-4 text-sm text-muted-foreground">Aucun appel IA enregistré.</p>
+            )}
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Annuler</Button>
-          <Button onClick={() => void submit()} disabled={submitting}>{submitting ? "Enregistrement…" : "Confirmer"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+            Annuler
+          </Button>
+          <Button onClick={() => void submit()} disabled={submitting}>
+            {submitting ? "Enregistrement…" : "Confirmer"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1403,6 +2096,31 @@ function AiSubscriptionDialog({
 }
 
 function TenantModulesDialog({
+  tenant,
+  open,
+  onOpenChange,
+}: {
+  tenant: SuperAdminTenant | null;
+  packs: SuperAdminModulePack[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Fiche tenant · Modules</DialogTitle>
+          <DialogDescription>
+            Gérez les modules de {tenant?.name}. Les abonnements Premium restent indépendants.
+          </DialogDescription>
+        </DialogHeader>
+        {tenant && <TenantModulesManager tenants={[tenant]} initialTenantId={tenant.id} fixedTenant />}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LegacyTenantModulesDialog({
   tenant,
   packs,
   open,
@@ -1419,22 +2137,102 @@ function TenantModulesDialog({
   const [modules, setModules] = useState<SuperAdminTenant["modules"]>([]);
   const [selectedPackId, setSelectedPackId] = useState("");
   const [assigning, setAssigning] = useState(false);
-  const [smsAdmin,setSmsAdmin]=useState<any>(null),[smsAction,setSmsAction]=useState("activate"),[smsPlan,setSmsPlan]=useState(""),[smsCredits,setSmsCredits]=useState("0"),[smsDays,setSmsDays]=useState("30"),[smsBusy,setSmsBusy]=useState(false),[planName,setPlanName]=useState(""),[planPrice,setPlanPrice]=useState("0"),[planCredits,setPlanCredits]=useState("100");
+  const [smsAdmin, setSmsAdmin] = useState<any>(null),
+    [smsAction, setSmsAction] = useState("activate"),
+    [smsPlan, setSmsPlan] = useState(""),
+    [smsCredits, setSmsCredits] = useState("0"),
+    [smsDays, setSmsDays] = useState("30"),
+    [smsBusy, setSmsBusy] = useState(false),
+    [orangeTestBusy, setOrangeTestBusy] = useState(false),
+    [orangeStatus, setOrangeStatus] = useState<"untested" | "connected" | "error">("untested"),
+    [planName, setPlanName] = useState(""),
+    [planPrice, setPlanPrice] = useState("0"),
+    [planCredits, setPlanCredits] = useState("100");
 
   useEffect(() => {
     setSelectedPackId(tenant?.pack?.id ?? "");
     setModules(tenant?.modules ?? []);
   }, [tenant]);
-  useEffect(()=>{if(open)getSmsAdminState().then((state:any)=>{setSmsAdmin(state);if(!smsPlan&&state.plans?.[0])setSmsPlan(state.plans[0].id);}).catch(()=>setSmsAdmin(null));},[open,smsPlan]);
-  const applySmsSubscription=async()=>{if(!tenant)return;setSmsBusy(true);try{await manageSmsSubscription({data:{tenantId:tenant.id,action:smsAction as any,planId:["activate","renew"].includes(smsAction)?smsPlan:null,credits:Number(smsCredits),expiresAt:["activate","renew","reactivate"].includes(smsAction)?new Date(Date.now()+Number(smsDays)*86400000).toISOString():null,reason:`Gestion SMS Super Admin : ${smsAction}`}});toast.success("Abonnement SMS mis à jour.");setSmsAdmin(await getSmsAdminState());await router.invalidate();}catch(error){toast.error(error instanceof Error?error.message:"Gestion SMS impossible");}finally{setSmsBusy(false);}};
-  const createSmsPlan=async()=>{setSmsBusy(true);try{await saveSmsPlan({data:{id:null,name:planName,price:Number(planPrice),durationDays:Number(smsDays),credits:Number(planCredits),active:true}});setSmsAdmin(await getSmsAdminState());setPlanName("");toast.success("Forfait SMS créé.");}catch(error){toast.error(error instanceof Error?error.message:"Création impossible");}finally{setSmsBusy(false);}};
+  useEffect(() => {
+    if (open)
+      getSmsAdminState()
+        .then((state: any) => {
+          setSmsAdmin(state);
+          if (!smsPlan && state.plans?.[0]) setSmsPlan(state.plans[0].id);
+        })
+        .catch(() => setSmsAdmin(null));
+  }, [open, smsPlan]);
+  const applySmsSubscription = async () => {
+    if (!tenant) return;
+    setSmsBusy(true);
+    try {
+      await manageSmsSubscription({
+        data: {
+          tenantId: tenant.id,
+          action: smsAction as any,
+          planId: ["activate", "renew"].includes(smsAction) ? smsPlan : null,
+          credits: Number(smsCredits),
+          expiresAt: ["activate", "renew", "reactivate"].includes(smsAction)
+            ? new Date(Date.now() + Number(smsDays) * 86400000).toISOString()
+            : null,
+          reason: `Gestion SMS Super Admin : ${smsAction}`,
+        },
+      });
+      toast.success("Abonnement SMS mis à jour.");
+      setSmsAdmin(await getSmsAdminState());
+      await router.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gestion SMS impossible");
+    } finally {
+      setSmsBusy(false);
+    }
+  };
+  const createSmsPlan = async () => {
+    setSmsBusy(true);
+    try {
+      await saveSmsPlan({
+        data: {
+          id: null,
+          name: planName,
+          price: Number(planPrice),
+          durationDays: Number(smsDays),
+          credits: Number(planCredits),
+          active: true,
+        },
+      });
+      setSmsAdmin(await getSmsAdminState());
+      setPlanName("");
+      toast.success("Forfait SMS créé.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Création impossible");
+    } finally {
+      setSmsBusy(false);
+    }
+  };
+  const testOrange = async () => {
+    setOrangeTestBusy(true);
+    try {
+      const result = await testOrangeSmsConnection();
+      setOrangeStatus(result.connected ? "connected" : "error");
+      result.connected ? toast.success(result.message) : toast.error(result.message);
+    } catch {
+      setOrangeStatus("error");
+      toast.error("Impossible de vérifier la connexion Orange.");
+    } finally {
+      setOrangeTestBusy(false);
+    }
+  };
 
   const applyPack = async () => {
     if (!tenant || !selectedPackId) return;
     setAssigning(true);
     try {
-      await assignModulePack({ data: { tenantId: tenant.id, packId: selectedPackId } });
-      toast.success("Pack attribué et modules synchronisés.");
+      const result = await assignModulePack({ data: { tenantId: tenant.id, packId: selectedPackId } });
+      toast.success(
+        result.preservedPremiumModuleNames.length
+          ? `Pack attribué. Modules Premium conservés car leur abonnement est actif : ${result.preservedPremiumModuleNames.join(", ")}.`
+          : "Pack attribué et modules synchronisés.",
+      );
       onOpenChange(false);
       await router.invalidate();
     } catch (error) {
@@ -1448,9 +2246,9 @@ function TenantModulesDialog({
     if (!tenant) return;
     const previousEnabled = modules.find((module) => module.id === moduleId)?.enabled ?? !enabled;
     setPendingModules((current) => new Set(current).add(moduleId));
-    setModules((current) => current.map((module) =>
-      module.id === moduleId ? { ...module, enabled } : module
-    ));
+    setModules((current) =>
+      current.map((module) => (module.id === moduleId ? { ...module, enabled } : module)),
+    );
     try {
       await manageTenantModule({
         data: { tenantId: tenant.id, moduleId, enabled },
@@ -1459,9 +2257,11 @@ function TenantModulesDialog({
       await queryClient.invalidateQueries({ queryKey: tenantModulesQueryKey(tenant.id) });
       await router.invalidate();
     } catch (error) {
-      setModules((current) => current.map((module) =>
-        module.id === moduleId ? { ...module, enabled: previousEnabled } : module
-      ));
+      setModules((current) =>
+        current.map((module) =>
+          module.id === moduleId ? { ...module, enabled: previousEnabled } : module,
+        ),
+      );
       toast.error(
         error instanceof Error
           ? `Impossible de mettre à jour le module : ${error.message}. L’état précédent a été restauré.`
@@ -1493,9 +2293,13 @@ function TenantModulesDialog({
                 <SelectValue placeholder="Sélectionner un pack" />
               </SelectTrigger>
               <SelectContent>
-                {packs.filter((pack) => pack.is_active && pack.code === "hotel").map((pack) => (
-                  <SelectItem key={pack.id} value={pack.id}>{pack.name}</SelectItem>
-                ))}
+                {packs
+                  .filter((pack) => pack.is_active && pack.code === "hotel")
+                  .map((pack) => (
+                    <SelectItem key={pack.id} value={pack.id}>
+                      {pack.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Button
@@ -1511,40 +2315,166 @@ function TenantModulesDialog({
           </p>
         </div>
         <div className="max-h-[60vh] space-y-2 overflow-y-auto py-2">
-          <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-4 dark:bg-amber-950/20"><div className="flex items-center justify-between"><div><Label>Abonnement SMS Premium</Label><p className="text-xs text-muted-foreground">Solde : {smsAdmin?.subscriptions?.find((x:any)=>x.tenant_id===tenant?.id)?.credit_balance??0} crédits</p></div><Badge variant="outline">SAOVIA</Badge></div><div className="grid gap-2 sm:grid-cols-2"><Select value={smsAction} onValueChange={setSmsAction}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="activate">Activer</SelectItem><SelectItem value="renew">Renouveler</SelectItem><SelectItem value="recharge">Recharger</SelectItem><SelectItem value="adjust">Ajuster</SelectItem><SelectItem value="suspend">Suspendre</SelectItem><SelectItem value="reactivate">Réactiver</SelectItem></SelectContent></Select>{["activate","renew"].includes(smsAction)&&<Select value={smsPlan} onValueChange={setSmsPlan}><SelectTrigger><SelectValue placeholder="Forfait"/></SelectTrigger><SelectContent>{smsAdmin?.plans?.filter((x:any)=>x.is_active).map((x:any)=><SelectItem key={x.id} value={x.id}>{x.name} · {x.included_credits} SMS · {x.price} XOF</SelectItem>)}</SelectContent></Select>}{["activate","renew","recharge","adjust"].includes(smsAction)&&<Input type="number" value={smsCredits} onChange={e=>setSmsCredits(e.target.value)} placeholder="Crédits supplémentaires"/>}{["activate","renew","reactivate"].includes(smsAction)&&<Input type="number" min="1" value={smsDays} onChange={e=>setSmsDays(e.target.value)} placeholder="Durée en jours"/>}</div><Button size="sm" disabled={smsBusy||(["activate","renew"].includes(smsAction)&&!smsPlan)} onClick={()=>void applySmsSubscription()}>{smsBusy?"Application…":"Appliquer l’abonnement"}</Button></div>
-          <div className="space-y-2 rounded-xl border p-4"><Label>Créer un forfait SMS configurable</Label><div className="grid gap-2 sm:grid-cols-3"><Input value={planName} onChange={e=>setPlanName(e.target.value)} placeholder="Nom du forfait"/><Input type="number" min="0" value={planPrice} onChange={e=>setPlanPrice(e.target.value)} placeholder="Prix XOF"/><Input type="number" min="0" value={planCredits} onChange={e=>setPlanCredits(e.target.value)} placeholder="Nombre de SMS"/></div><Button size="sm" variant="outline" disabled={smsBusy||!planName.trim()} onClick={()=>void createSmsPlan()}>Créer le forfait</Button></div>
+          <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-4 dark:bg-amber-950/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Abonnement SMS Premium</Label>
+                <p className="text-xs text-muted-foreground">
+                  Solde :{" "}
+                  {smsAdmin?.subscriptions?.find((x: any) => x.tenant_id === tenant?.id)
+                    ?.credit_balance ?? 0}{" "}
+                  crédits
+                </p>
+              </div>
+              <Badge variant="outline">SAOVIA</Badge>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={orangeTestBusy}
+                onClick={() => void testOrange()}
+              >
+                {orangeTestBusy ? "Test en cours…" : "Tester la connexion Orange"}
+              </Button>
+              <Badge
+                variant={orangeStatus === "error" ? "destructive" : "outline"}
+                className={orangeStatus === "connected" ? "bg-emerald-600 text-white" : undefined}
+              >
+                {orangeStatus === "untested"
+                  ? "Non testé"
+                  : orangeStatus === "connected"
+                    ? "Connecté"
+                    : "Erreur de configuration"}
+              </Badge>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Select value={smsAction} onValueChange={setSmsAction}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="activate">Activer</SelectItem>
+                  <SelectItem value="renew">Renouveler</SelectItem>
+                  <SelectItem value="recharge">Recharger</SelectItem>
+                  <SelectItem value="adjust">Ajuster</SelectItem>
+                  <SelectItem value="suspend">Suspendre</SelectItem>
+                  <SelectItem value="reactivate">Réactiver</SelectItem>
+                </SelectContent>
+              </Select>
+              {["activate", "renew"].includes(smsAction) && (
+                <Select value={smsPlan} onValueChange={setSmsPlan}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Forfait" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {smsAdmin?.plans
+                      ?.filter((x: any) => x.is_active)
+                      .map((x: any) => (
+                        <SelectItem key={x.id} value={x.id}>
+                          {x.name} · {x.included_credits} SMS · {x.price} XOF
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {["activate", "renew", "recharge", "adjust"].includes(smsAction) && (
+                <Input
+                  type="number"
+                  value={smsCredits}
+                  onChange={(e) => setSmsCredits(e.target.value)}
+                  placeholder="Crédits supplémentaires"
+                />
+              )}
+              {["activate", "renew", "reactivate"].includes(smsAction) && (
+                <Input
+                  type="number"
+                  min="1"
+                  value={smsDays}
+                  onChange={(e) => setSmsDays(e.target.value)}
+                  placeholder="Durée en jours"
+                />
+              )}
+            </div>
+            <Button
+              size="sm"
+              disabled={smsBusy || (["activate", "renew"].includes(smsAction) && !smsPlan)}
+              onClick={() => void applySmsSubscription()}
+            >
+              {smsBusy ? "Application…" : "Appliquer l’abonnement"}
+            </Button>
+          </div>
+          <div className="space-y-2 rounded-xl border p-4">
+            <Label>Créer un forfait SMS configurable</Label>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Input
+                value={planName}
+                onChange={(e) => setPlanName(e.target.value)}
+                placeholder="Nom du forfait"
+              />
+              <Input
+                type="number"
+                min="0"
+                value={planPrice}
+                onChange={(e) => setPlanPrice(e.target.value)}
+                placeholder="Prix XOF"
+              />
+              <Input
+                type="number"
+                min="0"
+                value={planCredits}
+                onChange={(e) => setPlanCredits(e.target.value)}
+                placeholder="Nombre de SMS"
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={smsBusy || !planName.trim()}
+              onClick={() => void createSmsPlan()}
+            >
+              Créer le forfait
+            </Button>
+          </div>
           {!modules.length ? (
             <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
               Aucun module disponible pour ce tenant.
             </p>
-          ) : modules.map((module) => (
-            <div
-              key={module.id}
-              className="flex items-center justify-between gap-4 rounded-lg border border-border p-3"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor={`module-${module.id}`}>{module.name}</Label>
-                  <Badge variant={module.enabled ? "default" : "secondary"}>
-                    {module.enabled ? "Actif" : "Inactif"}
-                  </Badge>
-                  {module.code === "hotel_sms" && (
-                    <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">Premium</Badge>
-                  )}
+          ) : (
+            modules.map((module) => (
+              <div
+                key={module.id}
+                className="flex items-center justify-between gap-4 rounded-lg border border-border p-3"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`module-${module.id}`}>{module.name}</Label>
+                    <Badge variant={module.enabled ? "default" : "secondary"}>
+                      {module.enabled ? "Actif" : "Inactif"}
+                    </Badge>
+                    {module.code === "hotel_sms" && (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-400 text-amber-700 dark:text-amber-300"
+                      >
+                        Premium
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {module.description ?? module.code}
+                  </p>
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {module.description ?? module.code}
-                </p>
+                <Switch
+                  id={`module-${module.id}`}
+                  checked={module.enabled}
+                  disabled={pendingModules.has(module.id)}
+                  onCheckedChange={(enabled) => toggleModule(module.id, enabled)}
+                  aria-label={`${module.enabled ? "Désactiver" : "Activer"} ${module.name}`}
+                />
               </div>
-              <Switch
-                id={`module-${module.id}`}
-                checked={module.enabled}
-                disabled={pendingModules.has(module.id)}
-                onCheckedChange={(enabled) => toggleModule(module.id, enabled)}
-                aria-label={`${module.enabled ? "Désactiver" : "Activer"} ${module.name}`}
-              />
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -1744,7 +2674,11 @@ function SubscriptionSummary({ data }: { data: SuperAdminDashboard["subscription
   );
 }
 
-function CreateTenantDialog({ open, onOpenChange, modules }: {
+function CreateTenantDialog({
+  open,
+  onOpenChange,
+  modules,
+}: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   modules: SuperAdminDashboard["modules"];
@@ -1762,22 +2696,27 @@ function CreateTenantDialog({ open, onOpenChange, modules }: {
   const submit = async () => {
     setSubmitting(true);
     try {
-      const result = await createInvitedTenant({ data: {
-        companyName,
-        adminName,
-        platformType,
-        adminEmail,
-        billingCycle,
-        durationDays: Number(durationDays),
-        moduleIds,
-      } });
+      const result = await createInvitedTenant({
+        data: {
+          companyName,
+          adminName,
+          platformType,
+          adminEmail,
+          billingCycle,
+          durationDays: Number(durationDays),
+          moduleIds,
+        },
+      });
       if (!result.ok) {
         toast.error(result.message);
         return;
       }
       toast.success("Tenant créé et invitation envoyée.");
       onOpenChange(false);
-      setCompanyName(""); setAdminName(""); setAdminEmail(""); setModuleIds([]);
+      setCompanyName("");
+      setAdminName("");
+      setAdminEmail("");
+      setModuleIds([]);
       await router.invalidate();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impossible de créer le tenant.");
@@ -1786,34 +2725,267 @@ function CreateTenantDialog({ open, onOpenChange, modules }: {
     }
   };
 
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-      <DialogHeader>
-        <DialogTitle>Créer un tenant par invitation</DialogTitle>
-        <DialogDescription>Le client recevra un lien pour définir lui-même son mot de passe.</DialogDescription>
-      </DialogHeader>
-      <div className="space-y-4">
-        <div className="space-y-2"><Label htmlFor="tenant-company">Entreprise</Label><Input id="tenant-company" value={companyName} onChange={(event) => setCompanyName(event.target.value)} /></div>
-        <div className="space-y-2"><Label htmlFor="tenant-admin-name">Nom de l’administrateur</Label><Input id="tenant-admin-name" value={adminName} onChange={(event) => setAdminName(event.target.value)} /></div>
-        <div className="space-y-2"><Label htmlFor="tenant-email">E-mail administrateur</Label><Input id="tenant-email" type="email" autoComplete="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} /></div>
-        <div className="space-y-2"><Label>Plateforme</Label><Select value={platformType} onValueChange={(value) => setPlatformType(value as "ERP" | "HOTEL")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ERP">ERP Entreprise</SelectItem><SelectItem value="HOTEL">Hôtel &amp; Résidences</SelectItem></SelectContent></Select></div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2"><Label>Offre</Label><Select value={billingCycle} onValueChange={(value) => setBillingCycle(value as SubscriptionBillingCycle)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="monthly">Mensuelle</SelectItem><SelectItem value="quarterly">Trimestrielle</SelectItem><SelectItem value="yearly">Annuelle</SelectItem></SelectContent></Select></div>
-          <div className="space-y-2"><Label htmlFor="tenant-duration">Durée (jours)</Label><Input id="tenant-duration" type="number" min="1" max="3650" value={durationDays} onChange={(event) => setDurationDays(event.target.value)} /></div>
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Créer un tenant par invitation</DialogTitle>
+          <DialogDescription>
+            Le client recevra un lien pour définir lui-même son mot de passe.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="tenant-company">Entreprise</Label>
+            <Input
+              id="tenant-company"
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tenant-admin-name">Nom de l’administrateur</Label>
+            <Input
+              id="tenant-admin-name"
+              value={adminName}
+              onChange={(event) => setAdminName(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tenant-email">E-mail administrateur</Label>
+            <Input
+              id="tenant-email"
+              type="email"
+              autoComplete="email"
+              value={adminEmail}
+              onChange={(event) => setAdminEmail(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Plateforme</Label>
+            <Select
+              value={platformType}
+              onValueChange={(value) => setPlatformType(value as "ERP" | "HOTEL")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ERP">ERP Entreprise</SelectItem>
+                <SelectItem value="HOTEL">Hôtel &amp; Résidences</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Offre</Label>
+              <Select
+                value={billingCycle}
+                onValueChange={(value) => setBillingCycle(value as SubscriptionBillingCycle)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Mensuelle</SelectItem>
+                  <SelectItem value="quarterly">Trimestrielle</SelectItem>
+                  <SelectItem value="yearly">Annuelle</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tenant-duration">Durée (jours)</Label>
+              <Input
+                id="tenant-duration"
+                type="number"
+                min="1"
+                max="3650"
+                value={durationDays}
+                onChange={(event) => setDurationDays(event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Modules</Label>
+            <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
+              {modules
+                .filter((module) => module.is_active)
+                .map((module) => (
+                  <label key={module.id} className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={moduleIds.includes(module.id)}
+                      onCheckedChange={(checked) =>
+                        setModuleIds((current) =>
+                          checked
+                            ? [...current, module.id]
+                            : current.filter((id) => id !== module.id),
+                        )
+                      }
+                    />
+                    {module.name}
+                  </label>
+                ))}
+            </div>
+          </div>
         </div>
-        <div className="space-y-2"><Label>Modules</Label><div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">{modules.filter((module) => module.is_active).map((module) => <label key={module.id} className="flex items-center gap-2 text-sm"><Checkbox checked={moduleIds.includes(module.id)} onCheckedChange={(checked) => setModuleIds((current) => checked ? [...current, module.id] : current.filter((id) => id !== module.id))} />{module.name}</label>)}</div></div>
-      </div>
-      <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Annuler</Button><Button onClick={() => void submit()} disabled={submitting || companyName.trim().length < 2 || adminName.trim().length < 2 || !adminEmail.includes("@") || Number(durationDays) < 1}>{submitting ? "Création…" : "Créer et inviter"}</Button></DialogFooter>
-    </DialogContent>
-  </Dialog>;
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+            Annuler
+          </Button>
+          <Button
+            onClick={() => void submit()}
+            disabled={
+              submitting ||
+              companyName.trim().length < 2 ||
+              adminName.trim().length < 2 ||
+              !adminEmail.includes("@") ||
+              Number(durationDays) < 1
+            }
+          >
+            {submitting ? "Création…" : "Créer et inviter"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
-function PendingActivationDialog({ tenant, packs, open, onOpenChange }: { tenant: SuperAdminTenant | null; packs: SuperAdminModulePack[]; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const router = useRouter(); const [packId,setPackId]=useState<string>(""); const [moduleIds,setModuleIds]=useState<string[]>([]); const [cycle,setCycle]=useState<SubscriptionBillingCycle>("monthly"); const [days,setDays]=useState("3"); const [amount,setAmount]=useState("0"); const [busy,setBusy]=useState(false);
-  useEffect(()=>{if(!tenant)return;const suggested=packs.find(p=>p.code===tenant.suggestedPackCode);setPackId(suggested?.id??"");setModuleIds(suggested?.moduleIds??[]);},[tenant,packs]);
-  const choosePack=(id:string)=>{setPackId(id);setModuleIds(packs.find(p=>p.id===id)?.moduleIds??[])};
-  const submit=async()=>{if(!tenant)return;setBusy(true);try{await activatePendingTrial({data:{tenantId:tenant.id,packId:packId||null,moduleIds,billingCycle:cycle,durationDays:Number(days),amount:Number(amount)}});toast.success("Essai activé.");onOpenChange(false);await router.invalidate();}catch(e){toast.error(e instanceof Error?e.message:"Activation impossible.")}finally{setBusy(false)}};
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Configurer et activer {tenant?.name}</DialogTitle><DialogDescription>Activité : {tenant?.activity??"Non renseignée"}. L’essai commence à la validation.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label>Pack suggéré</Label><Select value={packId} onValueChange={choosePack}><SelectTrigger><SelectValue placeholder="Choisir un pack"/></SelectTrigger><SelectContent>{packs.filter(p=>p.is_active).map(p=><SelectItem key={p.id} value={p.id}>{p.name}{p.code===tenant?.suggestedPackCode?" — suggéré":""}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Modules</Label>{tenant?.modules.map(m=><label key={m.id} className="flex items-center gap-2 text-sm"><Checkbox checked={moduleIds.includes(m.id)} onCheckedChange={checked=>setModuleIds(v=>checked?[...v,m.id]:v.filter(id=>id!==m.id))}/>{m.name}</label>)}</div><div className="grid grid-cols-3 gap-3"><div><Label>Offre</Label><Select value={cycle} onValueChange={v=>setCycle(v as SubscriptionBillingCycle)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="monthly">Mensuelle</SelectItem><SelectItem value="quarterly">Trimestrielle</SelectItem><SelectItem value="yearly">Annuelle</SelectItem></SelectContent></Select></div><div><Label>Durée (jours)</Label><Input type="number" min="1" value={days} onChange={e=>setDays(e.target.value)}/></div><div><Label>Montant</Label><Input type="number" min="0" value={amount} onChange={e=>setAmount(e.target.value)}/></div></div></div><DialogFooter><Button variant="outline" onClick={()=>onOpenChange(false)}>Annuler</Button><Button disabled={busy||moduleIds.length===0||Number(days)<1} onClick={()=>void submit()}>{busy?"Activation…":"Valider et démarrer"}</Button></DialogFooter></DialogContent></Dialog>;
+function PendingActivationDialog({
+  tenant,
+  packs,
+  open,
+  onOpenChange,
+}: {
+  tenant: SuperAdminTenant | null;
+  packs: SuperAdminModulePack[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const [packId, setPackId] = useState<string>("");
+  const [moduleIds, setModuleIds] = useState<string[]>([]);
+  const [cycle, setCycle] = useState<SubscriptionBillingCycle>("monthly");
+  const [days, setDays] = useState("3");
+  const [amount, setAmount] = useState("0");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!tenant) return;
+    const suggested = packs.find((p) => p.code === tenant.suggestedPackCode);
+    setPackId(suggested?.id ?? "");
+    setModuleIds(suggested?.moduleIds ?? []);
+  }, [tenant, packs]);
+  const choosePack = (id: string) => {
+    setPackId(id);
+    setModuleIds(packs.find((p) => p.id === id)?.moduleIds ?? []);
+  };
+  const submit = async () => {
+    if (!tenant) return;
+    setBusy(true);
+    try {
+      await activatePendingTrial({
+        data: {
+          tenantId: tenant.id,
+          packId: packId || null,
+          moduleIds,
+          billingCycle: cycle,
+          durationDays: Number(days),
+          amount: Number(amount),
+        },
+      });
+      toast.success("Essai activé.");
+      onOpenChange(false);
+      await router.invalidate();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Activation impossible.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Configurer et activer {tenant?.name}</DialogTitle>
+          <DialogDescription>
+            Activité : {tenant?.activity ?? "Non renseignée"}. L’essai commence à la validation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Pack suggéré</Label>
+            <Select value={packId} onValueChange={choosePack}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choisir un pack" />
+              </SelectTrigger>
+              <SelectContent>
+                {packs
+                  .filter((p) => p.is_active)
+                  .map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      {p.code === tenant?.suggestedPackCode ? " — suggéré" : ""}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Modules</Label>
+            {tenant?.modules.map((m) => (
+              <label key={m.id} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={moduleIds.includes(m.id)}
+                  onCheckedChange={(checked) =>
+                    setModuleIds((v) => (checked ? [...v, m.id] : v.filter((id) => id !== m.id)))
+                  }
+                />
+                {m.name}
+              </label>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label>Offre</Label>
+              <Select value={cycle} onValueChange={(v) => setCycle(v as SubscriptionBillingCycle)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Mensuelle</SelectItem>
+                  <SelectItem value="quarterly">Trimestrielle</SelectItem>
+                  <SelectItem value="yearly">Annuelle</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Durée (jours)</Label>
+              <Input type="number" min="1" value={days} onChange={(e) => setDays(e.target.value)} />
+            </div>
+            <div>
+              <Label>Montant</Label>
+              <Input
+                type="number"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Annuler
+          </Button>
+          <Button
+            disabled={busy || moduleIds.length === 0 || Number(days) < 1}
+            onClick={() => void submit()}
+          >
+            {busy ? "Activation…" : "Valider et démarrer"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function SuperAdminDashboardView({
@@ -1842,7 +3014,7 @@ export function SuperAdminDashboardView({
   return (
     <div className="min-h-screen bg-muted/30 text-foreground dark:bg-background">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] lg:block">
-        <SidebarContent onCreateTenant={() => setCreateTenantOpen(true)} />
+        <SuperAdminSidebar onCreateTenant={() => setCreateTenantOpen(true)} />
       </aside>
 
       <div className="lg:pl-[248px]">
@@ -1858,7 +3030,7 @@ export function SuperAdminDashboardView({
                 </SheetTrigger>
                 <SheetContent side="left" className="w-[280px] border-0 p-0 [&>button]:text-white">
                   <SheetTitle className="sr-only">Navigation Super Admin</SheetTitle>
-                  <SidebarContent mobile onCreateTenant={() => setCreateTenantOpen(true)} />
+                  <SuperAdminSidebar mobile onCreateTenant={() => setCreateTenantOpen(true)} />
                 </SheetContent>
               </Sheet>
               <BrandLogo context="mobile" className="sm:hidden" />
@@ -2096,7 +3268,11 @@ export function SuperAdminDashboardView({
           />
           <SubscriptionSummary data={dashboard.subscriptions} />
         </main>
-        <CreateTenantDialog open={createTenantOpen} onOpenChange={setCreateTenantOpen} modules={dashboard.modules} />
+        <CreateTenantDialog
+          open={createTenantOpen}
+          onOpenChange={setCreateTenantOpen}
+          modules={dashboard.modules}
+        />
       </div>
     </div>
   );

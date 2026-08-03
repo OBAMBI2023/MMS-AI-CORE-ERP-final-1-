@@ -55,6 +55,7 @@ import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
 import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
 import { Route as SettingsUsersRouteImport } from './routes/settings.users'
 import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.ia-platform'
+import { Route as SuperAdminModulesRouteImport } from './routes/super-admin.modules'
 import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
 import { Route as SuperAdminUsersRouteImport } from './routes/super-admin.users'
 
@@ -288,6 +289,11 @@ const SuperAdminIaPlatformRoute = SuperAdminIaPlatformRouteImport.update({
   path: '/ia-platform',
   getParentRoute: () => SuperAdminRoute,
 } as any)
+const SuperAdminModulesRoute = SuperAdminModulesRouteImport.update({
+  id: '/modules',
+  path: '/modules',
+  getParentRoute: () => SuperAdminRoute,
+} as any)
 const SuperAdminPartnersRoute = SuperAdminPartnersRouteImport.update({
   id: '/partners',
   path: '/partners',
@@ -344,6 +350,7 @@ export interface FileRoutesByFullPath {
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
+  '/super-admin/modules': typeof SuperAdminModulesRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app/': typeof AppIndexRoute
@@ -393,6 +400,7 @@ export interface FileRoutesByTo {
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
+  '/super-admin/modules': typeof SuperAdminModulesRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app': typeof AppIndexRoute
@@ -444,6 +452,7 @@ export interface FileRoutesById {
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
+  '/super-admin/modules': typeof SuperAdminModulesRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app/': typeof AppIndexRoute
@@ -496,6 +505,7 @@ export interface FileRouteTypes {
     | '/settings/catalogue'
     | '/settings/users'
     | '/super-admin/ia-platform'
+    | '/super-admin/modules'
     | '/super-admin/partners'
     | '/super-admin/users'
     | '/app/'
@@ -545,6 +555,7 @@ export interface FileRouteTypes {
     | '/settings/catalogue'
     | '/settings/users'
     | '/super-admin/ia-platform'
+    | '/super-admin/modules'
     | '/super-admin/partners'
     | '/super-admin/users'
     | '/app'
@@ -595,6 +606,7 @@ export interface FileRouteTypes {
     | '/settings/catalogue'
     | '/settings/users'
     | '/super-admin/ia-platform'
+    | '/super-admin/modules'
     | '/super-admin/partners'
     | '/super-admin/users'
     | '/app/'
@@ -964,6 +976,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperAdminIaPlatformRouteImport
       parentRoute: typeof SuperAdminRoute
     }
+    '/super-admin/modules': {
+      id: '/super-admin/modules'
+      path: '/modules'
+      fullPath: '/super-admin/modules'
+      preLoaderRoute: typeof SuperAdminModulesRouteImport
+      parentRoute: typeof SuperAdminRoute
+    }
     '/super-admin/partners': {
       id: '/super-admin/partners'
       path: '/partners'
@@ -1009,12 +1028,14 @@ const HotelRouteWithChildren = HotelRoute._addFileChildren(HotelRouteChildren)
 
 interface SuperAdminRouteChildren {
   SuperAdminIaPlatformRoute: typeof SuperAdminIaPlatformRoute
+  SuperAdminModulesRoute: typeof SuperAdminModulesRoute
   SuperAdminPartnersRoute: typeof SuperAdminPartnersRoute
   SuperAdminUsersRoute: typeof SuperAdminUsersRoute
 }
 
 const SuperAdminRouteChildren: SuperAdminRouteChildren = {
   SuperAdminIaPlatformRoute: SuperAdminIaPlatformRoute,
+  SuperAdminModulesRoute: SuperAdminModulesRoute,
   SuperAdminPartnersRoute: SuperAdminPartnersRoute,
   SuperAdminUsersRoute: SuperAdminUsersRoute,
 }

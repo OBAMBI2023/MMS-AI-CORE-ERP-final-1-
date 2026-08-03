@@ -31,8 +31,14 @@ type ModuleRow = {
   description: string | null;
   sort_order: number;
   is_active: boolean;
+  module_type: "standard" | "premium";
 };
-type TenantModuleRow = { tenant_id: string; module_id: string; enabled: boolean };
+type TenantModuleRow = {
+  tenant_id: string;
+  module_id: string;
+  enabled: boolean;
+  assignment_source: "pack" | "manual" | "subscription" | "system";
+};
 type ModulePackRow = {
   id: string;
   name: string;
@@ -213,7 +219,10 @@ export type TenantDeletionJob = {
   completedAt: string | null;
 };
 
-export type SuperAdminTenantModule = ModuleRow & { enabled: boolean };
+export type SuperAdminTenantModule = ModuleRow & {
+  enabled: boolean;
+  assignmentSource: "pack" | "manual" | "subscription" | "system";
+};
 export type SuperAdminModulePack = ModulePackRow & { moduleIds: string[] };
 export type SuperAdminPartnerOffer = {
   id: string; name: string; price: number; includedTenantCredits: number; durationDays: number;
@@ -414,12 +423,12 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       fetchRows<ModuleRow>(
         supabaseAdmin,
         "erp_modules",
-        "id, code, name, description, sort_order, is_active",
+        "id, code, name, description, sort_order, is_active, module_type",
       ),
       fetchRows<TenantModuleRow>(
         supabaseAdmin,
         "tenant_modules",
-        "tenant_id, module_id, enabled",
+        "tenant_id, module_id, enabled, assignment_source",
       ),
       fetchRows<ModulePackRow>(
         supabaseAdmin,
@@ -485,7 +494,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
     const tenantModuleState = new Map(
       tenantModuleRows.map((assignment) => [
         `${assignment.tenant_id}:${assignment.module_id}`,
-        assignment.enabled,
+        assignment,
       ]),
     );
     const modulePacks = modulePackRows
@@ -634,7 +643,9 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
             ))
             .map((module) => ({
               ...module,
-              enabled: tenantModuleState.get(`${tenant.id}:${module.id}`) ?? false,
+              enabled: tenantModuleState.get(`${tenant.id}:${module.id}`)?.enabled ?? false,
+              assignmentSource:
+                tenantModuleState.get(`${tenant.id}:${module.id}`)?.assignment_source ?? "system",
             }))
             .sort((a, b) => a.sort_order - b.sort_order),
           pack: packsById.get(tenantPackState.get(tenant.id) ?? "") ?? null,
@@ -1108,13 +1119,40 @@ export const assignModulePack = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [packItemsResult, subscriptionsResult, modulesResult, aiSubscriptionResult] = await Promise.all([
+      (supabaseAdmin as any).from("module_pack_items").select("module_id").eq("pack_id", data.packId),
+      (supabaseAdmin as any).from("tenant_module_subscriptions")
+        .select("module_id, status, expires_at").eq("tenant_id", data.tenantId).eq("status", "active"),
+      (supabaseAdmin as any).from("erp_modules").select("id, name, code").eq("module_type", "premium"),
+      (supabaseAdmin as any).from("tenant_ai_subscriptions")
+        .select("status, expires_at").eq("tenant_id", data.tenantId).maybeSingle(),
+    ]);
+    for (const result of [packItemsResult, subscriptionsResult, modulesResult, aiSubscriptionResult]) {
+      if (result.error) throw new Error(formatSupabaseError(result.error));
+    }
+    const includedIds = new Set((packItemsResult.data ?? []).map((item: any) => item.module_id));
+    const activeIds = new Set(
+      (subscriptionsResult.data ?? [])
+        .filter((subscription: any) => !subscription.expires_at || new Date(subscription.expires_at).getTime() > Date.now())
+        .map((subscription: any) => subscription.module_id),
+    );
+    const aiSubscription = aiSubscriptionResult.data as { status?: string; expires_at?: string | null } | null;
+    const aiActive = ["active", "trial"].includes(aiSubscription?.status ?? "")
+      && (!aiSubscription?.expires_at || new Date(aiSubscription.expires_at).getTime() > Date.now());
+    if (aiActive) {
+      const aiModule = (modulesResult.data ?? []).find((module: any) => module.code === "ai_assistant");
+      if (aiModule) activeIds.add(aiModule.id);
+    }
+    const preservedPremiumModuleNames = (modulesResult.data ?? [])
+      .filter((module: any) => activeIds.has(module.id) && !includedIds.has(module.id))
+      .map((module: any) => module.name as string);
     const { error } = await supabaseAdmin.rpc("assign_module_pack_to_tenant", {
       requested_tenant_id: data.tenantId,
       requested_pack_id: data.packId,
       requested_by: context.userId,
     });
     if (error) throw new Error(formatSupabaseError(error));
-    return { success: true };
+    return { success: true, preservedPremiumModuleNames };
   });
 
 const manageTenantModuleSchema = z.object({
@@ -1129,6 +1167,23 @@ export const manageTenantModule = createServerFn({ method: "POST" })
   .handler(({ context, data }) =>
     executeManageHotelTenantModule(context, data, assertSuperAdmin),
   );
+
+export const saveTenantModules = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({
+    tenantId: z.string().uuid(),
+    changes: z.array(z.object({ moduleId: z.string().uuid(), enabled: z.boolean() })).max(100),
+  }))
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { error } = await (context.supabase as any).rpc("manage_tenant_modules", {
+      requested_tenant_id: data.tenantId,
+      requested_changes: data.changes,
+      requested_actor_id: context.userId,
+    });
+    if (error) throw new Error(formatSupabaseError(error));
+    return { success: true as const };
+  });
 
 const manageSubscriptionSchema = z.object({
   tenantId: z.string().uuid(),

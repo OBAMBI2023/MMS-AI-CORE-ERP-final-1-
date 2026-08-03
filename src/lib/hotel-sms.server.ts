@@ -2,38 +2,443 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth, AuthHttpError } from "@/integrations/supabase/auth-middleware";
 import { readEnvVar } from "@/integrations/supabase/env";
-import { HOTEL_SMS_TYPES, normalizeIvorianPhone, type ProviderResult, type SMSProvider } from "./hotel-sms";
-import { OrangeSmsError, sendOrangeSms, testOrangeConnection, type OrangeSmsConfig } from "./orange-sms";
+import {
+  HOTEL_SMS_TYPES,
+  normalizeIvorianPhone,
+  type ProviderResult,
+  type SMSProvider,
+} from "./hotel-sms";
+import {
+  OrangeSmsError,
+  sendOrangeSms,
+  testOrangeConnection,
+  type OrangeSmsConfig,
+} from "./orange-sms";
 
 type ProviderName = "orange" | "twilio" | "infobip";
-export class SmsProviderError extends Error { constructor(message:string,readonly details:{httpStatus?:number;code?:string;requestId?:string;providerMessageId?:string;payload?:unknown}){super(message);} }
-const parse=async(response:Response)=>response.json().catch(async()=>({raw:await response.text().catch(()=>"")})) as any;
-const required=(name:string)=>{const value=readEnvVar(name);if(!value)throw new SmsProviderError(`Identifiant serveur manquant : ${name}`,{code:"CONFIGURATION_MISSING"});return value;};
-const optional=(...names:string[])=>readEnvVar(...names)?.trim()||undefined;
-export const readOrangeSmsConfig=():OrangeSmsConfig=>{
- const apiUrl=required("ORANGE_SMS_API_URL"),sender=required("ORANGE_SMS_SENDER"),apiToken=optional("ORANGE_SMS_API_TOKEN"),clientId=optional("ORANGE_SMS_CLIENT_ID"),clientSecret=optional("ORANGE_SMS_CLIENT_SECRET"),tokenUrl=optional("ORANGE_SMS_TOKEN_URL");
- if(!apiToken&&(!clientId||!clientSecret||!tokenUrl))throw new SmsProviderError("Configuration Orange incomplète : renseignez ORANGE_SMS_API_TOKEN, ou ORANGE_SMS_CLIENT_ID, ORANGE_SMS_CLIENT_SECRET et ORANGE_SMS_TOKEN_URL.",{code:"CONFIGURATION_MISSING"});
- const timeoutMs=Number(optional("ORANGE_SMS_TIMEOUT_MS")??"10000"),maxAttempts=Number(optional("ORANGE_SMS_MAX_ATTEMPTS")??"3");
- if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>60000)throw new SmsProviderError("ORANGE_SMS_TIMEOUT_MS doit être compris entre 1000 et 60000.",{code:"CONFIGURATION_INVALID"});
- if(!Number.isInteger(maxAttempts)||maxAttempts<1||maxAttempts>5)throw new SmsProviderError("ORANGE_SMS_MAX_ATTEMPTS doit être compris entre 1 et 5.",{code:"CONFIGURATION_INVALID"});
- return{apiUrl,sender,apiToken,clientId,clientSecret,tokenUrl,timeoutMs,maxAttempts};
+export class SmsProviderError extends Error {
+  constructor(
+    message: string,
+    readonly details: {
+      httpStatus?: number;
+      code?: string;
+      requestId?: string;
+      providerMessageId?: string;
+      payload?: unknown;
+    },
+  ) {
+    super(message);
+  }
+}
+const parse = async (response: Response) =>
+  response.json().catch(async () => ({ raw: await response.text().catch(() => "") })) as any;
+const required = (name: string) => {
+  const value = readEnvVar(name);
+  if (!value)
+    throw new SmsProviderError(`Identifiant serveur manquant : ${name}`, {
+      code: "CONFIGURATION_MISSING",
+    });
+  return value;
 };
-const checked=(response:Response,payload:any,providerMessageId?:string,estimatedCost?:number,currency?:string):ProviderResult=>{const requestId=response.headers.get("x-request-id")??response.headers.get("x-correlation-id")??payload?.requestId;if(!response.ok)throw new SmsProviderError(payload?.description??payload?.message??payload?.error?.message??`Erreur fournisseur HTTP ${response.status}`,{httpStatus:response.status,code:String(payload?.code??payload?.error?.code??response.status),requestId,providerMessageId,payload});return{status:"sent",providerMessageId,requestId,httpStatus:response.status,payload,estimatedCost,currency};};
-class OrangeProvider implements SMSProvider{readonly name="orange";async send(input:{to:string;message:string;idempotencyKey:string}){try{return await sendOrangeSms(readOrangeSmsConfig(),input);}catch(error){if(error instanceof OrangeSmsError)throw new SmsProviderError(error.message,error.details);throw error;}}}
-class TwilioProvider implements SMSProvider{readonly name="twilio";async send({to,message,idempotencyKey}:{to:string;message:string;idempotencyKey:string}){const sid=required("TWILIO_ACCOUNT_SID"),token=required("TWILIO_AUTH_TOKEN"),body=new URLSearchParams({To:to,From:required("TWILIO_FROM"),Body:message});const response=await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,{method:"POST",headers:{Authorization:`Basic ${btoa(`${sid}:${token}`)}`,"Content-Type":"application/x-www-form-urlencoded","Idempotency-Key":idempotencyKey},body});const payload=await parse(response);return checked(response,payload,payload?.sid,payload?.price?Math.abs(Number(payload.price)):undefined,payload?.price_unit?.toUpperCase());}}
-class InfobipProvider implements SMSProvider{readonly name="infobip";async send({to,message,idempotencyKey}:{to:string;message:string;idempotencyKey:string}){const response=await fetch(`${required("INFOBIP_BASE_URL").replace(/\/$/,"")}/sms/2/text/advanced`,{method:"POST",headers:{Authorization:`App ${required("INFOBIP_API_KEY")}`,"Content-Type":"application/json","X-Request-ID":idempotencyKey},body:JSON.stringify({messages:[{destinations:[{to}],from:required("INFOBIP_SENDER"),text:message}]})});const payload=await parse(response),item=payload?.messages?.[0];return checked(response,payload,item?.messageId,item?.price?.pricePerMessage,item?.price?.currency);}}
-const providerFor=(name:ProviderName):SMSProvider=>name==="twilio"?new TwilioProvider():name==="infobip"?new InfobipProvider():new OrangeProvider();
-const input=z.object({reservationId:z.string().uuid(),messageType:z.enum(HOTEL_SMS_TYPES),message:z.string().trim().min(1).max(918),retryOf:z.string().uuid().optional()});
-export const sendHotelSms=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).validator(input).handler(async({data,context})=>{const db=context.supabase as any;const{data:settings}=await db.from("hotel_sms_settings").select("provider").maybeSingle();const provider=(settings?.provider??"orange")as ProviderName;const{data:prepared,error}=await db.rpc("prepare_hotel_sms",{target_reservation_id:data.reservationId,sms_type:data.messageType,sms_message:data.message,sms_provider:provider,retried_log_id:data.retryOf??null});if(error){if(error.code==="42501")throw new AuthHttpError(403,"Vous n’êtes pas autorisé à envoyer ce SMS.");throw new Error("Impossible de préparer l’envoi. Vérifiez l’abonnement et le solde SMS.");}const row=Array.isArray(prepared)?prepared[0]:prepared;if(!row?.log_id||!row?.phone)throw new Error("Le numéro du client est introuvable.");try{const phone=normalizeIvorianPhone(row.phone),result=await providerFor(provider).send({to:phone,message:data.message,idempotencyKey:row.log_id});const{error:completeError}=await db.rpc("complete_hotel_sms",{target_log_id:row.log_id,final_status:result.status,external_id:result.providerMessageId??null,failure_message:null,response_request_id:result.requestId??null,response_http_status:result.httpStatus,response_error_code:null,response_error_message:null,response_payload:result.payload,response_estimated_cost:result.estimatedCost??null,response_currency:result.currency??null});if(completeError)throw new Error("L’envoi a été accepté, mais sa confirmation n’a pas pu être enregistrée.");return{id:row.log_id,status:result.status,phone};}catch(cause){const detail=cause instanceof SmsProviderError?cause.details:{},failure=cause instanceof Error?cause.message.slice(0,1000):"Échec inconnu du fournisseur SMS";await db.rpc("complete_hotel_sms",{target_log_id:row.log_id,final_status:"failed",external_id:detail.providerMessageId??null,failure_message:failure,response_request_id:detail.requestId??null,response_http_status:detail.httpStatus??null,response_error_code:detail.code??null,response_error_message:failure,response_payload:detail.payload??null,response_estimated_cost:null,response_currency:null});return{id:row.log_id,status:"failed"as const,phone:row.phone,error:detail.code==="CONFIGURATION_MISSING"?"Le service SMS n’est pas encore configuré.":detail.code==="ORANGE_TIMEOUT"?"Orange ne répond pas pour le moment. Réessayez plus tard.":"Le SMS n’a pas pu être envoyé. Aucun crédit n’a été consommé."};}});
-const batchInput=z.object({reservationIds:z.array(z.string().uuid()).min(1).max(100),messageType:z.enum(HOTEL_SMS_TYPES),message:z.string().trim().min(1).max(918)});
-export const sendHotelSmsBatch=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).validator(batchInput).handler(async({data,context})=>{
- const db=context.supabase as any,{data:settings}=await db.from("hotel_sms_settings").select("provider").maybeSingle(),provider=(settings?.provider??"orange")as ProviderName,results=[] as Array<{reservationId:string;status:"sent"|"failed";id?:string;error?:string}>;
- for(const reservationId of [...new Set(data.reservationIds)]){
-  const{data:prepared,error}=await db.rpc("prepare_hotel_sms",{target_reservation_id:reservationId,sms_type:data.messageType,sms_message:data.message,sms_provider:provider,retried_log_id:null}),row=Array.isArray(prepared)?prepared[0]:prepared;
-  if(error||!row?.log_id||!row?.phone){results.push({reservationId,status:"failed",error:"Envoi impossible pour ce destinataire."});continue;}
-  try{const result=await providerFor(provider).send({to:normalizeIvorianPhone(row.phone),message:data.message,idempotencyKey:row.log_id});const{error:completeError}=await db.rpc("complete_hotel_sms",{target_log_id:row.log_id,final_status:"sent",external_id:result.providerMessageId??null,failure_message:null,response_request_id:result.requestId??null,response_http_status:result.httpStatus,response_error_code:null,response_error_message:null,response_payload:result.payload,response_estimated_cost:result.estimatedCost??null,response_currency:result.currency??null});if(completeError)throw completeError;results.push({reservationId,id:row.log_id,status:"sent"});}
-  catch(cause){const detail=cause instanceof SmsProviderError?cause.details:{},failure=cause instanceof Error?cause.message.slice(0,1000):"Échec fournisseur";await db.rpc("complete_hotel_sms",{target_log_id:row.log_id,final_status:"failed",external_id:detail.providerMessageId??null,failure_message:failure,response_request_id:detail.requestId??null,response_http_status:detail.httpStatus??null,response_error_code:detail.code??null,response_error_message:failure,response_payload:detail.payload??null,response_estimated_cost:null,response_currency:null});results.push({reservationId,id:row.log_id,status:"failed",error:"Le SMS n’a pas pu être envoyé."});}
- }
- return{total:results.length,sent:results.filter(x=>x.status==="sent").length,failed:results.filter(x=>x.status==="failed").length,results};
+const optional = (...names: string[]) => readEnvVar(...names)?.trim() || undefined;
+export const readOrangeSmsConfig = (): OrangeSmsConfig => {
+  const apiUrl = required("ORANGE_SMS_API_URL"),
+    sender = required("ORANGE_SMS_SENDER"),
+    apiToken = optional("ORANGE_SMS_API_TOKEN"),
+    clientId = optional("ORANGE_SMS_CLIENT_ID"),
+    clientSecret = optional("ORANGE_SMS_CLIENT_SECRET"),
+    tokenUrl = optional("ORANGE_SMS_TOKEN_URL");
+  if (!apiToken && (!clientId || !clientSecret || !tokenUrl))
+    throw new SmsProviderError(
+      "Configuration Orange incomplète : renseignez ORANGE_SMS_API_TOKEN, ou ORANGE_SMS_CLIENT_ID, ORANGE_SMS_CLIENT_SECRET et ORANGE_SMS_TOKEN_URL.",
+      { code: "CONFIGURATION_MISSING" },
+    );
+  const timeoutMs = Number(optional("ORANGE_SMS_TIMEOUT_MS") ?? "10000"),
+    maxAttempts = Number(optional("ORANGE_SMS_MAX_ATTEMPTS") ?? "3");
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60000)
+    throw new SmsProviderError("ORANGE_SMS_TIMEOUT_MS doit être compris entre 1000 et 60000.", {
+      code: "CONFIGURATION_INVALID",
+    });
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 5)
+    throw new SmsProviderError("ORANGE_SMS_MAX_ATTEMPTS doit être compris entre 1 et 5.", {
+      code: "CONFIGURATION_INVALID",
+    });
+  return { apiUrl, sender, apiToken, clientId, clientSecret, tokenUrl, timeoutMs, maxAttempts };
+};
+
+export type OrangeConnectionResult = {
+  connected: boolean;
+  status: "connected" | "configuration_error";
+  message: string;
+};
+
+export const orangeConnectionMessage = (error: unknown): string => {
+  const details =
+    error instanceof OrangeSmsError || error instanceof SmsProviderError
+      ? error.details
+      : undefined;
+  const code = details?.code;
+  if (code === "CONFIGURATION_MISSING" || code === "CONFIGURATION_INVALID")
+    return "La configuration Orange SMS est incomplète.";
+  if (code === "ORANGE_TIMEOUT") return "Orange ne répond pas pour le moment. Réessayez plus tard.";
+  if (code === "ORANGE_NETWORK_ERROR" || (details?.httpStatus != null && details.httpStatus >= 500))
+    return "Le service Orange SMS est temporairement inaccessible.";
+  if (details?.httpStatus === 400 || details?.httpStatus === 401 || details?.httpStatus === 403)
+    return "Les identifiants Orange sont invalides.";
+  return "Impossible de vérifier la connexion Orange.";
+};
+
+export async function runOrangeConnectionTest(
+  config: OrangeSmsConfig,
+  fetcher: typeof fetch = fetch,
+): Promise<OrangeConnectionResult> {
+  try {
+    await testOrangeConnection(config, fetcher);
+    return {
+      connected: true,
+      status: "connected",
+      message: "Connexion Orange réussie. Le service SMS est correctement configuré.",
+    };
+  } catch (error) {
+    return {
+      connected: false,
+      status: "configuration_error",
+      message: orangeConnectionMessage(error),
+    };
+  }
+}
+
+async function assertOrangeTestAccess(supabase: any, userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: platformAdmin, error: platformError } = await supabaseAdmin
+    .from("platform_admins")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (platformError) throw new AuthHttpError(403, "Accès refusé.");
+  if (platformAdmin) return;
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role_id,roles(name)")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profileError || !profile?.role_id) throw new AuthHttpError(403, "Accès refusé.");
+  if (profile.roles?.name === "Administrateur") return;
+  const { data: permission, error: permissionError } = await supabase
+    .from("role_permissions")
+    .select("permissions!inner(code)")
+    .eq("role_id", profile.role_id)
+    .eq("permissions.code", "hotel.sms.settings")
+    .limit(1)
+    .maybeSingle();
+  if (permissionError || !permission)
+    throw new AuthHttpError(403, "La permission hotel.sms.settings est requise.");
+}
+
+export const testOrangeSmsConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOrangeTestAccess(context.supabase, context.userId);
+    try {
+      return await runOrangeConnectionTest(readOrangeSmsConfig());
+    } catch (error) {
+      return {
+        connected: false,
+        status: "configuration_error" as const,
+        message: orangeConnectionMessage(error),
+      };
+    }
+  });
+const checked = (
+  response: Response,
+  payload: any,
+  providerMessageId?: string,
+  estimatedCost?: number,
+  currency?: string,
+): ProviderResult => {
+  const requestId =
+    response.headers.get("x-request-id") ??
+    response.headers.get("x-correlation-id") ??
+    payload?.requestId;
+  if (!response.ok)
+    throw new SmsProviderError(
+      payload?.description ??
+        payload?.message ??
+        payload?.error?.message ??
+        `Erreur fournisseur HTTP ${response.status}`,
+      {
+        httpStatus: response.status,
+        code: String(payload?.code ?? payload?.error?.code ?? response.status),
+        requestId,
+        providerMessageId,
+        payload,
+      },
+    );
+  return {
+    status: "sent",
+    providerMessageId,
+    requestId,
+    httpStatus: response.status,
+    payload,
+    estimatedCost,
+    currency,
+  };
+};
+class OrangeProvider implements SMSProvider {
+  readonly name = "orange";
+  async send(input: { to: string; message: string; idempotencyKey: string }) {
+    try {
+      return await sendOrangeSms(readOrangeSmsConfig(), input);
+    } catch (error) {
+      if (error instanceof OrangeSmsError) throw new SmsProviderError(error.message, error.details);
+      throw error;
+    }
+  }
+}
+class TwilioProvider implements SMSProvider {
+  readonly name = "twilio";
+  async send({
+    to,
+    message,
+    idempotencyKey,
+  }: {
+    to: string;
+    message: string;
+    idempotencyKey: string;
+  }) {
+    const sid = required("TWILIO_ACCOUNT_SID"),
+      token = required("TWILIO_AUTH_TOKEN"),
+      body = new URLSearchParams({ To: to, From: required("TWILIO_FROM"), Body: message });
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${btoa(`${sid}:${token}`)}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body,
+      },
+    );
+    const payload = await parse(response);
+    return checked(
+      response,
+      payload,
+      payload?.sid,
+      payload?.price ? Math.abs(Number(payload.price)) : undefined,
+      payload?.price_unit?.toUpperCase(),
+    );
+  }
+}
+class InfobipProvider implements SMSProvider {
+  readonly name = "infobip";
+  async send({
+    to,
+    message,
+    idempotencyKey,
+  }: {
+    to: string;
+    message: string;
+    idempotencyKey: string;
+  }) {
+    const response = await fetch(
+      `${required("INFOBIP_BASE_URL").replace(/\/$/, "")}/sms/2/text/advanced`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `App ${required("INFOBIP_API_KEY")}`,
+          "Content-Type": "application/json",
+          "X-Request-ID": idempotencyKey,
+        },
+        body: JSON.stringify({
+          messages: [{ destinations: [{ to }], from: required("INFOBIP_SENDER"), text: message }],
+        }),
+      },
+    );
+    const payload = await parse(response),
+      item = payload?.messages?.[0];
+    return checked(
+      response,
+      payload,
+      item?.messageId,
+      item?.price?.pricePerMessage,
+      item?.price?.currency,
+    );
+  }
+}
+const providerFor = (name: ProviderName): SMSProvider =>
+  name === "twilio"
+    ? new TwilioProvider()
+    : name === "infobip"
+      ? new InfobipProvider()
+      : new OrangeProvider();
+const input = z.object({
+  reservationId: z.string().uuid(),
+  messageType: z.enum(HOTEL_SMS_TYPES),
+  message: z.string().trim().min(1).max(918),
+  retryOf: z.string().uuid().optional(),
 });
-export const testHotelSmsProvider=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).validator(z.object({provider:z.enum(["orange","twilio","infobip"])})).handler(async({data})=>{try{if(data.provider==="orange")await testOrangeConnection(readOrangeSmsConfig());else if(data.provider==="twilio"){required("TWILIO_ACCOUNT_SID");required("TWILIO_AUTH_TOKEN");required("TWILIO_FROM");}else{required("INFOBIP_BASE_URL");required("INFOBIP_API_KEY");required("INFOBIP_SENDER");}return{connected:true};}catch(error){const code=error instanceof OrangeSmsError?error.details.code:error instanceof SmsProviderError?error.details.code:undefined;return{connected:false,error:code==="CONFIGURATION_MISSING"?"Configuration serveur incomplète.":"Connexion au fournisseur impossible."};}});
+export const sendHotelSms = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(input)
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as any;
+    const { data: settings } = await db.from("hotel_sms_settings").select("provider").maybeSingle();
+    const provider = (settings?.provider ?? "orange") as ProviderName;
+    const { data: prepared, error } = await db.rpc("prepare_hotel_sms", {
+      target_reservation_id: data.reservationId,
+      sms_type: data.messageType,
+      sms_message: data.message,
+      sms_provider: provider,
+      retried_log_id: data.retryOf ?? null,
+    });
+    if (error) {
+      if (error.code === "42501")
+        throw new AuthHttpError(403, "Vous n’êtes pas autorisé à envoyer ce SMS.");
+      throw new Error("Impossible de préparer l’envoi. Vérifiez l’abonnement et le solde SMS.");
+    }
+    const row = Array.isArray(prepared) ? prepared[0] : prepared;
+    if (!row?.log_id || !row?.phone) throw new Error("Le numéro du client est introuvable.");
+    try {
+      const phone = normalizeIvorianPhone(row.phone),
+        result = await providerFor(provider).send({
+          to: phone,
+          message: data.message,
+          idempotencyKey: row.log_id,
+        });
+      const { error: completeError } = await db.rpc("complete_hotel_sms", {
+        target_log_id: row.log_id,
+        final_status: result.status,
+        external_id: result.providerMessageId ?? null,
+        failure_message: null,
+        response_request_id: result.requestId ?? null,
+        response_http_status: result.httpStatus,
+        response_error_code: null,
+        response_error_message: null,
+        response_payload: result.payload,
+        response_estimated_cost: result.estimatedCost ?? null,
+        response_currency: result.currency ?? null,
+      });
+      if (completeError)
+        throw new Error("L’envoi a été accepté, mais sa confirmation n’a pas pu être enregistrée.");
+      return { id: row.log_id, status: result.status, phone };
+    } catch (cause) {
+      const detail = cause instanceof SmsProviderError ? cause.details : {},
+        failure =
+          cause instanceof Error
+            ? cause.message.slice(0, 1000)
+            : "Échec inconnu du fournisseur SMS";
+      await db.rpc("complete_hotel_sms", {
+        target_log_id: row.log_id,
+        final_status: "failed",
+        external_id: detail.providerMessageId ?? null,
+        failure_message: failure,
+        response_request_id: detail.requestId ?? null,
+        response_http_status: detail.httpStatus ?? null,
+        response_error_code: detail.code ?? null,
+        response_error_message: failure,
+        response_payload: detail.payload ?? null,
+        response_estimated_cost: null,
+        response_currency: null,
+      });
+      return {
+        id: row.log_id,
+        status: "failed" as const,
+        phone: row.phone,
+        error:
+          detail.code === "CONFIGURATION_MISSING"
+            ? "Le service SMS n’est pas encore configuré."
+            : detail.code === "ORANGE_TIMEOUT"
+              ? "Orange ne répond pas pour le moment. Réessayez plus tard."
+              : "Le SMS n’a pas pu être envoyé. Aucun crédit n’a été consommé.",
+      };
+    }
+  });
+const batchInput = z.object({
+  reservationIds: z.array(z.string().uuid()).min(1).max(100),
+  messageType: z.enum(HOTEL_SMS_TYPES),
+  message: z.string().trim().min(1).max(918),
+});
+export const sendHotelSmsBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(batchInput)
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as any,
+      { data: settings } = await db.from("hotel_sms_settings").select("provider").maybeSingle(),
+      provider = (settings?.provider ?? "orange") as ProviderName,
+      results = [] as Array<{
+        reservationId: string;
+        status: "sent" | "failed";
+        id?: string;
+        error?: string;
+      }>;
+    for (const reservationId of [...new Set(data.reservationIds)]) {
+      const { data: prepared, error } = await db.rpc("prepare_hotel_sms", {
+          target_reservation_id: reservationId,
+          sms_type: data.messageType,
+          sms_message: data.message,
+          sms_provider: provider,
+          retried_log_id: null,
+        }),
+        row = Array.isArray(prepared) ? prepared[0] : prepared;
+      if (error || !row?.log_id || !row?.phone) {
+        results.push({
+          reservationId,
+          status: "failed",
+          error: "Envoi impossible pour ce destinataire.",
+        });
+        continue;
+      }
+      try {
+        const result = await providerFor(provider).send({
+          to: normalizeIvorianPhone(row.phone),
+          message: data.message,
+          idempotencyKey: row.log_id,
+        });
+        const { error: completeError } = await db.rpc("complete_hotel_sms", {
+          target_log_id: row.log_id,
+          final_status: "sent",
+          external_id: result.providerMessageId ?? null,
+          failure_message: null,
+          response_request_id: result.requestId ?? null,
+          response_http_status: result.httpStatus,
+          response_error_code: null,
+          response_error_message: null,
+          response_payload: result.payload,
+          response_estimated_cost: result.estimatedCost ?? null,
+          response_currency: result.currency ?? null,
+        });
+        if (completeError) throw completeError;
+        results.push({ reservationId, id: row.log_id, status: "sent" });
+      } catch (cause) {
+        const detail = cause instanceof SmsProviderError ? cause.details : {},
+          failure = cause instanceof Error ? cause.message.slice(0, 1000) : "Échec fournisseur";
+        await db.rpc("complete_hotel_sms", {
+          target_log_id: row.log_id,
+          final_status: "failed",
+          external_id: detail.providerMessageId ?? null,
+          failure_message: failure,
+          response_request_id: detail.requestId ?? null,
+          response_http_status: detail.httpStatus ?? null,
+          response_error_code: detail.code ?? null,
+          response_error_message: failure,
+          response_payload: detail.payload ?? null,
+          response_estimated_cost: null,
+          response_currency: null,
+        });
+        results.push({
+          reservationId,
+          id: row.log_id,
+          status: "failed",
+          error: "Le SMS n’a pas pu être envoyé.",
+        });
+      }
+    }
+    return {
+      total: results.length,
+      sent: results.filter((x) => x.status === "sent").length,
+      failed: results.filter((x) => x.status === "failed").length,
+      results,
+    };
+  });

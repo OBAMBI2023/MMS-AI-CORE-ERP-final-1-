@@ -105,3 +105,4 @@ test("la modale synchronise immédiatement et restaure le module ciblé", () => 
   assert.match(source, /module\.id === moduleId \? \{ \.\.\.module, enabled: previousEnabled \} : module/);
   assert.match(source, /tenantModulesQueryKey\(tenant\.id\)/);
 });
+import "./tenant-module-management-security.test.ts";
