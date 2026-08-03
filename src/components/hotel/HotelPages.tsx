@@ -12,7 +12,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { jsPDF } from "jspdf";
 import { createXlsx } from "@/lib/mms/xlsx-export";
-import { Archive, Printer, Trash2 } from "lucide-react";
+import { Archive, Eye, Printer, Trash2, X } from "lucide-react";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { GuestDocumentsDownload } from "@/components/hotel/GuestDocumentsDownload";
 import { createHotelListPdf } from "@/lib/mms/hotel-pdf-engine";
@@ -24,6 +24,16 @@ export { HotelRoomsPage } from "@/components/hotel/HotelRoomsCrud";
 export { HotelReportsPage } from "@/components/hotel/HotelReportsPage";
 
 type Row = { id: string; [key: string]: unknown };
+type GuestStay = {
+  id: string;
+  guest_id: string;
+  room_id: string;
+  check_in: string;
+  check_out: string;
+  nights: number | null;
+  status: string;
+  room: { number: string } | { number: string }[] | null;
+};
 const db = supabase as any;
 const IDENTITY_BUCKET = "hotel-identity-documents";
 
@@ -144,17 +154,67 @@ function GuestRemovalAction({ row, hasHistory }: { row: Row; hasHistory: boolean
   </>;
 }
 
+function roomNumber(stay: GuestStay) {
+  const room = Array.isArray(stay.room) ? stay.room[0] : stay.room;
+  return room?.number || "Logement indisponible";
+}
+
+function stayNights(stay: GuestStay) {
+  if (typeof stay.nights === "number") return stay.nights;
+  const arrival = new Date(`${stay.check_in}T00:00:00`).getTime();
+  const departure = new Date(`${stay.check_out}T00:00:00`).getTime();
+  return Math.max(0, Math.round((departure - arrival) / 86_400_000));
+}
+
+function GuestDetailsAction({ row, stays }: { row: Row; stays: GuestStay[] }) {
+  const [open, setOpen] = useState(false);
+  const fullName = `${String(row.first_name ?? "")} ${String(row.last_name ?? "")}`.trim();
+  return <>
+    <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground sm:px-2.5" aria-label={`Voir la fiche de ${fullName}`} title="Voir la fiche">
+      <Eye className="h-4 w-4" /><span className="hidden xl:inline">Voir la fiche</span>
+    </button>
+    {open && <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={() => setOpen(false)}>
+      <section className="w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <header className="flex items-start justify-between border-b border-border px-6 py-4">
+          <div><h2 className="text-lg font-semibold">{fullName || "Voyageur"}</h2><p className="text-sm text-muted-foreground">{String(row.phone ?? "Téléphone non renseigné")}</p></div>
+          <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-2 hover:bg-muted" aria-label="Fermer"><X className="h-4 w-4" /></button>
+        </header>
+        <div className="max-h-[70vh] overflow-auto p-6">
+          <h3 className="mb-3 font-semibold">Historique des séjours</h3>
+          {stays.length === 0 ? <div className="rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">Aucun séjour</div> :
+            <div className="overflow-x-auto rounded-xl border border-border"><table className="w-full min-w-[620px] text-sm"><thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground"><tr><th className="px-4 py-3">Logement</th><th className="px-4 py-3">Arrivée</th><th className="px-4 py-3">Départ</th><th className="px-4 py-3">Nuits</th><th className="px-4 py-3">Statut</th></tr></thead><tbody>{stays.map((stay) => <tr key={stay.id} className="border-t border-border"><td className="px-4 py-3 font-medium">{roomNumber(stay)}</td><td className="px-4 py-3">{formatDate(stay.check_in)}</td><td className="px-4 py-3">{formatDate(stay.check_out)}</td><td className="px-4 py-3">{stayNights(stay)}</td><td className="px-4 py-3"><span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">{stay.status}</span></td></tr>)}</tbody></table></div>}
+        </div>
+      </section>
+    </div>}
+  </>;
+}
+
 export function HotelGuestsPage() {
   const { companyName, settings, logoUrl } = useCompanySettings();
-  const { tenant } = useTenant();
-  const reservationGuests = useQuery({
-    queryKey: ["hotel-guest-reservation-links"],
+  const { tenant, profile } = useTenant();
+  const tenantId = profile?.tenant_id;
+  const guestStaysQuery = useQuery({
+    queryKey: ["hotel-guest-stays", tenantId],
+    enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await db.from("hotel_reservations").select("guest_id");
+      const { data, error } = await db.from("hotel_reservations")
+        .select("id,guest_id,room_id,check_in,check_out,nights,status,room:hotel_rooms!hotel_reservations_room_id_tenant_id_fkey(number)")
+        .eq("tenant_id", tenantId)
+        .not("guest_id", "is", null)
+        .order("check_in", { ascending: false });
       if (error) throw error;
-      return new Set<string>((data ?? []).map((item: { guest_id?: string }) => item.guest_id).filter(Boolean));
+      return (data ?? []) as GuestStay[];
     },
   });
+  const staysByGuest = useMemo(() => {
+    const grouped = new Map<string, GuestStay[]>();
+    for (const stay of guestStaysQuery.data ?? []) {
+      const current = grouped.get(stay.guest_id) ?? [];
+      current.push(stay);
+      grouped.set(stay.guest_id, current);
+    }
+    return grouped;
+  }, [guestStaysQuery.data]);
   const fields: FieldDef[] = [
     {
       name: "full_name",
@@ -193,6 +253,10 @@ export function HotelGuestsPage() {
   const columns: ColumnDef<Row>[] = [
     { header: "Nom complet", cell: (r) => `${r.first_name} ${r.last_name}` },
     { header: "Téléphone", cell: (r) => String(r.phone ?? "—") },
+    { header: "Dernier logement", cell: (r) => {
+      const latestStay = staysByGuest.get(r.id)?.[0];
+      return latestStay ? roomNumber(latestStay) : "Aucun séjour";
+    } },
   ];
   const print = async (rows: Row[]) => {
     try {
@@ -231,7 +295,10 @@ export function HotelGuestsPage() {
         })}
         prepareEditPayload={toPayload}
         columns={columns}
-        renderRowActions={(row) => <><GuestDocumentsDownload row={row} /><GuestRemovalAction row={row} hasHistory={reservationGuests.data?.has(row.id) ?? false} /></>}
+        renderRowActions={(row) => {
+          const stays = staysByGuest.get(row.id) ?? [];
+          return <><GuestDetailsAction row={row} stays={stays} /><GuestDocumentsDownload row={row} /><GuestRemovalAction row={row} hasHistory={stays.length > 0} /></>;
+        }}
         hideDeleteAction
         filterRows={(row) => !row.archived_at}
         searchFields={["first_name", "last_name", "phone"]}

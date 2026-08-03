@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   Trash2,
+  MessageSquareText,
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
@@ -61,6 +62,7 @@ import { useActionPermission } from "@/hooks/use-action-permission";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { createHotelInvoicePdf } from "@/lib/mms/hotel-invoice-pdf";
 import { downloadPdf } from "@/lib/mms/download-pdf";
+import { HotelSmsDialog } from "@/components/hotel/HotelSmsDialog";
 
 const db = supabase as any;
 const statuses = [
@@ -102,8 +104,10 @@ export function HotelReservationsPage() {
   const [view, setView] = useState<"list" | "calendar">("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<any | null>(null);
+  const [smsReservation, setSmsReservation] = useState<any | null>(null);
   const canUpdate = useActionPermission("hotel.reservations.update");
   const canDelete = useActionPermission("hotel.reservations.delete");
+  const canSendSms = useActionPermission("hotel.sms.send");
 
   const { data } = useQuery({
     queryKey: ["hotel-reservations", profile?.tenant_id],
@@ -495,6 +499,8 @@ export function HotelReservationsPage() {
             canUpdate={canUpdate}
             canDelete={canDelete}
             downloadPdf={downloadReservationPdf}
+            sendSms={setSmsReservation}
+            canSendSms={canSendSms}
             changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
           />
         )}
@@ -520,6 +526,7 @@ export function HotelReservationsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {smsReservation && <HotelSmsDialog open={Boolean(smsReservation)} onOpenChange={(open: boolean) => !open && setSmsReservation(null)} reservation={smsReservation} guest={guests.get(smsReservation.guest_id)} room={rooms.get(smsReservation.room_id)} tenantId={profile?.tenant_id} />}
     </AppShell>
   );
 }
@@ -722,6 +729,8 @@ function ReservationTable({
   canUpdate,
   canDelete,
   downloadPdf,
+  sendSms,
+  canSendSms,
   changeStatus,
 }: any) {
   return (
@@ -789,6 +798,11 @@ function ReservationTable({
                           <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
                             <FileDown /> Télécharger la fiche PDF
                           </DropdownMenuItem>
+                          {canSendSms && (
+                            <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!g?.phone}>
+                              <MessageSquareText /> Envoyer un SMS
+                            </DropdownMenuItem>
+                          )}
                           {canDelete && (
                             <>
                               <DropdownMenuSeparator />

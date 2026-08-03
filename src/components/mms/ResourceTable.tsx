@@ -36,10 +36,17 @@ export interface FieldDef {
   label: string;
   type?: FieldType;
   required?: boolean;
-  options?: readonly string[];
+  options?: readonly (string | { value: string; label: string })[];
   placeholder?: string;
   colSpan?: 1 | 2;
   step?: string;
+  hidden?: (values: Record<string, unknown>) => boolean;
+  requiredWhen?: (values: Record<string, unknown>) => boolean;
+  createOption?: {
+    label: string;
+    inputLabel: string;
+    onCreate: (name: string) => Promise<{ value: string; label: string }>;
+  };
 }
 
 export interface ColumnDef<T> {
@@ -65,6 +72,7 @@ export interface ResourceTableProps<T extends { id: string }> {
   prepareCreatePayload?: (values: Record<string, unknown>) => Record<string, unknown>;
   prepareEditValues?: (row: T) => Record<string, unknown>;
   prepareEditPayload?: (values: Record<string, unknown>) => Record<string, unknown>;
+  saveErrorMessage?: (error: unknown) => string;
   selectable?: boolean;
   renderSelectionActions?: (selected: T[], clear: () => void) => ReactNode;
   imageStorage?: { bucket: string; folder: string };
@@ -94,6 +102,7 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
     prepareCreatePayload,
     prepareEditValues,
     prepareEditPayload,
+    saveErrorMessage,
     selectable = false,
     renderSelectionActions,
     imageStorage,
@@ -317,6 +326,7 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
             }
             editingId={editing?.id}
             prepareEditPayload={prepareEditPayload}
+            saveErrorMessage={saveErrorMessage}
             imageStorage={imageStorage}
             onClose={() => {
               setCreating(false);
@@ -336,6 +346,7 @@ function ResourceFormDialog<T extends { id: string }>({
   createFields,
   prepareCreatePayload,
   prepareEditPayload,
+  saveErrorMessage,
   editingId,
   initial,
   onClose,
@@ -347,6 +358,7 @@ function ResourceFormDialog<T extends { id: string }>({
   createFields?: FieldDef[];
   prepareCreatePayload?: (values: Record<string, unknown>) => Record<string, unknown>;
   prepareEditPayload?: (values: Record<string, unknown>) => Record<string, unknown>;
+  saveErrorMessage?: (error: unknown) => string;
   editingId?: string;
   initial: Partial<T> | T;
   onClose: () => void;
@@ -361,6 +373,24 @@ function ResourceFormDialog<T extends { id: string }>({
     for (const f of activeFields) base[f.name] = (initial as Record<string, unknown>)[f.name] ?? "";
     return base;
   });
+  const [optionDrafts, setOptionDrafts] = useState<Record<string, string>>({});
+  const [creatingOption, setCreatingOption] = useState<string | null>(null);
+
+  const createFieldOption = async (field: FieldDef) => {
+    const draft = optionDrafts[field.name]?.trim();
+    if (!field.createOption || !draft || creatingOption) return;
+    setCreatingOption(field.name);
+    try {
+      const created = await field.createOption.onCreate(draft);
+      setValues((current) => ({ ...current, [field.name]: created.value }));
+      setOptionDrafts((current) => ({ ...current, [field.name]: "" }));
+      toast.success(`Catégorie « ${created.label} » ajoutée`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible de créer la catégorie.");
+    } finally {
+      setCreatingOption(null);
+    }
+  };
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -393,7 +423,7 @@ function ResourceFormDialog<T extends { id: string }>({
       qc.invalidateQueries({ queryKey: [table] });
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error: unknown) => toast.error(saveErrorMessage?.(error) ?? (error instanceof Error ? error.message : "Enregistrement impossible.")),
   });
 
   return (
@@ -412,7 +442,12 @@ function ResourceFormDialog<T extends { id: string }>({
         onSubmit={(e) => {
           e.preventDefault();
           for (const f of activeFields) {
-            if (f.required && !values[f.name]) {
+            if (f.createOption && values[f.name] === `__create__${f.name}`) {
+              void createFieldOption(f);
+              toast.error(`Créez d’abord la nouvelle catégorie « ${f.label} »`);
+              return;
+            }
+            if (!f.hidden?.(values) && (f.required || f.requiredWhen?.(values)) && !values[f.name]) {
               toast.error(`Le champ « ${f.label} » est requis`);
               return;
             }
@@ -431,6 +466,7 @@ function ResourceFormDialog<T extends { id: string }>({
         </div>
         <div className="p-6 grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
           {activeFields.map((f) => {
+            if (f.hidden?.(values)) return null;
             const span =
               (f.colSpan ?? (f.type === "textarea" ? 2 : 1)) === 2 ? "col-span-2" : "col-span-1";
             const commonProps = {
@@ -447,7 +483,7 @@ function ResourceFormDialog<T extends { id: string }>({
               <label key={f.name} className={`${span} flex flex-col gap-1.5`}>
                 <span className="text-xs font-medium text-muted-foreground">
                   {f.label}
-                  {f.required && <span className="text-destructive"> *</span>}
+                  {(f.required || f.requiredWhen?.(values)) && <span className="text-destructive"> *</span>}
                 </span>
                 {f.type === "image" ? (
                   <ImageField
@@ -458,14 +494,33 @@ function ResourceFormDialog<T extends { id: string }>({
                 ) : f.type === "textarea" ? (
                   <textarea rows={3} {...commonProps} />
                 ) : f.type === "select" ? (
-                  <select {...commonProps}>
-                    <option value="">—</option>
-                    {(f.options ?? []).map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select {...commonProps}>
+                      <option value="">—</option>
+                      {(f.options ?? []).map((o) => (
+                        <option key={typeof o === "string" ? o : o.value} value={typeof o === "string" ? o : o.value}>
+                          {typeof o === "string" ? o : o.label}
+                        </option>
+                      ))}
+                      {f.createOption && <option value={`__create__${f.name}`}>{f.createOption.label}</option>}
+                    </select>
+                    {f.createOption && values[f.name] === `__create__${f.name}` && (
+                      <div className="flex gap-2">
+                        <input
+                          autoFocus
+                          value={optionDrafts[f.name] ?? ""}
+                          onChange={(event) => setOptionDrafts((current) => ({ ...current, [f.name]: event.target.value }))}
+                          onBlur={() => void createFieldOption(f)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") { event.preventDefault(); void createFieldOption(f); }
+                          }}
+                          placeholder={f.createOption.inputLabel}
+                          className="w-full rounded-xl bg-muted/60 border border-border px-3 py-2 text-sm outline-none focus:border-primary/40"
+                        />
+                        {creatingOption === f.name && <Loader2 className="mt-2.5 h-4 w-4 shrink-0 animate-spin" />}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <input type={f.type ?? "text"} step={f.step} {...commonProps} />
                 )}
@@ -483,7 +538,7 @@ function ResourceFormDialog<T extends { id: string }>({
           </button>
           <button
             type="submit"
-            disabled={saveMut.isPending}
+            disabled={saveMut.isPending || Boolean(creatingOption)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-60"
           >
             {saveMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}

@@ -800,39 +800,91 @@ export type Database = {
         Row: {
           amount: number
           category: string
+          category_id: string | null
           created_at: string
           description: string | null
           id: string
           paid_at: string
           payment_method: string | null
+          room_id: string | null
           tenant_id: string | null
           updated_at: string
         }
         Insert: {
           amount?: number
           category?: string
+          category_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
           paid_at?: string
           payment_method?: string | null
+          room_id?: string | null
           tenant_id?: string | null
           updated_at?: string
         }
         Update: {
           amount?: number
           category?: string
+          category_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
           paid_at?: string
           payment_method?: string | null
+          room_id?: string | null
           tenant_id?: string | null
           updated_at?: string
         }
         Relationships: [
           {
+            foreignKeyName: "depenses_category_id_tenant_id_fkey"
+            columns: ["category_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "depenses_room_id_tenant_id_fkey"
+            columns: ["room_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "hotel_rooms"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
             foreignKeyName: "depenses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_categories_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

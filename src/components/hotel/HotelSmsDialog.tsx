@@ -1,0 +1,23 @@
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Loader2, MessageSquareText } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { sendHotelSms } from "@/lib/hotel-sms.server";
+import { hotelSmsTemplates, renderHotelSms, type HotelSmsType } from "@/lib/hotel-sms";
+import { formatCurrency, formatDate } from "@/lib/mms/format";
+const labels: Record<HotelSmsType, string> = { confirmation: "Confirmation", arrival_reminder: "Rappel arrivée", departure_reminder: "Rappel départ", balance_reminder: "Solde restant", cancellation: "Annulation", thanks: "Remerciement" };
+export function HotelSmsDialog({ reservation, guest, room, tenantId, open, onOpenChange }: any) {
+  const [type, setType] = useState<HotelSmsType>("confirmation");
+  const values = useMemo(() => ({ client: guest ? `${guest.first_name} ${guest.last_name}` : "Client", arrivee: formatDate(reservation?.check_in), depart: formatDate(reservation?.check_out), chambre: room?.number ?? "—", solde: formatCurrency(Number(reservation?.balance_due ?? 0)) }), [guest, reservation, room]);
+  const rendered = useMemo(() => renderHotelSms(hotelSmsTemplates[type], values), [type, values]);
+  const [message, setMessage] = useState(rendered); useEffect(() => setMessage(rendered), [rendered]);
+  const history = useQuery({ queryKey: ["hotel-sms", tenantId, reservation?.id], enabled: open && Boolean(tenantId && reservation?.id), queryFn: async () => { const { data, error } = await (supabase as any).from("hotel_sms_logs").select("id,message_type,status,created_at,error_message").eq("tenant_id",tenantId).eq("reservation_id",reservation.id).order("created_at",{ascending:false}).limit(20); if(error) throw error; return data ?? []; } });
+  const send = useMutation({ mutationFn: () => sendHotelSms({ data: { reservationId: reservation.id, messageType: type, message } }), onSuccess: (result) => { void history.refetch(); if(result.status === "sent") toast.success("SMS envoyé"); else toast.error(`Échec : ${result.error}`); }, onError: (error: Error) => toast.error(error.message) });
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle className="flex items-center gap-2"><MessageSquareText className="size-5"/>Envoyer un SMS</DialogTitle><DialogDescription>Numéro du client : {guest?.phone || "non renseigné"}</DialogDescription></DialogHeader><div className="space-y-4"><div><Label>Modèle</Label><Select value={type} onValueChange={(v) => setType(v as HotelSmsType)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(labels).map(([v,l])=><SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent></Select></div><div><Label>Message modifiable</Label><Textarea rows={5} maxLength={918} value={message} onChange={(e)=>setMessage(e.target.value)}/><p className="mt-1 text-right text-xs text-muted-foreground">{message.length}/918</p></div><div className="rounded-lg border bg-muted/20 p-3"><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Aperçu</p><p className="whitespace-pre-wrap text-sm">{message}</p></div><div><p className="mb-2 text-sm font-medium">Historique</p>{history.isLoading?<p className="text-sm text-muted-foreground">Chargement…</p>:history.error?<p className="text-sm text-muted-foreground">Historique non accessible.</p>:history.data?.length?<div className="max-h-32 space-y-2 overflow-auto">{history.data.map((log:any)=><div key={log.id} className="flex items-center justify-between rounded border px-3 py-2 text-xs"><span>{labels[log.message_type as HotelSmsType] ?? log.message_type}</span><span>{log.status === "sent" ? "Envoyé" : log.status === "failed" ? "Échec" : "En attente"}</span></div>)}</div>:<p className="text-sm text-muted-foreground">Aucun envoi pour cette réservation.</p>}</div></div><DialogFooter><Button variant="outline" onClick={()=>onOpenChange(false)}>Fermer</Button><Button disabled={send.isPending || !guest?.phone || !message.trim()} onClick={()=>send.mutate()}>{send.isPending&&<Loader2 className="size-4 animate-spin"/>}{send.isPending?"Envoi…":"Envoyer"}</Button></DialogFooter></DialogContent></Dialog>;
+}
