@@ -1,7 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Check,
   ChevronsUpDown,
   FileDown,
@@ -64,6 +66,12 @@ import { createHotelInvoicePdf } from "@/lib/mms/hotel-invoice-pdf";
 import { downloadPdf } from "@/lib/mms/download-pdf";
 import { HotelSmsDialog } from "@/components/hotel/HotelSmsDialog";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
+import {
+  BLOCKING_RESERVATION_STATUSES,
+  findReservationConflict,
+  periodsOverlap,
+  roomIsAvailable,
+} from "@/lib/hotel-availability";
 
 const db = supabase as any;
 const statuses = [
@@ -103,9 +111,14 @@ export function HotelReservationsPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [view, setView] = useState<"list" | "calendar">("list");
+  const [planningMode, setPlanningMode] = useState<"month" | "week">("month");
+  const [planningDate, setPlanningDate] = useState(() => new Date());
+  const [planningType, setPlanningType] = useState("all");
+  const [planningFloor, setPlanningFloor] = useState("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<any | null>(null);
   const [smsReservation, setSmsReservation] = useState<any | null>(null);
+  const [calendarIntentApplied, setCalendarIntentApplied] = useState(false);
   const canUpdate = useActionPermission("hotel.reservations.update");
   const canDelete = useActionPermission("hotel.reservations.delete");
   const canSendSms = useActionPermission("hotel.sms.send");
@@ -125,28 +138,95 @@ export function HotelReservationsPage() {
           .order("check_in", { ascending: false }),
         db
           .from("hotel_guests")
-          .select("id,first_name,last_name,phone,email,identity_document_path,identity_number,identity_type")
+          .select(
+            "id,first_name,last_name,phone,email,identity_document_path,identity_number,identity_type",
+          )
           .eq("tenant_id", tenantId),
-        db.from("hotel_rooms").select("id,number,rate,status").eq("tenant_id", tenantId),
+        db
+          .from("hotel_rooms")
+          .select("id,tenant_id,number,rate,status,capacity,room_type_id,hotel_room_types(name)")
+          .eq("tenant_id", tenantId),
         db
           .from("hotel_guest_companions")
           .select("reservation_id,full_name")
           .eq("tenant_id", tenantId),
       ]);
       for (const result of [r, g, rooms, companions]) if (result.error) throw result.error;
-      return { reservations: r.data ?? [], guests: g.data ?? [], rooms: rooms.data ?? [], companions: companions.data ?? [] };
+      return {
+        reservations: r.data ?? [],
+        guests: g.data ?? [],
+        rooms: rooms.data ?? [],
+        companions: companions.data ?? [],
+      };
     },
   });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["hotel-reservations", profile?.tenant_id] });
     qc.invalidateQueries({ queryKey: ["hotel-overview"] });
+    qc.invalidateQueries({ queryKey: ["hotel_rooms", profile?.tenant_id] });
+    qc.invalidateQueries({ queryKey: ["hotel-room-management-context", profile?.tenant_id] });
+    qc.invalidateQueries({ queryKey: ["hotel-reports", profile?.tenant_id] });
   };
+  useEffect(() => {
+    if (!profile?.tenant_id) return;
+    const channel = supabase
+      .channel(`hotel-planning-${profile.tenant_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "hotel_reservations",
+          filter: `tenant_id=eq.${profile.tenant_id}`,
+        },
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "hotel_rooms",
+          filter: `tenant_id=eq.${profile.tenant_id}`,
+        },
+        refresh,
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [profile?.tenant_id]);
   const save = useMutation({
     mutationFn: async () => {
       if (!profile?.tenant_id) throw new Error("Tenant introuvable");
       if (!form.guest_id)
         throw new Error("Sélectionnez un client existant ou créez un nouveau client.");
+      const selectedRoom = data?.rooms.find((room: any) => room.id === form.room_id);
+      if (
+        !selectedRoom ||
+        !roomIsAvailable(
+          selectedRoom,
+          data?.reservations ?? [],
+          form.check_in,
+          form.check_out,
+          editingId,
+        )
+      ) {
+        const conflict = findReservationConflict(
+          data?.reservations ?? [],
+          form.room_id,
+          form.check_in,
+          form.check_out,
+          editingId,
+          profile.tenant_id,
+        );
+        if (conflict)
+          throw new Error(
+            `Cette chambre est déjà réservée du ${formatDate(conflict.check_in)} au ${formatDate(conflict.check_out)}.`,
+          );
+        throw new Error("Cette chambre est indisponible.");
+      }
       const advance = Number(form.advance || 0);
       const totals = hotelStayTotals(
         form.check_in,
@@ -185,17 +265,15 @@ export function HotelReservationsPage() {
       if (result.error) throw result.error;
       const paymentToAdd = advance - previousAdvance;
       if (paymentToAdd > 0) {
-        const payment = await db
-          .from("hotel_reservation_payments")
-          .insert({
-            tenant_id: profile.tenant_id,
-            reservation_id: result.data.id,
-            amount: paymentToAdd,
-            method: "Avance",
-            notes: editingId
-              ? "Complément d’avance depuis la réservation"
-              : "Avance à la réservation",
-          });
+        const payment = await db.from("hotel_reservation_payments").insert({
+          tenant_id: profile.tenant_id,
+          reservation_id: result.data.id,
+          amount: paymentToAdd,
+          method: "Avance",
+          notes: editingId
+            ? "Complément d’avance depuis la réservation"
+            : "Avance à la réservation",
+        });
         if (payment.error) throw payment.error;
       }
     },
@@ -205,12 +283,7 @@ export function HotelReservationsPage() {
       setForm(emptyForm);
       refresh();
     },
-    onError: (e: Error) =>
-      toast.error(
-        e.message.includes("hotel_reservations_no_overlap")
-          ? "Ce logement est déjà réservé sur cette période."
-          : e.message,
-      ),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const changeStatus = useMutation({
@@ -248,6 +321,53 @@ export function HotelReservationsPage() {
   });
   const guests = new Map((data?.guests ?? []).map((g: any) => [g.id, g]));
   const rooms = new Map((data?.rooms ?? []).map((r: any) => [r.id, r]));
+  const planningRooms = useMemo(() => {
+    const floorOf = (room: any) => room.number?.match(/\d+/)?.[0]?.slice(0, -2) || "—";
+    return (data?.rooms ?? [])
+      .filter((room: any) => planningType === "all" || room.hotel_room_types?.name === planningType)
+      .filter((room: any) => planningFloor === "all" || floorOf(room) === planningFloor)
+      .sort((a: any, b: any) =>
+        String(a.number).localeCompare(String(b.number), "fr", { numeric: true }),
+      );
+  }, [data?.rooms, planningFloor, planningType]);
+  const planningTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (data?.rooms ?? []).map((room: any) => room.hotel_room_types?.name).filter(Boolean),
+        ),
+      ).sort(),
+    [data?.rooms],
+  );
+  const planningFloors = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (data?.rooms ?? []).map(
+            (room: any) => room.number?.match(/\d+/)?.[0]?.slice(0, -2) || "—",
+          ),
+        ),
+      ).sort(),
+    [data?.rooms],
+  );
+  const availableRooms = useMemo(
+    () =>
+      (data?.rooms ?? []).filter((room: any) =>
+        roomIsAvailable(room, data?.reservations ?? [], form.check_in, form.check_out, editingId),
+      ),
+    [data?.rooms, data?.reservations, form.check_in, form.check_out, editingId],
+  );
+  const selectedRoomUnavailable = Boolean(
+    form.room_id && !availableRooms.some((room: any) => room.id === form.room_id),
+  );
+  const conflictingReservation: any = findReservationConflict(
+    data?.reservations ?? [],
+    form.room_id,
+    form.check_in,
+    form.check_out,
+    editingId,
+    profile?.tenant_id,
+  );
   const filtered = useMemo(
     () =>
       (data?.reservations ?? []).filter((r: any) => {
@@ -283,6 +403,26 @@ export function HotelReservationsPage() {
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  useEffect(() => {
+    if (calendarIntentApplied || !data) return;
+    const params = new URLSearchParams(window.location.search);
+    const reservationId = params.get("reservation");
+    const roomId = params.get("room");
+    const checkIn = params.get("date");
+    if (reservationId) {
+      const reservation = data.reservations.find((item: any) => item.id === reservationId);
+      if (reservation) edit(reservation);
+    } else if (roomId && checkIn) {
+      const room = data.rooms.find((item: any) => item.id === roomId);
+      if (room) {
+        const departure = new Date(`${checkIn}T12:00:00`);
+        departure.setDate(departure.getDate() + 1);
+        setForm({ ...emptyForm, room_id: room.id, check_in: checkIn, check_out: departure.toISOString().slice(0, 10), nightly_rate: String(room.rate) });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }
+    setCalendarIntentApplied(true);
+  }, [calendarIntentApplied, data]);
   const downloadReservationPdf = async (reservation: any) => {
     try {
       const guest: any = guests.get(reservation.guest_id);
@@ -365,13 +505,27 @@ export function HotelReservationsPage() {
                 <SelectValue placeholder="Sélectionner" />
               </SelectTrigger>
               <SelectContent>
-                {data?.rooms.map((r: any) => (
+                {availableRooms.map((r: any) => (
                   <SelectItem key={r.id} value={r.id}>
                     N° {r.number}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {selectedRoomUnavailable && (
+              <p className="mt-1.5 text-xs font-medium text-destructive">
+                {conflictingReservation
+                  ? `Cette chambre est déjà réservée du ${formatDate(conflictingReservation.check_in)} au ${formatDate(conflictingReservation.check_out)}.`
+                  : "Ce logement est indisponible ou placé en maintenance."}
+              </p>
+            )}
+            {form.check_in && form.check_out && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {availableRooms.length
+                  ? `Logements disponibles aux mêmes dates : ${availableRooms.map((room: any) => `N° ${room.number}`).join(", ")}.`
+                  : "Aucun logement disponible pour ces dates."}
+              </p>
+            )}
           </Field>
           <Field label="Arrivée">
             <Input
@@ -437,7 +591,13 @@ export function HotelReservationsPage() {
           <div className="flex items-end">
             <Button
               className="w-full"
-              disabled={save.isPending || !form.room_id || nights < 1 || invalidAdvance}
+              disabled={
+                save.isPending ||
+                !form.room_id ||
+                selectedRoomUnavailable ||
+                nights < 1 ||
+                invalidAdvance
+              }
               onClick={() => save.mutate()}
             >
               {save.isPending
@@ -491,7 +651,39 @@ export function HotelReservationsPage() {
           </div>
         </div>
         {view === "calendar" ? (
-          <Planning rows={filtered} guests={guests} rooms={rooms} />
+          <HorizontalPlanning
+            rows={filtered}
+            guests={guests}
+            rooms={planningRooms}
+            mode={planningMode}
+            date={planningDate}
+            onDateChange={setPlanningDate}
+            onModeChange={setPlanningMode}
+            onList={() => setView("list")}
+            onNew={() => {
+              setEditingId(null);
+              setForm(emptyForm);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            type={planningType}
+            floor={planningFloor}
+            types={planningTypes}
+            floors={planningFloors}
+            companions={data?.companions ?? []}
+            conflictPeriod={
+              form.check_in && form.check_out
+                ? {
+                    roomId: form.room_id,
+                    checkIn: form.check_in,
+                    checkOut: form.check_out,
+                    ignoredId: editingId,
+                  }
+                : null
+            }
+            onTypeChange={setPlanningType}
+            onFloorChange={setPlanningFloor}
+            onSelect={edit}
+          />
         ) : (
           <ReservationTable
             rows={filtered}
@@ -513,7 +705,8 @@ export function HotelReservationsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer cette réservation ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. La réservation et ses données associées seront supprimées.
+              Cette action est irréversible. La réservation et ses données associées seront
+              supprimées.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -529,7 +722,16 @@ export function HotelReservationsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {smsReservation && <HotelSmsDialog open={Boolean(smsReservation)} onOpenChange={(open: boolean) => !open && setSmsReservation(null)} reservation={smsReservation} guest={guests.get(smsReservation.guest_id)} room={rooms.get(smsReservation.room_id)} tenantId={profile?.tenant_id} />}
+      {smsReservation && (
+        <HotelSmsDialog
+          open={Boolean(smsReservation)}
+          onOpenChange={(open: boolean) => !open && setSmsReservation(null)}
+          reservation={smsReservation}
+          guest={guests.get(smsReservation.guest_id)}
+          room={rooms.get(smsReservation.room_id)}
+          tenantId={profile?.tenant_id}
+        />
+      )}
     </AppShell>
   );
 }
@@ -782,43 +984,43 @@ function ReservationTable({
                 <td className="text-right">
                   <div className="flex justify-end gap-1">
                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="size-8"
-                            aria-label="Plus d’actions"
-                          >
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="min-w-56">
-                          {canUpdate && (
-                            <DropdownMenuItem onSelect={() => edit(r)}>
-                              <Pencil /> Modifier la réservation
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
-                            <FileDown /> Télécharger la fiche PDF
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-8"
+                          aria-label="Plus d’actions"
+                        >
+                          <MoreVertical className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-56">
+                        {canUpdate && (
+                          <DropdownMenuItem onSelect={() => edit(r)}>
+                            <Pencil /> Modifier la réservation
                           </DropdownMenuItem>
-                          {canSendSms && (
-                            <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!g?.phone}>
-                              <MessageSquareText /> Envoyer un SMS
+                        )}
+                        <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
+                          <FileDown /> Télécharger la fiche PDF
+                        </DropdownMenuItem>
+                        {canSendSms && (
+                          <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!g?.phone}>
+                            <MessageSquareText /> Envoyer un SMS
+                          </DropdownMenuItem>
+                        )}
+                        {canDelete && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={() => requestDelete(r)}
+                            >
+                              <Trash2 /> Supprimer la réservation
                             </DropdownMenuItem>
-                          )}
-                          {canDelete && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onSelect={() => requestDelete(r)}
-                              >
-                                <Trash2 /> Supprimer la réservation
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     {["pending", "confirmed"].includes(r.status) && (
                       <Button
                         size="sm"
@@ -893,6 +1095,281 @@ function Planning({ rows, guests, rooms }: any) {
           );
         })}
       {!rows.length && <p className="py-10 text-center text-slate-400">Aucun séjour à afficher.</p>}
+    </div>
+  );
+}
+
+function HorizontalPlanning({
+  rows,
+  guests,
+  rooms,
+  mode,
+  date,
+  onDateChange,
+  onModeChange,
+  onList,
+  onNew,
+  type,
+  floor,
+  types,
+  floors,
+  onTypeChange,
+  onFloorChange,
+  companions,
+  conflictPeriod,
+  onSelect,
+}: any) {
+  const key = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  if (mode === "month") start.setDate(1);
+  else {
+    const weekday = (start.getDay() + 6) % 7;
+    start.setDate(start.getDate() - weekday);
+  }
+  const count =
+    mode === "month" ? new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate() : 7;
+  const days = Array.from({ length: count }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+  const from = key(days[0]);
+  const to = key(
+    new Date(
+      days[count - 1].getFullYear(),
+      days[count - 1].getMonth(),
+      days[count - 1].getDate() + 1,
+    ),
+  );
+  const today = key(new Date());
+  const todayIndex = days.findIndex((d) => key(d) === today);
+  const reservationColors: Record<string, string> = {
+    pending: "bg-orange-400",
+    confirmed: "bg-blue-500",
+    checked_in: "bg-red-500",
+    checked_out: "bg-slate-500",
+  };
+  const roomColors: Record<string, string> = {
+    available: "bg-emerald-50",
+    occupied: "bg-red-50",
+    cleaning: "bg-violet-50",
+    maintenance: "bg-slate-200",
+  };
+  const index = (value: string) =>
+    Math.max(
+      0,
+      Math.min(
+        count,
+        Math.round((Date.parse(`${value}T00:00:00`) - Date.parse(`${from}T00:00:00`)) / 86400000),
+      ),
+    );
+  const move = (amount: number) => {
+    const next = new Date(date);
+    mode === "month"
+      ? next.setMonth(next.getMonth() + amount)
+      : next.setDate(next.getDate() + amount * 7);
+    onDateChange(next);
+  };
+  const title =
+    mode === "month"
+      ? start.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
+      : `${days[0].toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} – ${days[6].toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
+  const isFormConflict = (reservation: any) =>
+    Boolean(
+      conflictPeriod?.roomId === reservation.room_id &&
+      conflictPeriod.ignoredId !== reservation.id &&
+      BLOCKING_RESERVATION_STATUSES.has(reservation.status) &&
+      periodsOverlap(
+        conflictPeriod.checkIn,
+        conflictPeriod.checkOut,
+        reservation.check_in,
+        reservation.check_out,
+      ),
+    );
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center rounded-lg border p-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => move(-1)}
+            aria-label="Période précédente"
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onDateChange(new Date())}>
+            Aujourd’hui
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => move(1)} aria-label="Période suivante">
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+        <h3 className="min-w-48 font-semibold capitalize">{title}</h3>
+        <div className="ml-auto flex rounded-lg border p-1">
+          <Button
+            size="sm"
+            variant={mode === "month" ? "default" : "ghost"}
+            onClick={() => onModeChange("month")}
+          >
+            Mois
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === "week" ? "default" : "ghost"}
+            onClick={() => onModeChange("week")}
+          >
+            Semaine
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onList}>
+            Liste
+          </Button>
+        </div>
+        <Button size="sm" onClick={onNew}>
+          <Plus className="mr-1 size-4" />
+          Nouvelle réservation
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Select value={type} onValueChange={onTypeChange}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Type de logement" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les types</SelectItem>
+            {types.map((item: string) => (
+              <SelectItem key={item} value={item}>
+                {item}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={floor} onValueChange={onFloorChange}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Étage" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les étages</SelectItem>
+            {floors.map((item: string) => (
+              <SelectItem key={item} value={item}>
+                {item === "—" ? "Non défini" : `Étage ${item}`}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          {[
+            ["bg-emerald-400", "Disponible"],
+            ["bg-orange-400", "En attente"],
+            ["bg-blue-500", "Réservé"],
+            ["bg-red-500", "Occupé / conflit"],
+            ["bg-violet-500", "Nettoyage"],
+            ["bg-slate-400", "Maintenance"],
+          ].map(([color, text]) => (
+            <span key={text} className="inline-flex items-center gap-1">
+              <i className={`size-2 rounded-full ${color}`} />
+              {text}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="overflow-x-auto rounded-xl border">
+        <div className="min-w-[900px]">
+          <div className="grid" style={{ gridTemplateColumns: "180px minmax(700px, 1fr)" }}>
+            <div className="border-b bg-muted/30 p-3 text-xs font-semibold">Logement</div>
+            <div
+              className="grid border-b"
+              style={{ gridTemplateColumns: `repeat(${count}, minmax(32px, 1fr))` }}
+            >
+              {days.map((day) => (
+                <div
+                  key={key(day)}
+                  className={`border-l p-2 text-center text-[10px] ${key(day) === today ? "font-bold text-primary" : "text-muted-foreground"}`}
+                >
+                  <span className="block uppercase">
+                    {day.toLocaleDateString("fr-FR", { weekday: "short" }).slice(0, 2)}
+                  </span>
+                  <span>{day.getDate()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {rooms.map((room: any) => {
+            const roomReservations = rows.filter(
+              (r: any) =>
+                r.room_id === room.id &&
+                r.check_in < to &&
+                r.check_out > from &&
+                !["cancelled", "no_show"].includes(r.status),
+            );
+            return (
+              <div
+                key={room.id}
+                className="grid"
+                style={{ gridTemplateColumns: "180px minmax(700px, 1fr)" }}
+              >
+                <div className="border-b p-2">
+                  <p className="font-medium">N° {room.number}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {room.hotel_room_types?.name ?? "Type non défini"} · {room.capacity ?? 1} pers.
+                  </p>
+                </div>
+                <div
+                  className="relative grid min-h-14 border-b"
+                  style={{ gridTemplateColumns: `repeat(${count}, minmax(32px, 1fr))` }}
+                >
+                  {days.map((day) => (
+                    <div
+                      key={key(day)}
+                      className={`border-l ${roomColors[room.status] ?? roomColors.available}`}
+                    />
+                  ))}
+                  {todayIndex >= 0 && (
+                    <div
+                      className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-primary/70"
+                      style={{ left: `${((todayIndex + 0.5) / count) * 100}%` }}
+                    />
+                  )}
+                  {roomReservations.map((r: any) => {
+                    const left = index(r.check_in);
+                    const width = Math.max(1, index(r.check_out) - left);
+                    const guest: any = guests.get(r.guest_id);
+                    const travelerCount =
+                      1 + companions.filter((c: any) => c.reservation_id === r.id).length;
+                    return (
+                      <button
+                        type="button"
+                        key={r.id}
+                        onClick={() => onSelect(r)}
+                        title={`${guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL} · ${travelerCount} voyageur(s)`}
+                        className={`absolute inset-y-2 z-10 overflow-hidden rounded-md px-2 text-left text-[11px] font-semibold text-white shadow-sm ${isFormConflict(r) ? "bg-red-600 ring-2 ring-red-300" : (reservationColors[r.status] ?? "bg-blue-500")}`}
+                        style={{
+                          left: `${(left / count) * 100}%`,
+                          width: `${(width / count) * 100}%`,
+                        }}
+                      >
+                        <span className="block truncate">
+                          {guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL}
+                        </span>
+                        <span className="block truncate text-[10px] font-normal">
+                          {travelerCount} voyageur{travelerCount > 1 ? "s" : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {!rooms.length && (
+            <p className="p-10 text-center text-sm text-muted-foreground">
+              Aucun logement ne correspond aux filtres.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

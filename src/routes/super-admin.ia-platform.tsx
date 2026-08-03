@@ -1,11 +1,11 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { TriangleAlert } from "lucide-react";
-import { AiPlatformView } from "@/components/super-admin/AiPlatform";
+import { AiControlCenter } from "@/components/super-admin/AiControlCenter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { getAiPlatform } from "@/lib/ai-platform.server";
+import { getAiControlCenter } from "@/lib/ai-control-center.server";
 
 export const Route = createFileRoute("/super-admin/ia-platform")({
   // Supabase persists the browser session locally. Running this child route's
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/super-admin/ia-platform")({
     try {
       // The global attachSupabaseAuth function middleware propagates this
       // session as: Authorization: Bearer <access_token>.
-      return { aiPlatform: await getAiPlatform() };
+      return { aiPlatform: await getAiControlCenter() };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("Unauthorized")) throw redirect({ to: "/login" });
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/super-admin/ia-platform")({
   },
   loader: ({ context }) => context.aiPlatform,
   component: function AiPlatformPage() {
-    return <AiPlatformView data={Route.useLoaderData()} />;
+    return <AiControlCenter data={Route.useLoaderData()} />;
   },
   errorComponent: function AiPlatformError({ error }) {
     const router = useRouter();

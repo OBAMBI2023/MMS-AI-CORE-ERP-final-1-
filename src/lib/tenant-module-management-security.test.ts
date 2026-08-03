@@ -9,8 +9,11 @@ const premiumFixMigration = readFileSync(new URL("../../supabase/migrations/2026
 const premiumBoundaryMigration = readFileSync(new URL("../../supabase/migrations/20260803162000_enforce_premium_subscription_at_tenant_modules.sql", import.meta.url), "utf8");
 const premiumDeleteMigration = readFileSync(new URL("../../supabase/migrations/20260803163000_protect_premium_tenant_module_deletes.sql", import.meta.url), "utf8");
 const premiumKeyUpdateMigration = readFileSync(new URL("../../supabase/migrations/20260803164000_protect_premium_tenant_module_key_updates.sql", import.meta.url), "utf8");
+const aiModuleSyncMigration = readFileSync(new URL("../../supabase/migrations/20260803180000_sync_ai_module_subscription.sql", import.meta.url), "utf8");
 const trialActivationMigration = readFileSync(new URL("../../supabase/migrations/20260801190000_validate_pending_trial_billing_cycle.sql", import.meta.url), "utf8");
 const managerUi = readFileSync(new URL("../components/super-admin/TenantModulesManager.tsx", import.meta.url), "utf8");
+const sidebar = readFileSync(new URL("../components/mms/SidebarContent.tsx", import.meta.url), "utf8");
+const tenantModulesHook = readFileSync(new URL("../hooks/use-tenant-modules.ts", import.meta.url), "utf8");
 
 test("module management is platform-admin-only, tenant-scoped and audited", () => {
   assert.match(migration, /platform_admins[\s\S]*administrator\.user_id = auth\.uid\(\)/i);
@@ -121,4 +124,20 @@ test("UPDATE cannot move an active Premium assignment to another tenant or modul
     premiumKeyUpdateMigration,
     /UPDATE public\.tenant_module_subscriptions|UPDATE public\.tenant_ai_subscriptions|credit_balance\s*=/i,
   );
+});
+
+test("Assistant IA activation and deactivation keep module and subscription states aligned", () => {
+  assert.match(aiModuleSyncMigration, /target_module\.code = 'ai_assistant'/i);
+  assert.match(aiModuleSyncMigration, /IF next_enabled[\s\S]*SET status = 'active'/i);
+  assert.match(aiModuleSyncMigration, /ELSE[\s\S]*SET status = 'suspended'/i);
+  assert.match(aiModuleSyncMigration, /status IN \('active', 'trial'\)/i);
+  assert.doesNotMatch(aiModuleSyncMigration, /DELETE FROM public\.(tenant_modules|tenant_ai_subscriptions)/i);
+});
+
+test("the Hotel menu and route guard admit a valid manually assigned Assistant IA module", () => {
+  assert.match(sidebar, /hotelPaths[\s\S]*"\/app\/assistant-ia"/i);
+  assert.match(sidebar, /hotelNavigationOrder[\s\S]*"\/app\/assistant-ia"/i);
+  assert.match(routeGuard, /isHotelPath[\s\S]*location\.pathname === "\/app\/assistant-ia"/i);
+  assert.match(tenantModulesHook, /VALID_AI_SUBSCRIPTION_STATUSES[\s\S]*active[\s\S]*trial/i);
+  assert.match(tenantModulesHook, /tenant_ai_subscriptions[\s\S]*expires_at/i);
 });

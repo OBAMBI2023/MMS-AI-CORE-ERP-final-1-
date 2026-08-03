@@ -246,6 +246,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       const isHotelPath =
         location.pathname === "/hotel" ||
         location.pathname.startsWith("/hotel/") ||
+        location.pathname === "/app/assistant-ia" ||
         location.pathname === "/depenses";
       if (tenantAccess.platformType === "HOTEL" && !isHotelPath) {
         throw redirect({ to: "/hotel" });

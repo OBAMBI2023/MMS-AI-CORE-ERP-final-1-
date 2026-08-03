@@ -5,6 +5,8 @@ import { useTenant } from "@/providers/TenantProvider";
 
 type ModuleRelation = { code: string } | { code: string }[] | null;
 type TenantModuleListener = () => void;
+const AI_MODULE_CODE = "ai_assistant";
+const VALID_AI_SUBSCRIPTION_STATUSES = new Set(["active", "trial"]);
 
 type TenantModuleSubscription = {
   channel: ReturnType<typeof supabase.channel>;
@@ -36,6 +38,16 @@ function subscribeToTenantModules(tenantId: string, listener: TenantModuleListen
         event: "*",
         schema: "public",
         table: "tenant_modules",
+        filter: `tenant_id=eq.${tenantId}`,
+      },
+      () => listeners.forEach((notify) => notify()),
+    );
+    channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "tenant_ai_subscriptions",
         filter: `tenant_id=eq.${tenantId}`,
       },
       () => listeners.forEach((notify) => notify()),
@@ -86,19 +98,33 @@ export function useTenantModules() {
     queryKey: tenantModulesQueryKey(tenantId),
     queryFn: async () => {
       if (!tenantId) return new Set<string>();
-      const { data, error } = await supabase
-        .from("tenant_modules")
-        .select("enabled, erp_modules!inner(code)")
-        .eq("tenant_id", tenantId)
-        .eq("enabled", true);
+      const [{ data, error }, { data: aiSubscription, error: aiSubscriptionError }] = await Promise.all([
+        supabase
+          .from("tenant_modules")
+          .select("enabled, erp_modules!inner(code)")
+          .eq("tenant_id", tenantId)
+          .eq("enabled", true),
+        supabase
+          .from("tenant_ai_subscriptions")
+          .select("status, expires_at")
+          .eq("tenant_id", tenantId)
+          .maybeSingle(),
+      ]);
 
       if (error) throw error;
+      if (aiSubscriptionError) throw aiSubscriptionError;
+
+      const aiSubscriptionValid = Boolean(
+        aiSubscription
+        && VALID_AI_SUBSCRIPTION_STATUSES.has(aiSubscription.status)
+        && (!aiSubscription.expires_at || new Date(aiSubscription.expires_at).getTime() > Date.now()),
+      );
 
       return new Set(
         (data ?? []).flatMap((row) => {
           const module = row.erp_modules as ModuleRelation;
-          if (Array.isArray(module)) return module.map((item) => item.code);
-          return module ? [module.code] : [];
+          const codes = Array.isArray(module) ? module.map((item) => item.code) : module ? [module.code] : [];
+          return codes.filter((code) => code !== AI_MODULE_CODE || aiSubscriptionValid);
         }),
       );
     },

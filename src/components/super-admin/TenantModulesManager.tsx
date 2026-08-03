@@ -27,6 +27,8 @@ const sourceLabels = {
   system: "Système",
 } as const;
 
+const MODULE_DRAFT_KEY = "mms:super-admin:module-draft";
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "Sans expiration";
   const date = new Date(value);
@@ -57,8 +59,22 @@ export function TenantModulesManager({
   const tenant = tenants.find((item) => item.id === selectedTenantId) ?? initialTenant;
 
   useEffect(() => {
-    setDraft(Object.fromEntries((tenant?.modules ?? []).map((module) => [module.id, module.enabled])));
+    const storedDraft = sessionStorage.getItem(MODULE_DRAFT_KEY);
+    let saved: { tenantId?: string; draft?: Record<string, boolean> } | null = null;
+    try {
+      saved = storedDraft ? JSON.parse(storedDraft) : null;
+    } catch {
+      sessionStorage.removeItem(MODULE_DRAFT_KEY);
+    }
+    setDraft(saved?.tenantId === tenant?.id && saved.draft
+      ? saved.draft
+      : Object.fromEntries((tenant?.modules ?? []).map((module) => [module.id, module.enabled])));
   }, [tenant]);
+  useEffect(() => {
+    if (tenant && Object.keys(draft).length) {
+      sessionStorage.setItem(MODULE_DRAFT_KEY, JSON.stringify({ tenantId: tenant.id, draft }));
+    }
+  }, [draft, tenant]);
   useEffect(() => {
     if (smsSubscriptions.length) {
       setLoadedSmsSubscriptions(smsSubscriptions);
@@ -95,6 +111,7 @@ export function TenantModulesManager({
       });
       await queryClient.invalidateQueries({ queryKey: tenantModulesQueryKey(tenant.id) });
       await router.invalidate();
+      sessionStorage.removeItem(MODULE_DRAFT_KEY);
       toast.success("Modules enregistrés. Le menu du tenant est actualisé.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Enregistrement impossible");

@@ -1,19 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -35,61 +21,80 @@ import { formatCurrency } from "@/lib/mms/format";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/mms/AppShell";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useTenant } from "@/providers/TenantProvider";
 
 type HotelData = { rooms: any[]; reservations: any[]; expenses: any[]; payments: any[] };
+type HotelDataKey = keyof HotelData;
+type HotelErrors = Partial<Record<HotelDataKey, string>>;
+const HotelDashboardCharts = lazy(() => import("./HotelDashboardCharts"));
 const gold = "#C9A227";
 const navy = "#0F172A";
 const keyOf = (date: Date) => date.toISOString().slice(0, 10);
 
 export function HotelDashboardPage() {
   const queryClient = useQueryClient();
-  const { data } = useQuery({
-    queryKey: ["hotel-overview"],
+  const { profile, loading: tenantLoading } = useTenant();
+  const tenantId = profile?.tenant_id;
+  const { data, isLoading } = useQuery({
+    queryKey: ["hotel-overview", tenantId],
     queryFn: async () => {
+      if (!tenantId) throw new Error("Tenant hôtel introuvable");
       const db = supabase as any;
-      const [rooms, reservations, expenses, payments] = await Promise.all([
-        db.from("hotel_rooms").select("*"),
-        db.from("hotel_reservation_balances").select("*"),
-        db.from("depenses").select("amount,paid_at"),
-        db.from("hotel_reservation_payments").select("reservation_id,amount,paid_at"),
-      ]);
-      for (const result of [rooms, reservations, expenses, payments])
+      const request = async (query: PromiseLike<{ data: any[] | null; error: any }>) => {
+        const result = await query;
         if (result.error) throw result.error;
-      return {
-        rooms: rooms.data ?? [],
-        reservations: reservations.data ?? [],
-        expenses: expenses.data ?? [],
-        payments: payments.data ?? [],
+        return result.data ?? [];
       };
+      const results = await Promise.allSettled([
+        request(db.from("hotel_rooms").select("id,status").eq("tenant_id", tenantId)),
+        request(db.from("hotel_reservation_balances").select("id,status,check_in,check_out,nights,grand_total,paid_total").eq("tenant_id", tenantId)),
+        request(db.from("depenses").select("amount,paid_at").eq("tenant_id", tenantId)),
+        request(db.from("hotel_reservation_payments").select("reservation_id,amount,paid_at").eq("tenant_id", tenantId)),
+      ]);
+      const keys: HotelDataKey[] = ["rooms", "reservations", "expenses", "payments"];
+      const nextData = { rooms: [], reservations: [], expenses: [], payments: [] } as HotelData;
+      const errors: HotelErrors = {};
+      results.forEach((result, index) => {
+        const key = keys[index];
+        if (result.status === "fulfilled") nextData[key] = result.value;
+        else errors[key] = result.reason instanceof Error ? result.reason.message : "Données indisponibles";
+      });
+      return { data: nextData, errors };
     },
+    enabled: !tenantLoading && Boolean(tenantId),
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    placeholderData: (previous) => previous,
   });
   useEffect(() => {
-    const refresh = () => void queryClient.invalidateQueries({ queryKey: ["hotel-overview"] });
+    if (!tenantId) return;
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: ["hotel-overview", tenantId] });
     const channel = supabase
       .channel("hotel-dashboard-live")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "hotel_reservations" },
+        { event: "*", schema: "public", table: "hotel_reservations", filter: `tenant_id=eq.${tenantId}` },
         refresh,
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "hotel_reservation_payments" },
+        { event: "*", schema: "public", table: "hotel_reservation_payments", filter: `tenant_id=eq.${tenantId}` },
         refresh,
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, tenantId]);
   return (
     <AppShell title="Tableau de bord" subtitle="Pilotage de votre établissement en temps réel">
-      <HotelDashboard data={data} />
+      <HotelDashboard data={data?.data} errors={data?.errors} isLoading={isLoading || tenantLoading} />
     </AppShell>
   );
 }
 
-export function HotelDashboard({ data }: { data?: HotelData }) {
+export function HotelDashboard({ data, errors, isLoading = false }: { data?: HotelData; errors?: HotelErrors; isLoading?: boolean }) {
   const today = keyOf(new Date());
   const rooms = data?.rooms ?? [],
     reservations = data?.reservations ?? [],
@@ -215,13 +220,12 @@ export function HotelDashboard({ data }: { data?: HotelData }) {
             <p className="mt-4 text-[10px] font-semibold uppercase tracking-[.08em] text-slate-500">
               {label}
             </p>
-            <p className="mt-1 truncate text-xl font-bold tracking-tight text-[#0F172A] dark:text-white sm:text-2xl">
-              {value}
-            </p>
-            <p className="mt-1 truncate text-[11px] text-slate-400">{note}</p>
+            {isLoading ? <><Skeleton className="mt-2 h-7 w-20" /><Skeleton className="mt-2 h-3 w-24" /></> : <><p className="mt-1 truncate text-xl font-bold tracking-tight text-[#0F172A] dark:text-white sm:text-2xl">{value}</p><p className="mt-1 truncate text-[11px] text-slate-400">{note}</p></>}
           </div>
         ))}
       </section>
+
+      {(errors?.rooms || errors?.reservations || errors?.payments) && <WidgetError message="Certains indicateurs d’activité sont temporairement indisponibles." />}
 
       <Panel title="Actions rapides" subtitle="Accédez aux opérations les plus courantes">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
@@ -240,62 +244,15 @@ export function HotelDashboard({ data }: { data?: HotelData }) {
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,.72fr)]">
         <div className="space-y-5">
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Chart title="Évolution des revenus" value={formatCurrency(revenue)}>
-              <AreaChart data={history} margin={{ left: -20, right: 4, top: 12 }}>
-                <defs>
-                  <linearGradient id="hotelRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stopColor={gold} stopOpacity={0.35} />
-                    <stop offset="1" stopColor={gold} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <Grid />
-                <XAxis dataKey="day" {...axis} />
-                <YAxis {...axis} />
-                <Tooltip {...tooltip} />
-                <Area
-                  type="monotone"
-                  dataKey="revenus"
-                  stroke={gold}
-                  strokeWidth={2.5}
-                  fill="url(#hotelRevenue)"
-                />
-              </AreaChart>
-            </Chart>
-            <Chart title="Taux d’occupation" value={`${occupancy}%`}>
-              <BarChart data={history} margin={{ left: -25, right: 4, top: 12 }}>
-                <Grid />
-                <XAxis dataKey="day" {...axis} />
-                <YAxis domain={[0, 100]} {...axis} />
-                <Tooltip {...tooltip} />
-                <Bar dataKey="occupation" fill={navy} radius={[6, 6, 2, 2]} barSize={22} />
-              </BarChart>
-            </Chart>
-          </div>
+          <Suspense fallback={<ChartsSkeleton />}>
+            <HotelDashboardCharts history={history} revenue={revenue} occupancy={occupancy} />
+          </Suspense>
           <div className="grid gap-5 lg:grid-cols-[.9fr_1.1fr]">
             <Panel title="Répartition des chambres" subtitle="État actuel du parc">
               <div className="flex flex-col items-center gap-3 sm:flex-row">
-                <div className="relative h-44 w-44 shrink-0">
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie
-                        data={distribution}
-                        dataKey="value"
-                        innerRadius={52}
-                        outerRadius={72}
-                        paddingAngle={3}
-                        stroke="none"
-                      >
-                        {distribution.map((item) => (
-                          <Cell key={item.name} fill={item.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 grid place-content-center text-center">
-                    <b className="text-2xl dark:text-white">{rooms.length}</b>
-                    <span className="text-[9px] uppercase text-slate-400">chambres</span>
-                  </div>
+                <div className="grid size-36 shrink-0 place-content-center rounded-full border-[18px] border-amber-200 text-center dark:border-amber-500/30">
+                  <b className="text-2xl dark:text-white">{rooms.length}</b>
+                  <span className="text-[9px] uppercase text-slate-400">chambres</span>
                 </div>
                 <div className="w-full space-y-3">
                   {distribution.map((item) => (
@@ -311,6 +268,7 @@ export function HotelDashboard({ data }: { data?: HotelData }) {
               </div>
             </Panel>
             <Panel title="Performance du jour" subtitle="Indicateurs hôteliers essentiels">
+              {errors?.expenses && <div className="mb-3"><WidgetError message="Les dépenses sont temporairement indisponibles." /></div>}
               <div className="grid grid-cols-2 gap-3">
                 {[
                   ["ADR", formatCurrency(adr), "Tarif moyen", ArrowUpRight],
@@ -380,32 +338,8 @@ export function HotelDashboard({ data }: { data?: HotelData }) {
   );
 }
 
-const axis = { axisLine: false, tickLine: false, tick: { fill: "#94A3B8", fontSize: 10 } };
-const tooltip = { contentStyle: { borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 } };
-function Grid() {
-  return <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="#E8ECF2" />;
-}
-function Chart({ title, value, children }: any) {
-  return (
-    <div className="hotel-panel">
-      <div className="flex justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-[#B08B13]">
-            7 derniers jours
-          </p>
-          <h3 className="mt-1 font-semibold">{title}</h3>
-        </div>
-        <div className="text-right">
-          <b>{value}</b>
-          <p className="text-[10px] text-slate-400">Mise à jour en direct</p>
-        </div>
-      </div>
-      <div className="mt-3 h-[220px]">
-        <ResponsiveContainer>{children}</ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
+function ChartsSkeleton() { return <div className="grid gap-5 lg:grid-cols-2"><Skeleton className="h-[310px] rounded-2xl" /><Skeleton className="h-[310px] rounded-2xl" /></div>; }
+function WidgetError({ message }: { message: string }) { return <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{message}</div>; }
 function Panel({ title, subtitle, children }: any) {
   return (
     <div className="hotel-panel">

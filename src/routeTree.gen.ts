@@ -43,6 +43,7 @@ import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppSplatRouteImport } from './routes/app.$'
 import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as HotelIndexRouteImport } from './routes/hotel.index'
+import { Route as HotelCalendrierRouteImport } from './routes/hotel.calendrier'
 import { Route as HotelChambresRouteImport } from './routes/hotel.chambres'
 import { Route as HotelLogementsRouteImport } from './routes/hotel.logements'
 import { Route as HotelParametresRouteImport } from './routes/hotel.parametres'
@@ -229,6 +230,11 @@ const HotelIndexRoute = HotelIndexRouteImport.update({
   path: '/',
   getParentRoute: () => HotelRoute,
 } as any)
+const HotelCalendrierRoute = HotelCalendrierRouteImport.update({
+  id: '/calendrier',
+  path: '/calendrier',
+  getParentRoute: () => HotelRoute,
+} as any)
 const HotelChambresRoute = HotelChambresRouteImport.update({
   id: '/chambres',
   path: '/chambres',
@@ -338,6 +344,7 @@ export interface FileRoutesByFullPath {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel/calendrier': typeof HotelCalendrierRoute
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
@@ -388,6 +395,7 @@ export interface FileRoutesByTo {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel/calendrier': typeof HotelCalendrierRoute
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
@@ -440,6 +448,7 @@ export interface FileRoutesById {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel/calendrier': typeof HotelCalendrierRoute
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
@@ -493,6 +502,7 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel/calendrier'
     | '/hotel/chambres'
     | '/hotel/logements'
     | '/hotel/parametres'
@@ -543,6 +553,7 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel/calendrier'
     | '/hotel/chambres'
     | '/hotel/logements'
     | '/hotel/parametres'
@@ -594,6 +605,7 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel/calendrier'
     | '/hotel/chambres'
     | '/hotel/logements'
     | '/hotel/parametres'
@@ -892,6 +904,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelIndexRouteImport
       parentRoute: typeof HotelRoute
     }
+    '/hotel/calendrier': {
+      id: '/hotel/calendrier'
+      path: '/calendrier'
+      fullPath: '/hotel/calendrier'
+      preLoaderRoute: typeof HotelCalendrierRouteImport
+      parentRoute: typeof HotelRoute
+    }
     '/hotel/chambres': {
       id: '/hotel/chambres'
       path: '/chambres'
@@ -1001,6 +1020,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface HotelRouteChildren {
+  HotelCalendrierRoute: typeof HotelCalendrierRoute
   HotelChambresRoute: typeof HotelChambresRoute
   HotelLogementsRoute: typeof HotelLogementsRoute
   HotelParametresRoute: typeof HotelParametresRoute
@@ -1013,6 +1033,7 @@ interface HotelRouteChildren {
 }
 
 const HotelRouteChildren: HotelRouteChildren = {
+  HotelCalendrierRoute: HotelCalendrierRoute,
   HotelChambresRoute: HotelChambresRoute,
   HotelLogementsRoute: HotelLogementsRoute,
   HotelParametresRoute: HotelParametresRoute,

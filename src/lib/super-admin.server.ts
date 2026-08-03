@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { AuthHttpError, requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { extractErrorDiagnostic, formatSupabaseError, safeErrorMessage } from "@/lib/supabase-error";
 import { getPasswordRedirectUrl } from "@/lib/app-url.server";
@@ -308,7 +308,7 @@ export const manageSmsSubscription=createServerFn({method:"POST"}).middleware([r
 
 async function assertSuperAdmin(_supabase: SupabaseClient, userId: string) {
   const data = await readPlatformAdminMembership(userId);
-  if (!data) throw new Error("Accès refusé : super administrateur de plateforme requis.");
+  if (!data) throw new AuthHttpError(403, "Accès refusé : super administrateur de plateforme requis.");
 }
 
 export const getPlatformAdminAccess = createServerFn({ method: "GET" })
@@ -639,6 +639,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           modules: moduleRows
             .filter((module) => module.is_active && (
               tenant.platform_type !== "HOTEL" ||
+              module.code === "ai_assistant" ||
               modulePacks.find((pack) => pack.code === "hotel")?.moduleIds.includes(module.id)
             ))
             .map((module) => ({

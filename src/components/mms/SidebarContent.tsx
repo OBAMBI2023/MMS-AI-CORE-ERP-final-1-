@@ -48,6 +48,7 @@ const items = [
   { icon: Settings, label: "Paramètres", to: "/parametres" },
   { icon: Hotel, label: "Tableau de bord", to: "/hotel" },
   { icon: CalendarDays, label: "Réservations", to: "/hotel/reservations" },
+  { icon: CalendarDays, label: "Calendrier", to: "/hotel/calendrier" },
   { icon: MessageSquareText, label: "SMS Clients", to: "/hotel/sms" },
   { icon: BedDouble, label: "Logements", to: "/hotel/chambres" },
   { icon: Wrench, label: "Prestataires", to: "/hotel/prestataires" },
@@ -58,7 +59,9 @@ const items = [
 
 const hotelPaths = new Set([
   "/hotel",
+  "/app/assistant-ia",
   "/hotel/reservations",
+  "/hotel/calendrier",
   "/hotel/sms",
   "/hotel/logements",
   "/hotel/chambres",
@@ -71,7 +74,9 @@ const hotelPaths = new Set([
 
 const hotelNavigationOrder = [
   "/hotel",
+  "/app/assistant-ia",
   "/hotel/reservations",
+  "/hotel/calendrier",
   "/hotel/sms",
   "/hotel/chambres",
   "/hotel/voyageurs",

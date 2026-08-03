@@ -68,6 +68,13 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const authMessage = sessionStorage.getItem("mms:auth-message");
+    if (!authMessage) return;
+    sessionStorage.removeItem("mms:auth-message");
+    toast.error(authMessage);
+  }, []);
+
+  useEffect(() => {
     if (!tenantSlug) {
       setTenant(null);
       setTenantLoading(false);
