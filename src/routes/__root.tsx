@@ -250,7 +250,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       if (tenantAccess.platformType === "HOTEL" && !isHotelPath) {
         throw redirect({ to: "/hotel" });
       }
-      if (tenantAccess.platformType === "ERP" && location.pathname.startsWith("/hotel")) {
+      if (tenantAccess.platformType === "ERP" && location.pathname.startsWith("/hotel") && location.pathname !== "/hotel/sms") {
         throw redirect({ to: "/app" });
       }
 
@@ -269,7 +269,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           staleTime: 0,
         });
         if (moduleError || !moduleEnabled) {
-          throw redirect({ to: "/403" });
+          throw redirect({ href: requiredModule === "hotel_sms" ? "/403?reason=premium" : "/403" });
         }
       }
 

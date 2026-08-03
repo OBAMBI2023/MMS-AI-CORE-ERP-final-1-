@@ -1,27 +1,3 @@
-import { Link } from "@tanstack/react-router";
-import { ShieldAlert } from "lucide-react";
-
-export function ForbiddenPage() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-          <ShieldAlert className="h-10 w-10" />
-        </div>
-        <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground">Accès refusé</h1>
-        <p className="mt-4 text-muted-foreground">
-          Vous n'avez pas les permissions nécessaires pour accéder à cette page. Veuillez contacter
-          votre administrateur si vous pensez qu'il s'agit d'une erreur.
-        </p>
-        <div className="mt-8">
-          <Link
-            to="/login"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Retour à mon espace
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { Link, useSearch } from "@tanstack/react-router";
+import { BellRing, CheckCircle2, CreditCard, Megaphone, MessageSquareText, ShieldAlert } from "lucide-react";
+export function ForbiddenPage(){const search=useSearch({strict:false})as{reason?:string};const premium=search.reason==="premium";if(premium)return <div className="flex min-h-screen items-center justify-center bg-background px-4"><div className="w-full max-w-2xl rounded-2xl border bg-card p-8 shadow-sm"><div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600"><MessageSquareText className="size-8"/></div><h1 className="mt-5 text-center text-3xl font-bold">Module SMS Premium</h1><p className="mt-3 text-center text-muted-foreground">Ce service nécessite un abonnement SMS SAOVIA.</p><div className="mt-7 grid gap-3 sm:grid-cols-2">{[[CheckCircle2,"Confirmations transactionnelles"],[BellRing,"Rappels automatiques"],[CreditCard,"Notifications de paiement"],[Megaphone,"Marketing et notifications"]].map(([Icon,label]:any)=><div key={label} className="flex items-center gap-3 rounded-lg border p-3"><Icon className="size-5 text-emerald-600"/><span>{label}</span></div>)}</div><div className="mt-8 flex flex-wrap justify-center gap-3"><a href="mailto:support@saovia.com?subject=Abonnement%20SMS%20Premium" className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">Contacter le support</a><Link to="/app" className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium">Retour à mon espace</Link></div></div></div>;return <div className="flex min-h-screen items-center justify-center bg-background px-4"><div className="max-w-md text-center"><ShieldAlert className="mx-auto size-12 text-destructive"/><h1 className="mt-6 text-3xl font-bold">Accès refusé</h1><p className="mt-4 text-muted-foreground">Vous n’avez pas les permissions nécessaires pour accéder à cette page.</p><Link to="/login" className="mt-8 inline-flex rounded-md bg-primary px-4 py-2 text-primary-foreground">Retour</Link></div></div>}

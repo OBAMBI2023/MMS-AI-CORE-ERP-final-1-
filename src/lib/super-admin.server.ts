@@ -289,6 +289,14 @@ async function readPlatformAdminMembership(userId: string) {
   return data;
 }
 
+export const getSmsAdminState = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).handler(async({context})=>{
+  await assertSuperAdmin(context.supabase,context.userId);const{supabaseAdmin}=await import("@/integrations/supabase/client.server");
+  const[module,plans,subscriptions,ledger]=await Promise.all([(supabaseAdmin as any).from("erp_modules").select("id").eq("code","hotel_sms").single(),(supabaseAdmin as any).from("module_plans").select("*").order("included_credits"),(supabaseAdmin as any).from("tenant_module_subscriptions").select("*").order("updated_at",{ascending:false}),(supabaseAdmin as any).from("module_credit_ledger").select("*").order("created_at",{ascending:false}).limit(1000)]);
+  for(const result of[module,plans,subscriptions,ledger])if(result.error)throw new Error(formatSupabaseError(result.error));return{plans:plans.data??[],subscriptions:subscriptions.data??[],ledger:ledger.data??[]};
+});
+export const saveSmsPlan=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).validator(z.object({id:z.string().uuid().nullable(),name:z.string().trim().min(1),price:z.number().min(0),durationDays:z.number().int().positive(),credits:z.number().int().nonnegative(),active:z.boolean()})).handler(async({context,data})=>{await assertSuperAdmin(context.supabase,context.userId);const{supabaseAdmin}=await import("@/integrations/supabase/client.server");const{error}=await(supabaseAdmin as any).rpc("manage_module_plan",{p_id:data.id,p_module_code:"hotel_sms",p_name:data.name,p_price:data.price,p_duration_days:data.durationDays,p_credits:data.credits,p_active:data.active,p_actor:context.userId});if(error)throw new Error(formatSupabaseError(error));return{ok:true};});
+export const manageSmsSubscription=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).validator(z.object({tenantId:z.string().uuid(),action:z.enum(["activate","renew","recharge","adjust","suspend","reactivate"]),planId:z.string().uuid().nullable(),credits:z.number().int(),expiresAt:z.string().datetime().nullable(),reason:z.string().trim().min(1)})).handler(async({context,data})=>{await assertSuperAdmin(context.supabase,context.userId);const{supabaseAdmin}=await import("@/integrations/supabase/client.server");const{error}=await(supabaseAdmin as any).rpc("manage_tenant_module_subscription",{p_tenant:data.tenantId,p_module_code:"hotel_sms",p_action:data.action,p_plan:data.planId,p_credits:data.credits,p_expires_at:data.expiresAt,p_reason:data.reason,p_actor:context.userId});if(error)throw new Error(formatSupabaseError(error));return{ok:true};});
+
 async function assertSuperAdmin(_supabase: SupabaseClient, userId: string) {
   const data = await readPlatformAdminMembership(userId);
   if (!data) throw new Error("Accès refusé : super administrateur de plateforme requis.");

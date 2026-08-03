@@ -65,6 +65,9 @@ import {
   createInvitedTenant,
   resendSuperAdminTenantInvitation,
   activatePendingTrial,
+  getSmsAdminState,
+  manageSmsSubscription,
+  saveSmsPlan,
   type AiSubscriptionStatus,
   type SubscriptionBillingCycle,
   type SuperAdminDashboard,
@@ -1416,11 +1419,15 @@ function TenantModulesDialog({
   const [modules, setModules] = useState<SuperAdminTenant["modules"]>([]);
   const [selectedPackId, setSelectedPackId] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [smsAdmin,setSmsAdmin]=useState<any>(null),[smsAction,setSmsAction]=useState("activate"),[smsPlan,setSmsPlan]=useState(""),[smsCredits,setSmsCredits]=useState("0"),[smsDays,setSmsDays]=useState("30"),[smsBusy,setSmsBusy]=useState(false),[planName,setPlanName]=useState(""),[planPrice,setPlanPrice]=useState("0"),[planCredits,setPlanCredits]=useState("100");
 
   useEffect(() => {
     setSelectedPackId(tenant?.pack?.id ?? "");
     setModules(tenant?.modules ?? []);
   }, [tenant]);
+  useEffect(()=>{if(open)getSmsAdminState().then((state:any)=>{setSmsAdmin(state);if(!smsPlan&&state.plans?.[0])setSmsPlan(state.plans[0].id);}).catch(()=>setSmsAdmin(null));},[open,smsPlan]);
+  const applySmsSubscription=async()=>{if(!tenant)return;setSmsBusy(true);try{await manageSmsSubscription({data:{tenantId:tenant.id,action:smsAction as any,planId:["activate","renew"].includes(smsAction)?smsPlan:null,credits:Number(smsCredits),expiresAt:["activate","renew","reactivate"].includes(smsAction)?new Date(Date.now()+Number(smsDays)*86400000).toISOString():null,reason:`Gestion SMS Super Admin : ${smsAction}`}});toast.success("Abonnement SMS mis à jour.");setSmsAdmin(await getSmsAdminState());await router.invalidate();}catch(error){toast.error(error instanceof Error?error.message:"Gestion SMS impossible");}finally{setSmsBusy(false);}};
+  const createSmsPlan=async()=>{setSmsBusy(true);try{await saveSmsPlan({data:{id:null,name:planName,price:Number(planPrice),durationDays:Number(smsDays),credits:Number(planCredits),active:true}});setSmsAdmin(await getSmsAdminState());setPlanName("");toast.success("Forfait SMS créé.");}catch(error){toast.error(error instanceof Error?error.message:"Création impossible");}finally{setSmsBusy(false);}};
 
   const applyPack = async () => {
     if (!tenant || !selectedPackId) return;
@@ -1504,6 +1511,8 @@ function TenantModulesDialog({
           </p>
         </div>
         <div className="max-h-[60vh] space-y-2 overflow-y-auto py-2">
+          <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-4 dark:bg-amber-950/20"><div className="flex items-center justify-between"><div><Label>Abonnement SMS Premium</Label><p className="text-xs text-muted-foreground">Solde : {smsAdmin?.subscriptions?.find((x:any)=>x.tenant_id===tenant?.id)?.credit_balance??0} crédits</p></div><Badge variant="outline">SAOVIA</Badge></div><div className="grid gap-2 sm:grid-cols-2"><Select value={smsAction} onValueChange={setSmsAction}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="activate">Activer</SelectItem><SelectItem value="renew">Renouveler</SelectItem><SelectItem value="recharge">Recharger</SelectItem><SelectItem value="adjust">Ajuster</SelectItem><SelectItem value="suspend">Suspendre</SelectItem><SelectItem value="reactivate">Réactiver</SelectItem></SelectContent></Select>{["activate","renew"].includes(smsAction)&&<Select value={smsPlan} onValueChange={setSmsPlan}><SelectTrigger><SelectValue placeholder="Forfait"/></SelectTrigger><SelectContent>{smsAdmin?.plans?.filter((x:any)=>x.is_active).map((x:any)=><SelectItem key={x.id} value={x.id}>{x.name} · {x.included_credits} SMS · {x.price} XOF</SelectItem>)}</SelectContent></Select>}{["activate","renew","recharge","adjust"].includes(smsAction)&&<Input type="number" value={smsCredits} onChange={e=>setSmsCredits(e.target.value)} placeholder="Crédits supplémentaires"/>}{["activate","renew","reactivate"].includes(smsAction)&&<Input type="number" min="1" value={smsDays} onChange={e=>setSmsDays(e.target.value)} placeholder="Durée en jours"/>}</div><Button size="sm" disabled={smsBusy||(["activate","renew"].includes(smsAction)&&!smsPlan)} onClick={()=>void applySmsSubscription()}>{smsBusy?"Application…":"Appliquer l’abonnement"}</Button></div>
+          <div className="space-y-2 rounded-xl border p-4"><Label>Créer un forfait SMS configurable</Label><div className="grid gap-2 sm:grid-cols-3"><Input value={planName} onChange={e=>setPlanName(e.target.value)} placeholder="Nom du forfait"/><Input type="number" min="0" value={planPrice} onChange={e=>setPlanPrice(e.target.value)} placeholder="Prix XOF"/><Input type="number" min="0" value={planCredits} onChange={e=>setPlanCredits(e.target.value)} placeholder="Nombre de SMS"/></div><Button size="sm" variant="outline" disabled={smsBusy||!planName.trim()} onClick={()=>void createSmsPlan()}>Créer le forfait</Button></div>
           {!modules.length ? (
             <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
               Aucun module disponible pour ce tenant.
@@ -1519,6 +1528,9 @@ function TenantModulesDialog({
                   <Badge variant={module.enabled ? "default" : "secondary"}>
                     {module.enabled ? "Actif" : "Inactif"}
                   </Badge>
+                  {module.code === "hotel_sms" && (
+                    <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">Premium</Badge>
+                  )}
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {module.description ?? module.code}

@@ -49,6 +49,7 @@ import { Route as HotelParametresRouteImport } from './routes/hotel.parametres'
 import { Route as HotelPrestatairesRouteImport } from './routes/hotel.prestataires'
 import { Route as HotelRapportsRouteImport } from './routes/hotel.rapports'
 import { Route as HotelReservationsRouteImport } from './routes/hotel.reservations'
+import { Route as HotelSmsRouteImport } from './routes/hotel.sms'
 import { Route as HotelVoyageursRouteImport } from './routes/hotel.voyageurs'
 import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
 import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
@@ -257,6 +258,11 @@ const HotelReservationsRoute = HotelReservationsRouteImport.update({
   path: '/reservations',
   getParentRoute: () => HotelRoute,
 } as any)
+const HotelSmsRoute = HotelSmsRouteImport.update({
+  id: '/sms',
+  path: '/sms',
+  getParentRoute: () => HotelRoute,
+} as any)
 const HotelVoyageursRoute = HotelVoyageursRouteImport.update({
   id: '/voyageurs',
   path: '/voyageurs',
@@ -332,6 +338,7 @@ export interface FileRoutesByFullPath {
   '/hotel/prestataires': typeof HotelPrestatairesRoute
   '/hotel/rapports': typeof HotelRapportsRoute
   '/hotel/reservations': typeof HotelReservationsRoute
+  '/hotel/sms': typeof HotelSmsRoute
   '/hotel/voyageurs': typeof HotelVoyageursRoute
   '/login/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
@@ -380,6 +387,7 @@ export interface FileRoutesByTo {
   '/hotel/prestataires': typeof HotelPrestatairesRoute
   '/hotel/rapports': typeof HotelRapportsRoute
   '/hotel/reservations': typeof HotelReservationsRoute
+  '/hotel/sms': typeof HotelSmsRoute
   '/hotel/voyageurs': typeof HotelVoyageursRoute
   '/login/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
@@ -430,6 +438,7 @@ export interface FileRoutesById {
   '/hotel/prestataires': typeof HotelPrestatairesRoute
   '/hotel/rapports': typeof HotelRapportsRoute
   '/hotel/reservations': typeof HotelReservationsRoute
+  '/hotel/sms': typeof HotelSmsRoute
   '/hotel/voyageurs': typeof HotelVoyageursRoute
   '/login_/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
@@ -481,6 +490,7 @@ export interface FileRouteTypes {
     | '/hotel/prestataires'
     | '/hotel/rapports'
     | '/hotel/reservations'
+    | '/hotel/sms'
     | '/hotel/voyageurs'
     | '/login/$slug'
     | '/settings/catalogue'
@@ -529,6 +539,7 @@ export interface FileRouteTypes {
     | '/hotel/prestataires'
     | '/hotel/rapports'
     | '/hotel/reservations'
+    | '/hotel/sms'
     | '/hotel/voyageurs'
     | '/login/$slug'
     | '/settings/catalogue'
@@ -578,6 +589,7 @@ export interface FileRouteTypes {
     | '/hotel/prestataires'
     | '/hotel/rapports'
     | '/hotel/reservations'
+    | '/hotel/sms'
     | '/hotel/voyageurs'
     | '/login_/$slug'
     | '/settings/catalogue'
@@ -910,6 +922,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelReservationsRouteImport
       parentRoute: typeof HotelRoute
     }
+    '/hotel/sms': {
+      id: '/hotel/sms'
+      path: '/sms'
+      fullPath: '/hotel/sms'
+      preLoaderRoute: typeof HotelSmsRouteImport
+      parentRoute: typeof HotelRoute
+    }
     '/hotel/voyageurs': {
       id: '/hotel/voyageurs'
       path: '/voyageurs'
@@ -969,6 +988,7 @@ interface HotelRouteChildren {
   HotelPrestatairesRoute: typeof HotelPrestatairesRoute
   HotelRapportsRoute: typeof HotelRapportsRoute
   HotelReservationsRoute: typeof HotelReservationsRoute
+  HotelSmsRoute: typeof HotelSmsRoute
   HotelVoyageursRoute: typeof HotelVoyageursRoute
   HotelIndexRoute: typeof HotelIndexRoute
 }
@@ -980,6 +1000,7 @@ const HotelRouteChildren: HotelRouteChildren = {
   HotelPrestatairesRoute: HotelPrestatairesRoute,
   HotelRapportsRoute: HotelRapportsRoute,
   HotelReservationsRoute: HotelReservationsRoute,
+  HotelSmsRoute: HotelSmsRoute,
   HotelVoyageursRoute: HotelVoyageursRoute,
   HotelIndexRoute: HotelIndexRoute,
 }

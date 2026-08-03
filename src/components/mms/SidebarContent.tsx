@@ -20,6 +20,7 @@ import {
   ChartNoAxesCombined,
   Settings2,
   Wrench,
+  MessageSquareText,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -47,6 +48,7 @@ const items = [
   { icon: Settings, label: "Paramètres", to: "/parametres" },
   { icon: Hotel, label: "Tableau de bord", to: "/hotel" },
   { icon: CalendarDays, label: "Réservations", to: "/hotel/reservations" },
+  { icon: MessageSquareText, label: "SMS Clients", to: "/hotel/sms" },
   { icon: BedDouble, label: "Logements", to: "/hotel/chambres" },
   { icon: Wrench, label: "Prestataires", to: "/hotel/prestataires" },
   { icon: ContactRound, label: "Voyageurs", to: "/hotel/voyageurs" },
@@ -57,6 +59,7 @@ const items = [
 const hotelPaths = new Set([
   "/hotel",
   "/hotel/reservations",
+  "/hotel/sms",
   "/hotel/logements",
   "/hotel/chambres",
   "/hotel/prestataires",
@@ -69,6 +72,7 @@ const hotelPaths = new Set([
 const hotelNavigationOrder = [
   "/hotel",
   "/hotel/reservations",
+  "/hotel/sms",
   "/hotel/chambres",
   "/hotel/voyageurs",
   "/hotel/prestataires",
@@ -89,10 +93,11 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
 
   const filteredItems = items.filter((it) => {
     if (isLoading || modulesQuery.isLoading || catalogSettingsQuery.isLoading) return false;
-    if (isHotel !== hotelPaths.has(it.to)) return false;
+    if (it.to !== "/hotel/sms" && isHotel !== hotelPaths.has(it.to)) return false;
     if (!catalogRouteEnabled(catalogSettingsQuery.data, it.to)) return false;
     const requiredModule = routeModules[it.to];
-    if (requiredModule && !modulesQuery.data?.has(requiredModule)) return false;
+    // SMS remains visible so an unsubscribed tenant can discover the Premium offer.
+    if (requiredModule && requiredModule !== "hotel_sms" && !modulesQuery.data?.has(requiredModule)) return false;
     if (it.to === "/clients" || it.to === "/fournisseurs") {
       return canAccessParties(role, permissions);
     }

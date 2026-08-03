@@ -63,6 +63,7 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { createHotelInvoicePdf } from "@/lib/mms/hotel-invoice-pdf";
 import { downloadPdf } from "@/lib/mms/download-pdf";
 import { HotelSmsDialog } from "@/components/hotel/HotelSmsDialog";
+import { useTenantModules } from "@/hooks/use-tenant-modules";
 
 const db = supabase as any;
 const statuses = [
@@ -108,6 +109,8 @@ export function HotelReservationsPage() {
   const canUpdate = useActionPermission("hotel.reservations.update");
   const canDelete = useActionPermission("hotel.reservations.delete");
   const canSendSms = useActionPermission("hotel.sms.send");
+  const modulesQuery = useTenantModules();
+  const smsModuleEnabled = modulesQuery.data?.has("hotel_sms") === true;
 
   const { data } = useQuery({
     queryKey: ["hotel-reservations", profile?.tenant_id],
@@ -500,7 +503,7 @@ export function HotelReservationsPage() {
             canDelete={canDelete}
             downloadPdf={downloadReservationPdf}
             sendSms={setSmsReservation}
-            canSendSms={canSendSms}
+            canSendSms={canSendSms && smsModuleEnabled}
             changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
           />
         )}

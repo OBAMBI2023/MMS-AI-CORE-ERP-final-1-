@@ -9,9 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { sendHotelSms } from "@/lib/hotel-sms.server";
-import { hotelSmsTemplates, renderHotelSms, type HotelSmsType } from "@/lib/hotel-sms";
+import { HOTEL_SMS_LABELS, hotelSmsTemplates, renderHotelSms, type HotelSmsType } from "@/lib/hotel-sms";
 import { formatCurrency, formatDate } from "@/lib/mms/format";
-const labels: Record<HotelSmsType, string> = { confirmation: "Confirmation", arrival_reminder: "Rappel arrivée", departure_reminder: "Rappel départ", balance_reminder: "Solde restant", cancellation: "Annulation", thanks: "Remerciement" };
+const labels = HOTEL_SMS_LABELS;
 export function HotelSmsDialog({ reservation, guest, room, tenantId, open, onOpenChange }: any) {
   const [type, setType] = useState<HotelSmsType>("confirmation");
   const values = useMemo(() => ({ client: guest ? `${guest.first_name} ${guest.last_name}` : "Client", arrivee: formatDate(reservation?.check_in), depart: formatDate(reservation?.check_out), chambre: room?.number ?? "—", solde: formatCurrency(Number(reservation?.balance_due ?? 0)) }), [guest, reservation, room]);
