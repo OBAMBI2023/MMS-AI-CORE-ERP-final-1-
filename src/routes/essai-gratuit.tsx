@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowRight,
@@ -37,7 +37,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/essai-gratuit")({ component: TrialSignupPage });
 
 const fieldClass =
-  "h-[52px] w-full rounded-[10px] border border-[#DCE4F0] bg-white pl-11 text-[15px] text-slate-900 shadow-none transition-all duration-200 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-4 focus-visible:ring-blue-500/10";
+  "h-11 w-full rounded-[10px] border border-[#DCE4F0] bg-white pl-11 text-base text-slate-900 shadow-none transition-all duration-200 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-4 focus-visible:ring-blue-500/10 [@media(max-width:767px)_and_(max-height:760px)]:h-[42px] md:h-[52px] md:text-[15px]";
 const iconClass =
   "pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400";
 
@@ -95,6 +95,14 @@ function TrialSignupPage() {
   const [token, setToken] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [turnstileSize, setTurnstileSize] = useState<"normal" | "flexible">("normal");
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const update = () => setTurnstileSize(mql.matches ? "flexible" : "normal");
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
   const [form, setForm] = useState({
     companyName: "",
     adminName: "",
@@ -132,20 +140,20 @@ function TrialSignupPage() {
   const siteKey = readEnvVar("VITE_TURNSTILE_SITE_KEY") ?? "";
 
   return (
-    <main className="flex min-h-screen w-full items-center justify-center bg-[#020C24] px-4 py-6 lg:py-8">
-      <div className="mx-auto grid w-full max-w-[1200px] gap-6 lg:grid-cols-[2fr_3fr] lg:items-stretch lg:gap-0 lg:overflow-hidden lg:rounded-[28px] lg:shadow-[0_24px_80px_rgba(15,23,42,0.35)]">
+    <main className="flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-[#020C24] px-3 pt-3 [padding-bottom:max(12px,env(safe-area-inset-bottom))] md:h-auto md:min-h-screen md:overflow-visible md:px-4 md:py-6 md:[padding-bottom:0] lg:py-8">
+      <div className="mx-auto grid h-full w-full max-w-[1200px] gap-6 overflow-hidden md:h-auto md:overflow-visible lg:grid-cols-[2fr_3fr] lg:items-stretch lg:gap-0 lg:overflow-hidden lg:rounded-[28px] lg:shadow-[0_24px_80px_rgba(15,23,42,0.35)]">
         {/* Form column — shown first on mobile */}
-        <section className="order-1 rounded-[28px] bg-white p-6 shadow-[0_20px_60px_-15px_rgba(11,31,77,0.15)] sm:p-8 lg:order-2 lg:rounded-none lg:p-11 lg:[padding:44px_52px]">
-          <div className="mx-auto max-w-md">
-            <BrandLogo context="header" className="lg:hidden" />
-            <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-[26px]">
+        <section className="order-1 flex h-full max-h-[calc(100dvh-24px-env(safe-area-inset-bottom))] flex-col justify-center overflow-hidden rounded-[24px] bg-white p-4 shadow-[0_20px_60px_-15px_rgba(11,31,77,0.15)] [@media(max-width:767px)_and_(max-height:760px)]:p-3 md:h-auto md:max-h-none md:justify-start md:overflow-visible md:rounded-[28px] md:p-8 lg:order-2 lg:rounded-none lg:p-11 lg:[padding:44px_52px]">
+          <div className="mx-auto w-full max-w-md">
+            <BrandLogo context="header" className="size-8 md:size-14 lg:hidden" />
+            <h1 className="mt-1.5 text-xl font-extrabold tracking-tight text-slate-950 [@media(max-width:767px)_and_(max-height:760px)]:text-lg md:mt-2 md:text-[26px]">
               Créer votre espace d’essai
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-0.5 text-xs text-slate-500 [@media(max-width:767px)_and_(max-height:760px)]:hidden md:mt-1 md:text-sm">
               Accédez immédiatement à votre plateforme pendant 7 jours.
             </p>
 
-            <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="mt-5 hidden grid-cols-3 gap-2 md:grid">
               {benefitBadges.map(({ icon: Icon, label }) => (
                 <div
                   key={label}
@@ -159,12 +167,15 @@ function TrialSignupPage() {
               ))}
             </div>
 
-            <form onSubmit={submit} className="mt-5 space-y-4">
+            <form
+              onSubmit={submit}
+              className="mt-3 space-y-2.5 [@media(max-width:767px)_and_(max-height:760px)]:space-y-2 md:mt-5 md:space-y-4"
+            >
               <div className="space-y-2.5">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
                   Votre entreprise
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2.5 [@media(max-width:767px)_and_(max-height:760px)]:gap-2 md:gap-3">
                   <div className="relative">
                     <Building2 className={iconClass} aria-hidden="true" />
                     <Input
@@ -196,7 +207,7 @@ function TrialSignupPage() {
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
                   Vos accès
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2.5 [@media(max-width:767px)_and_(max-height:760px)]:gap-2 md:gap-3">
                   <div className="relative">
                     <Mail className={iconClass} aria-hidden="true" />
                     <Input
@@ -229,7 +240,7 @@ function TrialSignupPage() {
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
                   Plateforme
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2.5 [@media(max-width:767px)_and_(max-height:760px)]:gap-2 md:gap-3">
                   {platformOptions.map(({ value, icon: Icon, title, description, details }) => {
                     const selected = form.platformType === value;
                     return (
@@ -239,7 +250,7 @@ function TrialSignupPage() {
                         onClick={() => setForm((v) => ({ ...v, platformType: value }))}
                         aria-pressed={selected}
                         className={cn(
-                          "relative flex flex-col items-start gap-1.5 rounded-[10px] border px-4 py-3 text-left transition-all duration-150",
+                          "relative flex flex-col items-start gap-1 rounded-[10px] border px-3 py-2 text-left transition-all duration-150 md:gap-1.5 md:px-4 md:py-3",
                           selected
                             ? "border-2 border-blue-600 bg-[#F8FBFF]"
                             : "border-[#DCE4F0] bg-white hover:border-blue-300",
@@ -250,9 +261,9 @@ function TrialSignupPage() {
                             <Check className="h-3 w-3" aria-hidden="true" />
                           </span>
                         )}
-                        <Icon className="h-5 w-5 text-blue-600" aria-hidden="true" />
+                        <Icon className="h-4 w-4 text-blue-600 md:h-5 md:w-5" aria-hidden="true" />
                         <span className="text-sm font-bold text-slate-900">{title}</span>
-                        <span className="text-xs leading-snug text-slate-500">
+                        <span className="hidden text-xs leading-snug text-slate-500 md:block">
                           {description}
                           <br />
                           {details}
@@ -267,7 +278,7 @@ function TrialSignupPage() {
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
                   Sécurité
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2.5 [@media(max-width:767px)_and_(max-height:760px)]:gap-2 md:gap-3">
                   <div className="relative">
                     <Lock className={iconClass} aria-hidden="true" />
                     <Input
@@ -344,7 +355,7 @@ function TrialSignupPage() {
                 )}
               </div>
 
-              <label className="flex items-start gap-2.5 text-sm text-slate-600">
+              <label className="flex items-start gap-2 text-xs text-slate-600 md:gap-2.5 md:text-sm">
                 <Checkbox
                   checked={form.termsAccepted}
                   onCheckedChange={(checked) =>
@@ -357,14 +368,21 @@ function TrialSignupPage() {
                 </span>
               </label>
 
-              <div className="rounded-[10px] border border-[#DCE4F0] bg-slate-50/60 p-3">
-                <p className="text-xs font-bold text-slate-700">Protection anti-robot</p>
-                <p className="mt-0.5 text-xs text-slate-500">
+              <div className="rounded-[10px] border border-[#DCE4F0] bg-slate-50/60 p-2 md:p-3">
+                <p className="hidden text-xs font-bold text-slate-700 md:block">
+                  Protection anti-robot
+                </p>
+                <p className="hidden text-xs text-slate-500 md:mt-0.5 md:block">
                   Nous vérifions que vous êtes bien humain.
                 </p>
-                <div className="mt-2">
+                <div className="md:mt-2">
                   {siteKey ? (
-                    <Turnstile ref={turnstile} siteKey={siteKey} onTokenChange={setToken} />
+                    <Turnstile
+                      ref={turnstile}
+                      siteKey={siteKey}
+                      onTokenChange={setToken}
+                      size={turnstileSize}
+                    />
                   ) : (
                     <p className="text-sm text-destructive">
                       Le contrôle anti-robot n’est pas configuré.
@@ -375,7 +393,7 @@ function TrialSignupPage() {
 
               <Button
                 disabled={busy || !token || !form.termsAccepted}
-                className="group h-[58px] w-full rounded-[10px] bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-[15px] font-bold text-white shadow-[0_16px_32px_-10px_rgba(37,99,235,0.5)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_-10px_rgba(37,99,235,0.55)] active:translate-y-0"
+                className="group h-auto min-h-[52px] w-full rounded-[10px] bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] py-3 text-[15px] font-bold text-white shadow-[0_16px_32px_-10px_rgba(37,99,235,0.5)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_-10px_rgba(37,99,235,0.55)] active:translate-y-0 md:h-[58px] md:min-h-0 md:py-0"
               >
                 {busy ? (
                   "Création…"
@@ -392,10 +410,13 @@ function TrialSignupPage() {
               </Button>
             </form>
 
-            <div className="mt-5 flex items-center justify-center gap-5 border-t border-slate-100 pt-4">
+            <div className="mt-2.5 flex items-center justify-center gap-3 border-t border-slate-100 pt-2.5 [@media(max-width:767px)_and_(max-height:760px)]:gap-2 md:mt-5 md:gap-5 md:pt-4">
               {footerReassurance.map(({ icon: Icon, label }) => (
-                <span key={label} className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Icon className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" />
+                <span
+                  key={label}
+                  className="flex items-center gap-1 text-[10px] text-slate-500 md:gap-1.5 md:text-xs"
+                >
+                  <Icon className="h-3 w-3 text-blue-600 md:h-3.5 md:w-3.5" aria-hidden="true" />
                   {label}
                 </span>
               ))}
@@ -403,8 +424,8 @@ function TrialSignupPage() {
           </div>
         </section>
 
-        {/* Marketing column — shown after the form on mobile */}
-        <aside className="relative order-2 flex flex-col justify-between overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.35),transparent_55%),radial-gradient(circle_at_100%_100%,rgba(59,130,246,0.25),transparent_50%),linear-gradient(180deg,#020C24_0%,#0B1F4D_100%)] p-8 text-white sm:p-10 lg:order-1 lg:rounded-none lg:p-11">
+        {/* Marketing column — hidden on mobile, shown from tablet up */}
+        <aside className="relative order-2 hidden flex-col justify-between overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.35),transparent_55%),radial-gradient(circle_at_100%_100%,rgba(59,130,246,0.25),transparent_50%),linear-gradient(180deg,#020C24_0%,#0B1F4D_100%)] p-8 text-white sm:p-10 md:flex lg:order-1 lg:rounded-none lg:p-11">
           <BrandLogo context="login" className="hidden self-start lg:flex" />
 
           <div className="lg:my-auto">

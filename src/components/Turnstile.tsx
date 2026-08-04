@@ -10,6 +10,7 @@ type TurnstileApi = {
     options: {
       sitekey: string;
       action: string;
+      size?: "normal" | "flexible" | "compact";
       callback: (token: string) => void;
       "expired-callback": () => void;
       "error-callback": (errorCode?: string) => void;
@@ -80,8 +81,9 @@ export const Turnstile = forwardRef<
   {
     siteKey: string;
     onTokenChange: (token: string) => void;
+    size?: "normal" | "flexible" | "compact";
   }
->(function Turnstile({ siteKey, onTokenChange }, ref) {
+>(function Turnstile({ siteKey, onTokenChange, size = "normal" }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | undefined>(undefined);
   const [error, setError] = useState("");
@@ -110,6 +112,7 @@ export const Turnstile = forwardRef<
         widgetIdRef.current = api.render(container, {
           sitekey: siteKey.trim(),
           action: "trial_signup",
+          size,
           callback: (token) => {
             if (disposed) return;
             setError("");
@@ -140,7 +143,7 @@ export const Turnstile = forwardRef<
       if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
       onTokenChange("");
     };
-  }, [siteKey, onTokenChange]);
+  }, [siteKey, onTokenChange, size]);
 
   return (
     <div>
