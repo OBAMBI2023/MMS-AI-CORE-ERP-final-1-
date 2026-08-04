@@ -14,6 +14,7 @@ const trialActivationMigration = readFileSync(new URL("../../supabase/migrations
 const managerUi = readFileSync(new URL("../components/super-admin/TenantModulesManager.tsx", import.meta.url), "utf8");
 const sidebar = readFileSync(new URL("../components/mms/SidebarContent.tsx", import.meta.url), "utf8");
 const tenantModulesHook = readFileSync(new URL("../hooks/use-tenant-modules.ts", import.meta.url), "utf8");
+const tenantRouteAccess = readFileSync(new URL("./tenant-route-access.ts", import.meta.url), "utf8");
 
 test("module management is platform-admin-only, tenant-scoped and audited", () => {
   assert.match(migration, /platform_admins[\s\S]*administrator\.user_id = auth\.uid\(\)/i);
@@ -137,7 +138,9 @@ test("Assistant IA activation and deactivation keep module and subscription stat
 test("the Hotel menu and route guard admit a valid manually assigned Assistant IA module", () => {
   assert.match(sidebar, /hotelPaths[\s\S]*"\/app\/assistant-ia"/i);
   assert.match(sidebar, /hotelNavigationOrder[\s\S]*"\/app\/assistant-ia"/i);
-  assert.match(routeGuard, /isHotelPath[\s\S]*location\.pathname === "\/app\/assistant-ia"/i);
+  assert.match(routeGuard, /decidePlatformRedirect/i);
+  assert.match(tenantRouteAccess, /isHotelPath/);
+  assert.match(tenantRouteAccess, /"\/app\/assistant-ia"/);
   assert.match(tenantModulesHook, /VALID_AI_SUBSCRIPTION_STATUSES[\s\S]*active[\s\S]*trial/i);
   assert.match(tenantModulesHook, /tenant_ai_subscriptions[\s\S]*expires_at/i);
 });

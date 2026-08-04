@@ -90,7 +90,7 @@ function DevisPage() {
 
     const logoUrl = await getUrl(settings.logo_url);
     const signatureUrl = await getUrl(settings.signature_url);
-    const cachetUrl = await getUrl(settings.cachet_url);
+    const cachetUrl = await getUrl(settings.stamp_url);
 
     await generateDevisPDF(
       {

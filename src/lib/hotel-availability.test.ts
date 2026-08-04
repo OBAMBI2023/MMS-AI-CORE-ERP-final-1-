@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { findReservationConflict, periodsOverlap, roomIsAvailable } from "./hotel-availability.ts";
+import { calculateEarlyCheckoutDates, findReservationConflict, periodsOverlap, roomIsAvailable } from "./hotel-availability.ts";
 
 test("une arrivée le jour du départ précédent est disponible", () => {
   assert.equal(periodsOverlap("2026-08-05", "2026-08-07", "2026-08-07", "2026-08-10"), false);
@@ -19,9 +19,9 @@ test("un chevauchement actif bloque le logement", () => {
 });
 test("seuls pending, confirmed et checked_in bloquent une chambre", () => {
   const ended = [
-    { room_id: "room-1", check_in: "2026-08-05", check_out: "2026-08-08", status: "checked_out" },
+    { room_id: "room-1", check_in: "2026-08-05", check_out: "2026-08-08", status: "completed" },
   ];
-  for (const status of ["cancelled", "no_show", "checked_out"]) {
+  for (const status of ["cancelled", "no_show", "checked_out", "completed"]) {
     assert.equal(
       roomIsAvailable(
         { id: "room-1", status: "available" },
@@ -36,6 +36,15 @@ test("seuls pending, confirmed et checked_in bloquent une chambre", () => {
     roomIsAvailable({ id: "room-1", status: "maintenance" }, [], "2026-08-07", "2026-08-10"),
     false,
   );
+});
+
+test("un départ anticipé conserve le check_in et ajuste la date de départ", () => {
+  const result = calculateEarlyCheckoutDates("2026-08-01", "2026-08-10", "2026-08-05");
+  assert.deepEqual(result, {
+    checkIn: "2026-08-01",
+    checkOut: "2026-08-05",
+    isEarlyDeparture: true,
+  });
 });
 
 test("la reservation modifiee est exclue de sa propre verification", () => {

@@ -1,4 +1,5 @@
 export const BLOCKING_RESERVATION_STATUSES = new Set(["pending", "confirmed", "checked_in"]);
+export const NON_BLOCKING_RESERVATION_STATUSES = new Set(["completed", "checked_out", "cancelled", "no_show"]);
 
 type ReservationPeriod = {
   id?: string;
@@ -54,4 +55,35 @@ export function findReservationConflict(
       BLOCKING_RESERVATION_STATUSES.has(reservation.status) &&
       periodsOverlap(arrival, departure, reservation.check_in, reservation.check_out),
   );
+}
+
+export function getRoomOptions(
+  rooms: { id: string; status: string; tenant_id?: string }[],
+  reservations: ReservationPeriod[],
+  arrival: string,
+  departure: string,
+  editingId: string | null,
+  selectedRoomId: string | null,
+) {
+  const availableRooms = rooms.filter((room) =>
+    roomIsAvailable(room, reservations, arrival, departure, editingId),
+  );
+  const selectedRoom = selectedRoomId ? rooms.find((r) => r.id === selectedRoomId) : null;
+
+  if (selectedRoom && !availableRooms.find((r) => r.id === selectedRoom.id)) {
+    return [...availableRooms, selectedRoom];
+  }
+  return availableRooms;
+}
+
+export function calculateEarlyCheckoutDates(
+  checkIn: string,
+  plannedCheckOut: string,
+  effectiveDepartureDate?: string | null,
+) {
+  if (!effectiveDepartureDate || effectiveDepartureDate >= plannedCheckOut) {
+    return { checkIn, checkOut: plannedCheckOut, isEarlyDeparture: false };
+  }
+  const effectiveCheckOut = effectiveDepartureDate > checkIn ? effectiveDepartureDate : checkIn;
+  return { checkIn, checkOut: effectiveCheckOut, isEarlyDeparture: true };
 }

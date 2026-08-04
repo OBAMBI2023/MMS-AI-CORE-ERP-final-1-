@@ -21,6 +21,7 @@ import {
   Settings2,
   Wrench,
   MessageSquareText,
+  ReceiptText,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -31,6 +32,7 @@ import { canAccessParties } from "@/lib/party-access";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { catalogRouteEnabled } from "@/lib/catalog-settings";
 import { useTenant } from "@/providers/TenantProvider";
+import { ERP_SETTINGS_PATH, HOTEL_SETTINGS_PATH, getSettingsPath } from "@/lib/settings-navigation";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/app" },
@@ -48,6 +50,7 @@ const items = [
   { icon: Settings, label: "Paramètres", to: "/parametres" },
   { icon: Hotel, label: "Tableau de bord", to: "/hotel" },
   { icon: CalendarDays, label: "Réservations", to: "/hotel/reservations" },
+  { icon: ReceiptText, label: "Facturation", to: "/hotel/facturation" },
   { icon: CalendarDays, label: "Calendrier", to: "/hotel/calendrier" },
   { icon: MessageSquareText, label: "SMS Clients", to: "/hotel/sms" },
   { icon: BedDouble, label: "Logements", to: "/hotel/chambres" },
@@ -61,6 +64,7 @@ const hotelPaths = new Set([
   "/hotel",
   "/app/assistant-ia",
   "/hotel/reservations",
+  "/hotel/facturation",
   "/hotel/calendrier",
   "/hotel/sms",
   "/hotel/logements",
@@ -76,6 +80,7 @@ const hotelNavigationOrder = [
   "/hotel",
   "/app/assistant-ia",
   "/hotel/reservations",
+  "/hotel/facturation",
   "/hotel/calendrier",
   "/hotel/sms",
   "/hotel/chambres",
@@ -96,8 +101,14 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const permissions = data?.permissions || [];
   const role = data?.role;
 
+  const settingsPath = getSettingsPath(tenant?.platform_type);
+
   const filteredItems = items.filter((it) => {
     if (isLoading || modulesQuery.isLoading || catalogSettingsQuery.isLoading) return false;
+    // Explicit rule: only the settings entry matching the tenant's own
+    // platform_type may ever appear — ERP tenants never see /hotel/parametres
+    // and vice versa, regardless of hotelPaths bookkeeping below.
+    if ((it.to === ERP_SETTINGS_PATH || it.to === HOTEL_SETTINGS_PATH) && it.to !== settingsPath) return false;
     if (it.to !== "/hotel/sms" && isHotel !== hotelPaths.has(it.to)) return false;
     if (!catalogRouteEnabled(catalogSettingsQuery.data, it.to)) return false;
     const requiredModule = routeModules[it.to];

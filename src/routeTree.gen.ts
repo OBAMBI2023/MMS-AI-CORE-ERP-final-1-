@@ -45,6 +45,7 @@ import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as HotelIndexRouteImport } from './routes/hotel.index'
 import { Route as HotelCalendrierRouteImport } from './routes/hotel.calendrier'
 import { Route as HotelChambresRouteImport } from './routes/hotel.chambres'
+import { Route as HotelFacturationRouteImport } from './routes/hotel.facturation'
 import { Route as HotelLogementsRouteImport } from './routes/hotel.logements'
 import { Route as HotelParametresRouteImport } from './routes/hotel.parametres'
 import { Route as HotelPrestatairesRouteImport } from './routes/hotel.prestataires'
@@ -240,6 +241,11 @@ const HotelChambresRoute = HotelChambresRouteImport.update({
   path: '/chambres',
   getParentRoute: () => HotelRoute,
 } as any)
+const HotelFacturationRoute = HotelFacturationRouteImport.update({
+  id: '/facturation',
+  path: '/facturation',
+  getParentRoute: () => HotelRoute,
+} as any)
 const HotelLogementsRoute = HotelLogementsRouteImport.update({
   id: '/logements',
   path: '/logements',
@@ -346,6 +352,7 @@ export interface FileRoutesByFullPath {
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/hotel/calendrier': typeof HotelCalendrierRoute
   '/hotel/chambres': typeof HotelChambresRoute
+  '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
   '/hotel/prestataires': typeof HotelPrestatairesRoute
@@ -397,6 +404,7 @@ export interface FileRoutesByTo {
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/hotel/calendrier': typeof HotelCalendrierRoute
   '/hotel/chambres': typeof HotelChambresRoute
+  '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
   '/hotel/prestataires': typeof HotelPrestatairesRoute
@@ -450,6 +458,7 @@ export interface FileRoutesById {
   '/app/assistant-ia': typeof AppAssistantIaRoute
   '/hotel/calendrier': typeof HotelCalendrierRoute
   '/hotel/chambres': typeof HotelChambresRoute
+  '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/logements': typeof HotelLogementsRoute
   '/hotel/parametres': typeof HotelParametresRoute
   '/hotel/prestataires': typeof HotelPrestatairesRoute
@@ -504,6 +513,7 @@ export interface FileRouteTypes {
     | '/app/assistant-ia'
     | '/hotel/calendrier'
     | '/hotel/chambres'
+    | '/hotel/facturation'
     | '/hotel/logements'
     | '/hotel/parametres'
     | '/hotel/prestataires'
@@ -555,6 +565,7 @@ export interface FileRouteTypes {
     | '/app/assistant-ia'
     | '/hotel/calendrier'
     | '/hotel/chambres'
+    | '/hotel/facturation'
     | '/hotel/logements'
     | '/hotel/parametres'
     | '/hotel/prestataires'
@@ -607,6 +618,7 @@ export interface FileRouteTypes {
     | '/app/assistant-ia'
     | '/hotel/calendrier'
     | '/hotel/chambres'
+    | '/hotel/facturation'
     | '/hotel/logements'
     | '/hotel/parametres'
     | '/hotel/prestataires'
@@ -918,6 +930,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelChambresRouteImport
       parentRoute: typeof HotelRoute
     }
+    '/hotel/facturation': {
+      id: '/hotel/facturation'
+      path: '/facturation'
+      fullPath: '/hotel/facturation'
+      preLoaderRoute: typeof HotelFacturationRouteImport
+      parentRoute: typeof HotelRoute
+    }
     '/hotel/logements': {
       id: '/hotel/logements'
       path: '/logements'
@@ -1022,6 +1041,7 @@ declare module '@tanstack/react-router' {
 interface HotelRouteChildren {
   HotelCalendrierRoute: typeof HotelCalendrierRoute
   HotelChambresRoute: typeof HotelChambresRoute
+  HotelFacturationRoute: typeof HotelFacturationRoute
   HotelLogementsRoute: typeof HotelLogementsRoute
   HotelParametresRoute: typeof HotelParametresRoute
   HotelPrestatairesRoute: typeof HotelPrestatairesRoute
@@ -1035,6 +1055,7 @@ interface HotelRouteChildren {
 const HotelRouteChildren: HotelRouteChildren = {
   HotelCalendrierRoute: HotelCalendrierRoute,
   HotelChambresRoute: HotelChambresRoute,
+  HotelFacturationRoute: HotelFacturationRoute,
   HotelLogementsRoute: HotelLogementsRoute,
   HotelParametresRoute: HotelParametresRoute,
   HotelPrestatairesRoute: HotelPrestatairesRoute,

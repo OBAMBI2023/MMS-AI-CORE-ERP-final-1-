@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -42,6 +45,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { ImageField } from "@/components/mms/ResourceTable";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -69,6 +74,7 @@ import { useTenantModules } from "@/hooks/use-tenant-modules";
 import {
   BLOCKING_RESERVATION_STATUSES,
   findReservationConflict,
+  getRoomOptions,
   periodsOverlap,
   roomIsAvailable,
 } from "@/lib/hotel-availability";
@@ -78,18 +84,29 @@ const statuses = [
   "pending",
   "confirmed",
   "checked_in",
-  "checked_out",
-  "cancelled",
-  "no_show",
 ] as const;
 const statusLabel: Record<string, string> = {
   pending: "En attente",
   confirmed: "Confirmée",
   checked_in: "En séjour",
-  checked_out: "Terminée",
+  checked_out: "Départ effectué",
+  completed: "Terminé",
   cancelled: "Annulée",
-  no_show: "Non présenté",
+  no_show: "Absence",
 };
+const statusBadgeStyle: Record<string, string> = {
+  pending: "bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
+  confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+  checked_in: "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300",
+  checked_out: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  cancelled: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  no_show: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+};
+function guestInitials(guest: any): string {
+  const initials = `${guest?.first_name?.[0] ?? ""}${guest?.last_name?.[0] ?? ""}`.toUpperCase();
+  return initials || "CP";
+}
 const WALK_IN_LABEL = "Client de passage";
 const emptyForm = {
   guest_id: "",
@@ -227,6 +244,9 @@ export function HotelReservationsPage() {
           );
         throw new Error("Cette chambre est indisponible.");
       }
+      if (!["pending", "confirmed"].includes(form.status))
+        throw new Error("La réservation doit être en statut 'En attente' ou 'Confirmée' pour être créée.");
+
       const advance = Number(form.advance || 0);
       const totals = hotelStayTotals(
         form.check_in,
@@ -287,17 +307,48 @@ export function HotelReservationsPage() {
   });
 
   const changeStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({
+      id,
+      status,
+      effectiveCheckOut,
+    }: {
+      id: string;
+      status: string;
+      effectiveCheckOut?: string;
+    }) => {
       if (!profile?.tenant_id) throw new Error("Tenant introuvable");
+      const reservation = data?.reservations.find((r: any) => r.id === id);
+      const updates: Record<string, any> = { status };
+      if (
+        (status === "completed" || status === "checked_out") &&
+        effectiveCheckOut &&
+        reservation &&
+        effectiveCheckOut < reservation.check_out &&
+        effectiveCheckOut >= reservation.check_in
+      ) {
+        updates.check_out = effectiveCheckOut;
+      }
       const { error } = await db
         .from("hotel_reservations")
-        .update({ status })
+        .update(updates)
         .eq("tenant_id", profile.tenant_id)
         .eq("id", id);
       if (error) throw error;
+
+      if (status === "completed" && reservation?.room_id) {
+        await db
+          .from("hotel_rooms")
+          .update({ status: "available" })
+          .eq("tenant_id", profile.tenant_id)
+          .eq("id", reservation.room_id);
+      }
     },
-    onSuccess: () => {
-      toast.success("Statut mis à jour");
+    onSuccess: (_, variables) => {
+      if (variables.status === "completed") {
+        toast.success("Séjour terminé — Logement disponible");
+      } else {
+        toast.success("Statut mis à jour");
+      }
       refresh();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -356,6 +407,18 @@ export function HotelReservationsPage() {
         roomIsAvailable(room, data?.reservations ?? [], form.check_in, form.check_out, editingId),
       ),
     [data?.rooms, data?.reservations, form.check_in, form.check_out, editingId],
+  );
+  const roomOptions = useMemo(
+    () =>
+      getRoomOptions(
+        data?.rooms ?? [],
+        data?.reservations ?? [],
+        form.check_in,
+        form.check_out,
+        editingId,
+        form.room_id,
+      ),
+    [data?.rooms, data?.reservations, form.check_in, form.check_out, editingId, form.room_id],
   );
   const selectedRoomUnavailable = Boolean(
     form.room_id && !availableRooms.some((room: any) => room.id === form.room_id),
@@ -505,11 +568,14 @@ export function HotelReservationsPage() {
                 <SelectValue placeholder="Sélectionner" />
               </SelectTrigger>
               <SelectContent>
-                {availableRooms.map((r: any) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    N° {r.number}
-                  </SelectItem>
-                ))}
+                {roomOptions.map((r: any) => {
+                  const isAvailable = availableRooms.some((ar: any) => ar.id === r.id);
+                  return (
+                    <SelectItem key={r.id} value={r.id}>
+                      N° {r.number} {!isAvailable && "(Indisponible)"}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             {selectedRoomUnavailable && (
@@ -925,6 +991,48 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     </div>
   );
 }
+type SortKey = "client" | "chambre" | "sejour" | "statut" | "avance" | "solde";
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: { key: SortKey | null; dir: "asc" | "desc" };
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const active = sort.key === sortKey;
+  return (
+    <th className={cn("p-3 font-medium", className)}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          "inline-flex items-center gap-1 hover:text-foreground",
+          active && "text-foreground",
+        )}
+      >
+        {label}
+        {active ? (
+          sort.dir === "asc" ? (
+            <ArrowUp className="size-3" />
+          ) : (
+            <ArrowDown className="size-3" />
+          )
+        ) : (
+          <ArrowUpDown className="size-3 opacity-40" />
+        )}
+      </button>
+    </th>
+  );
+}
+
 function ReservationTable({
   rows,
   guests,
@@ -938,132 +1046,340 @@ function ReservationTable({
   canSendSms,
   changeStatus,
 }: any) {
+  const [sort, setSort] = useState<{ key: SortKey | null; dir: "asc" | "desc" }>({
+    key: null,
+    dir: "asc",
+  });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
+  const toggleSort = (key: SortKey) =>
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
+    );
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const sortAccessors: Record<SortKey, (r: any) => string | number> = {
+    client: (r) => {
+      const g = guests.get(r.guest_id);
+      return g ? `${g.first_name} ${g.last_name}` : WALK_IN_LABEL;
+    },
+    chambre: (r) => rooms.get(r.room_id)?.number ?? "",
+    sejour: (r) => r.check_in ?? "",
+    statut: (r) => statusLabel[r.status] ?? r.status,
+    avance: (r) => Number(r.paid_total ?? 0),
+    solde: (r) => Number(r.balance_due ?? 0),
+  };
+  const sortedRows = useMemo(() => {
+    if (!sort.key) return rows;
+    const accessor = sortAccessors[sort.key];
+    const copy = [...rows];
+    copy.sort((a: any, b: any) => {
+      const va = accessor(a);
+      const vb = accessor(b);
+      const cmp =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb), "fr");
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rows, sort, guests, rooms]);
+
+  const totalItems = sortedRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const rangeStart = totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(totalItems, safePage * pageSize);
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[820px] table-fixed text-sm">
-        <colgroup>
-          <col className="w-[18%]" />
-          <col className="w-[10%]" />
-          <col className="w-[21%]" />
-          <col className="w-[12%]" />
-          <col className="w-[13%]" />
-          <col className="w-[13%]" />
-          <col className="w-[13%]" />
-        </colgroup>
-        <thead>
-          <tr className="border-b text-left text-xs uppercase text-slate-400">
-            <th className="p-3">Client</th>
-            <th>Chambre</th>
-            <th>Séjour</th>
-            <th>Statut</th>
-            <th>Avance</th>
-            <th>Solde</th>
-            <th className="text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r: any) => {
-            const g = guests.get(r.guest_id),
-              room = rooms.get(r.room_id);
-            return (
-              <tr key={r.id} className="border-b">
-                <td className="truncate p-3 font-medium">
-                  {g ? `${g.first_name} ${g.last_name}` : WALK_IN_LABEL}
-                </td>
-                <td>N° {room?.number ?? "—"}</td>
-                <td>
-                  {formatDate(r.check_in)} → {formatDate(r.check_out)}
-                </td>
-                <td>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs dark:bg-white/10">
-                    {statusLabel[r.status] ?? r.status}
-                  </span>
-                </td>
-                <td className="font-medium">{formatCurrency(Number(r.paid_total ?? 0))}</td>
-                <td className="font-medium">{formatCurrency(Number(r.balance_due ?? 0))}</td>
-                <td className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-8"
-                          aria-label="Plus d’actions"
+    <TooltipProvider delayDuration={200}>
+      <div className="overflow-x-auto rounded-xl border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/20 text-left text-xs uppercase text-slate-400">
+              <SortHeader label="Client" sortKey="client" sort={sort} onSort={toggleSort} />
+              <SortHeader
+                label="Chambre"
+                sortKey="chambre"
+                sort={sort}
+                onSort={toggleSort}
+                className="hidden md:table-cell"
+              />
+              <SortHeader label="Séjour" sortKey="sejour" sort={sort} onSort={toggleSort} />
+              <SortHeader label="Statut" sortKey="statut" sort={sort} onSort={toggleSort} />
+              <SortHeader
+                label="Avance"
+                sortKey="avance"
+                sort={sort}
+                onSort={toggleSort}
+                className="hidden min-w-[130px] whitespace-nowrap text-right md:table-cell"
+              />
+              <SortHeader
+                label="Solde"
+                sortKey="solde"
+                sort={sort}
+                onSort={toggleSort}
+                className="hidden min-w-[130px] whitespace-nowrap text-right md:table-cell"
+              />
+              <th className="p-3 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((r: any) => {
+              const g = guests.get(r.guest_id),
+                room = rooms.get(r.room_id);
+              const guestName = g ? `${g.first_name} ${g.last_name}` : WALK_IN_LABEL;
+              const paid = Number(r.paid_total ?? 0);
+              const balance = Number(r.balance_due ?? 0);
+              const isPreArrival = ["pending", "confirmed"].includes(r.status);
+              const isInStay = r.status === "checked_in";
+              const isRowExpanded = expanded.has(r.id);
+              return (
+                <Fragment key={r.id}>
+                  <tr className="border-b last:border-b-0 hover:bg-muted/10">
+                    <td className="p-3 align-middle">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="shrink-0 text-slate-400 md:hidden"
+                          onClick={() => toggleExpanded(r.id)}
+                          aria-label={isRowExpanded ? "Masquer les détails" : "Afficher les détails"}
                         >
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-56">
-                        {canUpdate && (
-                          <DropdownMenuItem onSelect={() => edit(r)}>
-                            <Pencil /> Modifier la réservation
-                          </DropdownMenuItem>
+                          <ChevronRight
+                            className={cn("size-4 transition-transform", isRowExpanded && "rotate-90")}
+                          />
+                        </button>
+                        <Avatar className="size-8 shrink-0">
+                          <AvatarFallback className="bg-[#0F172A] text-xs font-semibold text-white">
+                            {guestInitials(g)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold">{guestName}</p>
+                          <p className="truncate text-xs text-muted-foreground">{g?.phone ?? "—"}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="hidden truncate p-3 align-middle md:table-cell">
+                      N° {room?.number ?? "—"}
+                    </td>
+                    <td className="p-3 align-middle">
+                      <p>
+                        {formatDate(r.check_in)} → {formatDate(r.check_out)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {r.nights ?? "—"} nuit{Number(r.nights ?? 0) > 1 ? "s" : ""}
+                      </p>
+                    </td>
+                    <td className="p-3 align-middle">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-1 text-xs font-medium",
+                          statusBadgeStyle[r.status] ?? "bg-slate-100 text-slate-700 dark:bg-white/10",
                         )}
-                        <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
-                          <FileDown /> Télécharger la fiche PDF
-                        </DropdownMenuItem>
-                        {canSendSms && (
-                          <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!g?.phone}>
-                            <MessageSquareText /> Envoyer un SMS
-                          </DropdownMenuItem>
-                        )}
-                        {canDelete && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onSelect={() => requestDelete(r)}
+                      >
+                        {statusLabel[r.status] ?? r.status}
+                      </span>
+                    </td>
+                    <td className="hidden min-w-[130px] whitespace-nowrap p-3 text-right align-middle font-medium tabular-nums md:table-cell">
+                      {formatCurrency(paid)}
+                    </td>
+                    <td
+                      className={cn(
+                        "hidden min-w-[130px] whitespace-nowrap p-3 text-right align-middle tabular-nums md:table-cell",
+                        balance > 0 ? "font-bold" : "font-medium",
+                      )}
+                    >
+                      {formatCurrency(balance)}
+                    </td>
+                    <td className="p-3 text-right align-middle">
+                      <div className="flex justify-end gap-1">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8"
+                              aria-label="Plus d’actions"
                             >
-                              <Trash2 /> Supprimer la réservation
+                              <MoreVertical className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-56">
+                            {canUpdate && (
+                              <DropdownMenuItem onSelect={() => edit(r)}>
+                                <Pencil /> Modifier la réservation
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
+                              <FileDown /> Télécharger la fiche PDF
                             </DropdownMenuItem>
-                          </>
+                            {canSendSms && (
+                              <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!g?.phone}>
+                                <MessageSquareText /> Envoyer un SMS
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onSelect={() => requestDelete(r)}
+                                >
+                                  <Trash2 /> Supprimer la réservation
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        {isPreArrival && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => changeStatus(r.id, "checked_in")}
+                              >
+                                Arrivée
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Enregistrer l’arrivée du client</TooltipContent>
+                          </Tooltip>
                         )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    {["pending", "confirmed"].includes(r.status) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => changeStatus(r.id, "checked_in")}
-                      >
-                        Check-in
-                      </Button>
-                    )}
-                    {r.status === "checked_in" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => changeStatus(r.id, "checked_out")}
-                      >
-                        Check-out
-                      </Button>
-                    )}
-                    {!["cancelled", "checked_out"].includes(r.status) && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-600"
-                        onClick={() => changeStatus(r.id, "cancelled")}
-                      >
-                        Annuler
-                      </Button>
-                    )}
-                  </div>
+                        {isInStay && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => changeStatus(r.id, "completed")}
+                              >
+                                Départ
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Enregistrer le départ du client</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {isPreArrival && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-600"
+                                onClick={() => changeStatus(r.id, "cancelled")}
+                              >
+                                Annuler
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Annuler cette réservation</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {isRowExpanded && (
+                    <tr className="border-b bg-muted/10 md:hidden">
+                      <td colSpan={7} className="px-3 pb-3 pt-0">
+                        <div className="grid grid-cols-3 gap-3 rounded-lg border bg-background p-3 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">Chambre</p>
+                            <p className="font-medium">N° {room?.number ?? "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Avance</p>
+                            <p className="whitespace-nowrap font-medium tabular-nums">
+                              {formatCurrency(paid)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Solde</p>
+                            <p
+                              className={cn(
+                                "whitespace-nowrap font-medium tabular-nums",
+                                balance > 0 && "font-bold",
+                              )}
+                            >
+                              {formatCurrency(balance)}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+            {!rows.length && (
+              <tr>
+                <td colSpan={7} className="py-12 text-center text-slate-400">
+                  Aucune réservation trouvée.
                 </td>
               </tr>
-            );
-          })}
-          {!rows.length && (
-            <tr>
-              <td colSpan={7} className="py-12 text-center text-slate-400">
-                Aucune réservation trouvée.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {totalItems > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 text-sm text-muted-foreground">
+          <p>
+            {rangeStart}–{rangeEnd} sur {totalItems} réservation{totalItems > 1 ? "s" : ""}
+          </p>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => {
+                setPageSize(Number(v));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-8 w-28 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} / page
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="icon"
+              variant="outline"
+              className="size-8"
+              disabled={safePage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Page précédente"
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className="size-8"
+              disabled={safePage >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              aria-label="Page suivante"
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </TooltipProvider>
   );
 }
 function Planning({ rows, guests, rooms }: any) {

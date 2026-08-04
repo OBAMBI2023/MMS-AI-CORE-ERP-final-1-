@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { PDF_COLORS } from "./PdfTheme";
 import {
   createHotelPdf,
@@ -30,6 +31,9 @@ export type HotelInvoiceData = {
   identityProvided?: boolean;
   roomNumber: string;
   notes?: string | null;
+  invoiceNumber?: string;
+  issuedAt?: string;
+  payments?: Array<{ paid_at: string; amount: number; method: string; reference?: string | null }>;
 };
 
 const MARGIN = 12;
@@ -175,13 +179,13 @@ export async function createHotelInvoicePdf(
   settings?: Record<string, unknown> | null,
   logoUrl?: string | null,
 ) {
-  const reference = `HOT-${text(invoice.id, "RESERVATION")
+  const reference = invoice.invoiceNumber || `HOT-${text(invoice.id, "RESERVATION")
     .replace(/[^a-z0-9]/gi, "")
     .slice(0, 10)
     .toUpperCase()}`;
-  const { doc, y: headerY } = await createHotelPdf("Fiche de réservation", settings, logoUrl, [
+  const { doc, y: headerY } = await createHotelPdf(invoice.invoiceNumber ? "Facture" : "Fiche de réservation", settings, logoUrl, [
     { label: "Référence", value: reference },
-    { label: "Date d’émission", value: formatDate(new Date()) },
+    { label: "Date d’émission", value: formatDate(invoice.issuedAt || new Date()) },
   ]);
   const gap = 5;
   const blockWidth = (CONTENT_WIDTH - gap) / 2;
@@ -212,7 +216,24 @@ export async function createHotelInvoicePdf(
     blockWidth,
   );
   const financialBottom = finances(doc, invoice, Math.max(clientBottom, stayBottom) + 9);
-  signatures(doc, financialBottom + 18);
+  let contentBottom = financialBottom;
+  if (invoice.payments?.length) {
+    const tableY = financialBottom + 17;
+    autoTable(doc, {
+      startY: tableY,
+      margin: { left: MARGIN, right: MARGIN, bottom: 22 },
+      head: [["Date", "Mode", "Référence", "Montant"]],
+      body: invoice.payments.map((payment) => [formatDate(payment.paid_at), text(payment.method), text(payment.reference), formatMoney(payment.amount)]),
+      theme: "grid",
+      styles: { font: "helvetica", fontSize: 7.5, cellPadding: 2.5, overflow: "linebreak" },
+      headStyles: { fillColor: PDF_COLORS.primary, textColor: [255,255,255], fontStyle: "bold" },
+      rowPageBreak: "avoid",
+      didDrawPage: () => footer(doc, reference),
+    });
+    contentBottom = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? tableY;
+  }
+  if (contentBottom + 50 > doc.internal.pageSize.getHeight() - 18) doc.addPage();
+  signatures(doc, Math.min(contentBottom + 18, doc.internal.pageSize.getHeight() - 45));
   footer(doc, reference);
-  return { doc, number: reference, filename: `reservation-${reference}.pdf` };
+  return { doc, number: reference, filename: `${invoice.invoiceNumber ? "facture" : "reservation"}-${reference}.pdf` };
 }
