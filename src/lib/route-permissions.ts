@@ -16,7 +16,6 @@ export const routePermissions: Record<string, string> = {
   "/utilisateurs": "settings.manage",
   "/hotel": "hotel.reservations.view",
   "/hotel/reservations": "hotel.reservations.view",
-  "/hotel/facturation": "hotel.invoices.view",
   "/hotel/calendrier": "hotel.reservations.view",
   "/hotel/sms": "hotel.sms.view",
   "/hotel/rooms": "hotel.rooms.view",

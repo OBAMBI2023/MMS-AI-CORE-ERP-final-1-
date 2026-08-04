@@ -15,8 +15,8 @@ const db = supabase as any;
 const IMAGE_BUCKET = "hotel-room-images";
 type Room = { id: string; tenant_id: string; number: string; status: string; cover_image_path: string | null; hotel_room_types?: { name: string } | null };
 type Reservation = CalendarReservation & { guest?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null };
-const statusStyle: Record<string, string> = { confirmed: "bg-blue-500", pending: "bg-orange-500", checked_in: "bg-emerald-500", completed: "bg-slate-400", checked_out: "bg-slate-400" };
-const statusLabel: Record<string, string> = { confirmed: "Confirmée", pending: "En attente", checked_in: "En séjour", completed: "Séjour terminé — Logement disponible", checked_out: "Séjour terminé — Logement disponible" };
+const statusStyle: Record<string, string> = { confirmed: "bg-blue-500", pending: "bg-orange-500", checked_in: "bg-emerald-500" };
+const statusLabel: Record<string, string> = { confirmed: "Confirmée", pending: "En attente", checked_in: "En séjour" };
 
 function guestName(reservation: Reservation) {
   const guest = Array.isArray(reservation.guest) ? reservation.guest[0] : reservation.guest;

@@ -16,7 +16,6 @@ export const routeModules: Record<string, string> = {
   "/settings/users": "users",
   "/utilisateurs": "users",
   "/hotel/reservations": "hotel_reservations",
-  "/hotel/facturation": "hotel_invoicing",
   "/hotel/calendrier": "hotel_reservations",
   "/hotel/sms": "hotel_sms",
   "/hotel/logements": "hotel_rooms",

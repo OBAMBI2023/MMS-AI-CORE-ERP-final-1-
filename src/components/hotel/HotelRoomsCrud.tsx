@@ -16,6 +16,9 @@ import {
   Users,
   Wrench,
   FileText,
+  TrendingUp,
+  Wallet,
+  X,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -280,75 +283,145 @@ export function HotelRoomsPage() {
     await downloadPdf(pdf.doc, pdf.filename);
   };
 
+  const totalRooms = roomsQuery.data?.length ?? 0;
+  const occupiedCount = (roomsQuery.data ?? []).filter((r) => r.status === "occupied").length;
+  const occupancyRate = totalRooms ? Math.round((occupiedCount / totalRooms) * 100) : 0;
+  const estimatedRevenue = (roomsQuery.data ?? [])
+    .filter((r) => r.status === "occupied")
+    .reduce((sum, r) => sum + Number(r.rate || 0), 0);
+  const hasActiveFilters = Boolean(query || status !== "all" || type !== "all" || floor !== "all");
+  const resetFilters = () => {
+    setQuery("");
+    setStatus("all");
+    setType("all");
+    setFloor("all");
+    setSort("name");
+  };
+
   return (
     <AppShell
       title="Logements"
       subtitle="Gérez vos chambres et résidences avec élégance."
-      actions={<div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={!rooms.length} onClick={() => void exportRooms()}>
-          <FileText className="size-4" /> Exporter PDF
-        </Button>
-        {canCreate ? (
-          <Button
-            onClick={openCreate}
-            className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]"
-          >
-            <Plus className="size-4" />
-            Ajouter un logement
-          </Button>
-        ) : null}
-      </div>}
+      actions={
+        <>
+          {/* Desktop / tablette : boutons complets, jamais masqués */}
+          <div className="hidden items-center gap-2 sm:flex">
+            <Button variant="outline" disabled={!rooms.length} onClick={() => void exportRooms()} className="rounded-xl">
+              <FileText className="size-4" /> Exporter PDF
+            </Button>
+            {canCreate ? (
+              <Button
+                onClick={openCreate}
+                className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]"
+              >
+                <Plus className="size-4" />
+                Ajouter un logement
+              </Button>
+            ) : null}
+          </div>
+          {/* Mobile : rien n'est caché, tout reste accessible via un menu compact */}
+          <div className="flex items-center gap-2 sm:hidden">
+            {canCreate ? (
+              <Button
+                size="icon"
+                onClick={openCreate}
+                aria-label="Ajouter un logement"
+                className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]"
+              >
+                <Plus className="size-4" />
+              </Button>
+            ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-xl" aria-label="Plus d’actions">
+                  <MoreVertical className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                <DropdownMenuItem disabled={!rooms.length} onSelect={() => void exportRooms()}>
+                  <FileText className="size-4" /> Exporter en PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </>
+      }
     >
-      <section className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {([
-          ["Total", roomsQuery.data?.length ?? 0, BedDouble],
+          ["Total", totalRooms, BedDouble],
           ["Disponibles", (roomsQuery.data ?? []).filter((r) => r.status === "available" && !activeReservationRoomIds.has(r.id)).length, Eye],
-          ["Occupés", (roomsQuery.data ?? []).filter((r) => r.status === "occupied").length, Users],
+          ["Occupés", occupiedCount, Users],
           ["Réservés", activeReservationRoomIds.size, CalendarPlus],
           ["Nettoyage", (roomsQuery.data ?? []).filter((r) => r.status === "cleaning").length, SlidersHorizontal],
           ["Maintenance", (roomsQuery.data ?? []).filter((r) => ["maintenance", "out_of_service"].includes(r.status)).length, Wrench],
+          ["Taux d’occupation", `${occupancyRate}%`, TrendingUp],
+          ["Revenu estimé", formatCurrency(estimatedRevenue), Wallet],
         ] as const).map(([label, value, Icon]) => (
-          <div key={label} className="flex items-center gap-3 rounded-xl border border-[#D8C99E]/45 bg-card px-3 py-3 shadow-sm">
-            <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#102A43] text-[#E2C66E]"><Icon className="size-4" /></div>
-            <div><p className="text-xl font-bold leading-none text-[#102A43] dark:text-white">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{label}</p></div>
+          <div
+            key={label}
+            className="group flex items-center gap-3 rounded-2xl border border-[#D8C99E]/40 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105">
+              <Icon className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold leading-none text-[#102A43] dark:text-white sm:text-xl">{value}</p>
+              <p className="mt-1.5 truncate text-[11px] text-muted-foreground">{label}</p>
+            </div>
           </div>
         ))}
       </section>
 
-      <div className="mt-4 flex flex-wrap gap-2 rounded-xl border bg-card p-2 shadow-sm">
-        <div className="relative min-w-0 flex-1">
-          <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Rechercher un logement…"
-            className="h-10 w-full rounded-lg border bg-background pl-10 pr-4 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+      <div className="mt-4 rounded-2xl border bg-card p-3 shadow-sm">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))]">
+          <div className="relative min-w-0 sm:col-span-2 lg:col-span-1">
+            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Rechercher un logement…"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+            />
+          </div>
+          <FilterSelect value={type} onChange={setType} options={[["all", "Tous les types"], ...roomTypes.map((v) => [v, v])]} />
+          <FilterSelect
+            icon={<SlidersHorizontal className="size-4" />}
+            value={status}
+            onChange={(value) => setStatus(value as typeof status)}
+            options={[
+              ["all", "Tous les statuts"],
+              ["available", "Disponible"],
+              ["occupied", "Occupé"],
+              ["reserved", "Réservé"],
+              ["cleaning", "Nettoyage"],
+              ["maintenance", "Maintenance"],
+              ["out_of_service", "Hors service"],
+            ]}
           />
+          <FilterSelect value={floor} onChange={setFloor} options={[["all", "Tous les étages"], ...floors.map((v) => [v, v === "—" ? "Étage non défini" : `Étage ${v}`])]} />
+          <div className="flex items-center gap-2">
+            <FilterSelect
+              value={sort}
+              onChange={(value) => setSort(value as typeof sort)}
+              options={[
+                ["name", "Trier par nom"],
+                ["price", "Trier par tarif"],
+              ]}
+            />
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={resetFilters}
+                aria-label="Réinitialiser les filtres"
+                className="h-11 w-11 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </Button>
+            )}
+          </div>
         </div>
-        <FilterSelect value={type} onChange={setType} options={[["all", "Tous les types"], ...roomTypes.map((v) => [v, v])]} />
-        <FilterSelect
-          icon={<SlidersHorizontal className="size-4" />}
-          value={status}
-          onChange={(value) => setStatus(value as typeof status)}
-          options={[
-            ["all", "Tous les statuts"],
-            ["available", "Disponible"],
-            ["occupied", "Occupé"],
-            ["reserved", "Réservé"],
-            ["cleaning", "Nettoyage"],
-            ["maintenance", "Maintenance"],
-            ["out_of_service", "Hors service"],
-          ]}
-        />
-        <FilterSelect value={floor} onChange={setFloor} options={[["all", "Tous les étages"], ...floors.map((v) => [v, v === "—" ? "Étage non défini" : `Étage ${v}`])]} />
-        <FilterSelect
-          value={sort}
-          onChange={(value) => setSort(value as typeof sort)}
-          options={[
-            ["name", "Trier par nom"],
-            ["price", "Trier par tarif"],
-          ]}
-        />
       </div>
 
       {roomsQuery.isLoading ? (
@@ -370,10 +443,11 @@ export function HotelRoomsPage() {
               onEdit={() => openEdit(room)}
               onReserve={() => void navigate({ to: "/hotel/reservations" })}
               onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })}
+              onSetStatus={(newStatus) => changeRoomStatus.mutate({ room, status: newStatus })}
               onDelete={() => setDeleting(room)}
             />
           ))}</tbody></table></div>
-          <div className="divide-y md:hidden">{rooms.map((room) => <RoomMobileCard key={room.id} room={room} image={imageFor(room)} reserved={activeReservationRoomIds.has(room.id)} canUpdate={canUpdate} canDelete={canDelete} onView={() => setViewing(room)} onEdit={() => openEdit(room)} onReserve={() => void navigate({ to: "/hotel/reservations" })} onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })} onDelete={() => setDeleting(room)} />)}</div>
+          <div className="divide-y md:hidden">{rooms.map((room) => <RoomMobileCard key={room.id} room={room} image={imageFor(room)} reserved={activeReservationRoomIds.has(room.id)} canUpdate={canUpdate} canDelete={canDelete} onView={() => setViewing(room)} onEdit={() => openEdit(room)} onReserve={() => void navigate({ to: "/hotel/reservations" })} onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })} onSetStatus={(newStatus) => changeRoomStatus.mutate({ room, status: newStatus })} onDelete={() => setDeleting(room)} />)}</div>
         </div>
       ) : (
         <EmptyState
@@ -487,8 +561,29 @@ function RoomThumbnail({ room, image }: { room: HotelRoom; image?: string }) {
   return image ? <img src={image} alt="" className="size-12 rounded-lg object-cover" /> : <div className="grid size-12 place-items-center rounded-lg bg-[#102A43]/10 text-[#102A43]"><BedDouble className="size-5" /></div>;
 }
 
-type ManageRoomProps = { room: HotelRoom; image?: string; reserved: boolean; canUpdate: boolean; canDelete: boolean; onView: () => void; onEdit: () => void; onReserve: () => void; onBlock: () => void; onDelete: () => void };
-function RoomActions({ canUpdate, canDelete, onView, onEdit, onReserve, onDelete }: Omit<ManageRoomProps, "image" | "reserved">) {
+type ManageRoomProps = {
+  room: HotelRoom;
+  image?: string;
+  reserved: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  onView: () => void;
+  onEdit: () => void;
+  onReserve: () => void;
+  onBlock: () => void;
+  onSetStatus: (status: RoomStatus) => void;
+  onDelete: () => void;
+};
+function RoomActions({
+  room,
+  canUpdate,
+  canDelete,
+  onView,
+  onEdit,
+  onReserve,
+  onSetStatus,
+  onDelete,
+}: Omit<ManageRoomProps, "image" | "reserved" | "onBlock">) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -511,8 +606,18 @@ function RoomActions({ canUpdate, canDelete, onView, onEdit, onReserve, onDelete
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={onReserve}>
-          <CalendarPlus className="size-4" /> Créer une réservation
+          <CalendarPlus className="size-4" /> Réserver
         </DropdownMenuItem>
+        {canUpdate && (
+          <>
+            <DropdownMenuItem disabled={room.status === "maintenance"} onSelect={() => onSetStatus("maintenance")}>
+              <Wrench className="size-4" /> Maintenance
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={room.status === "cleaning"} onSelect={() => onSetStatus("cleaning")}>
+              <SlidersHorizontal className="size-4" /> Nettoyage
+            </DropdownMenuItem>
+          </>
+        )}
         {canDelete && (
           <>
             <DropdownMenuSeparator />
@@ -544,8 +649,37 @@ function RoomRow(props: ManageRoomProps) {
 }
 
 function RoomMobileCard(props: ManageRoomProps) {
-  const { room, image, reserved } = props; const meta = effectiveMeta(room, reserved);
-  return <article className="p-3"><div className="flex gap-3"><RoomThumbnail room={room} image={image} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><h3 className="font-semibold text-[#102A43] dark:text-white">{room.number}</h3><p className="text-xs text-muted-foreground">{room.hotel_room_types?.name ?? "Type non défini"} · {room.capacity} pers.</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ${meta.className}`}>{meta.label}</span></div><p className="mt-1 text-sm font-semibold text-[#9D7927]">{formatCurrency(Number(room.rate))} <span className="text-[10px] font-normal text-muted-foreground">/ nuit</span></p></div></div><div className="mt-2 border-t pt-2"><RoomActions {...props} /></div></article>;
+  const { room, image, reserved } = props;
+  const meta = effectiveMeta(room, reserved);
+  return (
+    <article className="p-4 transition-colors active:bg-muted/20">
+      <div className="flex gap-3.5">
+        <div className="overflow-hidden rounded-xl">
+          <RoomThumbnail room={room} image={image} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate font-semibold text-[#102A43] dark:text-white">{room.number}</h3>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {room.hotel_room_types?.name ?? "Type non défini"} · {room.capacity} pers.
+              </p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${meta.className}`}>
+              {meta.label}
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm font-semibold text-[#9D7927] dark:text-[#E2C66E]">
+            {formatCurrency(Number(room.rate))}{" "}
+            <span className="text-[10px] font-normal text-muted-foreground">/ nuit</span>
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-end border-t pt-2.5">
+        <RoomActions {...props} />
+      </div>
+    </article>
+  );
 }
 
 function RoomCard({

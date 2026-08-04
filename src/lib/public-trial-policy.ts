@@ -1,13 +1,9 @@
 import { z } from "zod";
 
-export const ERP_PACK_CODES = ["commerce", "services", "restaurant", "complet"] as const;
-export type ErpPackCode = (typeof ERP_PACK_CODES)[number];
-
 export const trialRequestSchema = z.object({
   companyName: z.string().trim().min(2, "Le nom de l’entreprise est requis.").max(120),
   adminName: z.string().trim().min(2, "Le nom de l’administrateur est requis.").max(120),
   platformType: z.enum(["ERP", "HOTEL"]),
-  packCode: z.enum(ERP_PACK_CODES).optional(),
   termsAccepted: z.literal(true, {
     errorMap: () => ({ message: "Vous devez accepter les conditions." }),
   }),

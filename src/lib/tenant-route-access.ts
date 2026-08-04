@@ -40,27 +40,3 @@ export function decideTenantRouteAccess(
     platformType: facts.platformType === "HOTEL" ? "HOTEL" : "ERP",
   };
 }
-
-const HOTEL_ONLY_ERP_EXCEPTIONS = new Set(["/app/assistant-ia", "/depenses"]);
-
-export function isHotelPath(pathname: string): boolean {
-  return pathname === "/hotel" || pathname.startsWith("/hotel/") || HOTEL_ONLY_ERP_EXCEPTIONS.has(pathname);
-}
-
-/**
- * Explicit platform routing rule: a tenant may only browse the area matching
- * its own platform_type. Returns the redirect target, or null when the
- * requested pathname already belongs to the tenant's platform.
- */
-export function decidePlatformRedirect(
-  platformType: "ERP" | "HOTEL",
-  pathname: string,
-): string | null {
-  if (platformType === "HOTEL" && !isHotelPath(pathname)) {
-    return "/hotel";
-  }
-  if (platformType === "ERP" && pathname.startsWith("/hotel") && pathname !== "/hotel/sms") {
-    return "/app";
-  }
-  return null;
-}

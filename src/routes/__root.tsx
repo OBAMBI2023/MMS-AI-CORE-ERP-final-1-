@@ -26,8 +26,6 @@ import { readRecoveryCallback } from "@/integrations/supabase/password-recovery-
 import { isRecoveryRouteAllowed } from "@/integrations/supabase/password-recovery-callback";
 import { hasPasswordRecoveryContext } from "@/integrations/supabase/password-recovery";
 import { getTenantRouteAccess } from "@/lib/tenant-route-access.server";
-import { decidePlatformRedirect } from "@/lib/tenant-route-access";
-import { shouldClearTenantScopedCache } from "@/lib/tenant-cache";
 
 function getSiteOrigin() {
   const browserOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
@@ -245,9 +243,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         throw redirect({ to: "/403" });
       }
 
-      const platformRedirect = decidePlatformRedirect(tenantAccess.platformType, location.pathname);
-      if (platformRedirect) {
-        throw redirect({ to: platformRedirect });
+      const isHotelPath =
+        location.pathname === "/hotel" ||
+        location.pathname.startsWith("/hotel/") ||
+        location.pathname === "/app/assistant-ia" ||
+        location.pathname === "/depenses";
+      if (tenantAccess.platformType === "HOTEL" && !isHotelPath) {
+        throw redirect({ to: "/hotel" });
+      }
+      if (tenantAccess.platformType === "ERP" && location.pathname.startsWith("/hotel") && location.pathname !== "/hotel/sms") {
+        throw redirect({ to: "/app" });
       }
 
       const requiredModule = getRouteModule(location.pathname);
@@ -373,7 +378,7 @@ function RootComponent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (shouldClearTenantScopedCache(event)) {
+      if (["SIGNED_OUT", "USER_UPDATED"].includes(event)) {
         // A user metadata update may represent a real tenant switch. Clear all
         // cached tenant data so no query without a tenant key can leak across.
         queryClient.clear();

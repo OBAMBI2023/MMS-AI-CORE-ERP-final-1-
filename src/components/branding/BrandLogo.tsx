@@ -14,7 +14,7 @@ export type BrandLogoContext =
 
 const contextClasses: Record<BrandLogoContext, string> = {
   sidebar: "size-9 md:size-10",
-  header: "size-14 md:size-16",
+  header: "size-11 md:size-12",
   login: "size-[72px] sm:size-20 lg:size-24",
   superAdmin: "size-12 md:size-14",
   partner: "size-12 md:size-14",

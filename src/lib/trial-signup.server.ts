@@ -34,7 +34,6 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
     const { data: tenantId, error } = await (supabaseAdmin as any).rpc("create_public_trial_workspace", {
       p_user_id: created.user.id, p_company_name: data.companyName, p_full_name: data.adminName,
       p_email: data.email, p_phone: data.phone, p_platform_type: data.platformType,
-      p_pack_code: data.platformType === "ERP" ? data.packCode ?? null : null,
     });
     if (error) {
       await supabaseAdmin.auth.admin.deleteUser(created.user.id);
