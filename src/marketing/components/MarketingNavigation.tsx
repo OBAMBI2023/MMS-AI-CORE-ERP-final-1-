@@ -47,10 +47,10 @@ export function MarketingNavigation() {
             Connexion
           </Link>
           <Link
-            to="/demo"
+            to="/essai-gratuit"
             className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-700"
           >
-            Demander un accès
+            Essayer gratuitement
           </Link>
         </div>
 
@@ -92,11 +92,11 @@ export function MarketingNavigation() {
                 Connexion
               </Link>
               <Link
-                to="/demo"
+                to="/essai-gratuit"
                 onClick={() => setIsOpen(false)}
                 className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white"
               >
-                Demander un accès
+                Essayer gratuitement
               </Link>
             </div>
           </div>
