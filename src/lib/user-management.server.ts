@@ -10,6 +10,19 @@ const TENANT_ROLE_NAMES = [
   "Commercial", "Caissier", "Employé",
 ] as const;
 
+// L'UI affiche des libellés français ("Actif", "Désactivé") mais la contrainte
+// profiles_status_check n'accepte que les valeurs canoniques anglaises.
+const STATUS_UI_TO_DB = {
+  actif: "active",
+  suspendu: "suspended",
+} as const satisfies Record<string, string>;
+
+type StatusUi = keyof typeof STATUS_UI_TO_DB;
+
+function toDbStatus(status: StatusUi): (typeof STATUS_UI_TO_DB)[StatusUi] {
+  return STATUS_UI_TO_DB[status];
+}
+
 async function logRejectedPrivilegeAttempt(
   actorId: string,
   reason: string,
@@ -57,7 +70,7 @@ async function assertProfileInTenant(profileId: string, tenantId: string) {
 async function assertRoleInTenant(roleId: string, tenantId: string) {
   const { data, error } = await (supabaseAdmin as any)
     .from("roles")
-    .select("id")
+    .select("id, name")
     .eq("id", roleId)
     .eq("tenant_id", tenantId)
     .single();
@@ -82,7 +95,7 @@ export const deleteUser = createServerFn({ method: "POST" })
       .from("profiles")
       .select("id, roles!inner(name)", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
-      .eq("status", "actif")
+      .eq("status", "active")
       .eq("roles.name", "Administrateur")
       .neq("id", data.id);
 
@@ -147,7 +160,7 @@ export const createUser = createServerFn({ method: "POST" })
       phone: data.phone,
       tenant_id: tenantId,
       role_id: data.role_id,
-      status: data.status,
+      status: toDbStatus(data.status),
     });
 
     if (profileError) {
@@ -198,7 +211,7 @@ export const updateUser = createServerFn({ method: "POST" })
       .from("profiles")
       .update({
         role_id: data.role_id,
-        status: data.status,
+        status: data.status ? toDbStatus(data.status) : undefined,
         full_name: data.full_name,
         username: data.username,
         phone: data.phone,
@@ -223,7 +236,7 @@ export const toggleStatus = createServerFn({ method: "POST" })
 
     const { error } = await (supabaseAdmin as any)
       .from("profiles")
-      .update({ status: data.status })
+      .update({ status: toDbStatus(data.status) })
       .eq("id", data.id)
       .eq("tenant_id", tenantId);
     if (error) throw new Error(formatSupabaseError(error));

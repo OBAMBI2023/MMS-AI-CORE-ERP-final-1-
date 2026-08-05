@@ -38,6 +38,13 @@ import { useTenant } from "@/providers/TenantProvider";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { ProfileAvatar } from "@/components/mms/ProfileAvatar";
 
+// public.profiles.status stocke des valeurs techniques anglaises ; l'UI reste en français.
+const STATUS_LABELS: Record<string, string> = {
+  active: "Actif",
+  suspended: "Suspendu",
+  archived: "Archivé",
+};
+
 export function UserManagement() {
   const qc = useQueryClient();
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -140,7 +147,7 @@ export function UserManagement() {
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{(user.roles as any)?.name}</TableCell>
                 <TableCell className="capitalize">
-                  {user.status === "suspendu" ? "Inactif" : user.status}
+                  {(user.status && STATUS_LABELS[user.status]) ?? user.status}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>
@@ -181,17 +188,17 @@ export function UserManagement() {
                           toggleMutation.mutate({
                             data: {
                               id: user.id,
-                              status: user.status === "actif" ? "suspendu" : "actif",
+                              status: user.status === "active" ? "suspendu" : "actif",
                             },
                           })
                         }
                       >
-                        {user.status === "actif" ? (
+                        {user.status === "active" ? (
                           <ToggleLeft className="mr-2 h-4 w-4" />
                         ) : (
                           <ToggleRight className="mr-2 h-4 w-4" />
                         )}
-                        {user.status === "actif" ? "Désactiver" : "Activer"}
+                        {user.status === "active" ? "Désactiver" : "Activer"}
                       </DropdownMenuItem>
                       {canDeleteUser && (
                           <DropdownMenuItem
