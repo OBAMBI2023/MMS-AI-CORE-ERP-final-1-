@@ -13,9 +13,6 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/mms/AppShell";
-import { CompanyPreviewCard } from "@/components/settings/CompanyPreviewCard";
-import { ConfigurationProgress } from "@/components/settings/ConfigurationProgress";
-import { QuickActions } from "@/components/settings/QuickActions";
 import { BillingTab } from "@/components/settings/tabs/BillingTab";
 import { CatalogTab } from "@/components/settings/tabs/CatalogTab";
 import { DocumentsTab } from "@/components/settings/tabs/DocumentsTab";
@@ -70,6 +67,16 @@ function ParametresPage() {
   const activeTab = visibleTabs.includes(tab) ? tab : visibleTabs[0];
   const loading = editor.loading || modulesQuery.isLoading;
 
+  console.log("[DEBUG ParametresPage] render", {
+    editorLoading: editor.loading,
+    modulesLoading: modulesQuery.isLoading,
+    modulesFetchStatus: modulesQuery.fetchStatus,
+    loading,
+    editorError: editor.error,
+    tenantId: editor.tenantId,
+    hasForm: Boolean(editor.form),
+  });
+
   return (
     <AppShell
       title="Paramètres"
@@ -91,7 +98,7 @@ function ParametresPage() {
         ) : undefined
       }
     >
-      <div className="mx-auto w-full max-w-6xl">
+      <div className="w-full">
         <div className="mb-6 flex items-center gap-2 overflow-x-auto rounded-xl border bg-card p-1.5 shadow-sm">
           {visibleTabs.map((id) => {
             const meta = TAB_META[id];
@@ -118,39 +125,31 @@ function ParametresPage() {
           <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Chargement des paramètres…
           </div>
-        ) : editor.error || !editor.tenantId || !editor.form ? (
+        ) : editor.error ? (
           <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive">
-            {formatError(editor.error || new Error("Aucun tenant associé à ce compte."))}
+            {formatError(editor.error)}
+          </div>
+        ) : !editor.tenantId ? (
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive">
+            Aucun tenant associé à ce compte.
+          </div>
+        ) : !editor.form ? (
+          <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" /> Chargement des paramètres…
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="space-y-6 lg:order-1">
-              {activeTab === "general" && (
-                <GeneralTab form={editor.form} tenantId={editor.tenantId} update={editor.update} />
-              )}
-              {activeTab === "legal" && <LegalTab form={editor.form} update={editor.update} />}
-              {activeTab === "catalog" && <CatalogTab />}
-              {activeTab === "users" && <UsersTab />}
-              {activeTab === "billing" && <BillingTab form={editor.form} update={editor.update} />}
-              {activeTab === "documents" && (
-                <DocumentsTab
-                  form={editor.form}
-                  tenantId={editor.tenantId}
-                  update={editor.update}
-                />
-              )}
-              {activeTab === "security" && <SecurityTab />}
-            </div>
-            <div className="space-y-6 lg:order-2">
-              <CompanyPreviewCard form={editor.form} />
-              <ConfigurationProgress form={editor.form} />
-              <QuickActions
-                form={editor.form}
-                onImport={editor.merge}
-                onReset={editor.revert}
-                isDirty={editor.isDirty}
-              />
-            </div>
+          <div className="space-y-6">
+            {activeTab === "general" && (
+              <GeneralTab form={editor.form} tenantId={editor.tenantId} update={editor.update} />
+            )}
+            {activeTab === "legal" && <LegalTab form={editor.form} update={editor.update} />}
+            {activeTab === "catalog" && <CatalogTab />}
+            {activeTab === "users" && <UsersTab />}
+            {activeTab === "billing" && <BillingTab form={editor.form} update={editor.update} />}
+            {activeTab === "documents" && (
+              <DocumentsTab form={editor.form} tenantId={editor.tenantId} update={editor.update} />
+            )}
+            {activeTab === "security" && <SecurityTab />}
           </div>
         )}
       </div>

@@ -16,6 +16,7 @@ type TenantContextType = {
   profile: TenantProfile | null;
   tenant: Tenant | null;
   loading: boolean;
+  error: string | null;
   refreshTenant: () => Promise<string | null>;
 };
 
@@ -23,6 +24,7 @@ const TenantContext = createContext<TenantContextType>({
   profile: null,
   tenant: null,
   loading: true,
+  error: null,
   refreshTenant: async () => null,
 });
 
@@ -30,28 +32,39 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<TenantProfile | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const loadSequence = useRef(0);
 
   const loadTenant = useCallback(async (session: Session | null) => {
     const sequence = ++loadSequence.current;
+    console.log("[DEBUG TenantProvider] loadTenant START", { sequence, hasSession: Boolean(session) });
     setLoading(true);
+    setError(null);
     if (!session) {
       configureCurrency(DEFAULT_CURRENCY);
       setProfile(null);
       setTenant(null);
       setLoading(false);
+      console.log("[DEBUG TenantProvider] loadTenant END (no session)", { sequence });
       return null;
     }
 
     try {
       // profiles/tenants are not present in the currently generated Database type.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      console.log("[DEBUG TenantProvider] SELECT profiles start", { sequence, user_id: session.user.id });
       const profileResult = await (supabase as any)
         .from("profiles")
         .select("id, email, full_name, tenant_id, role_id, avatar_url")
         .eq("id", session.user.id)
         .maybeSingle();
       const { data: profileData, error: profileError, status: profileStatus } = profileResult;
+      console.log("[DEBUG TenantProvider] SELECT profiles done", {
+        sequence,
+        profileData,
+        profileError,
+        profileStatus,
+      });
 
       if (profileError) {
         console.error("[TenantProvider] Erreur Supabase profiles", {
@@ -87,25 +100,35 @@ export function TenantProvider({ children }: { children: ReactNode }) {
               }
             : null,
         });
+        if (profileError) setError(profileError.message);
         setProfile(null);
         setTenant(null);
         setLoading(false);
+        console.log("[DEBUG TenantProvider] loadTenant END (no profile/tenant_id)", { sequence, reason });
         return null;
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      console.log("[DEBUG TenantProvider] SELECT tenants start", { sequence, tenant_id: profileData.tenant_id });
       const tenantResult = await (supabase as any)
         .from("tenants")
         .select("*")
         .eq("id", profileData.tenant_id)
         .maybeSingle();
       const { data: tenantData, error: tenantError, status: tenantStatus } = tenantResult;
-      const { data: currencySettings } = await (supabase as any)
+      console.log("[DEBUG TenantProvider] SELECT tenants done", { sequence, tenantData, tenantError, tenantStatus });
+      console.log("[DEBUG TenantProvider] SELECT parametres (currency) start", { sequence, tenant_id: profileData.tenant_id });
+      const { data: currencySettings, error: currencySettingsError } = await (supabase as any)
         .from("parametres")
         .select("currency,decimals")
         .eq("tenant_id", profileData.tenant_id)
         .limit(1)
         .maybeSingle();
+      console.log("[DEBUG TenantProvider] SELECT parametres (currency) done", {
+        sequence,
+        currencySettings,
+        currencySettingsError,
+      });
 
       if (sequence === loadSequence.current) {
         configureCurrency(currencySettings?.currency, currencySettings?.decimals);
@@ -129,15 +152,25 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         setProfile(profileData as TenantProfile);
         setTenant((tenantData as Tenant | null) ?? null);
         setLoading(false);
+        console.log("[DEBUG TenantProvider] loadTenant END (success)", { sequence });
+      } else {
+        console.log("[DEBUG TenantProvider] loadTenant SKIPPED (superseded by newer sequence)", {
+          sequence,
+          current: loadSequence.current,
+        });
       }
       return profileData.tenant_id as string;
-    } catch (error) {
+    } catch (caughtError) {
       if (sequence === loadSequence.current) {
-        console.error("[TenantProvider] Échec inattendu du chargement du tenant", { error });
+        console.error("[TenantProvider] Échec inattendu du chargement du tenant", {
+          error: caughtError,
+        });
+        setError(caughtError instanceof Error ? caughtError.message : "Erreur inattendue.");
         setProfile(null);
         setTenant(null);
         configureCurrency(DEFAULT_CURRENCY);
         setLoading(false);
+        console.log("[DEBUG TenantProvider] loadTenant END (catch)", { sequence, error: caughtError });
       }
       return null;
     }
@@ -172,6 +205,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         profile,
         tenant,
         loading,
+        error,
         refreshTenant,
       }}
     >

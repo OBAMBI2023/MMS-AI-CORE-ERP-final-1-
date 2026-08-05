@@ -55,15 +55,22 @@ function formatError(error: unknown) {
  */
 export function useParametresEditor() {
   const queryClient = useQueryClient();
-  const { profile, loading: tenantLoading } = useTenant();
+  const { profile, loading: tenantLoading, error: tenantError } = useTenant();
   const tenantId = profile?.tenant_id;
   const [form, setForm] = useState<ParametresForm | null>(null);
   const [snapshot, setSnapshot] = useState<ParametresForm | null>(null);
+
+  console.log("[DEBUG useParametresEditor] render", {
+    tenantId,
+    tenantLoading,
+    tenantError,
+  });
 
   const query = useQuery({
     queryKey: ["parametres", tenantId],
     enabled: !tenantLoading && Boolean(tenantId),
     queryFn: async () => {
+      console.log("[DEBUG useParametresEditor] queryFn START", { tenantId });
       if (!tenantId) throw new Error("Aucun tenant associé à ce compte.");
       const { data, error } = await supabase
         .from("parametres")
@@ -71,13 +78,25 @@ export function useParametresEditor() {
         .eq("tenant_id", tenantId)
         .limit(1)
         .maybeSingle();
+      console.log("[DEBUG useParametresEditor] queryFn done", { tenantId, data, error });
       if (error) throw error;
       if (!data) throw new Error("Les paramètres de ce tenant sont introuvables.");
       return data;
     },
   });
 
+  console.log("[DEBUG useParametresEditor] query state", {
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isPending: query.isPending,
+    status: query.status,
+    fetchStatus: query.fetchStatus,
+    error: query.error,
+    hasData: Boolean(query.data),
+  });
+
   useEffect(() => {
+    console.log("[DEBUG useParametresEditor] effect(query.data) fired", { hasData: Boolean(query.data) });
     if (!query.data) return;
     const next = toForm(query.data);
     setForm(next);
@@ -114,25 +133,16 @@ export function useParametresEditor() {
   const update = <K extends keyof ParametresForm>(key: K, value: ParametresForm[K]) =>
     setForm((current) => (current ? { ...current, [key]: value } : current));
 
-  const merge = (patch: Partial<ParametresForm>) =>
-    setForm((current) => (current ? { ...current, ...patch } : current));
-
-  const revert = () => {
-    if (snapshot) setForm(snapshot);
-  };
-
   const isDirty = Boolean(form && snapshot && JSON.stringify(form) !== JSON.stringify(snapshot));
 
   return {
     tenantId,
     settingsId: query.data?.id ?? null,
     loading: tenantLoading || query.isLoading,
-    error: query.error,
+    error: tenantError ? new Error(tenantError) : query.error,
     refetch: query.refetch,
     form,
     update,
-    merge,
-    revert,
     isDirty,
     save: () => (form ? saveMutation.mutateAsync(form) : Promise.resolve(undefined)),
     isSaving: saveMutation.isPending,
