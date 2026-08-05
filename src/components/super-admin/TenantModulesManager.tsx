@@ -194,6 +194,11 @@ export function TenantModulesManager({
                     Ce module possède un abonnement actif. Suspendez ou annulez l’abonnement avant de le désactiver.
                   </p>
                 )}
+                {isSms && draft[module.id] && !activePremiumSubscription && (
+                  <p className="mt-3 rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+                    Aucun abonnement SMS actif. Le module reste accessible mais l’envoi de SMS restera refusé tant qu’un abonnement actif avec des crédits disponibles n’est pas attribué.
+                  </p>
+                )}
                 {(isSms || isAi) && (
                   <div className="mt-4 grid gap-3 rounded-lg bg-muted/50 p-3 text-sm sm:grid-cols-4">
                     <div><span className="block text-xs text-muted-foreground">Abonnement</span><strong>{subscriptionStatus ?? "Absent"}</strong></div>
