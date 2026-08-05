@@ -32,23 +32,18 @@ import { Turnstile, type TurnstileHandle } from "@/components/Turnstile";
 import { BrandLogo } from "@/components/branding/BrandLogo";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { createTrialWorkspace } from "@/lib/trial-signup.server";
+import { TRIAL_ACTIVITIES, TRIAL_ACTIVITY_CODES } from "@/lib/trial-activities";
 import { supabase } from "@/integrations/supabase/client";
 import { readEnvVar } from "@/integrations/supabase/env";
 
-// Le backend (create_trial_workspace) n'a pas de colonne secteur : cette liste
-// est propre à l'UI et n'est pas transmise au serveur.
-const TRIAL_SECTORS = [
-  "Commerce & Distribution",
-  "Restauration & Hôtellerie",
-  "Industrie & Production",
-  "Services & Conseil",
-  "Santé & Bien-être",
-  "Éducation & Formation",
-  "Transport & Logistique",
-  "Technologie & Digital",
-  "Immobilier & BTP",
-  "Autre",
-] as const;
+// Chaque activité détermine automatiquement la configuration ERP du tenant
+// créé (voir create_trial_workspace) — aucun choix de pack n'est exposé ici.
+function resolvePostSignupRoute(_platformType: string): "/app" {
+  // Toutes les activités (y compris hôtel) provisionnent l'espace ERP
+  // générique pour l'instant. Ajouter un cas "HOTEL" ici branchera la
+  // redirection dédiée le jour où cette expérience existera.
+  return "/app";
+}
 
 const navigationItems = [
   { label: "Accueil", to: "/" },
@@ -101,7 +96,9 @@ const signupSchema = z
   .object({
     companyName: z.string().trim().min(2, "Indiquez le nom de votre entreprise"),
     fullName: z.string().trim().min(2, "Indiquez votre nom complet"),
-    sector: z.string().min(1, "Sélectionnez un secteur d'activité"),
+    activity: z.enum(TRIAL_ACTIVITY_CODES, {
+      errorMap: () => ({ message: "Sélectionnez une activité" }),
+    }),
     email: z.string().trim().email("Adresse e-mail invalide"),
     phone: z.string().trim().min(6, "Numéro de téléphone invalide"),
     password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
@@ -140,7 +137,6 @@ export function TrialSignupPage() {
     defaultValues: {
       companyName: "",
       fullName: "",
-      sector: "",
       email: "",
       phone: "",
       password: "",
@@ -167,6 +163,7 @@ export function TrialSignupPage() {
         data: {
           companyName: values.companyName,
           fullName: values.fullName,
+          activity: values.activity,
           email: values.email,
           phone: values.phone,
           password: values.password,
@@ -188,7 +185,7 @@ export function TrialSignupPage() {
       }
 
       toast.success("Votre espace est prêt. Votre essai gratuit de 7 jours commence maintenant.");
-      await navigate({ to: "/app", replace: true });
+      await navigate({ to: resolvePostSignupRoute(session.platformType), replace: true });
     } catch (error: unknown) {
       const message =
         error instanceof Error
@@ -457,26 +454,26 @@ export function TrialSignupPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="sector" className="text-xs font-semibold text-slate-600">
+                  <label htmlFor="activity" className="text-xs font-semibold text-slate-600">
                     Secteur d'activité
                   </label>
                   <select
-                    id="sector"
+                    id="activity"
                     defaultValue=""
                     className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-900 shadow-sm transition-all duration-200 focus:border-blue-500 focus:bg-white focus:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                    {...register("sector")}
+                    {...register("activity")}
                   >
                     <option value="" disabled>
                       Sélectionnez votre secteur d'activité
                     </option>
-                    {TRIAL_SECTORS.map((sector) => (
-                      <option key={sector} value={sector}>
-                        {sector}
+                    {TRIAL_ACTIVITIES.map((activity) => (
+                      <option key={activity.value} value={activity.value}>
+                        {activity.label}
                       </option>
                     ))}
                   </select>
-                  {errors.sector?.message && (
-                    <p className="text-xs font-medium text-red-600">{errors.sector.message}</p>
+                  {errors.activity?.message && (
+                    <p className="text-xs font-medium text-red-600">{errors.activity.message}</p>
                   )}
                 </div>
 

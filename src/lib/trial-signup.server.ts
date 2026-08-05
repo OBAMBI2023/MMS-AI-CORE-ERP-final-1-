@@ -6,10 +6,12 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
 import { readEnvVar } from "@/integrations/supabase/env";
 import { formatSupabaseError } from "@/lib/supabase-error";
+import { TRIAL_ACTIVITY_CODES } from "@/lib/trial-activities";
 
 const trialSignupSchema = z.object({
   companyName: z.string().trim().min(2).max(120),
   fullName: z.string().trim().min(2).max(120),
+  activity: z.enum(TRIAL_ACTIVITY_CODES),
   email: z.string().trim().email().max(254),
   phone: z.string().trim().min(6).max(30),
   password: z.string().min(8).max(72),
@@ -132,6 +134,7 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
       {
         p_ip_address: ipAddress,
         p_email: data.email,
+        p_phone: data.phone,
       },
     );
     if (rateLimitError) {
@@ -169,6 +172,7 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
           p_full_name: data.fullName,
           p_email: data.email,
           p_phone: data.phone,
+          p_activity: data.activity,
         },
       );
 
@@ -176,7 +180,7 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
         logSupabaseError(onboardingError);
         throw new Error(formatSupabaseError(onboardingError));
       }
-      const createdWorkspace = workspace as { loginUrl: string } | null;
+      const createdWorkspace = workspace as { loginUrl: string; platformType: string } | null;
       if (!createdWorkspace?.loginUrl) {
         throw new Error("L'espace d'essai ne contient pas d'URL de connexion.");
       }
@@ -201,6 +205,7 @@ export const createTrialWorkspace = createServerFn({ method: "POST" })
         accessToken: sessionData.session.access_token,
         refreshToken: sessionData.session.refresh_token,
         loginUrl: createdWorkspace.loginUrl,
+        platformType: createdWorkspace.platformType,
       };
     } catch (error: unknown) {
       try {

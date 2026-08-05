@@ -2439,6 +2439,7 @@ export type Database = {
           p_email: string
           p_ip_address: string
           p_max_attempts?: number
+          p_phone?: string
           p_window?: string
         }
         Returns: boolean
@@ -2464,6 +2465,7 @@ export type Database = {
       }
       create_trial_workspace: {
         Args: {
+          p_activity?: string
           p_company_name: string
           p_email: string
           p_full_name: string
