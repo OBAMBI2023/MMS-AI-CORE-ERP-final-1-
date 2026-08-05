@@ -27,11 +27,6 @@ type LoginTenant = { id: string; name: string; logoUrl: string | null };
 const loginInputClassName =
   "login-field h-[60px] rounded-2xl border-slate-300 bg-white pl-12 pr-12 text-sm text-slate-900 caret-slate-900 shadow-sm shadow-slate-100 transition-all duration-200 placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-[#0F5BFF] focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-blue-500/10 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:caret-white dark:shadow-none dark:placeholder:text-slate-400 dark:hover:border-slate-500 dark:focus-visible:border-blue-400 dark:focus-visible:bg-slate-900 dark:focus-visible:ring-blue-400/20";
 
-async function getAuthenticatedHome(): Promise<"/app" | "/super-admin" | "/partner"> {
-  const destination = await getAuthenticatedDestination();
-  return destination === "/403" ? "/app" : destination;
-}
-
 async function logConnectionAttempt(
   email: string,
   status: "success" | "failure",
@@ -55,7 +50,7 @@ export const Route = createFileRoute("/login")({
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    if (session) throw redirect({ to: await getAuthenticatedHome() });
+    if (session) throw redirect({ to: await getAuthenticatedDestination() });
   },
 });
 
@@ -139,7 +134,7 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
       }
 
       void logConnectionAttempt(values.email, "success", data.user.id);
-      await navigate({ to: tenantSlug ? "/app" : await getAuthenticatedHome(), replace: true });
+      await navigate({ to: await getAuthenticatedDestination(), replace: true });
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Une erreur est survenue");
     } finally {

@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { LoginPage } from "@/routes/login";
 import { getPlatformAdminAccess } from "@/lib/super-admin.server";
+import { getAuthenticatedDestination } from "@/lib/partner-admin.server";
 import { profileBelongsToTenant } from "@/lib/tenant-login-access";
 
 export const Route = createFileRoute("/login_/$slug")({
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/login_/$slug")({
         supabase.from("profiles").select("tenant_id").eq("id", session.user.id).maybeSingle(),
       ]);
       if (tenant && profileBelongsToTenant(profile?.tenant_id, tenant.id)) {
-        throw redirect({ to: "/app" });
+        throw redirect({ to: await getAuthenticatedDestination() });
       }
       await supabase.auth.signOut();
     }

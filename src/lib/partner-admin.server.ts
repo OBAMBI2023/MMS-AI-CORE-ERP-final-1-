@@ -6,7 +6,11 @@ import type { Json } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { readEnvVar } from "@/integrations/supabase/env";
 import { resendExistingAuthInvitation } from "@/lib/partner-invitation";
+import { resolveTenantLandingRoute } from "@/lib/tenant-landing-route.server";
+import type { AuthenticatedDestination } from "@/lib/tenant-landing-route.server";
 import { z } from "zod";
+
+export type { AuthenticatedDestination } from "@/lib/tenant-landing-route.server";
 
 function getInvitationRedirectUrl(): string {
   const appUrl = readEnvVar("APP_URL");
@@ -92,12 +96,6 @@ export type PartnerDashboard = {
     createdAt: string;
   }[];
 };
-
-export type AuthenticatedDestination =
-  | "/super-admin"
-  | "/partner"
-  | "/app"
-  | "/403";
 
 async function signCompanyAsset(
   admin: any,
@@ -265,7 +263,9 @@ export const getAuthenticatedDestination = createServerFn({ method: "GET" })
       .maybeSingle();
     if (profileError) throw new Error(formatSupabaseError(profileError));
 
-    return profile?.tenant_id ? "/app" : "/403";
+    if (!profile?.tenant_id) return "/403";
+
+    return resolveTenantLandingRoute(context.supabase, context.userId, profile.tenant_id);
   });
 
 export const getPartnerDashboard = createServerFn({ method: "GET" })
