@@ -1,9 +1,26 @@
 import { z } from "zod";
 
+// Kept in sync with the sector CASE in create_public_trial_workspace
+// (see supabase/migrations/20260805120000_public_trial_sector_signup.sql).
+export const TRIAL_SECTORS = [
+  "Commerce",
+  "Services",
+  "Restaurant",
+  "Hôtel / Résidence / Hébergement",
+] as const;
+
+export type TrialSector = (typeof TRIAL_SECTORS)[number];
+
+export function platformTypeForSector(sector: TrialSector): "ERP" | "HOTEL" {
+  return sector === "Hôtel / Résidence / Hébergement" ? "HOTEL" : "ERP";
+}
+
 export const trialRequestSchema = z.object({
   companyName: z.string().trim().min(2, "Le nom de l’entreprise est requis.").max(120),
   adminName: z.string().trim().min(2, "Le nom de l’administrateur est requis.").max(120),
-  platformType: z.enum(["ERP", "HOTEL"]),
+  sector: z.enum(TRIAL_SECTORS, {
+    errorMap: () => ({ message: "Veuillez sélectionner un secteur d’activité." }),
+  }),
   termsAccepted: z.literal(true, {
     errorMap: () => ({ message: "Vous devez accepter les conditions." }),
   }),

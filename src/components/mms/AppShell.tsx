@@ -43,7 +43,7 @@ export function AppShell({
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="w-[300px] p-0 bg-sidebar text-sidebar-foreground"
+                className="w-[88vw] max-w-[360px] p-0 bg-sidebar text-sidebar-foreground"
               >
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <div className="flex h-full flex-col gap-2">
