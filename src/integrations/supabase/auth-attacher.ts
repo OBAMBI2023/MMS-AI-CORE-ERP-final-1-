@@ -6,14 +6,14 @@ import { supabase } from "./client";
 // the browser never attaches the bearer token to serverFn RPCs.
 export const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
   async ({ next }) => {
-    const { data, error } = await supabase.auth.getSession();
+    // No local session is the normal state for public/anonymous server functions
+    // (e.g. the trial signup RPC). Do not treat that as an expired session here —
+    // protected server functions enforce their own auth via `requireSupabaseAuth`
+    // and return 401, which `fetchServerFnWithAuthRetry` already turns into the
+    // real "session expired" redirect after a failed refresh attempt.
+    const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
-    if (error || !token) {
-      sessionStorage.setItem("mms:auth-message", "Votre session a expiré. Veuillez vous reconnecter.");
-      await supabase.auth.signOut();
-      window.location.assign("/login");
-      throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
-    }
+    if (!token) return next();
     return next({
       headers: { Authorization: `Bearer ${token}` },
     });

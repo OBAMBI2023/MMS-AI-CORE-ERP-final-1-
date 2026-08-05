@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate, Link, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowRight,
@@ -23,6 +24,7 @@ import {
 import { Turnstile, type TurnstileHandle } from "@/components/Turnstile";
 import { BrandLogo } from "@/components/branding/BrandLogo";
 import { createTrialWorkspace } from "@/lib/trial-signup.server";
+import { TRIAL_SECTORS, type TrialSector } from "@/lib/public-trial-policy";
 import { supabase } from "@/integrations/supabase/client";
 import { readEnvVar } from "@/integrations/supabase/env";
 
@@ -56,12 +58,10 @@ const features = [
   },
 ] as const;
 
-type PlatformType = "ERP" | "HOTEL";
-
 type FormState = {
   companyName: string;
   adminName: string;
-  platformType: PlatformType;
+  sector: TrialSector | "";
   email: string;
   phone: string;
   password: string;
@@ -72,7 +72,7 @@ type FormState = {
 const initialForm: FormState = {
   companyName: "",
   adminName: "",
-  platformType: "ERP",
+  sector: "",
   email: "",
   phone: "",
   password: "",
@@ -82,6 +82,7 @@ const initialForm: FormState = {
 
 export function TrialSignupPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const turnstile = useRef<TurnstileHandle>(null);
@@ -101,6 +102,11 @@ export function TrialSignupPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+    if (!form.sector) {
+      toast.error("Veuillez sélectionner un secteur d’activité.");
+      return;
+    }
     if (form.password !== form.confirmation) {
       toast.error("Les mots de passe ne correspondent pas.");
       return;
@@ -108,12 +114,35 @@ export function TrialSignupPage() {
     setBusy(true);
     try {
       const result = await createTrialWorkspace({
-        data: { ...form, termsAccepted: form.termsAccepted as true, turnstileToken: token },
+        data: { ...form, sector: form.sector, termsAccepted: form.termsAccepted as true, turnstileToken: token },
       });
-      await supabase.auth.setSession({
-        access_token: result.accessToken,
-        refresh_token: result.refreshToken,
+
+      // The account and tenant now exist. Establish the browser session
+      // explicitly instead of assuming signUp/the RPC left one behind.
+      const normalizedEmail = form.email.trim().toLowerCase();
+      const { data: signIn, error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: form.password,
       });
+
+      if (signInError || !signIn.session || !signIn.user) {
+        toast.error(
+          signInError?.message ??
+            "Votre espace a été créé mais la connexion automatique a échoué. Veuillez vous connecter.",
+        );
+        return;
+      }
+
+      const { data: verified } = await supabase.auth.getSession();
+      if (!verified.session) {
+        toast.error("Votre espace a été créé mais la session n’a pas pu être établie. Veuillez vous connecter.");
+        return;
+      }
+
+      // A brand-new user id can't have stale cached data, but clear anyway so
+      // no query keyed off a previous session in this tab can leak in.
+      queryClient.clear();
+      setForm(initialForm);
       await navigate({ to: result.platformType === "HOTEL" ? "/hotel" : "/app", replace: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impossible d'envoyer la demande.");
@@ -310,24 +339,28 @@ export function TrialSignupPage() {
                   required
                 />
 
-                <div className="space-y-2">
-                  <span className="text-xs font-medium text-slate-400">Plateforme</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["ERP", "HOTEL"] as const).map((value) => (
-                      <button
-                        type="button"
-                        key={value}
-                        onClick={() => setForm((v) => ({ ...v, platformType: value }))}
-                        className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                          form.platformType === value
-                            ? "border-blue-400/60 bg-blue-500/15 text-blue-200"
-                            : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10"
-                        }`}
-                      >
-                        {value === "ERP" ? "ERP Entreprise" : "Hôtel & Résidences"}
-                      </button>
+                <div className="space-y-1.5">
+                  <label htmlFor="sector" className="text-xs font-medium text-slate-400">
+                    Secteur d'activité*
+                  </label>
+                  <select
+                    id="sector"
+                    value={form.sector}
+                    onChange={(e) =>
+                      setForm((v) => ({ ...v, sector: e.target.value as TrialSector }))
+                    }
+                    required
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white focus:border-blue-400/60 focus:outline-none focus:ring-2 focus:ring-blue-500/20 [&>option]:bg-[#0B1220]"
+                  >
+                    <option value="" disabled>
+                      Sélectionnez votre secteur d'activité
+                    </option>
+                    {TRIAL_SECTORS.map((sector) => (
+                      <option key={sector} value={sector}>
+                        {sector}
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 </div>
               </section>
 
@@ -417,7 +450,7 @@ export function TrialSignupPage() {
 
               <button
                 type="submit"
-                disabled={busy || !token || !form.termsAccepted || passwordsMismatch}
+                disabled={busy || !token || !form.termsAccepted || !form.sector || passwordsMismatch}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
               >
                 {busy ? (
