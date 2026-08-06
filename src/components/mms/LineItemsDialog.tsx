@@ -101,7 +101,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   const [partnerId, setPartnerId] = useState<string>("");
   const [partnerName, setPartnerName] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
-  const [items, setItems] = useState<LineItem[]>([{ name: "", unit: "unité", qty: 1, price: 0 }]);
+  const [items, setItems] = useState<LineItem[]>([{ name: "", unit: "unité", qty: 0, price: 0 }]);
   const [extra, setExtra] = useState<Record<string, string>>({});
   const [discount, setDiscount] = useState(0);
 
@@ -350,7 +350,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
           });
         else updateItem(idx, { name: v });
       }}
-      placeholder="Service..."
+      placeholder={isAchats ? "Produit..." : "Service..."}
       className={className}
     />
   );
@@ -368,8 +368,11 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       type="number"
       min="0"
       step="0.01"
-      value={it.qty}
-      onChange={(e) => updateItem(idx, { qty: Number(e.target.value) })}
+      value={it.qty === 0 || it.qty === undefined || it.qty === null ? "" : it.qty}
+      placeholder="0"
+      onChange={(e) =>
+        updateItem(idx, { qty: e.target.value === "" ? 0 : Number(e.target.value) })
+      }
       className={className}
     />
   );
@@ -379,8 +382,11 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       type="number"
       min="0"
       step="1"
-      value={it.price}
-      onChange={(e) => updateItem(idx, { price: Number(e.target.value) })}
+      value={it.price === 0 || it.price === undefined || it.price === null ? "" : it.price}
+      placeholder="0"
+      onChange={(e) =>
+        updateItem(idx, { price: e.target.value === "" ? 0 : Number(e.target.value) })
+      }
       className={className}
     />
   );
@@ -398,7 +404,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   const addLineButton = (className: string) => (
     <button
       type="button"
-      onClick={() => setItems((arr) => [...arr, { name: "", unit: "unité", qty: 1, price: 0 }])}
+      onClick={() => setItems((arr) => [...arr, { name: "", unit: "unité", qty: 0, price: 0 }])}
       className={className}
     >
       <Plus className="h-3.5 w-3.5" /> Ajouter une ligne
