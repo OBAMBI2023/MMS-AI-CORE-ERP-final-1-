@@ -35,14 +35,14 @@ export function DashboardSecondaryCard({
     >
       <a
         href={route}
-        className="flex h-full items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+        className="flex h-full items-center gap-2.5 rounded-[24px] border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md dark:bg-[#151B2F] dark:border-white/5"
       >
-        <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl", accentMap[accent])}>
-          <Icon className="h-5 w-5" />
+        <div className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", accentMap[accent])}>
+          <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-xs font-medium text-muted-foreground">{title}</p>
-          <p className="text-lg font-bold tracking-tight">{value}</p>
+          <p className="truncate text-[11px] font-medium text-muted-foreground">{title}</p>
+          <p className="text-[1.15rem] font-bold leading-tight tracking-tight">{value}</p>
         </div>
       </a>
     </motion.div>

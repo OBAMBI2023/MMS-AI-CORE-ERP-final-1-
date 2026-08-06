@@ -82,26 +82,26 @@ export function DashboardKpiCard({
       className="h-full"
     >
       <a href={route} className="block h-full group">
-        <div className="relative h-full overflow-hidden rounded-2xl border border-border bg-card p-5 transition-shadow group-hover:shadow-lg group-hover:shadow-black/5">
+        <div className="relative h-full overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm transition-shadow group-hover:shadow-lg group-hover:shadow-black/5 dark:bg-[#151B2F] dark:border-white/5 dark:shadow-none dark:group-hover:shadow-lg dark:group-hover:shadow-indigo-950/40">
           <div
             className={cn(
               "pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent opacity-0 transition-opacity group-hover:opacity-100",
               colors.glow,
             )}
           />
-          <div className="relative flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">{title}</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
+          <div className="relative flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{title}</p>
+              <p className="mt-2.5 text-[1.7rem] font-bold leading-none tracking-tight">{value}</p>
             </div>
             <div
-              className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl", colors.icon)}
+              className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-2xl", colors.icon)}
             >
               <Icon className="h-5 w-5" />
             </div>
           </div>
 
-          <div className="relative mt-3 flex items-center justify-between gap-2">
+          <div className="relative mt-4 flex items-center justify-between gap-2">
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 text-xs font-semibold",

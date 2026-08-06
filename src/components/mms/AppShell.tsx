@@ -34,12 +34,12 @@ export function AppShell({
     <div className="flex h-screen w-full bg-background text-foreground">
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-4 sm:gap-4 md:px-8 md:pb-4 md:pt-6">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+        <header className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5 sm:gap-4 md:px-8 md:pb-4 md:pt-5">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild className="md:hidden">
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-6 w-6" />
+                <Button variant="ghost" size="icon" className="shrink-0">
+                  <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent
@@ -70,8 +70,8 @@ export function AppShell({
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-            {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            {actions && <div className="flex items-center gap-2 shrink-0 mr-1 sm:mr-2">{actions}</div>}
             <Button
               variant="ghost"
               size="icon"
@@ -94,7 +94,9 @@ export function AppShell({
                 </p>
               </PopoverContent>
             </Popover>
-            <UserMenu />
+            <div className="ml-1 sm:ml-1.5">
+              <UserMenu />
+            </div>
           </div>
         </header>
         <div

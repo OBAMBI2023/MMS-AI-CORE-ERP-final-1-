@@ -392,6 +392,33 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
     />
   );
 
+  // Devis-only: same underlying numeric value as priceInput, formatted with
+  // thousands separators for display while typing (display-only, no logic change).
+  const formatThousandsInput = (raw: string) => {
+    if (!raw) return "";
+    const [intPart, decPart] = raw.split(".");
+    const withSep = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return decPart !== undefined ? `${withSep}.${decPart}` : withSep;
+  };
+
+  const devisPriceInput = (idx: number, it: LineItem, className: string) => (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={
+        it.price === 0 || it.price === undefined || it.price === null
+          ? ""
+          : formatThousandsInput(String(it.price))
+      }
+      placeholder="0"
+      onChange={(e) => {
+        const digits = e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+        updateItem(idx, { price: digits === "" ? 0 : Number(digits) });
+      }}
+      className={className}
+    />
+  );
+
   const removeLineButton = (idx: number, className: string) => (
     <button
       type="button"
@@ -426,12 +453,16 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       </div>
     </div>
   ) : isDevis ? (
-    <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-2.5 text-sm">
-      <div className="flex justify-between">
+    <div className="rounded-2xl border border-border bg-muted/30 p-4 sm:p-5 space-y-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
         <span className="text-muted-foreground">Sous-total</span>
-        <span className="font-medium">{formatCurrency(subtotal)}</span>
+        <span className="font-medium whitespace-nowrap">{formatCurrency(subtotal)}</span>
       </div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-muted-foreground">TVA</span>
+        <span className="font-medium whitespace-nowrap">{formatCurrency(0)}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
         <span className="text-muted-foreground">Remise</span>
         <input
           type="number"
@@ -441,9 +472,9 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
           className="w-28 text-right rounded-lg bg-background border border-border px-2 py-1 text-sm outline-none focus:border-primary/40"
         />
       </div>
-      <div className="flex items-center justify-between pt-2.5 border-t border-border">
+      <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
         <span className="text-sm font-semibold">Total</span>
-        <span className="text-2xl font-bold text-primary break-all text-right">
+        <span className="text-xl sm:text-2xl font-bold text-primary whitespace-nowrap text-right">
           {formatCurrency(total)}
         </span>
       </div>
@@ -497,6 +528,30 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
           <CheckCircle2 className="h-4 w-4" />
         ) : null}
         {isEdit ? "Enregistrer" : isAchats ? "Créer l'achat" : isDevis ? "Créer le devis" : "Créer"}
+      </button>
+    </>
+  );
+
+  const devisFooterButtons = (
+    <>
+      <button
+        type="button"
+        onClick={onClose}
+        className="inline-flex h-12 items-center justify-center px-5 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
+      >
+        Annuler
+      </button>
+      <button
+        type="submit"
+        disabled={saveMut.isPending}
+        className="inline-flex h-12 items-center justify-center gap-2 px-6 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#3B82F6] text-sm font-semibold text-white shadow-md shadow-blue-500/25 transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/30 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none"
+      >
+        {saveMut.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <FileText className="h-4 w-4" />
+        )}
+        {isEdit ? "Enregistrer" : "Créer le devis"}
       </button>
     </>
   );
@@ -669,6 +724,8 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   }
 
   if (isDevis) {
+    const devisGridCols =
+      "minmax(180px,2.2fr) minmax(45px,0.5fr) minmax(100px,0.8fr) minmax(105px,0.9fr) minmax(130px,1fr) 32px";
     return (
       <Dialog open={true} onOpenChange={onClose}>
         <DialogContent className="w-full max-w-4xl">
@@ -709,44 +766,48 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                 </div>
 
                 {/* Desktop grid */}
-                <div className="hidden md:block rounded-xl border border-border overflow-hidden">
-                  <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                    <div className="col-span-5">Désignation</div>
-                    <div className="col-span-2">Unité</div>
-                    <div className="col-span-1 text-right">Quantité</div>
-                    <div className="col-span-2 text-right">Prix unitaire</div>
-                    <div className="col-span-1 text-right">Total</div>
-                    <div className="col-span-1" />
+                <div className="hidden md:block rounded-xl border border-border overflow-x-auto">
+                  <div
+                    className="grid gap-2 px-3 py-2 bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground font-medium"
+                    style={{ gridTemplateColumns: devisGridCols }}
+                  >
+                    <div>Désignation</div>
+                    <div>Unité</div>
+                    <div className="text-right">Quantité</div>
+                    <div className="text-right">Prix unitaire</div>
+                    <div className="text-right">Total</div>
+                    <div />
                   </div>
                   {items.map((it, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-12 gap-2 px-3 py-2 border-t border-border items-center"
+                      className="grid gap-2 px-3 py-2 border-t border-border items-center"
+                      style={{ gridTemplateColumns: devisGridCols }}
                     >
                       {nameInput(
                         idx,
                         it,
-                        "col-span-5 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm outline-none focus:border-primary/40",
+                        "rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm outline-none focus:border-primary/40",
                       )}
                       {unitInput(
                         idx,
                         it,
-                        "col-span-2 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm outline-none focus:border-primary/40",
+                        "rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm outline-none focus:border-primary/40",
                       )}
                       {qtyInput(
                         idx,
                         it,
-                        "col-span-1 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
+                        "rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
                       )}
-                      {priceInput(
+                      {devisPriceInput(
                         idx,
                         it,
-                        "col-span-2 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
+                        "rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
                       )}
-                      <div className="col-span-1 text-right text-sm font-medium">
+                      <div className="text-right text-sm font-bold whitespace-nowrap">
                         {formatCurrency(Number(it.qty || 0) * Number(it.price || 0))}
                       </div>
-                      <div className="col-span-1 text-right">
+                      <div className="text-right">
                         {removeLineButton(idx, "p-1 text-muted-foreground hover:text-destructive")}
                       </div>
                     </div>
@@ -758,7 +819,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                   {items.map((it, idx) => (
                     <div
                       key={idx}
-                      className="rounded-xl border border-border p-3 space-y-2 bg-muted/20"
+                      className="rounded-xl bg-card border border-border/60 p-3.5 space-y-2.5 shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-2">
                         {nameInput(
@@ -789,29 +850,27 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                           {qtyInput(
                             idx,
                             it,
-                            "w-full rounded-lg bg-background border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
+                            "w-full min-w-[100px] rounded-lg bg-background border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
                           )}
                         </label>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 items-end">
-                        <label className="flex flex-col gap-1">
-                          <span className="text-[10px] uppercase text-muted-foreground">
-                            Prix unitaire
-                          </span>
-                          {priceInput(
-                            idx,
-                            it,
-                            "w-full rounded-lg bg-background border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
-                          )}
-                        </label>
-                        <div className="flex flex-col gap-1 min-w-0">
-                          <span className="text-[10px] uppercase text-muted-foreground">
-                            Total
-                          </span>
-                          <div className="rounded-lg bg-muted/50 px-2 py-1.5 text-sm text-right font-semibold truncate">
-                            {formatCurrency(Number(it.qty || 0) * Number(it.price || 0))}
-                          </div>
-                        </div>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-[10px] uppercase text-muted-foreground">
+                          Prix unitaire
+                        </span>
+                        {devisPriceInput(
+                          idx,
+                          it,
+                          "w-full rounded-lg bg-background border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
+                        )}
+                      </label>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[10px] uppercase text-muted-foreground">
+                          Total
+                        </span>
+                        <span className="text-sm font-bold text-foreground whitespace-nowrap">
+                          {formatCurrency(Number(it.qty || 0) * Number(it.price || 0))}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -831,7 +890,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-4 border-t border-border">
-              {footerButtons}
+              {devisFooterButtons}
             </div>
           </form>
         </DialogContent>

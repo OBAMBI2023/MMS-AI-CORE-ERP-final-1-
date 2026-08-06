@@ -25,6 +25,7 @@ import {
   LogIn,
   MoreHorizontal,
   AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import {
   LineChart,
@@ -62,8 +63,24 @@ import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/mms/format";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import { cn } from "@/lib/utils";
 
 const PIE_COLORS = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4", "#6366f1"];
+
+const CHART_CARD_CLASS = "rounded-[24px] dark:bg-[#151B2F] dark:border-white/5";
+
+const CHART_TOOLTIP_STYLE = {
+  fontSize: 12,
+  padding: "6px 10px",
+  borderRadius: 12,
+  border: "1px solid var(--color-border)",
+  backgroundColor: "var(--color-popover)",
+  color: "var(--color-popover-foreground)",
+  boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+};
+const CHART_TOOLTIP_ITEM_STYLE = { fontSize: 12, padding: 0 };
+const CHART_TOOLTIP_LABEL_STYLE = { fontSize: 12, fontWeight: 600, marginBottom: 2 };
+const CHART_LEGEND_STYLE = { fontSize: 11 };
 
 function Dashboard() {
   const { data, isLoading, error } = useDashboardData();
@@ -152,7 +169,7 @@ function Dashboard() {
     data.counts.services === 0;
 
   return (
-    <AppShell title="Dashboard" contentClassName="bg-[#F8FAFC] dark:bg-background">
+    <AppShell title="Dashboard" contentClassName="bg-[#F8FAFC] dark:bg-[#0B1020]">
       {/* TODO: Réactiver la recherche globale plus tard */}
       {/* <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} /> */}
 
@@ -160,21 +177,26 @@ function Dashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="space-y-8 pb-4"
+        className="space-y-5 pb-4 sm:space-y-6"
       >
         {/* Welcome card */}
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-          {isLoading || catalogSettingsQuery.isLoading || !data?.session ? (
-            <div
-              className="h-9 w-64 max-w-full animate-pulse rounded-lg bg-muted"
-              aria-label="Chargement du message d’accueil"
-            />
-          ) : (
-            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-              {greeting}, {data.session.displayName} 👋
-            </h1>
-          )}
-          <p className="text-sm text-muted-foreground capitalize mt-1">{today}</p>
+        <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 p-6 shadow-lg shadow-indigo-500/20 sm:p-7 dark:shadow-indigo-950/50">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-14 right-16 h-32 w-32 rounded-full bg-white/10 blur-xl" />
+          <Sparkles className="pointer-events-none absolute right-6 top-6 h-9 w-9 text-white/25 sm:h-10 sm:w-10" />
+          <div className="relative">
+            {isLoading || catalogSettingsQuery.isLoading || !data?.session ? (
+              <div
+                className="h-9 w-64 max-w-full animate-pulse rounded-lg bg-white/20"
+                aria-label="Chargement du message d’accueil"
+              />
+            ) : (
+              <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+                {greeting}, {data.session.displayName} 👋
+              </h1>
+            )}
+            <p className="mt-1.5 text-sm text-white/80 capitalize">{today}</p>
+          </div>
         </div>
 
         {/* Actions Rapides */}
@@ -186,16 +208,18 @@ function Dashboard() {
                 key={action.title}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.96 }}
                 transition={{ duration: 0.2, delay: i * 0.02 }}
               >
                 <Link
                   to={action.route}
-                  className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-card border border-border hover:border-primary hover:shadow-md transition-all h-full"
+                  className="flex flex-col items-center gap-1.5 rounded-[24px] border border-border bg-card p-3 shadow-sm transition-all hover:border-primary hover:shadow-md h-full dark:bg-[#151B2F] dark:border-white/5"
                 >
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <action.icon className="h-5 w-5" />
+                  <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <action.icon className="h-4 w-4" />
                   </div>
-                  <span className="text-xs font-medium text-center">{action.title}</span>
+                  <span className="text-center text-[11px] font-medium leading-tight">{action.title}</span>
                 </Link>
               </motion.div>
             ))}
@@ -205,13 +229,15 @@ function Dashboard() {
                   <motion.button
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.96 }}
                     transition={{ duration: 0.2, delay: primaryActions.length * 0.02 }}
-                    className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-card border border-border hover:border-primary hover:shadow-md transition-all h-full w-full"
+                    className="flex flex-col items-center gap-1.5 rounded-[24px] border border-border bg-card p-3 shadow-sm transition-all hover:border-primary hover:shadow-md h-full w-full dark:bg-[#151B2F] dark:border-white/5"
                   >
-                    <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <MoreHorizontal className="h-5 w-5" />
+                    <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <MoreHorizontal className="h-4 w-4" />
                     </div>
-                    <span className="text-xs font-medium text-center">Plus</span>
+                    <span className="text-center text-[11px] font-medium leading-tight">Plus</span>
                   </motion.button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
@@ -246,7 +272,7 @@ function Dashboard() {
         {isLoading || catalogSettingsQuery.isLoading || !data ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="h-32 rounded-2xl" />
+              <Card key={i} className={cn("h-32", CHART_CARD_CLASS)} />
             ))}
           </div>
         ) : (
@@ -298,7 +324,7 @@ function Dashboard() {
         {isLoading || catalogSettingsQuery.isLoading || !data ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-pulse">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="h-20 rounded-2xl" />
+              <Card key={i} className={cn("h-20", CHART_CARD_CLASS)} />
             ))}
           </div>
         ) : (
@@ -349,11 +375,11 @@ function Dashboard() {
         {isLoading || !data ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} className="h-72 rounded-2xl" />
+              <Card key={i} className={cn("h-72", CHART_CARD_CLASS)} />
             ))}
           </div>
         ) : noDataAtAll ? (
-          <Card className="rounded-2xl">
+          <Card className={CHART_CARD_CLASS}>
             <DashboardEmptyState
               icon={BarChart3}
               title="Aucune donnée pour le moment"
@@ -365,9 +391,9 @@ function Dashboard() {
         ) : (
           <>
             {/* Graphiques */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="p-6 rounded-2xl lg:col-span-2">
-                <h3 className="font-bold mb-4">Évolution du chiffre d'affaires</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              <Card className={cn("p-4 sm:p-6 lg:col-span-2", CHART_CARD_CLASS)}>
+                <h3 className="font-bold mb-3 sm:mb-4">Évolution du chiffre d'affaires</h3>
                 {data.counts.ventes === 0 ? (
                   <DashboardEmptyState
                     compact
@@ -377,7 +403,7 @@ function Dashboard() {
                     actionRoute="/ventes"
                   />
                 ) : (
-                  <div className="h-64">
+                  <div className="h-52 sm:h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.monthlySeries}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -387,7 +413,12 @@ function Dashboard() {
                           tickLine={false}
                           tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                         />
-                        <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                        <Tooltip
+                          formatter={(v: number) => formatCurrency(v)}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                        />
                         <Line
                           type="monotone"
                           dataKey="ca"
@@ -402,8 +433,8 @@ function Dashboard() {
                 )}
               </Card>
 
-              <Card className="p-6 rounded-2xl">
-                <h3 className="font-bold mb-4">Répartition des ventes</h3>
+              <Card className={cn("p-4 sm:p-6", CHART_CARD_CLASS)}>
+                <h3 className="font-bold mb-3 sm:mb-4">Répartition des ventes</h3>
                 {data.ventesByMethod.length === 0 ? (
                   <DashboardEmptyState
                     compact
@@ -413,7 +444,7 @@ function Dashboard() {
                     actionRoute="/ventes"
                   />
                 ) : (
-                  <div className="h-64">
+                  <div className="h-52 sm:h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -428,16 +459,21 @@ function Dashboard() {
                             <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Tooltip
+                          formatter={(v: number) => formatCurrency(v)}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                        />
+                        <Legend wrapperStyle={CHART_LEGEND_STYLE} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                 )}
               </Card>
 
-              <Card className="p-6 rounded-2xl">
-                <h3 className="font-bold mb-4">Dépenses vs Revenus</h3>
+              <Card className={cn("p-4 sm:p-6", CHART_CARD_CLASS)}>
+                <h3 className="font-bold mb-3 sm:mb-4">Dépenses vs Revenus</h3>
                 {data.counts.depenses === 0 && data.counts.ventes === 0 ? (
                   <DashboardEmptyState
                     compact
@@ -447,7 +483,7 @@ function Dashboard() {
                     actionRoute="/depenses"
                   />
                 ) : (
-                  <div className="h-64">
+                  <div className="h-52 sm:h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={data.monthlySeries}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -457,8 +493,13 @@ function Dashboard() {
                           tickLine={false}
                           tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                         />
-                        <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Tooltip
+                          formatter={(v: number) => formatCurrency(v)}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                        />
+                        <Legend wrapperStyle={CHART_LEGEND_STYLE} />
                         <Bar dataKey="ca" name="Revenus" fill="#2563eb" radius={[4, 4, 0, 0]} />
                         <Bar
                           dataKey="depenses"
@@ -472,8 +513,8 @@ function Dashboard() {
                 )}
               </Card>
 
-              <Card className="p-6 rounded-2xl">
-                <h3 className="font-bold mb-4">Répartition des dépenses</h3>
+              <Card className={cn("p-4 sm:p-6", CHART_CARD_CLASS)}>
+                <h3 className="font-bold mb-3 sm:mb-4">Répartition des dépenses</h3>
                 {data.depensesByCategory.length === 0 ? (
                   <DashboardEmptyState
                     compact
@@ -483,7 +524,7 @@ function Dashboard() {
                     actionRoute="/depenses"
                   />
                 ) : (
-                  <div className="h-64">
+                  <div className="h-52 sm:h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -498,17 +539,22 @@ function Dashboard() {
                             <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Tooltip
+                          formatter={(v: number) => formatCurrency(v)}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                        />
+                        <Legend wrapperStyle={CHART_LEGEND_STYLE} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                 )}
               </Card>
 
-              <Card className="p-6 rounded-2xl">
-                <h3 className="font-bold mb-4">Évolution mensuelle</h3>
-                <div className="h-64">
+              <Card className={cn("p-4 sm:p-6", CHART_CARD_CLASS)}>
+                <h3 className="font-bold mb-3 sm:mb-4">Évolution mensuelle</h3>
+                <div className="h-52 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={data.monthlySeries}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -518,8 +564,13 @@ function Dashboard() {
                         tickLine={false}
                         tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                       />
-                      <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Tooltip
+                        formatter={(v: number) => formatCurrency(v)}
+                        contentStyle={CHART_TOOLTIP_STYLE}
+                        itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                        labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                      />
+                      <Legend wrapperStyle={CHART_LEGEND_STYLE} />
                       <Area
                         type="monotone"
                         dataKey="ca"
@@ -554,17 +605,51 @@ function Dashboard() {
             </div>
 
             {/* Activité récente */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="p-6 rounded-2xl lg:col-span-2">
-                <h3 className="font-bold mb-4">Activité récente</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              <Card className={cn("p-4 sm:p-6 lg:col-span-2", CHART_CARD_CLASS)}>
+                <h3 className="font-bold mb-3 sm:mb-4">Activité récente</h3>
                 <Tabs defaultValue="journal">
-                  <TabsList className="flex-wrap h-auto">
-                    <TabsTrigger value="journal">Journal</TabsTrigger>
-                    <TabsTrigger value="ventes">Ventes</TabsTrigger>
-                    <TabsTrigger value="achats">Achats</TabsTrigger>
-                    <TabsTrigger value="depenses">Dépenses</TabsTrigger>
-                    {canViewClients && <TabsTrigger value="clients">Clients</TabsTrigger>}
-                    {canViewFournisseurs && <TabsTrigger value="fournisseurs">Fournisseurs</TabsTrigger>}
+                  <TabsList className="flex h-auto w-full justify-start gap-1.5 overflow-x-auto rounded-full bg-muted/60 p-1.5 scrollbar-thin">
+                    <TabsTrigger
+                      value="journal"
+                      className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                    >
+                      Journal
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="ventes"
+                      className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                    >
+                      Ventes
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="achats"
+                      className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                    >
+                      Achats
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="depenses"
+                      className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                    >
+                      Dépenses
+                    </TabsTrigger>
+                    {canViewClients && (
+                      <TabsTrigger
+                        value="clients"
+                        className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                      >
+                        Clients
+                      </TabsTrigger>
+                    )}
+                    {canViewFournisseurs && (
+                      <TabsTrigger
+                        value="fournisseurs"
+                        className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                      >
+                        Fournisseurs
+                      </TabsTrigger>
+                    )}
                   </TabsList>
 
                   <TabsContent value="journal">
@@ -768,8 +853,8 @@ function Dashboard() {
                 </Tabs>
               </Card>
 
-              <div className="space-y-6">
-                <Card className="p-6 rounded-2xl">
+              <div className="space-y-4 sm:space-y-6">
+                <Card className={cn("p-4 sm:p-6", CHART_CARD_CLASS)}>
                   <h3 className="font-bold mb-4 flex items-center gap-2">
                     <LogIn className="h-4 w-4 text-primary" /> Session
                   </h3>
