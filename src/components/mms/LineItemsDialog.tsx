@@ -194,7 +194,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       const validItems = items.filter((i) => i.name && Number(i.qty) > 0);
       if (validItems.length === 0) throw new Error("Ajoutez au moins une ligne");
       if (
-        (headerTable === "ventes" || headerTable === "devis") &&
+        headerTable === "ventes" &&
         validItems.some((item) => !item.service_id || !item.item_type)
       ) {
         throw new Error("Sélectionnez chaque produit ou service dans le catalogue.");
@@ -351,7 +351,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
           });
         else updateItem(idx, { name: v });
       }}
-      placeholder={isAchats ? "Produit..." : "Service..."}
+      placeholder={isAchats ? "Produit..." : isDevis ? "Service/produit du catalogue ou texte libre..." : "Service..."}
       className={className}
     />
   );
