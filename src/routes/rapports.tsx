@@ -2,10 +2,17 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
   Download,
+  FileSpreadsheet,
   FileText,
+  GitCompareArrows,
   Package,
+  Printer,
   Receipt,
+  RefreshCw,
   ShoppingCart,
   TrendingUp,
   Wallet,
@@ -13,6 +20,28 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import {
+  addQuarters,
+  addWeeks,
+  endOfDay,
+  endOfMonth,
+  endOfQuarter,
+  endOfWeek,
+  endOfYear,
+  format,
+  getISOWeek,
+  getISOWeekYear,
+  isWithinInterval,
+  startOfDay,
+  startOfMonth,
+  startOfQuarter,
+  startOfWeek,
+  startOfYear,
+  subDays,
+  subMonths,
+  subYears,
+} from "date-fns";
+import { fr } from "date-fns/locale";
 import { AppShell } from "@/components/mms/AppShell";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,6 +83,9 @@ import { Button } from "@/components/ui/button";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import { DashboardKpiCard, type KpiAccent } from "@/components/mms/dashboard/DashboardKpiCard";
+import type { SparkPoint } from "@/hooks/use-dashboard-data";
+import { cn } from "@/lib/utils";
 
 type SaleItemType = "service" | "product";
 type SalesFilter = "all" | SaleItemType;
@@ -93,6 +125,7 @@ type Performance = {
   cost: number;
   margin: number;
 };
+type DateRange = { start: Date; end: Date };
 
 const PRODUCT_COLOR = "#2563eb";
 const SERVICE_COLOR = "#16a34a";
@@ -109,6 +142,26 @@ const MONTHS = [
   "Oct",
   "Nov",
   "Déc",
+];
+
+type PeriodPreset = "today" | "yesterday" | "week" | "month" | "lastMonth" | "quarter" | "year" | "custom";
+type ComparisonMode = "previous" | "lastYear" | "none";
+
+const PERIOD_OPTIONS: { value: PeriodPreset; label: string }[] = [
+  { value: "today", label: "Aujourd'hui" },
+  { value: "yesterday", label: "Hier" },
+  { value: "week", label: "Cette semaine" },
+  { value: "month", label: "Ce mois" },
+  { value: "lastMonth", label: "Mois précédent" },
+  { value: "quarter", label: "Ce trimestre" },
+  { value: "year", label: "Cette année" },
+  { value: "custom", label: "Période personnalisée" },
+];
+
+const COMPARISON_OPTIONS: { value: ComparisonMode; label: string }[] = [
+  { value: "previous", label: "Période précédente" },
+  { value: "lastYear", label: "Même période l'an dernier" },
+  { value: "none", label: "Aucune comparaison" },
 ];
 
 export const Route = createFileRoute("/rapports")({
@@ -154,9 +207,9 @@ function useData() {
   });
 }
 
-function isPeriod(date: string, month: number, year: number) {
+function inRange(date: string, range: DateRange) {
   const value = new Date(date);
-  return value.getMonth() + 1 === month && value.getFullYear() === year;
+  return isWithinInterval(value, { start: range.start, end: range.end });
 }
 
 function revenueForType(sale: ReportSale, type: SaleItemType) {
@@ -212,11 +265,147 @@ function quoteBucket(status: string | null) {
   return "pending";
 }
 
+/** Resolves the active preset + sub-controls into a concrete [start, end] window. */
+function getPeriodRange(params: {
+  preset: PeriodPreset;
+  month: number;
+  year: number;
+  weekOffset: number;
+  quarterOffset: number;
+  customFrom: string;
+  customTo: string;
+}): DateRange {
+  const now = new Date();
+  switch (params.preset) {
+    case "today":
+      return { start: startOfDay(now), end: endOfDay(now) };
+    case "yesterday": {
+      const d = subDays(now, 1);
+      return { start: startOfDay(d), end: endOfDay(d) };
+    }
+    case "week": {
+      const anchor = addWeeks(now, params.weekOffset);
+      return { start: startOfWeek(anchor, { weekStartsOn: 1 }), end: endOfWeek(anchor, { weekStartsOn: 1 }) };
+    }
+    case "lastMonth": {
+      const base = subMonths(now, 1);
+      return { start: startOfMonth(base), end: endOfMonth(base) };
+    }
+    case "quarter": {
+      const anchor = addQuarters(now, params.quarterOffset);
+      return { start: startOfQuarter(anchor), end: endOfQuarter(anchor) };
+    }
+    case "year": {
+      const base = new Date(params.year, 0, 1);
+      return { start: startOfYear(base), end: endOfYear(base) };
+    }
+    case "custom": {
+      const fromDate = params.customFrom ? new Date(`${params.customFrom}T00:00:00`) : startOfMonth(now);
+      const toDate = params.customTo ? new Date(`${params.customTo}T00:00:00`) : now;
+      const from = startOfDay(fromDate);
+      const to = endOfDay(toDate);
+      return { start: from, end: to.getTime() >= from.getTime() ? to : from };
+    }
+    case "month":
+    default: {
+      const base = new Date(params.year, params.month - 1, 1);
+      return { start: startOfMonth(base), end: endOfMonth(base) };
+    }
+  }
+}
+
+/** Mirrors getPeriodRange to find the "previous equivalent" window for automatic comparison. */
+function getComparisonRange(
+  mode: ComparisonMode,
+  params: Parameters<typeof getPeriodRange>[0],
+  range: DateRange,
+): DateRange | null {
+  if (mode === "none") return null;
+  if (mode === "lastYear") {
+    return { start: subYears(range.start, 1), end: subYears(range.end, 1) };
+  }
+  switch (params.preset) {
+    case "today":
+      return getPeriodRange({ ...params, preset: "yesterday" });
+    case "yesterday": {
+      const d = subDays(new Date(), 2);
+      return { start: startOfDay(d), end: endOfDay(d) };
+    }
+    case "week":
+      return getPeriodRange({ ...params, preset: "week", weekOffset: params.weekOffset - 1 });
+    case "quarter":
+      return getPeriodRange({ ...params, preset: "quarter", quarterOffset: params.quarterOffset - 1 });
+    case "year":
+      return getPeriodRange({ ...params, preset: "year", year: params.year - 1 });
+    case "lastMonth": {
+      const base = subMonths(new Date(), 2);
+      return { start: startOfMonth(base), end: endOfMonth(base) };
+    }
+    case "custom": {
+      const durationMs = range.end.getTime() - range.start.getTime();
+      const prevEnd = new Date(range.start.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - durationMs);
+      return { start: prevStart, end: prevEnd };
+    }
+    case "month":
+    default: {
+      const base = subMonths(new Date(params.year, params.month - 1, 1), 1);
+      return { start: startOfMonth(base), end: endOfMonth(base) };
+    }
+  }
+}
+
+function formatRangeLabel(range: DateRange) {
+  const sameDay = startOfDay(range.start).getTime() === startOfDay(range.end).getTime();
+  if (sameDay) return format(range.start, "dd MMMM yyyy", { locale: fr });
+  return `${format(range.start, "dd MMM", { locale: fr })} – ${format(range.end, "dd MMM yyyy", { locale: fr })}`;
+}
+
+function formatPeriodTitle(preset: PeriodPreset, range: DateRange) {
+  switch (preset) {
+    case "today":
+      return "Aujourd'hui";
+    case "yesterday":
+      return "Hier";
+    case "week":
+      return `Semaine ${getISOWeek(range.start)} (${getISOWeekYear(range.start)})`;
+    case "quarter":
+      return `T${Math.floor(range.start.getMonth() / 3) + 1} ${range.start.getFullYear()}`;
+    case "year":
+      return `Année ${range.start.getFullYear()}`;
+    case "lastMonth":
+      return `${format(range.start, "MMMM yyyy", { locale: fr })}`;
+    case "custom":
+      return "Période personnalisée";
+    case "month":
+    default:
+      return `${format(range.start, "MMMM yyyy", { locale: fr })}`;
+  }
+}
+
+/** Sums `valueFn` over the trailing N calendar days ending "today" — feeds KPI mini sparklines. */
+function lastNDaysSpark(days: number, valueFn: (day: DateRange) => number): SparkPoint[] {
+  const now = new Date();
+  const points: SparkPoint[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = subDays(now, i);
+    const dayRange = { start: startOfDay(day), end: endOfDay(day) };
+    points.push({ label: format(day, "dd/MM"), value: valueFn(dayRange) });
+  }
+  return points;
+}
+
 function RapportsPage() {
-  const { data, isLoading, error } = useData();
+  const { data, isLoading, isFetching, error, dataUpdatedAt, refetch } = useData();
+  const [preset, setPreset] = useState<PeriodPreset>("month");
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [quarterOffset, setQuarterOffset] = useState(0);
+  const [customFrom, setCustomFrom] = useState(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [customTo, setCustomTo] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("previous");
   const [salesFilter, setSalesFilter] = useState<SalesFilter>("all");
   const catalogSettingsQuery = useCatalogSettings();
   const catalogMode = catalogSettingsQuery.data?.catalog_mode;
@@ -232,12 +421,20 @@ function RapportsPage() {
     else if (catalogMode === "services") setSalesFilter("service");
   }, [catalogMode]);
 
+  const rangeParams = useMemo(
+    () => ({ preset, month, year, weekOffset, quarterOffset, customFrom, customTo }),
+    [preset, month, year, weekOffset, quarterOffset, customFrom, customTo],
+  );
+  const periodRange = useMemo(() => getPeriodRange(rangeParams), [rangeParams]);
+  const compareRange = useMemo(
+    () => getComparisonRange(comparisonMode, rangeParams, periodRange),
+    [comparisonMode, rangeParams, periodRange],
+  );
+
   const report = useMemo(() => {
     if (!data) return null;
-    const calculate = (targetMonth: number, targetYear: number) => {
-      const periodSales = data.ventes.filter((sale) =>
-        isPeriod(sale.created_at, targetMonth, targetYear),
-      );
+    const calculate = (range: DateRange) => {
+      const periodSales = data.ventes.filter((sale) => inRange(sale.created_at, range));
       const sales = periodSales.filter(
         (sale) =>
           salesFilter === "all" || sale.vente_items.some((item) => item.item_type === salesFilter),
@@ -251,7 +448,7 @@ function RapportsPage() {
           ? 0
           : sales.reduce((sum, sale) => sum + revenueForType(sale, "service"), 0);
       const expenses = data.depenses
-        .filter((row) => isPeriod(row.paid_at, targetMonth, targetYear))
+        .filter((row) => inRange(row.paid_at, range))
         .reduce((sum, row) => sum + Number(row.amount), 0);
       const productCost =
         salesFilter === "service"
@@ -264,9 +461,7 @@ function RapportsPage() {
                   .reduce((sum, item) => sum + Number(item.cost_price) * Number(item.qty), 0),
               0,
             );
-      const periodExpenses = data.depenses.filter((row) =>
-        isPeriod(row.paid_at, targetMonth, targetYear),
-      );
+      const periodExpenses = data.depenses.filter((row) => inRange(row.paid_at, range));
       const expenseCategories = [
         ...periodExpenses.reduce((rows, row) => {
           const category = row.category?.trim() || "Non catégorisée";
@@ -276,9 +471,7 @@ function RapportsPage() {
       ]
         .map(([category, amount]) => ({ category, amount }))
         .sort((a, b) => b.amount - a.amount);
-      const periodQuotes = data.devis.filter((row) =>
-        isPeriod(row.created_at, targetMonth, targetYear),
-      );
+      const periodQuotes = data.devis.filter((row) => inRange(row.created_at, range));
       const quoteAmounts = periodQuotes.reduce(
         (amounts, quote) => {
           amounts[quoteBucket(quote.status)] += Number(quote.total);
@@ -302,36 +495,98 @@ function RapportsPage() {
       };
     };
 
-    const target = calculate(month, year);
-    const previous = month === 1 ? calculate(12, year - 1) : calculate(month - 1, year);
+    const target = calculate(periodRange);
+    const previous = compareRange ? calculate(compareRange) : null;
     const compare = (value: number, oldValue: number) => ({
       diff: value - oldValue,
       pct: oldValue === 0 ? 0 : ((value - oldValue) / oldValue) * 100,
     });
-    const yearlyEvolution = [
-      {
-        name: MONTHS[month - 1],
-        produits: target.productRevenue,
-        services: target.serviceRevenue,
-      },
-    ];
+    const trend = (key: keyof typeof target) =>
+      previous ? compare(Number(target[key]), Number(previous[key])).pct : null;
+
     return {
       target,
-      compare: {
-        totalRevenue: compare(target.totalRevenue, previous.totalRevenue),
-        productRevenue: compare(target.productRevenue, previous.productRevenue),
-        serviceRevenue: compare(target.serviceRevenue, previous.serviceRevenue),
-        purchases: compare(target.purchases, previous.purchases),
-        expenses: compare(target.expenses, previous.expenses),
-        grossMargin: compare(target.grossMargin, previous.grossMargin),
-        netResult: compare(target.netResult, previous.netResult),
-        quoteCount: compare(target.quoteCount, previous.quoteCount),
+      previous,
+      trends: {
+        totalRevenue: trend("totalRevenue"),
+        productRevenue: trend("productRevenue"),
+        serviceRevenue: trend("serviceRevenue"),
+        purchases: trend("purchases"),
+        expenses: trend("expenses"),
+        grossMargin: trend("grossMargin"),
+        netResult: trend("netResult"),
+        quoteCount: trend("quoteCount"),
       },
-      yearlyEvolution,
       products: salesFilter === "service" ? [] : buildPerformance(target.sales, "product"),
       services: salesFilter === "product" ? [] : buildPerformance(target.sales, "service"),
     };
-  }, [data, month, salesFilter, year]);
+  }, [data, periodRange, compareRange, salesFilter]);
+
+  const trends = useMemo(() => {
+    if (!data) return null;
+    const ventes = data.ventes;
+    const depenses = data.depenses;
+    const revenueSpark = (type: SaleItemType | "all") =>
+      lastNDaysSpark(7, (day) =>
+        ventes
+          .filter((sale) => inRange(sale.created_at, day))
+          .reduce(
+            (sum, sale) =>
+              sum +
+              (type === "all"
+                ? revenueForType(sale, "product") + revenueForType(sale, "service")
+                : revenueForType(sale, type)),
+            0,
+          ),
+      );
+    const purchasesSpark = lastNDaysSpark(7, (day) =>
+      ventes
+        .filter((sale) => inRange(sale.created_at, day))
+        .reduce(
+          (sum, sale) =>
+            sum +
+            sale.vente_items
+              .filter((item) => item.item_type === "product")
+              .reduce((s, item) => s + Number(item.cost_price) * Number(item.qty), 0),
+          0,
+        ),
+    );
+    const expensesSpark = lastNDaysSpark(7, (day) =>
+      depenses.filter((row) => inRange(row.paid_at, day)).reduce((sum, row) => sum + Number(row.amount), 0),
+    );
+    const quotesSpark = lastNDaysSpark(7, (day) =>
+      data.devis.filter((row) => inRange(row.created_at, day)).length,
+    );
+    return {
+      total: revenueSpark("all"),
+      product: revenueSpark("product"),
+      service: revenueSpark("service"),
+      purchases: purchasesSpark,
+      expenses: expensesSpark,
+      quotes: quotesSpark,
+    };
+  }, [data]);
+
+  const dailyTrend = useMemo(() => {
+    if (!data) return [];
+    const now = new Date();
+    const out: { name: string; produits: number; services: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const day = subDays(now, i);
+      const dayRange = { start: startOfDay(day), end: endOfDay(day) };
+      const daySales = data.ventes.filter((sale) => inRange(sale.created_at, dayRange));
+      out.push({
+        name: format(day, "dd MMM", { locale: fr }),
+        produits: showProducts
+          ? daySales.reduce((sum, sale) => sum + revenueForType(sale, "product"), 0)
+          : 0,
+        services: showServices
+          ? daySales.reduce((sum, sale) => sum + revenueForType(sale, "service"), 0)
+          : 0,
+      });
+    }
+    return out;
+  }, [data, showProducts, showServices]);
 
   const years = useMemo(() => {
     const dates = data
@@ -349,13 +604,24 @@ function RapportsPage() {
     return Array.from({ length: currentYear - firstYear + 1 }, (_, index) => currentYear - index);
   }, [currentYear, data]);
 
-  const exportPDF = async () => {
+  const periodTitle = formatPeriodTitle(preset, periodRange);
+  const periodDates = formatRangeLabel(periodRange);
+  const comparisonTitle = compareRange
+    ? `${formatPeriodTitle(preset, compareRange)} · ${formatRangeLabel(compareRange)}`
+    : "Aucune comparaison";
+
+  const handleRefresh = () => {
+    void refetch();
+    void catalogSettingsQuery.refetch();
+    toast.success("Rapport actualisé.");
+  };
+
+  const exportPDF = async (successMessage = "Export PDF terminé.") => {
     if (!report) return;
     const doc = new jsPDF();
     const tenant = tenantFromSettings(settings, logoUrl);
-    const period = `${new Date(year, month - 1).toLocaleString("fr-FR", { month: "long" })} ${year}`;
     const startY = await PdfLayoutEngine.header(doc, tenant, "Rapport financier", [
-      { label: "Période", value: period },
+      { label: "Période", value: `${periodTitle} (${periodDates})` },
       { label: "CA total", value: formatCurrency(report.target.totalRevenue) },
       {
         label: "Filtre",
@@ -426,8 +692,8 @@ function RapportsPage() {
       { label: "Résultat net", value: formatCurrency(report.target.netResult) },
     ], finalY + 7);
     PdfLayoutEngine.footer(doc, tenant);
-    await downloadPdf(doc, `Rapport_${companyName || "Entreprise"}_${month}_${year}.pdf`);
-    toast.success("Export PDF terminé.");
+    await downloadPdf(doc, `Rapport_${companyName || "Entreprise"}_${format(periodRange.start, "yyyy-MM-dd")}.pdf`);
+    toast.success(successMessage);
   };
 
   const exportCSV = () => {
@@ -452,331 +718,586 @@ function RapportsPage() {
       ...(showProducts ? [["Meilleurs produits", "Quantité", "CA", "Coût", "Marge"], ...report.products.map((row) => [row.name, row.quantity, row.revenue, row.cost, row.margin]), []] : []),
       ...(showServices ? [["Meilleurs services", "Quantité", "CA"], ...report.services.map((row) => [row.name, row.quantity, row.revenue]), []] : []),
     ];
-    const blob = new Blob(["\ufeff" + rows.map((row) => row.join(";")).join("\n")], {
+    const blob = new Blob(["﻿" + rows.map((row) => row.join(";")).join("\n")], {
       type: "text/csv;charset=utf-8;",
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Rapport_${month}_${year}.csv`;
+    link.download = `Rapport_${format(periodRange.start, "yyyy-MM-dd")}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success("Export CSV terminé.");
+    toast.success("Export Excel (CSV) terminé.");
   };
 
   return (
-    <AppShell title="Rapports" subtitle="Produits, services, achats et dépenses">
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Select value={String(month)} onValueChange={(value) => setMonth(Number(value))}>
-            <SelectTrigger className="w-full rounded-xl sm:w-[170px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((name, index) => (
-                <SelectItem key={name} value={String(index + 1)}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
-            <SelectTrigger className="w-full rounded-xl sm:w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((value) => (
-                <SelectItem key={value} value={String(value)}>
-                  {value}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {showMixed && <Select
-            value={salesFilter}
-            onValueChange={(value) => setSalesFilter(value as SalesFilter)}
-          >
-            <SelectTrigger className="w-full rounded-xl sm:w-[170px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes les ventes</SelectItem>
-              <SelectItem value="product">Produits</SelectItem>
-              <SelectItem value="service">Services</SelectItem>
-            </SelectContent>
-          </Select>}
-        </div>
-        {canExport && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="gap-2 rounded-xl">
-                <Download className="h-4 w-4" /> Exporter
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => void exportPDF()}>PDF</DropdownMenuItem>
-              <DropdownMenuItem onClick={exportCSV}>CSV (Excel)</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-
-      {isLoading || catalogSettingsQuery.isLoading ? (
-        <div className="text-muted-foreground">Chargement des données réelles…</div>
-      ) : error || catalogSettingsQuery.error ? (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
-          Impossible de charger le rapport : {(error ?? catalogSettingsQuery.error)?.message}
-          <Button variant="outline" className="ml-3" onClick={() => { void catalogSettingsQuery.refetch(); }}>Réessayer</Button>
-        </div>
-      ) : !report ? (
-        <div className="text-muted-foreground">Aucune donnée disponible.</div>
-      ) : (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {showMixed && <StatCard
-              label="CA total"
-              value={report.target.totalRevenue}
-              compare={report.compare.totalRevenue}
-              icon={Wallet}
-              tone="blue"
-            />}
-            {showProducts && <StatCard
-              label="CA produits"
-              value={report.target.productRevenue}
-              compare={report.compare.productRevenue}
-              icon={Package}
-              tone="blue"
-            />}
-            {showServices && <StatCard
-              label="CA services"
-              value={report.target.serviceRevenue}
-              compare={report.compare.serviceRevenue}
-              icon={Wrench}
-              tone="green"
-            />}
-            {showPurchases && <StatCard
-              label="Achats"
-              value={report.target.purchases}
-              compare={report.compare.purchases}
-              icon={ShoppingCart}
-              tone="amber"
-            />}
-            <StatCard
-              label="Dépenses"
-              value={report.target.expenses}
-              compare={report.compare.expenses}
-              icon={Receipt}
-              tone="red"
-            />
-            {showProducts && <StatCard
-              label="Marge brute produits"
-              value={report.target.grossMargin}
-              compare={report.compare.grossMargin}
-              icon={BarChart3}
-              tone="blue"
-            />}
-            <StatCard
-              label="Résultat net"
-              value={report.target.netResult}
-              compare={report.compare.netResult}
-              icon={TrendingUp}
-              tone="green"
-            />
-            <StatCard
-              label="Nombre de devis"
-              value={report.target.quoteCount}
-              compare={report.compare.quoteCount}
-              icon={FileText}
-              tone="slate"
-              currency={false}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <AmountCard
-              label="Devis acceptés"
-              value={report.target.quoteAmounts.accepted}
-              tone="text-emerald-600"
-            />
-            <AmountCard
-              label="Devis en attente"
-              value={report.target.quoteAmounts.pending}
-              tone="text-amber-600"
-            />
-            <AmountCard
-              label="Devis refusés"
-              value={report.target.quoteAmounts.rejected}
-              tone="text-red-600"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <Panel title={`CA filtré — ${MONTHS[month - 1]} ${year}`} className="xl:col-span-2">
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={report.yearlyEvolution}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                    <Legend />
-                    {showProducts && <Line
-                      name="Produits"
-                      type="monotone"
-                      dataKey="produits"
-                      stroke={PRODUCT_COLOR}
-                      strokeWidth={3}
-                      dot={{ r: 5 }}
-                    />}
-                    {showServices && <Line
-                      name="Services"
-                      type="monotone"
-                      dataKey="services"
-                      stroke={SERVICE_COLOR}
-                      strokeWidth={3}
-                      dot={{ r: 5 }}
-                    />}
-                  </LineChart>
-                </ResponsiveContainer>
+    <AppShell title="Rapports" subtitle="Analyse complète des performances de votre entreprise.">
+      <div className="-m-4 min-h-full bg-[#F8FAFC] p-4 dark:bg-transparent md:-m-8 md:p-8">
+        <div className="sticky top-0 z-10 -mx-4 mb-6 border-b border-slate-200/70 bg-white/80 px-4 py-4 backdrop-blur-md dark:border-border dark:bg-background/80 md:-mx-8 md:rounded-b-[24px] md:px-8">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0">
+              <div className="shrink-0">
+                <Select value={preset} onValueChange={(value) => setPreset(value as PeriodPreset)}>
+                  <SelectTrigger className="w-[190px] rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                    <CalendarRange className="mr-1 h-4 w-4 text-slate-400" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PERIOD_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </Panel>
-            {showMixed && <Panel title="Répartition du CA Produits vs Services">
-              <div className="h-[320px]">
-                {report.target.totalRevenue === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    Aucun chiffre d’affaires sur la période.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: "Produits", value: report.target.productRevenue },
-                          { name: "Services", value: report.target.serviceRevenue },
-                        ]}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={65}
-                        outerRadius={95}
-                        paddingAngle={3}
-                      >
-                        <Cell fill={PRODUCT_COLOR} />
-                        <Cell fill={SERVICE_COLOR} />
-                      </Pie>
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-              {report.target.totalRevenue > 0 && (
-                <div className="grid grid-cols-2 gap-3 text-center text-sm">
-                  <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
-                    Produits{" "}
-                    <strong>
-                      {((report.target.productRevenue / report.target.totalRevenue) * 100).toFixed(
-                        1,
-                      )}{" "}
-                      %
-                    </strong>
-                  </div>
-                  <div className="rounded-xl bg-green-50 p-3 text-green-700">
-                    Services{" "}
-                    <strong>
-                      {((report.target.serviceRevenue / report.target.totalRevenue) * 100).toFixed(
-                        1,
-                      )}{" "}
-                      %
-                    </strong>
-                  </div>
+
+              {preset === "week" && (
+                <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 dark:border-border dark:bg-muted/40">
+                  <button
+                    type="button"
+                    onClick={() => setWeekOffset((v) => v - 1)}
+                    className="rounded-xl p-2 text-slate-500 hover:bg-white hover:text-slate-900 dark:hover:bg-muted dark:hover:text-foreground"
+                    aria-label="Semaine précédente"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="whitespace-nowrap px-1 text-sm font-medium text-slate-700 dark:text-foreground">
+                    Semaine {getISOWeek(periodRange.start)} ({getISOWeekYear(periodRange.start)})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setWeekOffset((v) => v + 1)}
+                    className="rounded-xl p-2 text-slate-500 hover:bg-white hover:text-slate-900 dark:hover:bg-muted dark:hover:text-foreground"
+                    aria-label="Semaine suivante"
+                    disabled={weekOffset >= 0}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               )}
-            </Panel>}
-          </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            {showProducts && <PerformanceTable title="Performances produits" rows={report.products} type="product" />}
-            {showServices && <PerformanceTable title="Performances services" rows={report.services} type="service" />}
-          </div>
+              {preset === "quarter" && (
+                <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 dark:border-border dark:bg-muted/40">
+                  <button
+                    type="button"
+                    onClick={() => setQuarterOffset((v) => v - 1)}
+                    className="rounded-xl p-2 text-slate-500 hover:bg-white hover:text-slate-900 dark:hover:bg-muted dark:hover:text-foreground"
+                    aria-label="Trimestre précédent"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="whitespace-nowrap px-1 text-sm font-medium text-slate-700 dark:text-foreground">
+                    {formatPeriodTitle("quarter", periodRange)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQuarterOffset((v) => v + 1)}
+                    className="rounded-xl p-2 text-slate-500 hover:bg-white hover:text-slate-900 dark:hover:bg-muted dark:hover:text-foreground"
+                    aria-label="Trimestre suivant"
+                    disabled={quarterOffset >= 0}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
 
-          <Panel title="Dépenses par catégorie">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">Catégorie</th>
-                    <th className="pb-3 text-right font-medium">Montant</th>
-                    <th className="pb-3 text-right font-medium">Part</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.target.expenseCategories.map((row) => (
-                    <tr key={row.category} className="border-b last:border-0">
-                      <td className="py-3 font-medium">{row.category}</td>
-                      <td className="py-3 text-right">{formatCurrency(row.amount)}</td>
-                      <td className="py-3 text-right">
-                        {report.target.expenses > 0
-                          ? `${((row.amount / report.target.expenses) * 100).toFixed(1)} %`
-                          : "0,0 %"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {report.target.expenseCategories.length === 0 && (
-                <EmptyState label="Aucune dépense sur cette période." />
+              {preset === "month" && (
+                <>
+                  <Select value={String(month)} onValueChange={(value) => setMonth(Number(value))}>
+                    <SelectTrigger className="w-[140px] shrink-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((name, index) => (
+                        <SelectItem key={name} value={String(index + 1)}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
+                    <SelectTrigger className="w-[120px] shrink-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map((value) => (
+                        <SelectItem key={value} value={String(value)}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+
+              {preset === "year" && (
+                <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
+                  <SelectTrigger className="w-[120px] shrink-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((value) => (
+                      <SelectItem key={value} value={String(value)}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {preset === "custom" && (
+                <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-border dark:bg-muted/40">
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="bg-transparent text-sm text-slate-700 outline-none dark:text-foreground"
+                  />
+                  <span className="text-slate-400">→</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="bg-transparent text-sm text-slate-700 outline-none dark:text-foreground"
+                  />
+                </div>
+              )}
+
+              {showMixed && (
+                <div className="shrink-0">
+                  <Select
+                    value={salesFilter}
+                    onValueChange={(value) => setSalesFilter(value as SalesFilter)}
+                  >
+                    <SelectTrigger className="w-[170px] rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes les ventes</SelectItem>
+                      <SelectItem value="product">Produits</SelectItem>
+                      <SelectItem value="service">Services</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="shrink-0">
+                <Select value={comparisonMode} onValueChange={(value) => setComparisonMode(value as ComparisonMode)}>
+                  <SelectTrigger className="w-[210px] rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                    <GitCompareArrows className="mr-1 h-4 w-4 text-slate-400" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMPARISON_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                className="gap-2 rounded-2xl border-slate-200 dark:border-border"
+                onClick={handleRefresh}
+                disabled={isFetching}
+              >
+                <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+                <span className="hidden sm:inline">Actualiser</span>
+              </Button>
+              {canExport && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40">
+                      <Download className="h-4 w-4" /> Exporter
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => void exportPDF("Export PDF terminé.")}>
+                      <FileText className="mr-2 h-4 w-4" /> Exporter PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportCSV}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" /> Exporter Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void exportPDF("Impression lancée.")}>
+                      <Printer className="mr-2 h-4 w-4" /> Imprimer
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
-          </Panel>
-
-          <Panel title="Dernières ventes">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">Type</th>
-                    <th className="pb-3 font-medium">Référence</th>
-                    <th className="pb-3 font-medium">Client</th>
-                    <th className="pb-3 text-right font-medium">Montant</th>
-                    <th className="pb-3 font-medium">Paiement</th>
-                    <th className="pb-3 font-medium">Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.target.sales.slice(0, 10).map((sale) => (
-                    <tr key={sale.id} className="border-b last:border-0">
-                      <td className="py-3">
-                        <TypeBadge type={saleType(sale)} />
-                      </td>
-                      <td className="py-3 font-medium">{sale.number}</td>
-                      <td className="py-3">{sale.client_name || "Client comptoir"}</td>
-                      <td className="py-3 text-right font-semibold">
-                        {formatCurrency(Number(sale.total))}
-                      </td>
-                      <td className="py-3">{sale.payment_method}</td>
-                      <td className="py-3">
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                          Finalisée
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {report.target.sales.length === 0 && (
-                <EmptyState label="Aucune vente sur cette période." />
-              )}
-            </div>
-          </Panel>
+          </div>
         </div>
-      )}
+
+        {report && (
+          <div className="mb-6 flex flex-col gap-3 rounded-[24px] border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-white p-5 shadow-sm dark:border-border dark:from-blue-500/10 dark:via-transparent dark:to-transparent sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                Période analysée
+              </p>
+              <p className="mt-0.5 text-lg font-semibold text-slate-900 dark:text-foreground">
+                {periodTitle}
+                <span className="ml-2 text-sm font-normal text-slate-500 dark:text-muted-foreground">
+                  {periodDates}
+                </span>
+              </p>
+            </div>
+            <div className="sm:text-right">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Comparée à</p>
+              <p className="mt-0.5 text-sm font-medium text-slate-600 dark:text-muted-foreground">
+                {comparisonTitle}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isLoading || catalogSettingsQuery.isLoading ? (
+          <div className="text-muted-foreground">Chargement des données réelles…</div>
+        ) : error || catalogSettingsQuery.error ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
+            Impossible de charger le rapport : {(error ?? catalogSettingsQuery.error)?.message}
+            <Button variant="outline" className="ml-3" onClick={() => { void catalogSettingsQuery.refetch(); }}>Réessayer</Button>
+          </div>
+        ) : !report ? (
+          <div className="text-muted-foreground">Aucune donnée disponible.</div>
+        ) : (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {showMixed && (
+                <KpiTile
+                  title="CA total"
+                  value={formatCurrency(report.target.totalRevenue)}
+                  icon={Wallet}
+                  trend={report.trends.totalRevenue}
+                  spark={trends?.total}
+                  accent="primary"
+                  index={0}
+                />
+              )}
+              {showProducts && (
+                <KpiTile
+                  title="CA produits"
+                  value={formatCurrency(report.target.productRevenue)}
+                  icon={Package}
+                  trend={report.trends.productRevenue}
+                  spark={trends?.product}
+                  accent="sky"
+                  index={1}
+                />
+              )}
+              {showServices && (
+                <KpiTile
+                  title="CA services"
+                  value={formatCurrency(report.target.serviceRevenue)}
+                  icon={Wrench}
+                  trend={report.trends.serviceRevenue}
+                  spark={trends?.service}
+                  accent="emerald"
+                  index={2}
+                />
+              )}
+              {showPurchases && (
+                <KpiTile
+                  title="Achats"
+                  value={formatCurrency(report.target.purchases)}
+                  icon={ShoppingCart}
+                  trend={report.trends.purchases}
+                  spark={trends?.purchases}
+                  accent="amber"
+                  index={3}
+                />
+              )}
+              <KpiTile
+                title="Dépenses"
+                value={formatCurrency(report.target.expenses)}
+                icon={Receipt}
+                trend={report.trends.expenses}
+                spark={trends?.expenses}
+                accent="rose"
+                index={4}
+              />
+              {showProducts && (
+                <KpiTile
+                  title="Marge brute produits"
+                  value={formatCurrency(report.target.grossMargin)}
+                  icon={BarChart3}
+                  trend={report.trends.grossMargin}
+                  accent="indigo"
+                  index={5}
+                />
+              )}
+              <KpiTile
+                title="Résultat net"
+                value={formatCurrency(report.target.netResult)}
+                icon={TrendingUp}
+                trend={report.trends.netResult}
+                accent="emerald"
+                index={6}
+              />
+              <KpiTile
+                title="Nombre de devis"
+                value={report.target.quoteCount.toLocaleString("fr-FR")}
+                icon={FileText}
+                trend={report.trends.quoteCount}
+                spark={trends?.quotes}
+                accent="violet"
+                index={7}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <AmountCard
+                label="Devis acceptés"
+                value={report.target.quoteAmounts.accepted}
+                tone="text-emerald-600"
+              />
+              <AmountCard
+                label="Devis en attente"
+                value={report.target.quoteAmounts.pending}
+                tone="text-amber-600"
+              />
+              <AmountCard
+                label="Devis refusés"
+                value={report.target.quoteAmounts.rejected}
+                tone="text-red-600"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+              <Panel title="Tendance des 7 derniers jours" className="xl:col-span-2">
+                <div className="h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dailyTrend}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" />
+                      <YAxis tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Legend />
+                      {showProducts && (
+                        <Line
+                          name="Produits"
+                          type="monotone"
+                          dataKey="produits"
+                          stroke={PRODUCT_COLOR}
+                          strokeWidth={3}
+                          dot={{ r: 4 }}
+                          isAnimationActive
+                        />
+                      )}
+                      {showServices && (
+                        <Line
+                          name="Services"
+                          type="monotone"
+                          dataKey="services"
+                          stroke={SERVICE_COLOR}
+                          strokeWidth={3}
+                          dot={{ r: 4 }}
+                          isAnimationActive
+                        />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Panel>
+              {showMixed && (
+                <Panel title="Répartition du CA Produits vs Services">
+                  <div className="relative h-[320px]">
+                    {report.target.totalRevenue === 0 ? (
+                      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                        Aucun chiffre d’affaires sur la période.
+                      </div>
+                    ) : (
+                      <>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: "Produits", value: report.target.productRevenue },
+                                { name: "Services", value: report.target.serviceRevenue },
+                              ]}
+                              dataKey="value"
+                              nameKey="name"
+                              innerRadius={65}
+                              outerRadius={95}
+                              paddingAngle={3}
+                              isAnimationActive
+                            >
+                              <Cell fill={PRODUCT_COLOR} />
+                              <Cell fill={SERVICE_COLOR} />
+                            </Pie>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pb-6">
+                          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            Total
+                          </span>
+                          <span className="text-lg font-bold text-slate-900 dark:text-foreground">
+                            {formatCurrency(report.target.totalRevenue)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {report.target.totalRevenue > 0 && (
+                    <div className="grid grid-cols-2 gap-3 text-center text-sm">
+                      <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
+                        Produits{" "}
+                        <strong>
+                          {((report.target.productRevenue / report.target.totalRevenue) * 100).toFixed(
+                            1,
+                          )}{" "}
+                          %
+                        </strong>
+                      </div>
+                      <div className="rounded-xl bg-green-50 p-3 text-green-700">
+                        Services{" "}
+                        <strong>
+                          {((report.target.serviceRevenue / report.target.totalRevenue) * 100).toFixed(
+                            1,
+                          )}{" "}
+                          %
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+                </Panel>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              {showProducts && <PerformanceTable title="Performances produits" rows={report.products} type="product" />}
+              {showServices && <PerformanceTable title="Performances services" rows={report.services} type="service" />}
+            </div>
+
+            <Panel title="Dépenses par catégorie">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[420px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-3 font-medium">Catégorie</th>
+                      <th className="pb-3 text-right font-medium">Montant</th>
+                      <th className="pb-3 text-right font-medium">Part</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.target.expenseCategories.map((row) => (
+                      <tr key={row.category} className="border-b last:border-0">
+                        <td className="py-3 font-medium">{row.category}</td>
+                        <td className="py-3 text-right">{formatCurrency(row.amount)}</td>
+                        <td className="py-3 text-right">
+                          {report.target.expenses > 0
+                            ? `${((row.amount / report.target.expenses) * 100).toFixed(1)} %`
+                            : "0,0 %"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {report.target.expenseCategories.length === 0 && (
+                  <EmptyState label="Aucune dépense sur cette période." />
+                )}
+              </div>
+            </Panel>
+
+            <Panel title="Dernières ventes">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-3 font-medium">Type</th>
+                      <th className="pb-3 font-medium">Référence</th>
+                      <th className="pb-3 font-medium">Client</th>
+                      <th className="pb-3 text-right font-medium">Montant</th>
+                      <th className="pb-3 font-medium">Paiement</th>
+                      <th className="pb-3 font-medium">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.target.sales.slice(0, 10).map((sale) => (
+                      <tr key={sale.id} className="border-b last:border-0">
+                        <td className="py-3">
+                          <TypeBadge type={saleType(sale)} />
+                        </td>
+                        <td className="py-3 font-medium">{sale.number}</td>
+                        <td className="py-3">{sale.client_name || "Client comptoir"}</td>
+                        <td className="py-3 text-right font-semibold">
+                          {formatCurrency(Number(sale.total))}
+                        </td>
+                        <td className="py-3">{sale.payment_method}</td>
+                        <td className="py-3">
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            Finalisée
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {report.target.sales.length === 0 && (
+                  <EmptyState label="Aucune vente sur cette période." />
+                )}
+              </div>
+            </Panel>
+
+            <div className="flex flex-col items-center justify-between gap-2 rounded-[24px] border border-slate-100 bg-white/60 px-5 py-3 text-xs text-slate-500 dark:border-border dark:bg-card/60 dark:text-muted-foreground sm:flex-row">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+                Données à jour
+              </span>
+              <span>
+                Dernière actualisation :{" "}
+                {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("fr-FR") : "—"}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
     </AppShell>
+  );
+}
+
+function KpiTile({
+  title,
+  value,
+  icon,
+  trend,
+  spark,
+  accent,
+  index,
+}: {
+  title: string;
+  value: string;
+  icon: LucideIcon;
+  trend: number | null;
+  spark?: SparkPoint[];
+  accent: KpiAccent;
+  index: number;
+}) {
+  return (
+    <DashboardKpiCard
+      title={title}
+      value={value}
+      icon={icon}
+      trend={trend}
+      spark={spark}
+      accent={accent}
+      index={index}
+    />
   );
 }
 
 function AmountCard({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div className="rounded-[20px] border border-border bg-card p-5 shadow-sm">
       <div className="text-sm text-muted-foreground">{label}</div>
       <div className={`mt-1 text-2xl font-bold ${tone}`}>{formatCurrency(value)}</div>
     </div>
@@ -793,12 +1314,15 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section
-      className={`rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6 ${className}`}
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className={`rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-6 ${className}`}
     >
       <h2 className="mb-5 text-lg font-semibold">{title}</h2>
       {children}
-    </section>
+    </motion.section>
   );
 }
 
@@ -862,50 +1386,4 @@ function TypeBadge({ type }: { type: string }) {
         ? "bg-green-50 text-green-700"
         : "bg-slate-100 text-slate-700";
   return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${style}`}>{type}</span>;
-}
-
-function StatCard({
-  label,
-  value,
-  compare,
-  icon: Icon,
-  tone,
-  currency = true,
-}: {
-  label: string;
-  value: number;
-  compare: { diff: number; pct: number };
-  icon: LucideIcon;
-  tone: "blue" | "green" | "amber" | "red" | "slate";
-  currency?: boolean;
-}) {
-  const tones = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
-    amber: "bg-amber-50 text-amber-600",
-    red: "bg-red-50 text-red-600",
-    slate: "bg-slate-100 text-slate-600",
-  };
-  return (
-    <motion.div
-      whileHover={{ y: -3 }}
-      className="rounded-2xl border border-border bg-card p-5 shadow-sm"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <div className={`rounded-xl p-2.5 ${tones[tone]}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <span
-          className={`text-xs font-medium ${compare.diff >= 0 ? "text-emerald-600" : "text-red-600"}`}
-        >
-          {compare.diff >= 0 ? "+" : ""}
-          {compare.pct.toFixed(1)} %
-        </span>
-      </div>
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-bold">
-        {currency ? formatCurrency(value) : value.toLocaleString("fr-FR")}
-      </div>
-    </motion.div>
-  );
 }

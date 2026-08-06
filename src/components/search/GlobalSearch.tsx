@@ -19,8 +19,9 @@ import {
   Settings,
   Loader2,
   Clock,
+  AlertCircle,
 } from "lucide-react";
-import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { useGlobalSearch, MIN_QUERY_LENGTH } from "@/hooks/useGlobalSearch";
 import { SearchModule } from "@/types/search";
 
 export function GlobalSearch({
@@ -30,7 +31,7 @@ export function GlobalSearch({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { query, setQuery, results, isLoading, history, clearHistory } = useGlobalSearch();
+  const { query, setQuery, results, isLoading, error, history, clearHistory } = useGlobalSearch();
 
   const iconMap: Record<SearchModule, ReactElement> = {
     Clients: <Users className="h-4 w-4" />,
@@ -77,11 +78,19 @@ export function GlobalSearch({
             <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Recherche en cours...
           </div>
         )}
-        {!isLoading && query.trim().length > 0 && results.length === 0 && (
-          <CommandEmpty>Aucun résultat trouvé pour "{query}".</CommandEmpty>
+
+        {!isLoading && error && (
+          <div className="flex items-center justify-center py-6 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 mr-2" /> {error}
+          </div>
         )}
 
-        {!isLoading && query.trim().length === 0 && history.length > 0 && (
+        {!isLoading &&
+          !error &&
+          query.trim().length >= MIN_QUERY_LENGTH &&
+          results.length === 0 && <CommandEmpty>Aucun résultat trouvé pour "{query}".</CommandEmpty>}
+
+        {!isLoading && !error && query.trim().length === 0 && history.length > 0 && (
           <CommandGroup heading="Historique">
             {history.map((h) => (
               <CommandItem key={h} onSelect={() => setQuery(h)}>

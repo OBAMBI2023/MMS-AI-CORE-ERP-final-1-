@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
+  type LucideIcon,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -63,6 +64,9 @@ export interface FieldDef {
     onChange: (value: string) => void;
     required?: boolean;
   }) => ReactNode;
+  /** Icon shown inside the input. Only rendered by the "premium" form dialog variant
+   * (see `ResourceTableProps.formVariant`); ignored otherwise. */
+  icon?: LucideIcon;
 }
 
 export interface ColumnDef<T> {
@@ -106,6 +110,16 @@ export interface ResourceTableProps<T extends { id: string }> {
   /** Label used for the "sort by first search field" options in the filter menu.
    * Defaults to "Nom". */
   nameSortLabel?: string;
+  /** Opt-in premium visual style for the create/edit form dialog (rounded 24px card,
+   * icon header, floating inputs with left icons). Defaults to "default" so existing
+   * consumers keep their current dialog, byte-for-byte. */
+  formVariant?: "default" | "premium";
+  /** Icon shown in the premium form dialog header. Ignored when formVariant is "default". */
+  formIcon?: LucideIcon;
+  /** Subtitle shown under the title when creating a record, premium variant only. */
+  formCreateSubtitle?: string;
+  /** Submit button label when creating a record, premium variant only. */
+  formSubmitLabel?: string;
 }
 
 type MobileSort = "default" | "name-asc" | "name-desc" | "recent" | "oldest";
@@ -144,6 +158,10 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
     mobilePageSize = 10,
     premiumLayout = false,
     nameSortLabel = "Nom",
+    formVariant = "default",
+    formIcon,
+    formCreateSubtitle,
+    formSubmitLabel,
   } = props;
   const hasMobileCards = Boolean(renderMobileCard);
   const useUnifiedCards = hasMobileCards && premiumLayout;
@@ -541,6 +559,10 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
               setCreating(false);
               setEditing(null);
             }}
+            variant={formVariant}
+            icon={formIcon}
+            createSubtitle={formCreateSubtitle}
+            submitLabel={formSubmitLabel}
           />
         )}
       </AnimatePresence>
@@ -554,12 +576,20 @@ function ResourceFormDialog<T extends { id: string }>({
   fields,
   initial,
   onClose,
+  variant = "default",
+  icon,
+  createSubtitle,
+  submitLabel,
 }: {
   table: string;
   singular: string;
   fields: FieldDef[];
   initial: Partial<T> | T;
   onClose: () => void;
+  variant?: "default" | "premium";
+  icon?: LucideIcon;
+  createSubtitle?: string;
+  submitLabel?: string;
 }) {
   const qc = useQueryClient();
   const { profile } = useTenant();
@@ -601,6 +631,35 @@ function ResourceFormDialog<T extends { id: string }>({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    for (const f of fields) {
+      if (f.required && !values[f.name]) {
+        toast.error(`Le champ « ${f.label} » est requis`);
+        return;
+      }
+    }
+    saveMut.mutate();
+  };
+
+  if (variant === "premium") {
+    return (
+      <PremiumResourceFormDialog
+        singular={singular}
+        fields={fields}
+        values={values}
+        setValues={setValues}
+        isEdit={isEdit}
+        icon={icon}
+        createSubtitle={createSubtitle}
+        submitLabel={submitLabel}
+        isPending={saveMut.isPending}
+        onClose={onClose}
+        onSubmit={handleSubmit}
+      />
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -614,16 +673,7 @@ function ResourceFormDialog<T extends { id: string }>({
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 12 }}
         onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          for (const f of fields) {
-            if (f.required && !values[f.name]) {
-              toast.error(`Le champ « ${f.label} » est requis`);
-              return;
-            }
-          }
-          saveMut.mutate();
-        }}
+        onSubmit={handleSubmit}
         className="w-full max-w-lg rounded-2xl bg-card border border-border shadow-xl"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -693,6 +743,216 @@ function ResourceFormDialog<T extends { id: string }>({
           >
             {saveMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             {isEdit ? "Enregistrer" : "Créer"}
+          </button>
+        </div>
+      </motion.form>
+    </motion.div>
+  );
+}
+
+/** Premium SaaS-styled form dialog (rounded-24px card, icon header, inputs with left
+ * icons). Opt-in via `ResourceTableProps.formVariant="premium"` — shares the exact same
+ * state, validation and submit handler as the default dialog; only the markup differs. */
+function PremiumResourceFormDialog({
+  singular,
+  fields,
+  values,
+  setValues,
+  isEdit,
+  icon: Icon,
+  createSubtitle,
+  submitLabel,
+  isPending,
+  onClose,
+  onSubmit,
+}: {
+  singular: string;
+  fields: FieldDef[];
+  values: Record<string, unknown>;
+  setValues: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
+  isEdit: boolean;
+  icon?: LucideIcon;
+  createSubtitle?: string;
+  submitLabel?: string;
+  isPending: boolean;
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
+  const titleId = useId();
+  const subtitleId = useId();
+  const cardRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    cardRef.current?.querySelector<HTMLElement>("input, textarea, select")?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !cardRef.current) return;
+      const focusables = cardRef.current.querySelectorAll<HTMLElement>(
+        'input, textarea, select, button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const title = isEdit ? `Modifier ${singular.toLowerCase()}` : `Nouveau ${singular.toLowerCase()}`;
+  const subtitle = isEdit
+    ? `Modifiez les informations de ce ${singular.toLowerCase()}.`
+    : (createSubtitle ?? `Ajoutez les informations de votre nouveau ${singular.toLowerCase()}.`);
+  const submitText = isEdit
+    ? "Enregistrer les modifications"
+    : (submitLabel ?? `Créer ${singular.toLowerCase()}`);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-3 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.form
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={subtitleId}
+        initial={{ opacity: 0, scale: 0.94, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={onSubmit}
+        className="flex max-h-[94vh] w-full max-w-lg flex-col overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-[0_25px_70px_-15px_rgba(15,23,42,0.35)] dark:border-border dark:bg-card sm:max-h-[85vh] sm:rounded-[24px]"
+      >
+        <div className="flex items-start justify-between gap-4 px-6 pb-5 pt-7 sm:px-8 sm:pt-8">
+          <div className="flex items-center gap-4">
+            {Icon && (
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                <Icon className="h-6 w-6" />
+              </div>
+            )}
+            <div>
+              <h3 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-foreground">
+                {title}
+              </h3>
+              <p id={subtitleId} className="mt-0.5 text-sm text-slate-500 dark:text-muted-foreground">
+                {subtitle}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer"
+            className="rounded-full p-2 text-slate-400 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-muted dark:hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 overflow-y-auto px-6 pb-2 sm:grid-cols-2 sm:gap-5 sm:px-8">
+          {fields.map((f) => {
+            const span =
+              (f.colSpan ?? (f.type === "textarea" ? 2 : 1)) === 2 ? "sm:col-span-2" : "sm:col-span-1";
+            const FieldIcon = f.icon;
+            const commonProps = {
+              value: (values[f.name] ?? "") as string | number,
+              onChange: (
+                e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+              ) => setValues((s) => ({ ...s, [f.name]: e.target.value })),
+              required: f.required,
+              placeholder: f.placeholder,
+            };
+            const inputClasses = `w-full rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-600/10 dark:border-border dark:bg-muted/40 dark:text-foreground ${FieldIcon ? "pl-11" : "pl-4"} pr-4`;
+
+            return (
+              <label key={f.name} className={`col-span-1 ${span} flex flex-col gap-2`}>
+                <span className="text-sm font-medium text-slate-700 dark:text-foreground">
+                  {f.label}
+                  {f.required && <span className="text-blue-600"> *</span>}
+                </span>
+                {f.render ? (
+                  f.render({
+                    value: (values[f.name] ?? "") as string | number,
+                    onChange: (v) => setValues((s) => ({ ...s, [f.name]: v })),
+                    required: f.required,
+                  })
+                ) : f.type === "textarea" ? (
+                  <div className="relative">
+                    {FieldIcon && (
+                      <FieldIcon className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" />
+                    )}
+                    <textarea
+                      rows={4}
+                      {...commonProps}
+                      className={`h-[120px] resize-none py-3.5 ${inputClasses}`}
+                    />
+                  </div>
+                ) : f.type === "select" ? (
+                  <div className="relative">
+                    {FieldIcon && (
+                      <FieldIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    )}
+                    <select {...commonProps} className={`h-14 ${inputClasses}`}>
+                      <option value="">—</option>
+                      {(f.options ?? []).map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    {FieldIcon && (
+                      <FieldIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    )}
+                    <input
+                      type={f.type ?? "text"}
+                      step={f.step}
+                      {...commonProps}
+                      className={`h-14 ${inputClasses}`}
+                    />
+                  </div>
+                )}
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="mt-2 flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-5 dark:border-border dark:bg-muted/10 sm:px-8">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 transition-colors duration-200 hover:bg-slate-100 dark:border-border dark:text-muted-foreground dark:hover:bg-muted"
+          >
+            <X className="h-4 w-4" /> Annuler
+          </button>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/40 active:translate-y-0 disabled:pointer-events-none disabled:opacity-60"
+          >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {submitText}
           </button>
         </div>
       </motion.form>

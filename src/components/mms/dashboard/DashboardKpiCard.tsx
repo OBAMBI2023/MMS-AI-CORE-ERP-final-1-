@@ -63,7 +63,7 @@ export function DashboardKpiCard({
   title: string;
   value: string;
   icon: LucideIcon;
-  route: string;
+  route?: string;
   trend: number | null;
   spark?: SparkPoint[];
   accent?: KpiAccent;
@@ -72,6 +72,7 @@ export function DashboardKpiCard({
   const colors = accentMap[accent];
   const trendUp = (trend ?? 0) > 0.001;
   const trendDown = (trend ?? 0) < -0.001;
+  const Wrapper = route ? "a" : "div";
 
   return (
     <motion.div
@@ -81,7 +82,7 @@ export function DashboardKpiCard({
       whileHover={{ y: -3 }}
       className="h-full"
     >
-      <a href={route} className="block h-full group">
+      <Wrapper href={route} className="block h-full group">
         <div className="relative h-full overflow-hidden rounded-[20px] border border-border bg-card p-3.5 shadow-sm transition-shadow group-hover:shadow-lg group-hover:shadow-black/5 sm:rounded-[24px] sm:p-5 dark:bg-[#151B2F] dark:border-white/5 dark:shadow-none dark:group-hover:shadow-lg dark:group-hover:shadow-indigo-950/40">
           <div
             className={cn(
@@ -134,7 +135,7 @@ export function DashboardKpiCard({
             )}
           </div>
         </div>
-      </a>
+      </Wrapper>
     </motion.div>
   );
 }

@@ -5,6 +5,7 @@ import {
   Building2,
   Mail,
   Phone,
+  MapPin,
   Pencil,
   Trash2,
   Eye,
@@ -54,11 +55,11 @@ interface AchatsStat {
 }
 
 const fields: FieldDef[] = [
-  { name: "name", label: "Nom", required: true, colSpan: 2 },
-  { name: "phone", label: "Téléphone", type: "tel" },
-  { name: "email", label: "Email", type: "email" },
-  { name: "address", label: "Adresse", colSpan: 2 },
-  { name: "notes", label: "Notes", type: "textarea" },
+  { name: "name", label: "Nom", required: true, colSpan: 2, icon: Building2 },
+  { name: "phone", label: "Téléphone", type: "tel", icon: Phone },
+  { name: "email", label: "Email", type: "email", icon: Mail },
+  { name: "address", label: "Adresse", colSpan: 2, icon: MapPin },
+  { name: "notes", label: "Notes", type: "textarea", colSpan: 2, icon: FileText },
 ];
 
 const columns: ColumnDef<Fournisseur>[] = [
@@ -272,6 +273,10 @@ function FournisseursPage() {
           deletePermission="fournisseurs.delete"
           entityName="fournisseurs"
           premiumLayout
+          formVariant="premium"
+          formIcon={Building2}
+          formCreateSubtitle="Ajoutez les informations de votre fournisseur"
+          formSubmitLabel="Créer le fournisseur"
           renderMobileCard={(row, actions) => (
             <FournisseurCard row={row} actions={actions} achatsInfo={achatsStats[row.id]} exportColumns={exportColumns} />
           )}

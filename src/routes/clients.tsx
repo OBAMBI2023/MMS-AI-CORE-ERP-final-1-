@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Users, Mail, Phone, MapPin, Pencil, Trash2, Eye, Printer, FileText, FileSpreadsheet, Download, CalendarDays } from "lucide-react";
+import { Users, User, UserPlus, Mail, Phone, MapPin, Pencil, Trash2, Eye, Printer, FileText, FileSpreadsheet, Download, CalendarDays } from "lucide-react";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { AppShell } from "@/components/mms/AppShell";
 import {
@@ -34,11 +34,11 @@ interface Client {
 }
 
 const fields: FieldDef[] = [
-  { name: "name", label: "Nom", required: true, colSpan: 2 },
-  { name: "phone", label: "Téléphone", type: "tel" },
-  { name: "email", label: "Email", type: "email" },
-  { name: "address", label: "Adresse", colSpan: 2 },
-  { name: "notes", label: "Notes", type: "textarea" },
+  { name: "name", label: "Nom", required: true, colSpan: 2, icon: User },
+  { name: "phone", label: "Téléphone", type: "tel", icon: Phone },
+  { name: "email", label: "Email", type: "email", icon: Mail },
+  { name: "address", label: "Adresse", colSpan: 2, icon: MapPin },
+  { name: "notes", label: "Notes", type: "textarea", colSpan: 2, icon: FileText },
 ];
 
 const columns: ColumnDef<Client>[] = [
@@ -205,6 +205,10 @@ function ClientsPage() {
           deletePermission="clients.delete"
           entityName="clients"
           premiumLayout
+          formVariant="premium"
+          formIcon={UserPlus}
+          formCreateSubtitle="Ajoutez les informations de votre nouveau client"
+          formSubmitLabel="Créer le client"
           renderMobileCard={(row, actions) => <ClientCard row={row} actions={actions} />}
           mobileEmptyState={{
             icon: <Users className="h-10 w-10 text-muted-foreground/50" />,
