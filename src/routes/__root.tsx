@@ -69,6 +69,7 @@ const publicRoutes = new Set([
   "/login",
   "/forgot-password",
   "/reset-password",
+  "/preview-achats",
 ]);
 
 function isPublicRoute(pathname: string) {

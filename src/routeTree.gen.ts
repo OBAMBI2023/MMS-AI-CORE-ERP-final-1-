@@ -17,6 +17,7 @@ import { Route as StockRouteImport } from './routes/stock'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RapportsRouteImport } from './routes/rapports'
+import { Route as PreviewAchatsRouteImport } from './routes/preview-achats'
 import { Route as PartnerLoginRouteImport } from './routes/partner-login'
 import { Route as PartnerAdminRouteImport } from './routes/partner-admin'
 import { Route as PartnerRouteImport } from './routes/partner'
@@ -84,6 +85,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RapportsRoute = RapportsRouteImport.update({
   id: '/rapports',
   path: '/rapports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAchatsRoute = PreviewAchatsRouteImport.update({
+  id: '/preview-achats',
+  path: '/preview-achats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PartnerLoginRoute = PartnerLoginRouteImport.update({
@@ -247,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/partner': typeof PartnerRoute
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
+  '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/partner': typeof PartnerRoute
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
+  '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
@@ -324,6 +332,7 @@ export interface FileRoutesById {
   '/partner': typeof PartnerRoute
   '/partner-admin': typeof PartnerAdminRoute
   '/partner-login': typeof PartnerLoginRoute
+  '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/services': typeof ServicesRoute
@@ -364,6 +373,7 @@ export interface FileRouteTypes {
     | '/partner'
     | '/partner-admin'
     | '/partner-login'
+    | '/preview-achats'
     | '/rapports'
     | '/reset-password'
     | '/services'
@@ -402,6 +412,7 @@ export interface FileRouteTypes {
     | '/partner'
     | '/partner-admin'
     | '/partner-login'
+    | '/preview-achats'
     | '/rapports'
     | '/reset-password'
     | '/services'
@@ -440,6 +451,7 @@ export interface FileRouteTypes {
     | '/partner'
     | '/partner-admin'
     | '/partner-login'
+    | '/preview-achats'
     | '/rapports'
     | '/reset-password'
     | '/services'
@@ -479,6 +491,7 @@ export interface RootRouteChildren {
   PartnerRoute: typeof PartnerRoute
   PartnerAdminRoute: typeof PartnerAdminRoute
   PartnerLoginRoute: typeof PartnerLoginRoute
+  PreviewAchatsRoute: typeof PreviewAchatsRoute
   RapportsRoute: typeof RapportsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ServicesRoute: typeof ServicesRoute
@@ -551,6 +564,13 @@ declare module '@tanstack/react-router' {
       path: '/rapports'
       fullPath: '/rapports'
       preLoaderRoute: typeof RapportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-achats': {
+      id: '/preview-achats'
+      path: '/preview-achats'
+      fullPath: '/preview-achats'
+      preLoaderRoute: typeof PreviewAchatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/partner-login': {
@@ -788,6 +808,7 @@ const rootRouteChildren: RootRouteChildren = {
   PartnerRoute: PartnerRoute,
   PartnerAdminRoute: PartnerAdminRoute,
   PartnerLoginRoute: PartnerLoginRoute,
+  PreviewAchatsRoute: PreviewAchatsRoute,
   RapportsRoute: RapportsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ServicesRoute: ServicesRoute,
