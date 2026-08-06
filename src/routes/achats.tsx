@@ -4,20 +4,36 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, Search, FileText } from "lucide-react";
+import {
+  ShoppingCart,
+  Pencil,
+  Trash2,
+  Eye,
+  Printer,
+  FileText,
+  FileSpreadsheet,
+  Download,
+  Calendar,
+  Building2,
+  Hash,
+  ListOrdered,
+  Loader2,
+  Plus,
+} from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
+import { PremiumResourceList } from "@/components/mms/PremiumResourceList";
+import { ResourceCard, type ResourceCardDetail, type ResourceCardMenuAction } from "@/components/mms/ResourceCard";
+import {
+  DataExportMenu,
+  exportRowsToPdf,
+  exportRowsToXlsx,
+  exportRowsToCsv,
+  type ExportColumn,
+} from "@/components/mms/DataExportMenu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDateTime } from "@/lib/mms/format";
-import { jsPDF } from "jspdf";
-import { downloadPdf } from "@/lib/mms/download-pdf";
-import {
-  renderAchatsHeader,
-  renderAchatsTable,
-  renderAchatsTotals,
-} from "@/lib/mms/pdf-achats-template";
-import { tenantFromSettings } from "@/lib/mms/PdfTheme";
-import { PdfLayoutEngine } from "@/lib/mms/PdfLayoutEngine";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
@@ -30,6 +46,16 @@ interface Achat {
   fournisseur_name: string | null;
   total: number;
   created_at: string;
+  [k: string]: unknown;
+}
+
+interface AchatItem {
+  id: string;
+  name: string;
+  qty: number;
+  price: number;
+  line_total: number;
+  unit: string | null;
 }
 
 export const Route = createFileRoute("/achats")({
@@ -42,6 +68,162 @@ export const Route = createFileRoute("/achats")({
   }),
 });
 
+function AchatCard({
+  row,
+  lineCount,
+  canEdit,
+  canDelete,
+  onEdit,
+  onDelete,
+  exportColumns,
+}: {
+  row: Achat;
+  lineCount: number;
+  canEdit: boolean;
+  canDelete: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  exportColumns: ExportColumn<Achat>[];
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const { settings, logoUrl } = useCompanySettings();
+
+  const { data: items = [], isLoading: itemsLoading } = useQuery({
+    queryKey: ["achat_items", row.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("achat_items")
+        .select("id, name, qty, price, line_total, unit")
+        .eq("achat_id", row.id);
+      if (error) throw error;
+      return (data ?? []) as AchatItem[];
+    },
+    enabled: detailsOpen,
+  });
+
+  const exportCtx = {
+    filename: `Achat_${row.number}`,
+    pdfTitle: "Bon d'achat",
+    companySettings: settings,
+    logoUrl,
+  };
+
+  const title = row.fournisseur_name?.trim() || "Achat sans fournisseur";
+
+  const details: ResourceCardDetail[] = [
+    { icon: Calendar, label: "Date", value: formatDateTime(row.created_at) },
+    { icon: Building2, label: "Fournisseur", value: row.fournisseur_name || "—" },
+    { icon: Hash, label: "Numéro", value: row.number },
+    { icon: ListOrdered, label: "Nombre de lignes", value: lineCount },
+  ];
+
+  const menuActions: ResourceCardMenuAction[] = [
+    { key: "details", icon: Eye, label: "Voir détails", onClick: () => setDetailsOpen(true) },
+    { key: "pdf", icon: FileText, label: "Exporter PDF", onClick: () => void exportRowsToPdf([row], exportColumns, exportCtx) },
+    { key: "xlsx", icon: FileSpreadsheet, label: "Exporter Excel", onClick: () => exportRowsToXlsx([row], exportColumns, exportCtx) },
+    { key: "csv", icon: Download, label: "Exporter CSV", onClick: () => exportRowsToCsv([row], exportColumns, exportCtx) },
+  ];
+  if (canDelete) {
+    menuActions.push({ key: "delete", icon: Trash2, label: "Supprimer", onClick: onDelete, destructive: true });
+  }
+
+  return (
+    <>
+      <ResourceCard
+        leading={{ variant: "icon", icon: ShoppingCart, className: "bg-blue-500" }}
+        title={title.toUpperCase()}
+        badge={{ label: row.number, className: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" }}
+        headerInfo={{ value: formatCurrency(Number(row.total)), className: "text-primary" }}
+        menuAriaLabel="Menu de l'achat"
+        menuActions={menuActions}
+        details={details}
+        footerActions={[
+          {
+            key: "edit",
+            icon: Pencil,
+            label: "Modifier",
+            onClick: onEdit,
+            colorClass:
+              "text-blue-600 hover:bg-blue-50 active:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-500/10",
+            disabled: !canEdit,
+          },
+          {
+            key: "print",
+            icon: Printer,
+            label: "Imprimer",
+            onClick: () =>
+              void exportRowsToPdf([row], exportColumns, { ...exportCtx, successMessage: "Impression lancée" }),
+            colorClass:
+              "text-gray-600 hover:bg-gray-50 active:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-500/10",
+          },
+          {
+            key: "delete",
+            icon: Trash2,
+            label: "Supprimer",
+            onClick: onDelete,
+            colorClass: "text-red-600 hover:bg-red-50 active:bg-red-100 dark:text-red-400 dark:hover:bg-red-500/10",
+            disabled: !canDelete,
+          },
+        ]}
+      />
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white">
+                <ShoppingCart className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="truncate">{title}</DialogTitle>
+                <DialogDescription>Achat {row.number}</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <span className="text-muted-foreground">Date</span>
+              <span className="font-medium text-foreground">{formatDateTime(row.created_at)}</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <span className="text-muted-foreground">Total</span>
+              <span className="text-base font-bold text-primary">{formatCurrency(Number(row.total))}</span>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Lignes d'achat
+              </p>
+              {itemsLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucune ligne.</p>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.qty} {item.unit || "unité"} × {formatCurrency(Number(item.price))}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold text-foreground">
+                        {formatCurrency(Number(item.line_total))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function AchatsPage() {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
@@ -49,7 +231,7 @@ function AchatsPage() {
   const [q, setQ] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const { settings, logoUrl } = useCompanySettings(tenantLoading ? null : tenantId);
+  const { settings, logoUrl, companyName } = useCompanySettings(tenantLoading ? null : tenantId);
   const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
   const permissionsQuery = usePermissions();
   const { roleId } = permissionsQuery.data || { roleId: null };
@@ -73,44 +255,28 @@ function AchatsPage() {
     enabled: !tenantLoading && Boolean(tenantId),
   });
 
-  const exportPDF = async (data: Achat[]) => {
-    if (data.length === 0) {
-      toast.error("Aucun achat à exporter.");
-      return;
-    }
-    if (!settings) {
-      toast.error("Paramètres de l'entreprise non chargés.");
-      return;
-    }
+  const { data: lineCounts = {} } = useQuery({
+    queryKey: ["achat_items_counts", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return {} as Record<string, number>;
+      const { data, error } = await supabase.from("achat_items").select("achat_id").eq("tenant_id", tenantId);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const item of data ?? []) {
+        counts[item.achat_id] = (counts[item.achat_id] ?? 0) + 1;
+      }
+      return counts;
+    },
+    enabled: !tenantLoading && Boolean(tenantId),
+  });
 
-    const doc = new jsPDF();
-    const total = data.reduce((acc, d) => acc + Number(d.total), 0);
-
-    const startY = await renderAchatsHeader(
-      doc,
-      settings,
-      logoUrl,
-      data.length,
-      formatCurrency(total),
-    );
-
-    renderAchatsTable(
-      doc,
-      data.map((d) => ({
-        date: formatDateTime(d.created_at),
-        reference: d.number,
-        fournisseur: d.fournisseur_name ?? "-",
-        amount: formatCurrency(Number(d.total)),
-      })),
-      startY + 5,
-    );
-
-    renderAchatsTotals(doc, formatCurrency(total));
-    PdfLayoutEngine.footer(doc, tenantFromSettings(settings, logoUrl));
-
-    await downloadPdf(doc, `Achats_${new Date().toISOString().slice(0, 10)}.pdf`);
-    toast.success("PDF généré.");
-  };
+  const exportColumns: ExportColumn<Achat>[] = [
+    { header: "Numéro", value: (row) => row.number },
+    { header: "Fournisseur", value: (row) => row.fournisseur_name ?? "-" },
+    { header: "Date", value: (row) => formatDateTime(row.created_at) },
+    { header: "Nombre de lignes", value: (row) => lineCounts[row.id] ?? 0 },
+    { header: "Total", value: (row) => formatCurrency(Number(row.total)) },
+  ];
 
   const del = useMutation({
     mutationFn: async (achat: Achat) => {
@@ -144,96 +310,60 @@ function AchatsPage() {
 
   return (
     <AppShell title="Achats" subtitle="Approvisionnements et commandes fournisseurs">
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Rechercher un achat..."
-              className="w-full rounded-xl bg-muted/60 border border-border pl-10 pr-4 py-2 text-sm outline-none focus:border-primary/40"
-            />
-          </div>
-          <div className="flex items-center gap-2 ml-auto">
-            {canExportAchat && (
-                <button
-                onClick={() => exportPDF(filtered)}
-                className="inline-flex items-center gap-2 rounded-xl bg-white border border-gray-300 text-gray-700 px-4 py-2 text-sm font-medium hover:text-blue-600 hover:border-blue-600 transition-colors"
-                >
-                <FileText className="h-4 w-4" /> Exporter PDF
-                </button>
-            )}
-            {canCreateAchat && (
-                <button
+      <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
+        <PremiumResourceList<Achat>
+          items={filtered}
+          isLoading={isLoading}
+          singular="Achat"
+          plural="Achats"
+          searchValue={q}
+          onSearchChange={setQ}
+          nameField="fournisseur_name"
+          nameSortLabel="Fournisseur"
+          dateField="created_at"
+          emptyState={{
+            icon: <ShoppingCart className="h-10 w-10 text-muted-foreground/50" />,
+            title: "Aucun achat",
+            subtitle: "Ajoutez votre premier achat pour commencer.",
+          }}
+          actionsSlot={
+            canExportAchat ? (
+              <DataExportMenu
+                data={filtered}
+                columns={exportColumns}
+                filename={`Liste_achats_${companyName}`}
+                pdfTitle="Liste des achats"
+                companySettings={settings}
+                logoUrl={logoUrl}
+                triggerVariant="outline"
+                triggerClassName="w-full min-h-[44px] justify-center gap-2 rounded-xl border-gray-300 bg-white text-gray-700 shadow-sm hover:border-blue-600 hover:bg-white hover:text-blue-600 dark:bg-card sm:w-auto"
+              />
+            ) : undefined
+          }
+          createSlot={
+            canCreateAchat ? (
+              <button
                 onClick={() => setCreating(true)}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-                >
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#3B82F6] px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-blue-500/25 transition-all duration-200 hover:shadow-md hover:shadow-blue-500/30 active:scale-[0.98]"
+              >
                 <Plus className="h-4 w-4" /> Nouvel achat
-                </button>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card overflow-x-auto w-full">
-          <table className="w-full text-sm min-w-max">
-            <thead className="bg-muted/40 text-muted-foreground text-xs uppercase tracking-wide">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Numéro</th>
-                <th className="text-left px-4 py-3 font-medium">Fournisseur</th>
-                <th className="text-left px-4 py-3 font-medium">Date</th>
-                <th className="text-right px-4 py-3 font-medium">Total</th>
-                <th className="w-24" />
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-12">
-                    <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-12 text-muted-foreground">
-                    Aucun achat {q ? "trouvé" : "pour l'instant"}.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((d) => (
-                  <tr key={d.id} className="border-t border-border hover:bg-muted/30">
-                    <td className="px-4 py-3 font-medium">{d.number}</td>
-                    <td className="px-4 py-3">{d.fournisseur_name ?? "-"}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {formatDateTime(d.created_at)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-primary">
-                      {formatCurrency(Number(d.total))}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setEditId(d.id)}
-                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        {canDeleteAchat && (
-                            <button
-                                onClick={() => confirm("Supprimer cet achat ?") && del.mutate(d)}
-                                className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              </button>
+            ) : undefined
+          }
+          renderCard={(row) => (
+            <AchatCard
+              row={row}
+              lineCount={lineCounts[row.id] ?? 0}
+              canEdit
+              canDelete={canDeleteAchat}
+              onEdit={() => setEditId(row.id)}
+              onDelete={() => {
+                if (confirm("Supprimer cet achat ?")) del.mutate(row);
+              }}
+              exportColumns={exportColumns}
+            />
+          )}
+        />
       </div>
 
       <AnimatePresence>

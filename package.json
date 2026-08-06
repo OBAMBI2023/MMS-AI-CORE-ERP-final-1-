@@ -6,6 +6,7 @@
   "scripts": {
     "migrate:company-assets": "node scripts/migrate-legacy-company-assets.mjs",
     "dev": "vite dev",
+    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",

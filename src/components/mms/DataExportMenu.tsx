@@ -19,13 +19,18 @@ export type ExportColumn<T> = {
   value: (row: T) => string | number | null | undefined;
 };
 
-type DataExportMenuProps<T> = {
-  data: T[];
-  columns: ExportColumn<T>[];
+export interface ExportContext {
   filename: string;
   pdfTitle: string;
   companySettings?: Record<string, unknown> | null;
   logoUrl?: string | null;
+  /** Overrides the default success toast (e.g. "Impression lancée" for a print action). */
+  successMessage?: string;
+}
+
+type DataExportMenuProps<T> = ExportContext & {
+  data: T[];
+  columns: ExportColumn<T>[];
   triggerVariant?: ButtonProps["variant"];
   triggerClassName?: string;
 };
@@ -33,7 +38,7 @@ type DataExportMenuProps<T> = {
 const safeFilename = (filename: string) =>
   filename
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-zA-Z0-9_-]+/g, "_");
 
 const downloadBlob = (blob: Blob, filename: string) => {
@@ -47,6 +52,80 @@ const downloadBlob = (blob: Blob, filename: string) => {
 
 const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
 
+const rowsToCells = <T,>(rows: T[], columns: ExportColumn<T>[]) =>
+  rows.map((row) =>
+    columns.map((column) => {
+      const value = column.value(row);
+      return value == null ? "" : value;
+    }),
+  );
+
+const ensureData = <T,>(rows: T[]) => {
+  if (rows.length) return true;
+  toast.error("Aucune donnée à exporter.");
+  return false;
+};
+
+/** Reusable export primitives — used both by the bulk `DataExportMenu` (filtered list) and
+ * by each card's ⋮ menu (single-row export), so the PDF/Excel/CSV generation logic lives
+ * in exactly one place. */
+export async function exportRowsToPdf<T>(
+  rows: T[],
+  columns: ExportColumn<T>[],
+  ctx: ExportContext,
+): Promise<void> {
+  if (!ensureData(rows)) return;
+  try {
+    const doc = new jsPDF({ orientation: "portrait", format: "a4", unit: "mm" });
+    const tenant = tenantFromSettings(ctx.companySettings, ctx.logoUrl);
+    const startY = await PdfLayoutEngine.header(doc, tenant, ctx.pdfTitle, [
+      { label: "Nombre de lignes", value: String(rows.length) },
+      { label: "Date", value: new Intl.DateTimeFormat("fr-FR").format(new Date()) },
+      { label: "Format", value: "A4 portrait" },
+      { label: "Statut", value: "Export validé" },
+    ]);
+    PdfLayoutEngine.table(
+      doc,
+      columns.map((column) => column.header),
+      rowsToCells(rows, columns),
+      startY,
+      { styles: { fontSize: 7, cellPadding: 2 } },
+    );
+    PdfLayoutEngine.footer(doc, tenant);
+    await downloadPdf(doc, `${safeFilename(ctx.filename)}.pdf`);
+    toast.success(ctx.successMessage ?? "Export PDF terminé.");
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Impossible de générer le PDF.");
+  }
+}
+
+export function exportRowsToXlsx<T>(rows: T[], columns: ExportColumn<T>[], ctx: ExportContext): void {
+  if (!ensureData(rows)) return;
+  try {
+    const file = createXlsx(
+      columns.map((column) => column.header),
+      rowsToCells(rows, columns),
+    );
+    downloadBlob(
+      new Blob([file], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+      `${safeFilename(ctx.filename)}.xlsx`,
+    );
+    toast.success("Export Excel terminé.");
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Impossible de générer le fichier Excel.");
+  }
+}
+
+export function exportRowsToCsv<T>(rows: T[], columns: ExportColumn<T>[], ctx: ExportContext): void {
+  if (!ensureData(rows)) return;
+  const csv = [
+    columns.map((column) => csvCell(column.header)).join(";"),
+    ...rowsToCells(rows, columns).map((row) => row.map(csvCell).join(";")),
+  ].join("\r\n");
+  downloadBlob(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }), `${safeFilename(ctx.filename)}.csv`);
+  toast.success("Export CSV terminé.");
+}
+
 export function DataExportMenu<T>({
   data,
   columns,
@@ -58,78 +137,12 @@ export function DataExportMenu<T>({
   triggerClassName,
 }: DataExportMenuProps<T>) {
   const [pending, setPending] = useState<"pdf" | "xlsx" | "csv" | null>(null);
-  const baseFilename = safeFilename(filename);
-  const rows = () =>
-    data.map((row) =>
-      columns.map((column) => {
-        const value = column.value(row);
-        return value == null ? "" : value;
-      }),
-    );
+  const ctx: ExportContext = { filename, pdfTitle, companySettings, logoUrl };
 
-  const ensureData = () => {
-    if (data.length) return true;
-    toast.error("Aucune donnée à exporter.");
-    return false;
-  };
-
-  const exportPdf = async () => {
-    if (!ensureData()) return;
-    setPending("pdf");
+  const run = async (kind: "pdf" | "xlsx" | "csv", action: () => void | Promise<void>) => {
+    setPending(kind);
     try {
-      const doc = new jsPDF({ orientation: "portrait", format: "a4", unit: "mm" });
-      const tenant = tenantFromSettings(companySettings, logoUrl);
-      const startY = await PdfLayoutEngine.header(doc, tenant, pdfTitle, [
-        { label: "Nombre de lignes", value: String(data.length) },
-        { label: "Date", value: new Intl.DateTimeFormat("fr-FR").format(new Date()) },
-        { label: "Format", value: "A4 portrait" },
-        { label: "Statut", value: "Export validé" },
-      ]);
-      PdfLayoutEngine.table(doc, columns.map((column) => column.header), rows(), startY, {
-        styles: { fontSize: 7, cellPadding: 2 },
-      });
-      PdfLayoutEngine.footer(doc, tenant);
-      await downloadPdf(doc, `${baseFilename}.pdf`);
-      toast.success("Export PDF terminé.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Impossible de générer le PDF.");
-    } finally {
-      setPending(null);
-    }
-  };
-
-  const exportXlsx = () => {
-    if (!ensureData()) return;
-    setPending("xlsx");
-    try {
-      const file = createXlsx(columns.map((column) => column.header), rows());
-      downloadBlob(
-        new Blob([file], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }),
-        `${baseFilename}.xlsx`,
-      );
-      toast.success("Export Excel terminé.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Impossible de générer le fichier Excel.");
-    } finally {
-      setPending(null);
-    }
-  };
-
-  const exportCsv = () => {
-    if (!ensureData()) return;
-    setPending("csv");
-    try {
-      const csv = [
-        columns.map((column) => csvCell(column.header)).join(";"),
-        ...rows().map((row) => row.map(csvCell).join(";")),
-      ].join("\r\n");
-      downloadBlob(
-        new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" }),
-        `${baseFilename}.csv`,
-      );
-      toast.success("Export CSV terminé.");
+      await action();
     } finally {
       setPending(null);
     }
@@ -143,22 +156,18 @@ export function DataExportMenu<T>({
           className={triggerClassName ?? "gap-2 rounded-xl"}
           disabled={pending !== null}
         >
-          {pending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           Exporter
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => void exportPdf()}>
+        <DropdownMenuItem onClick={() => void run("pdf", () => exportRowsToPdf(data, columns, ctx))}>
           <FileText className="h-4 w-4" /> PDF
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportXlsx}>
+        <DropdownMenuItem onClick={() => void run("xlsx", () => exportRowsToXlsx(data, columns, ctx))}>
           <FileSpreadsheet className="h-4 w-4" /> Excel (.xlsx)
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportCsv}>
+        <DropdownMenuItem onClick={() => void run("csv", () => exportRowsToCsv(data, columns, ctx))}>
           <Download className="h-4 w-4" /> CSV
         </DropdownMenuItem>
       </DropdownMenuContent>
