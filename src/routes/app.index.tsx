@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
 import {
   Wallet,
   ShoppingCart,
@@ -19,6 +20,7 @@ import {
   Settings,
   Bot,
   Search,
+  Command,
   ShoppingBag,
   Receipt,
   Clock,
@@ -48,18 +50,12 @@ import { AppShell } from "@/components/mms/AppShell";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { DashboardKpiCard } from "@/components/mms/dashboard/DashboardKpiCard";
 import { DashboardSecondaryCard } from "@/components/mms/dashboard/DashboardSecondaryCard";
 import { DashboardEmptyState } from "@/components/mms/dashboard/DashboardEmptyState";
-// TODO: Réactiver la recherche globale plus tard
-// import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import type { ActivityItem } from "@/hooks/use-dashboard-data";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/mms/format";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
@@ -82,6 +78,50 @@ const CHART_TOOLTIP_ITEM_STYLE = { fontSize: 12, padding: 0 };
 const CHART_TOOLTIP_LABEL_STYLE = { fontSize: 12, fontWeight: 600, marginBottom: 2 };
 const CHART_LEGEND_STYLE = { fontSize: 11 };
 
+type ActionColor = "blue" | "indigo" | "emerald" | "violet" | "amber" | "sky" | "rose" | "slate";
+
+const ACTION_COLOR_CLASSES: Record<ActionColor, string> = {
+  blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  indigo: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+  emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  sky: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  rose: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  slate: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+};
+
+const ACTIVITY_ICON: Record<
+  ActivityItem["type"],
+  { icon: LucideIcon; className: string; textClassName: string }
+> = {
+  vente: {
+    icon: ShoppingCart,
+    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    textClassName: "text-emerald-600 dark:text-emerald-400",
+  },
+  achat: {
+    icon: Package,
+    className: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    textClassName: "text-amber-600 dark:text-amber-400",
+  },
+  depense: {
+    icon: Receipt,
+    className: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    textClassName: "text-rose-600 dark:text-rose-400",
+  },
+  client: {
+    icon: Users,
+    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    textClassName: "text-sky-600 dark:text-sky-400",
+  },
+  fournisseur: {
+    icon: Truck,
+    className: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    textClassName: "text-violet-600 dark:text-violet-400",
+  },
+};
+
 function Dashboard() {
   const { data, isLoading, error } = useDashboardData();
   const modulesQuery = useTenantModules();
@@ -91,19 +131,19 @@ function Dashboard() {
   const canViewClients = modulesQuery.data?.has("customers") ?? false;
   const canViewFournisseurs = modulesQuery.data?.has("suppliers") ?? false;
   const canViewDevis = modulesQuery.data?.has("quotes") ?? false;
-  // TODO: Réactiver la recherche globale plus tard
-  // const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [showAllActions, setShowAllActions] = useState(false);
 
-  // useEffect(() => {
-  //   const handler = (e: KeyboardEvent) => {
-  //     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-  //       e.preventDefault();
-  //       setSearchOpen((o) => !o);
-  //     }
-  //   };
-  //   window.addEventListener("keydown", handler);
-  //   return () => window.removeEventListener("keydown", handler);
-  // }, []);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -124,15 +164,15 @@ function Dashboard() {
   );
 
   const quickActions = [
-    { title: "Nouvelle vente", icon: ShoppingCart, route: "/ventes" },
-    { title: "Nouveau devis", icon: FileText, route: "/devis" },
-    { title: "Nouveau client", icon: UserPlus, route: "/clients" },
-    ...(catalogSettings?.suppliers_enabled ? [{ title: "Nouveau fournisseur", icon: Building2, route: "/fournisseurs" }] : []),
-    ...(catalogSettings?.purchases_enabled ? [{ title: "Nouvel achat", icon: ShoppingBag, route: "/achats" }] : []),
-    { title: "Nouvelle dépense", icon: CreditCard, route: "/depenses" },
-    { title: catalogMode === "products" ? "Nouveau produit" : catalogMode === "services" ? "Nouveau service" : "Nouvel article", icon: Wrench, route: "/services" },
-    { title: "Rapports", icon: BarChart3, route: "/rapports" },
-    { title: "Paramètres", icon: Settings, route: "/parametres" },
+    { title: "Nouvelle vente", icon: ShoppingCart, route: "/ventes", color: "blue" as ActionColor },
+    { title: "Nouveau devis", icon: FileText, route: "/devis", color: "indigo" as ActionColor },
+    { title: "Nouveau client", icon: UserPlus, route: "/clients", color: "emerald" as ActionColor },
+    ...(catalogSettings?.suppliers_enabled ? [{ title: "Nouveau fournisseur", icon: Building2, route: "/fournisseurs", color: "sky" as ActionColor }] : []),
+    ...(catalogSettings?.purchases_enabled ? [{ title: "Nouvel achat", icon: ShoppingBag, route: "/achats", color: "amber" as ActionColor }] : []),
+    { title: "Nouvelle dépense", icon: CreditCard, route: "/depenses", color: "rose" as ActionColor },
+    { title: catalogMode === "products" ? "Nouveau produit" : catalogMode === "services" ? "Nouveau service" : "Nouvel article", icon: Wrench, route: "/services", color: "violet" as ActionColor },
+    { title: "Rapports", icon: BarChart3, route: "/rapports", color: "indigo" as ActionColor },
+    { title: "Paramètres", icon: Settings, route: "/parametres", color: "slate" as ActionColor },
     // { title: "Assistant IA", icon: Bot, route: "/assistant" },
   ].filter((action) => {
     if (action.route === "/clients") return canViewClients;
@@ -170,8 +210,7 @@ function Dashboard() {
 
   return (
     <AppShell title="Dashboard" contentClassName="bg-[#F8FAFC] dark:bg-[#0B1020]">
-      {/* TODO: Réactiver la recherche globale plus tard */}
-      {/* <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} /> */}
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
       <motion.div
         initial={{ opacity: 0 }}
@@ -196,14 +235,69 @@ function Dashboard() {
               </h1>
             )}
             <p className="mt-1.5 text-sm text-white/80 capitalize">{today}</p>
+
+            {isLoading || catalogSettingsQuery.isLoading || !data ? (
+              <div className="mt-5 h-14 w-full animate-pulse rounded-2xl bg-white/10" />
+            ) : (
+              <div className="mt-5 flex divide-x divide-white/15 overflow-hidden rounded-2xl bg-white/10">
+                {[
+                  { key: "ventes", icon: ShoppingCart, label: "Ventes", value: data.counts.ventes },
+                  ...(canViewDevis
+                    ? [
+                        { key: "devis", icon: FileText, label: "Devis", value: data.secondary.devisCount },
+                        {
+                          key: "impayees",
+                          icon: Wallet,
+                          label: "Facture à encaisser",
+                          value: data.secondary.facturesImpayeesCount,
+                        },
+                      ]
+                    : []),
+                ].map((stat) => (
+                  <div key={stat.key} className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 sm:px-3">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
+                      <stat.icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 leading-tight">
+                      <p className="truncate text-sm font-bold text-white">{stat.value}</p>
+                      <p className="truncate text-[10px] text-white/75">{stat.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Recherche */}
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm transition-colors hover:border-primary/50 dark:bg-[#151B2F] dark:border-white/5"
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="flex-1 truncate text-left">Rechercher un client, un produit, une facture...</span>
+          <span className="hidden shrink-0 items-center gap-0.5 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex dark:border-white/10 dark:bg-white/5">
+            <Command className="h-3 w-3" /> K
+          </span>
+        </button>
+
         {/* Actions Rapides */}
         <div className="space-y-3">
-          <h2 className="text-lg font-bold">Actions rapides</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {primaryActions.map((action, i) => (
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">Actions rapides</h2>
+            {overflowActions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAllActions((v) => !v)}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                {showAllActions ? "Réduire" : "Voir tout"}
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5 sm:gap-3">
+            {(showAllActions ? quickActions : primaryActions).map((action, i) => (
               <motion.div
                 key={action.title}
                 initial={{ opacity: 0, y: 8 }}
@@ -214,69 +308,47 @@ function Dashboard() {
               >
                 <Link
                   to={action.route}
-                  className="flex flex-col items-center gap-1.5 rounded-[24px] border border-border bg-card p-3 shadow-sm transition-all hover:border-primary hover:shadow-md h-full dark:bg-[#151B2F] dark:border-white/5"
+                  className="flex flex-col items-center gap-1.5 rounded-[20px] border border-border bg-card p-2.5 shadow-sm transition-all hover:border-primary hover:shadow-md h-full sm:rounded-[24px] sm:p-3 dark:bg-[#151B2F] dark:border-white/5"
                 >
-                  <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <div
+                    className={cn(
+                      "grid h-7 w-7 place-items-center rounded-xl sm:h-8 sm:w-8",
+                      ACTION_COLOR_CLASSES[action.color],
+                    )}
+                  >
                     <action.icon className="h-4 w-4" />
                   </div>
-                  <span className="text-center text-[11px] font-medium leading-tight">{action.title}</span>
+                  <span className="text-center text-[10px] font-medium leading-tight sm:text-[11px]">{action.title}</span>
                 </Link>
               </motion.div>
             ))}
-            {overflowActions.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <motion.button
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.96 }}
-                    transition={{ duration: 0.2, delay: primaryActions.length * 0.02 }}
-                    className="flex flex-col items-center gap-1.5 rounded-[24px] border border-border bg-card p-3 shadow-sm transition-all hover:border-primary hover:shadow-md h-full w-full dark:bg-[#151B2F] dark:border-white/5"
-                  >
-                    <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </div>
-                    <span className="text-center text-[11px] font-medium leading-tight">Plus</span>
-                  </motion.button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {overflowActions.map((action) => (
-                    <DropdownMenuItem key={action.title} asChild>
-                      <Link to={action.route} className="flex items-center gap-2">
-                        <action.icon className="h-4 w-4" />
-                        {action.title}
-                      </Link>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {/* TODO: Réactiver la recherche globale plus tard */}
-            {/* <motion.button
+          </div>
+          {!showAllActions && overflowActions.length > 0 && (
+            <motion.button
+              type="button"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, delay: quickActions.length * 0.02 }}
-              onClick={() => setSearchOpen(true)}
-              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-card border border-border hover:border-primary hover:shadow-md transition-all h-full"
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowAllActions(true)}
+              className="flex w-full items-center gap-3 rounded-[20px] border border-border bg-card px-4 py-3 text-sm font-medium shadow-sm transition-all hover:border-primary hover:shadow-md dark:bg-[#151B2F] dark:border-white/5"
             >
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                <Search className="h-5 w-5" />
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                <MoreHorizontal className="h-4 w-4" />
               </div>
-              <span className="text-xs font-medium text-center">Recherche globale</span>
-            </motion.button> */}
-          </div>
+              Plus d’actions
+            </motion.button>
+          )}
         </div>
 
         {/* KPI Premium */}
         {isLoading || catalogSettingsQuery.isLoading || !data ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 animate-pulse">
             {Array.from({ length: 4 }).map((_, i) => (
               <Card key={i} className={cn("h-32", CHART_CARD_CLASS)} />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <DashboardKpiCard
               index={0}
               title={catalogMode === "products" ? "CA produits" : catalogMode === "services" ? "CA services" : "CA total"}
@@ -607,7 +679,12 @@ function Dashboard() {
             {/* Activité récente */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               <Card className={cn("p-4 sm:p-6 lg:col-span-2", CHART_CARD_CLASS)}>
-                <h3 className="font-bold mb-3 sm:mb-4">Activité récente</h3>
+                <div className="mb-3 flex items-center justify-between sm:mb-4">
+                  <h3 className="font-bold">Activité récente</h3>
+                  <Link to="/journal" className="text-sm font-medium text-primary hover:underline">
+                    Voir tout
+                  </Link>
+                </div>
                 <Tabs defaultValue="journal">
                   <TabsList className="flex h-auto w-full justify-start gap-1.5 overflow-x-auto rounded-full bg-muted/60 p-1.5 scrollbar-thin">
                     <TabsTrigger
@@ -662,26 +739,37 @@ function Dashboard() {
                       />
                     ) : (
                       <ul className="divide-y divide-border">
-                        {data.activity.map((item) => (
-                          <li key={item.id}>
-                            <a
-                              href={item.route}
-                              className="flex items-center justify-between gap-3 py-2.5 text-sm hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
-                            >
-                              <div className="min-w-0">
-                                <p className="font-medium truncate">{item.title}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {item.subtitle} · {formatDate(item.date)}
-                                </p>
-                              </div>
-                              {item.amount !== undefined && (
-                                <span className="shrink-0 font-semibold text-sm">
-                                  {formatCurrency(item.amount)}
-                                </span>
-                              )}
-                            </a>
-                          </li>
-                        ))}
+                        {data.activity.map((item) => {
+                          const activityStyle = ACTIVITY_ICON[item.type];
+                          return (
+                            <li key={item.id}>
+                              <a
+                                href={item.route}
+                                className="flex items-center gap-3 py-2.5 text-sm hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
+                              >
+                                <div
+                                  className={cn(
+                                    "grid h-9 w-9 shrink-0 place-items-center rounded-full",
+                                    activityStyle.className,
+                                  )}
+                                >
+                                  <activityStyle.icon className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium truncate">{item.title}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {item.subtitle} · {formatDate(item.date)}
+                                  </p>
+                                </div>
+                                {item.amount !== undefined && (
+                                  <span className={cn("shrink-0 font-semibold text-sm", activityStyle.textClassName)}>
+                                    {formatCurrency(item.amount)}
+                                  </span>
+                                )}
+                              </a>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </TabsContent>
