@@ -53,10 +53,14 @@ export function AppShell({
                 </div>
               </SheetContent>
             </Sheet>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold tracking-tight md:text-2xl">{title}</h1>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold tracking-tight sm:text-xl md:text-2xl">
+                {title}
+              </h1>
               {subtitle && (
-                <p className="text-xs text-muted-foreground mt-1 md:text-sm">{subtitle}</p>
+                <p className="truncate text-xs text-muted-foreground mt-0.5 md:mt-1 md:text-sm">
+                  {subtitle}
+                </p>
               )}
             </div>
           </div>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,8 @@ type DataExportMenuProps<T> = {
   pdfTitle: string;
   companySettings?: Record<string, unknown> | null;
   logoUrl?: string | null;
+  triggerVariant?: ButtonProps["variant"];
+  triggerClassName?: string;
 };
 
 const safeFilename = (filename: string) =>
@@ -52,6 +54,8 @@ export function DataExportMenu<T>({
   pdfTitle,
   companySettings,
   logoUrl,
+  triggerVariant,
+  triggerClassName,
 }: DataExportMenuProps<T>) {
   const [pending, setPending] = useState<"pdf" | "xlsx" | "csv" | null>(null);
   const baseFilename = safeFilename(filename);
@@ -134,7 +138,11 @@ export function DataExportMenu<T>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button className="gap-2 rounded-xl" disabled={pending !== null}>
+        <Button
+          variant={triggerVariant}
+          className={triggerClassName ?? "gap-2 rounded-xl"}
+          disabled={pending !== null}
+        >
           {pending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
