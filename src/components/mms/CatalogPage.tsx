@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  DollarSign,
+  FolderTree,
   ImageIcon,
+  Info,
   Loader2,
   Package,
   Pencil,
   Plus,
+  RefreshCw,
+  Ruler,
   Search,
+  Settings2,
+  ShieldCheck,
+  Tag,
   Trash2,
-  Upload,
+  UploadCloud,
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { formatCurrency } from "@/lib/mms/format";
 import { generateUUID } from "@/lib/uuid";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -60,6 +70,17 @@ function isDuplicateServiceError(error: { code?: string | null; message?: string
   );
 }
 
+function formatNumberInput(raw: string) {
+  if (!raw) return "";
+  const [intPart, decimalPart] = raw.split(".");
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return decimalPart !== undefined ? `${withThousands}.${decimalPart}` : withThousands;
+}
+
+function parseNumberInput(formatted: string) {
+  return formatted.replace(/[^\d.]/g, "");
+}
+
 type CatalogForm = {
   type: "product" | "service";
   category_id: string;
@@ -79,14 +100,14 @@ const emptyForm: CatalogForm = {
   type: "service",
   category_id: "",
   name: "",
-  price: "0",
-  cost_price: "0",
+  price: "",
+  cost_price: "",
   unit: "unité",
   photo_url: "",
   photo_file: null,
   stock: "",
   manage_stock: false,
-  stock_alert_threshold: "0",
+  stock_alert_threshold: "",
   active: true,
 };
 
@@ -642,6 +663,99 @@ export function CatalogPage() {
   );
 }
 
+const SECTION_TONE_CLASSES: Record<string, string> = {
+  blue: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400",
+  green: "bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400",
+  orange: "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400",
+  violet: "bg-violet-50 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400",
+};
+
+function SectionCard({
+  number,
+  icon,
+  tone,
+  title,
+  className,
+  children,
+}: {
+  number: number;
+  icon: React.ReactNode;
+  tone: "blue" | "green" | "orange" | "violet";
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("rounded-2xl border border-border/70 bg-card/40 p-4 sm:p-5", className)}>
+      <div className="mb-4 flex items-center gap-2.5">
+        <span
+          className={cn(
+            "grid size-8 shrink-0 place-items-center rounded-lg",
+            SECTION_TONE_CLASSES[tone],
+          )}
+        >
+          {icon}
+        </span>
+        <h3 className="text-sm font-semibold text-foreground">
+          <span className="text-muted-foreground">{number}.</span> {title}
+        </h3>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
+}
+
+const TOGGLE_ROW_TONE_CLASSES: Record<string, { wrap: string; badge: string }> = {
+  blue: {
+    wrap: "border-blue-100 bg-blue-50/60 dark:border-blue-900/40 dark:bg-blue-950/20",
+    badge: "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400",
+  },
+  orange: {
+    wrap: "border-orange-100 bg-orange-50/60 dark:border-orange-900/40 dark:bg-orange-950/20",
+    badge: "bg-orange-100 text-orange-600 dark:bg-orange-900/50 dark:text-orange-400",
+  },
+  violet: {
+    wrap: "border-violet-100 bg-violet-50/60 dark:border-violet-900/40 dark:bg-violet-950/20",
+    badge: "bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-400",
+  },
+};
+
+function ToggleRow({
+  id,
+  icon,
+  tone,
+  title,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  icon: React.ReactNode;
+  tone: "blue" | "orange" | "violet";
+  title: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  const toneClasses = TOGGLE_ROW_TONE_CLASSES[tone];
+  return (
+    <div className={cn("flex items-center justify-between gap-3 rounded-xl border p-3.5", toneClasses.wrap)}>
+      <div className="flex min-w-0 items-center gap-3">
+        <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg", toneClasses.badge)}>
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <Label htmlFor={id} className="cursor-pointer text-sm font-medium">
+            {title}
+          </Label>
+          <p className="truncate text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+}
+
 function CatalogItemDialog({
   open,
   onOpenChange,
@@ -671,6 +785,7 @@ function CatalogItemDialog({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const storedPreview = useSignedUrl(form.photo_url || null, CATALOG_BUCKET);
   const update = <K extends keyof CatalogForm>(key: K, value: CatalogForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -698,194 +813,332 @@ function CatalogItemDialog({
     update("photo_file", file);
   };
 
+  const typeLabel = form.type === "product" ? "produit" : "service";
+  const hasPreview = Boolean(localPreview || storedPreview);
+  const imageSectionNumber = form.type === "product" ? 4 : 3;
+  const statusSectionNumber = form.type === "product" ? 5 : 4;
+  const actionsSectionNumber = form.type === "product" ? 6 : 5;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-xl flex-col gap-0 overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)] sm:w-full">
-        <DialogHeader className="shrink-0 border-b px-4 py-4 pr-12 sm:px-6">
-          <DialogTitle>
-            {editing ? "Modifier" : "Nouveau"} {form.type === "product" ? "produit" : "service"}
-          </DialogTitle>
-          <DialogDescription>
-            {form.type === "product"
-              ? "Article physique avec gestion de stock optionnelle."
-              : "Prestation facturable sans information de stock."}
-          </DialogDescription>
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-h-[calc(100dvh-2rem)] sm:w-full">
+        <DialogHeader className="flex shrink-0 flex-row items-center gap-3 space-y-0 border-b px-4 py-4 pr-14 text-left sm:px-6">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
+            {form.type === "product" ? <Package className="size-5" /> : <Wrench className="size-5" />}
+          </span>
+          <div className="min-w-0">
+            <DialogTitle>
+              {editing ? "Modifier" : "Nouveau"} {typeLabel}
+            </DialogTitle>
+            <DialogDescription>
+              {editing
+                ? `Modifiez les informations de ce ${typeLabel}.`
+                : `Ajoutez un nouveau ${typeLabel} à votre catalogue.`}
+            </DialogDescription>
+          </div>
         </DialogHeader>
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto overscroll-contain px-4 py-4 sm:grid-cols-2 sm:px-6">
-          <label className="space-y-2">
-            <Label>Type</Label>
-            <select
-              value={form.type}
-              onChange={(event) => {
-                const type = event.target.value as CatalogForm["type"];
-                setForm((current) => ({
-                  ...current,
-                  type,
-                  category_id:
-                    categories.find((category) => category.type === type)?.id ?? "",
-                }));
-              }}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {serviceEnabled && <option value="service">Service</option>}
-              {productEnabled && <option value="product">Produit</option>}
-            </select>
-          </label>
-          <div className="space-y-2">
-            <Label>Catégorie</Label>
-            <select
-              value={form.category_id}
-              onChange={(event) => update("category_id", event.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="" disabled>Sélectionner une catégorie</option>
-              {categories
-                .filter((category) => category.type === form.type)
-                .map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-                ))}
-            </select>
-            {categories.filter((category) => category.type === form.type).length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Aucune catégorie {form.type === "product" ? "produit" : "service"} disponible.
-              </p>
-            )}
-            {canCreateCategory && (
-              <Button type="button" variant="outline" size="sm" onClick={onOpenCreateCategory}>
-                <Plus className="size-4" />
-                Nouvelle catégorie
-              </Button>
-            )}
-          </div>
-          <label className="space-y-2 sm:col-span-2">
-            <Label>Nom</Label>
-            <Input value={form.name} onChange={(event) => update("name", event.target.value)} />
-          </label>
-          <label className="space-y-2">
-            <Label>Prix</Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.price}
-              onChange={(event) => update("price", event.target.value)}
-            />
-          </label>
-          {form.type === "product" && (
-            <label className="space-y-2">
-              <Label>Prix de revient</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.cost_price}
-                onChange={(event) => update("cost_price", event.target.value)}
-              />
-            </label>
-          )}
-          <label className="space-y-2">
-            <Label>Unité</Label>
-            <Input value={form.unit} onChange={(event) => update("unit", event.target.value)} />
-          </label>
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Photo</Label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_IMAGE_TYPES.join(",")}
-              className="hidden"
-              onChange={(event) => {
-                selectImage(event.target.files?.[0]);
-                event.target.value = "";
-              }}
-            />
-            {localPreview || storedPreview ? (
-              <div className="flex items-center gap-4 rounded-lg border p-3">
-                <img
-                  src={localPreview ?? storedPreview ?? ""}
-                  alt="Aperçu de l’article"
-                  className="size-24 rounded-lg object-cover"
-                />
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                    <Upload className="size-4" />
-                    Remplacer
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setForm((current) => ({ ...current, photo_url: "", photo_file: null }))}
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+          <SectionCard number={1} tone="blue" icon={<Info className="size-4" />} title="Informations générales">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="space-y-2">
+                <Label>Type</Label>
+                <div className="relative">
+                  <Package className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-blue-500" />
+                  <select
+                    value={form.type}
+                    onChange={(event) => {
+                      const type = event.target.value as CatalogForm["type"];
+                      setForm((current) => ({
+                        ...current,
+                        type,
+                        category_id:
+                          categories.find((category) => category.type === type)?.id ?? "",
+                      }));
+                    }}
+                    className="flex h-10 w-full appearance-none rounded-md border border-input bg-background pl-9 pr-8 text-sm"
                   >
-                    <Trash2 className="size-4 text-destructive" />
-                    Supprimer
-                  </Button>
+                    {serviceEnabled && <option value="service">Service</option>}
+                    {productEnabled && <option value="product">Produit</option>}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 </div>
+              </label>
+
+              <div className="space-y-2">
+                <Label>Catégorie</Label>
+                <div className="relative">
+                  <FolderTree className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-blue-500" />
+                  <select
+                    value={form.category_id}
+                    onChange={(event) => update("category_id", event.target.value)}
+                    className="flex h-10 w-full appearance-none rounded-md border border-input bg-background pl-9 pr-8 text-sm"
+                  >
+                    <option value="" disabled>Sélectionner une catégorie</option>
+                    {categories
+                      .filter((category) => category.type === form.type)
+                      .map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
+                {categories.filter((category) => category.type === form.type).length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Aucune catégorie {typeLabel} disponible.
+                  </p>
+                )}
+                {canCreateCategory && (
+                  <Button type="button" variant="outline" size="sm" onClick={onOpenCreateCategory}>
+                    <Plus className="size-4" />
+                    Nouvelle catégorie
+                  </Button>
+                )}
               </div>
-            ) : (
-              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="size-4" />
-                Téléverser une image
-              </Button>
-            )}
-            <p className="text-xs text-muted-foreground">JPG, PNG, WebP ou AVIF — 5 Mo maximum.</p>
+
+              <label className="space-y-2 sm:col-span-2">
+                <Label>
+                  Nom du {typeLabel} <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <Tag className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-blue-500" />
+                  <Input
+                    value={form.name}
+                    onChange={(event) => update("name", event.target.value)}
+                    placeholder={
+                      form.type === "product" ? "Ex. Rame de papier A4 80g" : "Ex. Prestation de conseil"
+                    }
+                    className="pl-9"
+                  />
+                </div>
+              </label>
+
+              <label className="space-y-2 sm:col-span-2">
+                <Label>Unité</Label>
+                <div className="relative">
+                  <Ruler className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-blue-500" />
+                  <Input
+                    value={form.unit}
+                    onChange={(event) => update("unit", event.target.value)}
+                    placeholder="Ex. unité, pièce, kg, litre..."
+                    className="pl-9"
+                  />
+                </div>
+              </label>
+            </div>
+          </SectionCard>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <SectionCard number={2} tone="green" icon={<Tag className="size-4" />} title="Tarification">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <Label>
+                    Prix de vente <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <DollarSign className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-green-600" />
+                    <Input
+                      inputMode="decimal"
+                      value={formatNumberInput(form.price)}
+                      onChange={(event) => update("price", parseNumberInput(event.target.value))}
+                      placeholder="Ex. 5 000"
+                      className="pl-9 pr-12"
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                      XOF
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Prix auquel le {typeLabel} est vendu</p>
+                </label>
+                {form.type === "product" && (
+                  <label className="space-y-1.5">
+                    <Label>Prix de revient</Label>
+                    <div className="relative">
+                      <DollarSign className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-green-600" />
+                      <Input
+                        inputMode="decimal"
+                        value={formatNumberInput(form.cost_price)}
+                        onChange={(event) => update("cost_price", parseNumberInput(event.target.value))}
+                        placeholder="Ex. 3 500"
+                        className="pl-9 pr-12"
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                        XOF
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Coût d’achat du {typeLabel}</p>
+                  </label>
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              number={imageSectionNumber}
+              tone="violet"
+              icon={<ImageIcon className="size-4" />}
+              title={`Image du ${typeLabel}`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_IMAGE_TYPES.join(",")}
+                className="hidden"
+                onChange={(event) => {
+                  selectImage(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setIsDragging(false);
+                  selectImage(event.dataTransfer.files?.[0]);
+                }}
+                className={cn(
+                  "flex w-full flex-col items-center gap-1.5 rounded-xl border-2 border-dashed p-6 text-center transition-colors",
+                  isDragging
+                    ? "border-violet-400 bg-violet-50 dark:bg-violet-950/30"
+                    : "border-violet-200 bg-violet-50/40 hover:bg-violet-50 dark:border-violet-900/50 dark:bg-violet-950/10 dark:hover:bg-violet-950/20",
+                )}
+              >
+                <span className="grid size-10 place-items-center rounded-full bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-400">
+                  <UploadCloud className="size-5" />
+                </span>
+                <span className="text-sm font-medium">Glissez-déposez une image ici</span>
+                <span className="text-xs text-muted-foreground">ou cliquez pour parcourir</span>
+                <span className="text-xs text-muted-foreground">PNG, JPG, WEBP ou AVIF — 5 Mo maximum</span>
+              </button>
+
+              {hasPreview && (
+                <div className="mt-3 flex items-center gap-3 rounded-lg border p-3">
+                  <img
+                    src={localPreview ?? storedPreview ?? ""}
+                    alt="Aperçu"
+                    className="size-16 shrink-0 rounded-lg object-cover"
+                  />
+                  <div className="flex flex-1 flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                      <Pencil className="size-3.5" />
+                      Remplacer
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setForm((current) => ({ ...current, photo_url: "", photo_file: null }))}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Supprimer
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </SectionCard>
           </div>
+
           {form.type === "product" && (
-            <>
-              <div className="flex items-center gap-3 self-end py-1">
-                <Switch
-                  id="catalog-manage-stock"
+            <SectionCard number={3} tone="orange" icon={<Package className="size-4" />} title="Gestion du stock">
+              <ToggleRow
+                id="catalog-manage-stock"
+                tone="orange"
+                icon={<RefreshCw className="size-4" />}
+                title="Gérer le stock"
+                description="Suivre les entrées et sorties de ce produit"
+                checked={form.manage_stock}
+                onCheckedChange={(checked) => update("manage_stock", checked)}
+              />
+              {form.manage_stock && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <label className="space-y-1.5">
+                    <Label>Stock initial</Label>
+                    <div className="relative">
+                      <Package className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-orange-500" />
+                      <Input
+                        inputMode="decimal"
+                        value={formatNumberInput(form.stock)}
+                        onChange={(event) => update("stock", parseNumberInput(event.target.value))}
+                        placeholder="Ex. 50"
+                        className="pl-9"
+                      />
+                    </div>
+                  </label>
+                  <label className="space-y-1.5">
+                    <Label>Stock minimum</Label>
+                    <div className="relative">
+                      <Package className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-orange-500" />
+                      <Input
+                        inputMode="decimal"
+                        value={formatNumberInput(form.stock_alert_threshold)}
+                        onChange={(event) =>
+                          update("stock_alert_threshold", parseNumberInput(event.target.value))
+                        }
+                        placeholder="Ex. 10"
+                        className="pl-9"
+                      />
+                    </div>
+                  </label>
+                  <label className="space-y-1.5">
+                    <Label>Unité de stock</Label>
+                    <div className="relative">
+                      <Ruler className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-orange-500" />
+                      <Input value={form.unit} disabled readOnly className="pl-9" />
+                    </div>
+                  </label>
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          <SectionCard number={statusSectionNumber} tone="violet" icon={<ShieldCheck className="size-4" />} title="Statut">
+            <div className={cn("grid grid-cols-1 gap-3", form.type === "product" && "sm:grid-cols-2")}>
+              <ToggleRow
+                id="catalog-active"
+                tone="blue"
+                icon={form.type === "product" ? <Package className="size-4" /> : <Wrench className="size-4" />}
+                title={form.type === "product" ? "Produit actif" : "Service actif"}
+                description="Disponible à la vente et dans le catalogue"
+                checked={form.active}
+                onCheckedChange={(checked) => update("active", checked)}
+              />
+              {form.type === "product" && (
+                <ToggleRow
+                  id="catalog-manage-stock-status"
+                  tone="violet"
+                  icon={<RefreshCw className="size-4" />}
+                  title="Gérer le stock"
+                  description="Suivre les entrées et sorties de ce produit"
                   checked={form.manage_stock}
                   onCheckedChange={(checked) => update("manage_stock", checked)}
                 />
-                <Label htmlFor="catalog-manage-stock">Gérer le stock</Label>
-              </div>
-              {form.manage_stock && (
-                <>
-                  <label className="space-y-1">
-                    <Label>Stock initial</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      value={form.stock}
-                      onChange={(event) => update("stock", event.target.value)}
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <Label>Seuil d’alerte</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      value={form.stock_alert_threshold}
-                      onChange={(event) => update("stock_alert_threshold", event.target.value)}
-                    />
-                  </label>
-                </>
               )}
-            </>
-          )}
-          <div className="flex items-center gap-3 self-end py-1">
-            <Switch
-              id="catalog-active"
-              checked={form.active}
-              onCheckedChange={(checked) => update("active", checked)}
-            />
-            <Label htmlFor="catalog-active">
-              {form.type === "product" ? "Produit actif" : "Service actif"}
-            </Label>
-          </div>
+            </div>
+          </SectionCard>
         </div>
-        <DialogFooter className="shrink-0 gap-2 border-t bg-background px-4 py-3 sm:px-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Annuler
-          </Button>
-          <Button onClick={onSubmit} disabled={submitting}>
-            {submitting && <Loader2 className="size-4 animate-spin" />}
-            Enregistrer
-          </Button>
+
+        <DialogFooter className="shrink-0 flex-col items-stretch gap-3 border-t bg-background px-4 py-3 sm:flex-col sm:items-stretch sm:justify-start sm:space-x-0 sm:px-6">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Settings2 className="size-4 text-muted-foreground" />
+            {actionsSectionNumber}. Actions
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
+              Annuler
+            </Button>
+            <Button onClick={onSubmit} disabled={submitting} className="w-full sm:w-auto">
+              {submitting && <Loader2 className="size-4 animate-spin" />}
+              Enregistrer
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
