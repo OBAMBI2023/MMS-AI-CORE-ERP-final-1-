@@ -5,7 +5,12 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { makeNumber, formatCurrency, formatNumber } from "@/lib/mms/format";
+import { makeNumber, formatCurrency, formatNumber, formatDateTime } from "@/lib/mms/format";
+import {
+  buildWhatsAppReceiptMessage,
+  buildWhatsAppShareUrl,
+  containsSensitiveData,
+} from "@/lib/mms/whatsapp-receipt";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -239,6 +244,8 @@ export function PosPage() {
     setDiscount(0);
   };
 
+  const cashierName = profile?.full_name || profile?.email || "Utilisateur";
+
   const validate = async () => {
     if (cart.length === 0) return;
     if (!profile?.tenant_id) {
@@ -262,7 +269,7 @@ export function PosPage() {
           discount,
           total,
           payment_method: payment,
-          cashier: "Bamba",
+          cashier: cashierName,
           tenant_id: profile.tenant_id,
         })
         .select("id")
@@ -300,7 +307,7 @@ export function PosPage() {
       total,
       payment,
       client: client || "Client comptoir",
-      cashier: "Bamba",
+      cashier: cashierName,
     };
     setMobileTicketOpen(false);
     setCheckout(ticket);
@@ -942,36 +949,28 @@ function ReceiptModal({
   };
 
   const handleWhatsApp = () => {
-    const contactLines = [
-      identity.name,
-      identity.address,
-      identity.phone ? `Tél. ${identity.phone}` : "",
-      identity.email,
-      identity.logoUrl ? `Logo: ${identity.logoUrl}` : "",
-    ].filter(Boolean);
-    const itemLines = ticket.items.map(
-      (item) => `${item.qty} x ${item.name} — ${formatCurrency(item.qty * item.price)}`,
-    );
-    const message = [
-      ...contactLines,
-      "",
-      `Ticket ${ticket.number}`,
-      `Date: ${ticket.date.toLocaleString("fr-FR")}`,
-      `Client: ${ticket.client}`,
-      "",
-      ...itemLines,
-      "",
-      `TOTAL: ${formatCurrency(ticket.total)}`,
-      `Paiement: ${ticket.payment}`,
-      "",
-      `Merci de votre visite${identity.name ? ` chez ${identity.name}` : ""} !`,
-    ].join("\n");
-    const recipient = identity.whatsapp.replace(/\D/g, "");
-    window.open(
-      `https://wa.me/${recipient}?text=${encodeURIComponent(message)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    const message = buildWhatsAppReceiptMessage({
+      companyName: identity.name,
+      ticketNumber: ticket.number,
+      date: formatDateTime(ticket.date),
+      customerName: ticket.client,
+      cashierName: ticket.cashier,
+      items: ticket.items.map((item) => ({
+        name: item.name,
+        quantity: item.qty,
+        total: item.qty * item.price,
+      })),
+      total: ticket.total,
+      paymentMethod: ticket.payment,
+    });
+
+    if (containsSensitiveData(message)) {
+      toast.error("Partage WhatsApp bloqué : le message contient des données sensibles.");
+      return;
+    }
+
+    const url = buildWhatsAppShareUrl(message, identity.whatsapp);
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (

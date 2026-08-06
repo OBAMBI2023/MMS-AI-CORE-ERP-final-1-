@@ -12,12 +12,10 @@ type MockProfile = {
 
 function createMockSupabase(opts: {
   profile: MockProfile;
-  rolePermissions?: string[];
   enabledModules?: Set<string>;
   catalogGatedAllowed?: Set<string>;
   rpcDelayMs?: number;
 }) {
-  const rolePermissions = opts.rolePermissions ?? [];
   const enabledModules = opts.enabledModules ?? new Set<string>();
   const catalogGatedAllowed = opts.catalogGatedAllowed ?? new Set<string>();
 
@@ -36,18 +34,6 @@ function createMockSupabase(opts: {
                   },
                 };
               },
-            };
-          },
-        };
-      }
-      if (table === "role_permissions") {
-        return {
-          select() {
-            return {
-              eq: async () => ({
-                data: rolePermissions.map((code) => ({ permissions: { code } })),
-                error: null,
-              }),
             };
           },
         };
@@ -95,7 +81,6 @@ test("Utilisateur secondaire avec accès au Dashboard est redirigé vers le Dash
       tenant_id: TENANT_A,
       roles: { name: "Manager", tenant_id: TENANT_A },
     },
-    rolePermissions: ["dashboard.view"],
     enabledModules: new Set(["dashboard"]),
   });
 
@@ -103,29 +88,27 @@ test("Utilisateur secondaire avec accès au Dashboard est redirigé vers le Dash
   assert.equal(destination, "/app");
 });
 
-test("Caissier sans accès Dashboard mais avec Ventes POS atterrit sur /ventes", async () => {
+test("Caissier sans aucune permission RBAC individuelle atterrit sur /ventes si Dashboard inactif", async () => {
   const supabase = createMockSupabase({
     profile: {
       role_id: "role-caissier",
       tenant_id: TENANT_A,
       roles: { name: "Caissier", tenant_id: TENANT_A },
     },
-    rolePermissions: ["ventes.view"],
-    enabledModules: new Set(["dashboard", "sales"]),
+    enabledModules: new Set(["sales"]),
   });
 
   const destination = await resolveTenantLandingRoute(supabase, USER_ID, TENANT_A);
   assert.equal(destination, "/ventes");
 });
 
-test("Comptable limité aux Dépenses/Rapports atterrit sur /depenses", async () => {
+test("Comptable sans aucune permission RBAC individuelle atterrit sur /depenses si Dashboard/Ventes inactifs", async () => {
   const supabase = createMockSupabase({
     profile: {
       role_id: "role-comptable",
       tenant_id: TENANT_A,
       roles: { name: "Comptable", tenant_id: TENANT_A },
     },
-    rolePermissions: ["ventes.view"],
     enabledModules: new Set(["expenses", "reports"]),
   });
 
@@ -133,14 +116,13 @@ test("Comptable limité aux Dépenses/Rapports atterrit sur /depenses", async ()
   assert.equal(destination, "/depenses");
 });
 
-test("une réponse RPC en cours de résolution n'est jamais interprétée comme une permission refusée", async () => {
+test("une réponse RPC en cours de résolution n'est jamais interprétée comme un accès refusé", async () => {
   const supabase = createMockSupabase({
     profile: {
       role_id: "role-manager",
       tenant_id: TENANT_A,
       roles: { name: "Manager", tenant_id: TENANT_A },
     },
-    rolePermissions: ["dashboard.view"],
     enabledModules: new Set(["dashboard"]),
     rpcDelayMs: 15,
   });
@@ -149,14 +131,13 @@ test("une réponse RPC en cours de résolution n'est jamais interprétée comme 
   assert.equal(destination, "/app");
 });
 
-test("un utilisateur sans aucune permission ni module accessible est redirigé vers /403", async () => {
+test("un utilisateur sans aucun module actif est redirigé vers /403", async () => {
   const supabase = createMockSupabase({
     profile: {
       role_id: "role-employe",
       tenant_id: TENANT_A,
       roles: { name: "Employé", tenant_id: TENANT_A },
     },
-    rolePermissions: [],
     enabledModules: new Set(),
   });
 
@@ -164,7 +145,23 @@ test("un utilisateur sans aucune permission ni module accessible est redirigé v
   assert.equal(destination, "/403");
 });
 
-test("isolation multi-tenant : un rôle appartenant à un autre tenant n'accorde aucun droit", async () => {
+test("un rôle secondaire n'atterrit jamais sur Paramètres ou Utilisateurs même si ces modules sont actifs", async () => {
+  const supabase = createMockSupabase({
+    profile: {
+      role_id: "role-caissier",
+      tenant_id: TENANT_A,
+      roles: { name: "Caissier", tenant_id: TENANT_A },
+    },
+    // Seuls les modules Paramètres/Utilisateurs sont actifs : aucun module
+    // métier n'est disponible pour ce rôle secondaire.
+    enabledModules: new Set(["settings", "users"]),
+  });
+
+  const destination = await resolveTenantLandingRoute(supabase, USER_ID, TENANT_A);
+  assert.equal(destination, "/403");
+});
+
+test("isolation multi-tenant : un rôle appartenant à un autre tenant n'accorde jamais l'accès Administrateur", async () => {
   const supabase = createMockSupabase({
     profile: {
       role_id: "role-admin-tenant-b",
@@ -172,8 +169,10 @@ test("isolation multi-tenant : un rôle appartenant à un autre tenant n'accorde
       // Simule une ligne corrompue/malveillante où le rôle appartient au tenant B.
       roles: { name: "Administrateur", tenant_id: TENANT_B },
     },
-    rolePermissions: ["dashboard.view", "ventes.view", "achats.view", "settings.manage"],
-    enabledModules: new Set(["dashboard", "sales"]),
+    // Paramètres/Utilisateurs actifs pour le tenant A, mais aucun module
+    // métier : si l'isolation tenant échouait, ce profil "Administrateur"
+    // corrompu atterrirait sur /parametres au lieu de /403.
+    enabledModules: new Set(["settings", "users"]),
   });
 
   const destination = await resolveTenantLandingRoute(supabase, USER_ID, TENANT_A);

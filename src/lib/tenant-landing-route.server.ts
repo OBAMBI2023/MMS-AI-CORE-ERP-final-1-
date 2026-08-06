@@ -1,9 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../integrations/supabase/types.ts";
 import { formatSupabaseError } from "./supabase-error.ts";
-import { routePermissions } from "./route-permissions.ts";
+import { isAdminOnlyRoute, isAdministratorRole } from "./route-permissions.ts";
 import { getRouteModule } from "./route-modules.ts";
-import { canAccessParties } from "./party-access.ts";
 
 export type AuthenticatedDestination =
   | "/super-admin"
@@ -55,7 +54,6 @@ const CATALOG_GATED_ROUTES = new Set(["/stock", "/achats", "/fournisseurs"]);
 async function isRouteAccessible(
   supabase: SupabaseClient<Database>,
   roleName: string | null,
-  permissions: string[],
   path: string,
 ): Promise<boolean> {
   const requiredModule = getRouteModule(path);
@@ -74,16 +72,7 @@ async function isRouteAccessible(
     if (error || !catalogRouteAllowed) return false;
   }
 
-  const requiredPermission = routePermissions[path];
-  if (requiredPermission) {
-    let isAuthorized = roleName === "Administrateur" || permissions.includes(requiredPermission);
-
-    if (path === "/clients" || path === "/fournisseurs") {
-      isAuthorized = canAccessParties(roleName, isAuthorized ? [requiredPermission] : []);
-    }
-
-    if (!isAuthorized) return false;
-  }
+  if (isAdminOnlyRoute(path) && !isAdministratorRole(roleName)) return false;
 
   return true;
 }
@@ -112,21 +101,9 @@ export async function resolveTenantLandingRoute(
     profile?.roles && (profile.roles as { tenant_id?: string } | null)?.tenant_id === tenantId
       ? (profile.roles as { name: string }).name
       : null;
-  const roleId = roleName ? profile?.role_id : null;
-
-  let permissions: string[] = [];
-  if (roleId) {
-    const { data: rolePermissions, error: permsError } = await supabase
-      .from("role_permissions")
-      .select("permissions(code)")
-      .eq("role_id", roleId);
-    if (permsError) throw new Error(formatSupabaseError(permsError));
-    permissions = (rolePermissions ?? []).map((row) => (row.permissions as { code: string } | null)?.code)
-      .filter((code): code is string => Boolean(code));
-  }
 
   for (const candidate of TENANT_LANDING_PRIORITY) {
-    if (await isRouteAccessible(supabase, roleName, permissions, candidate)) {
+    if (await isRouteAccessible(supabase, roleName, candidate)) {
       return candidate;
     }
   }

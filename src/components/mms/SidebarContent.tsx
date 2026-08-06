@@ -17,9 +17,8 @@ import {
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
-import { routePermissions } from "@/lib/route-permissions";
+import { isAdminOnlyRoute, isAdministratorRole } from "@/lib/route-permissions";
 import { routeModules } from "@/lib/route-modules";
-import { canAccessParties } from "@/lib/party-access";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { catalogRouteEnabled } from "@/lib/catalog-settings";
 
@@ -44,7 +43,6 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const { data, isLoading } = usePermissions();
   const modulesQuery = useTenantModules();
   const catalogSettingsQuery = useCatalogSettings();
-  const permissions = data?.permissions || [];
   const role = data?.role;
 
   const filteredItems = items.filter((it) => {
@@ -52,12 +50,8 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
     if (!catalogRouteEnabled(catalogSettingsQuery.data, it.to)) return false;
     const requiredModule = routeModules[it.to];
     if (requiredModule && !modulesQuery.data?.has(requiredModule)) return false;
-    if (it.to === "/clients" || it.to === "/fournisseurs") {
-      return canAccessParties(role, permissions);
-    }
-    const requiredPermission = routePermissions[it.to];
-    if (requiredPermission) {
-      return role === "Administrateur" || permissions.includes(requiredPermission);
+    if (isAdminOnlyRoute(it.to)) {
+      return isAdministratorRole(role);
     }
     return true;
   });

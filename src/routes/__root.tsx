@@ -13,9 +13,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { hasPermission } from "@/lib/auth";
-import { routePermissions } from "@/lib/route-permissions";
-import { canAccessParties } from "@/lib/party-access";
+import { isAdminOnlyRoute, isAdministratorRole } from "@/lib/route-permissions";
 import { getRouteModule } from "@/lib/route-modules";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TenantProvider } from "@/providers/TenantProvider";
@@ -257,37 +255,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         }
       }
 
-      const requiredPermission = routePermissions[location.pathname];
-      if (requiredPermission) {
+      // Paramètres et gestion des utilisateurs restent exclusifs à
+      // l'Administrateur. Tout autre module métier actif du tenant est
+      // ouvert à tout rôle secondaire (cf. le contrôle de module actif
+      // ci-dessus, qui s'applique déjà à cette route).
+      if (isAdminOnlyRoute(location.pathname)) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("roles(name)")
           .eq("id", session.user.id)
           .single();
 
-        const roleName = profile?.roles?.name;
+        const roleName = profile?.roles?.name ?? null;
 
-        // Logic fix:
-        // Use the new permission-based check to verify if the user has the required permission.
-        // Admins are always authorized.
-        let isAuthorized = roleName === "Administrateur";
-        if (!isAuthorized) {
-          isAuthorized = await hasPermission(session.user.id, requiredPermission);
-        }
-
-        if (location.pathname === "/clients" || location.pathname === "/fournisseurs") {
-          const permissions = isAuthorized ? [requiredPermission] : [];
-          isAuthorized = canAccessParties(roleName, permissions);
-        }
-
-        if (!isAuthorized) {
+        if (!isAdministratorRole(roleName)) {
           console.log("DEBUG: Access denied for", {
             role: roleName,
             path: location.pathname,
-            requiredPermission,
           });
-          // Ne pas renvoyer vers le Dashboard : un rôle sans dashboard.view
-          // y serait immédiatement refusé et provoquerait une boucle.
           throw redirect({ to: "/403" });
         }
       }
