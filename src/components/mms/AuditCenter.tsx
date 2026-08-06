@@ -16,6 +16,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useTenant } from "@/providers/TenantProvider";
 import { toast } from "sonner";
 
 // Note: This is a placeholder structure, it will be expanded based on the audit_logs schema.
@@ -30,20 +32,77 @@ type AuditLog = {
   created_at: string;
 };
 
+type AuditActorProfile = {
+  id: string;
+  full_name: string | null;
+  username: string | null;
+  email: string | null;
+  status: string | null;
+};
+
+function resolveAuditActor(userId: string | null, profile: AuditActorProfile | undefined) {
+  if (!userId) {
+    return { primary: "Système", secondary: null as string | null, deactivated: false };
+  }
+  if (!profile) {
+    // Profile row is gone (user deleted) but the tenant-scoped log entry remains.
+    return { primary: "Utilisateur supprimé", secondary: null as string | null, deactivated: false };
+  }
+  const primary =
+    profile.full_name?.trim() ||
+    profile.username?.trim() ||
+    profile.email?.trim() ||
+    "Utilisateur inconnu";
+  const secondary = profile.email?.trim() && profile.email.trim() !== primary ? profile.email.trim() : null;
+  const deactivated = !!profile.status && profile.status !== "active";
+  return { primary, secondary, deactivated };
+}
+
 export function AuditCenter() {
+  const { tenant } = useTenant();
+  const tenantId = tenant?.id;
+
   const {
     data: logs,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["audit-logs"],
+    queryKey: ["audit-logs", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
+      // RLS is the real security boundary (tenant_id = current_tenant_id()
+      // in the audit_logs_select_tenant_admin policy). This explicit filter
+      // is just query-shaping / defense-in-depth, not a security control.
       const { data, error } = await supabase
         .from("audit_logs")
         .select("*")
+        .eq("tenant_id", tenantId as string)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as AuditLog[];
+      const auditLogs = data as AuditLog[];
+
+      const userIds = Array.from(
+        new Set(auditLogs.map((log) => log.user_id).filter((id): id is string => !!id)),
+      );
+
+      const profilesById = new Map<string, AuditActorProfile>();
+      if (userIds.length > 0) {
+        // RLS on profiles already restricts results to the caller's own tenant,
+        // so this single batched lookup can never surface another tenant's users.
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, full_name, username, email, status")
+          .in("id", userIds);
+        if (profilesError) throw profilesError;
+        for (const profile of profiles ?? []) {
+          profilesById.set(profile.id, profile as AuditActorProfile);
+        }
+      }
+
+      return auditLogs.map((log) => ({
+        ...log,
+        actor: resolveAuditActor(log.user_id, log.user_id ? profilesById.get(log.user_id) : undefined),
+      }));
     },
   });
 
@@ -104,7 +163,7 @@ export function AuditCenter() {
       </Card>
 
       <Card className="overflow-hidden">
-        {isLoading ? (
+        {isLoading || !tenantId ? (
           <div className="p-10 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
@@ -120,19 +179,46 @@ export function AuditCenter() {
               </tr>
             </thead>
             <tbody>
-              {logs?.map((log) => (
-                <tr key={log.id} className="border-t">
-                  <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
-                  <td className="p-3">{log.user_id || "Système"}</td>
-                  <td className="p-3">{log.action}</td>
-                  <td className="p-3">
-                    <Badge variant="secondary">{log.module}</Badge>
-                  </td>
-                  <td className="p-3">
-                    <Badge variant="outline">Succès</Badge>
-                  </td>
-                </tr>
-              ))}
+              <TooltipProvider delayDuration={200}>
+                {logs?.map((log) => (
+                  <tr key={log.id} className="border-t">
+                    <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
+                    <td className="p-3 max-w-[220px]">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 truncate font-medium">
+                              <span className="truncate">{log.actor.primary}</span>
+                              {log.actor.deactivated && (
+                                <Badge variant="outline" className="shrink-0 text-[10px]">
+                                  Désactivé
+                                </Badge>
+                              )}
+                            </div>
+                            {log.actor.secondary && (
+                              <div className="truncate text-xs text-muted-foreground">
+                                {log.actor.secondary}
+                              </div>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-64 break-words">
+                          {log.actor.secondary
+                            ? `${log.actor.primary} · ${log.actor.secondary}`
+                            : log.actor.primary}
+                        </TooltipContent>
+                      </Tooltip>
+                    </td>
+                    <td className="p-3">{log.action}</td>
+                    <td className="p-3">
+                      <Badge variant="secondary">{log.module}</Badge>
+                    </td>
+                    <td className="p-3">
+                      <Badge variant="outline">Succès</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </TooltipProvider>
             </tbody>
           </table>
         )}

@@ -681,7 +681,7 @@ function Dashboard() {
               <Card className={cn("p-4 sm:p-6 lg:col-span-2", CHART_CARD_CLASS)}>
                 <div className="mb-3 flex items-center justify-between sm:mb-4">
                   <h3 className="font-bold">Activité récente</h3>
-                  <Link to="/journal" className="text-sm font-medium text-primary hover:underline">
+                  <Link to="/rapports" className="text-sm font-medium text-primary hover:underline">
                     Voir tout
                   </Link>
                 </div>
