@@ -107,18 +107,18 @@ export function AuditCenter() {
   });
 
   return (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" /> Journal de sécurité
+    <div className="w-full min-w-0 space-y-4 sm:space-y-6">
+      <Card className="p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-lg font-semibold sm:text-xl">
+              <Shield className="h-5 w-5 shrink-0 text-primary" /> Journal de sécurité
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="mt-1 text-sm text-muted-foreground">
               Historique complet des connexions et des actions sensibles du système.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
             <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
               <RefreshCcw className="h-4 w-4" /> Actualiser
             </Button>
@@ -129,100 +129,156 @@ export function AuditCenter() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
         {[
           { label: "Connexions réussies", value: "1,234", color: "text-emerald-600" },
           { label: "Échecs", value: "45", color: "text-red-600" },
           { label: "Modifications", value: "128", color: "text-amber-600" },
           { label: "Utilisateurs actifs", value: "12", color: "text-blue-600" },
         ].map((kpi, i) => (
-          <Card key={i} className="p-4">
-            <div className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</div>
-            <div className="text-xs text-muted-foreground">{kpi.label}</div>
+          <Card key={i} className="p-3.5 sm:p-4">
+            <div className={`text-xl font-bold sm:text-2xl ${kpi.color}`}>{kpi.value}</div>
+            <div className="text-xs text-muted-foreground sm:text-xs">{kpi.label}</div>
           </Card>
         ))}
       </div>
 
-      <Card className="p-4 flex gap-2">
-        <Input placeholder="Rechercher..." className="max-w-xs" />
-        <Button variant="outline" size="sm">
-          <Filter className="h-4 w-4 mr-2" /> Filtres
+      <Card className="flex flex-wrap items-center gap-2 p-2.5 sm:p-4">
+        <Input placeholder="Rechercher..." className="w-full sm:w-auto sm:max-w-xs" />
+        <Button variant="outline" size="sm" className="gap-2">
+          <Filter className="h-4 w-4" /> Filtres
         </Button>
-        <Button variant="outline" size="sm" className="ml-auto">
-          <Download className="h-4 w-4 mr-2" /> Exporter
+        <Button variant="outline" size="sm" className="gap-2 sm:ml-auto">
+          <Download className="h-4 w-4" /> Exporter
         </Button>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" className="px-2.5">
           <Printer className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" className="px-2.5">
           <Copy className="h-4 w-4" />
         </Button>
-        <Button variant="destructive" size="sm">
+        <Button variant="destructive" size="sm" className="gap-2">
           <Trash2 className="h-4 w-4" /> Vider
         </Button>
       </Card>
 
-      <Card className="overflow-hidden">
-        {isLoading || !tenantId ? (
-          <div className="p-10 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="p-3 text-left font-medium">Date</th>
-                <th className="p-3 text-left font-medium">Utilisateur</th>
-                <th className="p-3 text-left font-medium">Action</th>
-                <th className="p-3 text-left font-medium">Module</th>
-                <th className="p-3 text-left font-medium">Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              <TooltipProvider delayDuration={200}>
-                {logs?.map((log) => (
-                  <tr key={log.id} className="border-t">
-                    <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
-                    <td className="p-3 max-w-[220px]">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 truncate font-medium">
-                              <span className="truncate">{log.actor.primary}</span>
-                              {log.actor.deactivated && (
-                                <Badge variant="outline" className="shrink-0 text-[10px]">
-                                  Désactivé
-                                </Badge>
+      {isLoading || !tenantId ? (
+        <Card className="flex items-center justify-center p-10">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </Card>
+      ) : (
+        <>
+          {/* Desktop / tablet table — unchanged from md breakpoint up */}
+          <Card className="hidden overflow-hidden md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="p-3 text-left font-medium">Date</th>
+                  <th className="p-3 text-left font-medium">Utilisateur</th>
+                  <th className="p-3 text-left font-medium">Action</th>
+                  <th className="p-3 text-left font-medium">Module</th>
+                  <th className="p-3 text-left font-medium">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                <TooltipProvider delayDuration={200}>
+                  {logs?.map((log) => (
+                    <tr key={log.id} className="border-t">
+                      <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
+                      <td className="p-3 max-w-[220px]">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 truncate font-medium">
+                                <span className="truncate">{log.actor.primary}</span>
+                                {log.actor.deactivated && (
+                                  <Badge variant="outline" className="shrink-0 text-[10px]">
+                                    Désactivé
+                                  </Badge>
+                                )}
+                              </div>
+                              {log.actor.secondary && (
+                                <div className="truncate text-xs text-muted-foreground">
+                                  {log.actor.secondary}
+                                </div>
                               )}
                             </div>
-                            {log.actor.secondary && (
-                              <div className="truncate text-xs text-muted-foreground">
-                                {log.actor.secondary}
-                              </div>
-                            )}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-64 break-words">
-                          {log.actor.secondary
-                            ? `${log.actor.primary} · ${log.actor.secondary}`
-                            : log.actor.primary}
-                        </TooltipContent>
-                      </Tooltip>
-                    </td>
-                    <td className="p-3">{log.action}</td>
-                    <td className="p-3">
-                      <Badge variant="secondary">{log.module}</Badge>
-                    </td>
-                    <td className="p-3">
-                      <Badge variant="outline">Succès</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </TooltipProvider>
-            </tbody>
-          </table>
-        )}
-      </Card>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-64 break-words">
+                            {log.actor.secondary
+                              ? `${log.actor.primary} · ${log.actor.secondary}`
+                              : log.actor.primary}
+                          </TooltipContent>
+                        </Tooltip>
+                      </td>
+                      <td className="p-3">{log.action}</td>
+                      <td className="p-3">
+                        <Badge variant="secondary">{log.module}</Badge>
+                      </td>
+                      <td className="p-3">
+                        <Badge variant="outline">Succès</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </TooltipProvider>
+              </tbody>
+            </table>
+          </Card>
+
+          {/* Mobile card list — replaces the table below md */}
+          <div className="space-y-2.5 md:hidden">
+            {logs?.length ? (
+              logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="w-full rounded-xl border border-border bg-white p-3.5 shadow-sm dark:bg-card"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5 font-medium">
+                        <span className="break-words">{log.actor.primary}</span>
+                        {log.actor.deactivated && (
+                          <Badge variant="outline" className="shrink-0 text-[10px]">
+                            Désactivé
+                          </Badge>
+                        )}
+                      </div>
+                      {log.actor.secondary && (
+                        <div className="mt-0.5 break-words text-xs text-muted-foreground">
+                          {log.actor.secondary}
+                        </div>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                      Succès
+                    </Badge>
+                  </div>
+                  <div className="mt-2.5 space-y-1.5 text-xs">
+                    <div className="flex gap-1.5">
+                      <span className="shrink-0 text-muted-foreground">Date :</span>
+                      <span className="break-words">{new Date(log.created_at).toLocaleString()}</span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <span className="shrink-0 text-muted-foreground">Action :</span>
+                      <span className="break-words">{log.action}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0 text-muted-foreground">Module :</span>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {log.module}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <Card className="p-6 text-center text-sm text-muted-foreground">
+                Aucune activité enregistrée.
+              </Card>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
