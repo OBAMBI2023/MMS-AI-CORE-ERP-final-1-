@@ -1,25 +1,30 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/mms/Sidebar";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Menu, Sun, Moon } from "lucide-react";
+import { Menu, Sun, Moon, Bell } from "lucide-react";
 import { SidebarContent } from "./SidebarContent";
 import { useState } from "react";
 import { UserMenu } from "./UserMenu";
+import { BottomNav } from "./BottomNav";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useTheme } from "@/components/theme-provider";
 import { SidebarCompanyHeader } from "./SidebarCompanyHeader";
+import { cn } from "@/lib/utils";
 
 export function AppShell({
   title,
   subtitle,
   actions,
   children,
+  contentClassName,
 }: {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
+  contentClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
@@ -76,10 +81,31 @@ export function AppShell({
             >
               {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
             </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Notifications" title="Notifications">
+                  <Bell className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72">
+                <p className="text-sm font-semibold">Notifications</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Aucune nouvelle notification pour le moment.
+                </p>
+              </PopoverContent>
+            </Popover>
             <UserMenu />
           </div>
         </header>
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">{children}</div>
+        <div
+          className={cn(
+            "flex-1 overflow-y-auto p-4 pb-20 md:p-8 md:pb-8",
+            contentClassName,
+          )}
+        >
+          {children}
+        </div>
+        <BottomNav onMenuClick={() => setOpen(true)} />
       </main>
     </div>
   );

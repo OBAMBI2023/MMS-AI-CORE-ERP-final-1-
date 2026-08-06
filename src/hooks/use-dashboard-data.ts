@@ -221,7 +221,9 @@ export function useDashboardData() {
       const clients = clientsRes.data ?? [];
       const fournisseurs = fournisseursRes.data ?? [];
       const services = servicesRes.data ?? [];
-      const devis = (devisRes.data ?? []).filter((d) => d.status === "accepté");
+      const allDevis = devisRes.data ?? [];
+      const devis = allDevis.filter((d) => d.status === "accepté");
+      const devisEnAttente = allDevis.filter((d) => d.status === "envoyé");
 
       const now = new Date();
       const monthStart = startOfMonth(now);
@@ -496,6 +498,11 @@ export function useDashboardData() {
           clients: clients.length,
           fournisseurs: fournisseurs.length,
           services: services.length,
+        },
+        secondary: {
+          devisCount: allDevis.length,
+          facturesImpayeesCount: devisEnAttente.length,
+          facturesImpayeesTotal: devisEnAttente.reduce((s, d) => s + (Number(d.total) || 0), 0),
         },
         session: session
           ? {

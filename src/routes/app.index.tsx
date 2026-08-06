@@ -23,6 +23,8 @@ import {
   Receipt,
   Clock,
   LogIn,
+  MoreHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 import {
   LineChart,
@@ -45,7 +47,14 @@ import { AppShell } from "@/components/mms/AppShell";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DashboardKpiCard } from "@/components/mms/dashboard/DashboardKpiCard";
+import { DashboardSecondaryCard } from "@/components/mms/dashboard/DashboardSecondaryCard";
 import { DashboardEmptyState } from "@/components/mms/dashboard/DashboardEmptyState";
 // TODO: Réactiver la recherche globale plus tard
 // import { GlobalSearch } from "@/components/search/GlobalSearch";
@@ -64,6 +73,7 @@ function Dashboard() {
   const catalogMode = catalogSettings?.catalog_mode;
   const canViewClients = modulesQuery.data?.has("customers") ?? false;
   const canViewFournisseurs = modulesQuery.data?.has("suppliers") ?? false;
+  const canViewDevis = modulesQuery.data?.has("quotes") ?? false;
   // TODO: Réactiver la recherche globale plus tard
   // const [searchOpen, setSearchOpen] = useState(false);
 
@@ -113,6 +123,14 @@ function Dashboard() {
     return true;
   });
 
+  const primaryActionRoutes = ["/ventes", "/devis", "/clients", "/services"];
+  const primaryActions = primaryActionRoutes
+    .map((route) => quickActions.find((a) => a.route === route))
+    .filter((a): a is (typeof quickActions)[number] => Boolean(a));
+  const overflowActions = quickActions.filter(
+    (a) => !primaryActionRoutes.includes(a.route),
+  );
+
   if (error) {
     return (
       <AppShell title="Dashboard">
@@ -134,7 +152,7 @@ function Dashboard() {
     data.counts.services === 0;
 
   return (
-    <AppShell title="Dashboard">
+    <AppShell title="Dashboard" contentClassName="bg-[#F8FAFC] dark:bg-background">
       {/* TODO: Réactiver la recherche globale plus tard */}
       {/* <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} /> */}
 
@@ -144,7 +162,8 @@ function Dashboard() {
         transition={{ duration: 0.3 }}
         className="space-y-8 pb-4"
       >
-        <div>
+        {/* Welcome card */}
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
           {isLoading || catalogSettingsQuery.isLoading || !data?.session ? (
             <div
               className="h-9 w-64 max-w-full animate-pulse rounded-lg bg-muted"
@@ -158,10 +177,75 @@ function Dashboard() {
           <p className="text-sm text-muted-foreground capitalize mt-1">{today}</p>
         </div>
 
+        {/* Actions Rapides */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold">Actions rapides</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {primaryActions.map((action, i) => (
+              <motion.div
+                key={action.title}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: i * 0.02 }}
+              >
+                <Link
+                  to={action.route}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-card border border-border hover:border-primary hover:shadow-md transition-all h-full"
+                >
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <action.icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-xs font-medium text-center">{action.title}</span>
+                </Link>
+              </motion.div>
+            ))}
+            {overflowActions.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <motion.button
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: primaryActions.length * 0.02 }}
+                    className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-card border border-border hover:border-primary hover:shadow-md transition-all h-full w-full"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <MoreHorizontal className="h-5 w-5" />
+                    </div>
+                    <span className="text-xs font-medium text-center">Plus</span>
+                  </motion.button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {overflowActions.map((action) => (
+                    <DropdownMenuItem key={action.title} asChild>
+                      <Link to={action.route} className="flex items-center gap-2">
+                        <action.icon className="h-4 w-4" />
+                        {action.title}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {/* TODO: Réactiver la recherche globale plus tard */}
+            {/* <motion.button
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: quickActions.length * 0.02 }}
+              onClick={() => setSearchOpen(true)}
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-card border border-border hover:border-primary hover:shadow-md transition-all h-full"
+            >
+              <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Search className="h-5 w-5" />
+              </div>
+              <span className="text-xs font-medium text-center">Recherche globale</span>
+            </motion.button> */}
+          </div>
+        </div>
+
         {/* KPI Premium */}
         {isLoading || catalogSettingsQuery.isLoading || !data ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: 4 }).map((_, i) => (
               <Card key={i} className="h-32 rounded-2xl" />
             ))}
           </div>
@@ -207,90 +291,60 @@ function Dashboard() {
               spark={data.kpis.benefice.spark}
               accent="emerald"
             />
+          </div>
+        )}
+
+        {/* Cartes secondaires */}
+        {isLoading || catalogSettingsQuery.isLoading || !data ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-pulse">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="h-20 rounded-2xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {canViewClients && catalogSettings?.suppliers_enabled && (
-              <DashboardKpiCard
-                index={4}
+              <DashboardSecondaryCard
+                index={0}
                 title="Clients"
                 value={String(data.kpis.clients.value)}
                 icon={Users}
                 route="/clients"
-                trend={data.kpis.clients.trend}
-                spark={data.kpis.clients.spark}
                 accent="sky"
               />
             )}
             {canViewFournisseurs && (
-              <DashboardKpiCard
-                index={5}
+              <DashboardSecondaryCard
+                index={1}
                 title="Fournisseurs"
                 value={String(data.kpis.fournisseurs.value)}
                 icon={Truck}
                 route="/fournisseurs"
-                trend={data.kpis.fournisseurs.trend}
-                spark={data.kpis.fournisseurs.spark}
                 accent="violet"
               />
             )}
-            <DashboardKpiCard
-              index={6}
-              title="Ventes"
-              value={String(data.kpis.ventes.value)}
-              icon={ShoppingCart}
-              route="/ventes"
-              trend={data.kpis.ventes.trend}
-              spark={data.kpis.ventes.spark}
-              accent="indigo"
-            />
-            <DashboardKpiCard
-              index={7}
-              title={catalogMode === "products" ? "Produits vendus" : catalogMode === "services" ? "Prestations" : "Produits & Services"}
-              value={catalogMode === "products" ? String(data.catalogSummary.productQuantity) : catalogMode === "services" ? String(data.catalogSummary.serviceQuantity) : String(data.kpis.services.value)}
-              icon={Wrench}
-              route="/services"
-              trend={data.kpis.services.trend}
-              spark={data.kpis.services.spark}
-              accent="cyan"
-            />
+            {canViewDevis && (
+              <>
+                <DashboardSecondaryCard
+                  index={2}
+                  title="Devis"
+                  value={String(data.secondary.devisCount)}
+                  icon={FileText}
+                  route="/devis"
+                  accent="primary"
+                />
+                <DashboardSecondaryCard
+                  index={3}
+                  title="Factures impayées"
+                  value={formatCurrency(data.secondary.facturesImpayeesTotal)}
+                  icon={AlertTriangle}
+                  route="/devis"
+                  accent="amber"
+                />
+              </>
+            )}
           </div>
         )}
-
-        {/* Actions Rapides */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-bold">Actions rapides</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {quickActions.map((action, i) => (
-              <motion.div
-                key={action.title}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: i * 0.02 }}
-              >
-                <Link
-                  to={action.route}
-                  className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-card border border-border hover:border-primary hover:shadow-md transition-all h-full"
-                >
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <action.icon className="h-5 w-5" />
-                  </div>
-                  <span className="text-xs font-medium text-center">{action.title}</span>
-                </Link>
-              </motion.div>
-            ))}
-            {/* TODO: Réactiver la recherche globale plus tard */}
-            {/* <motion.button
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, delay: quickActions.length * 0.02 }}
-              onClick={() => setSearchOpen(true)}
-              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-card border border-border hover:border-primary hover:shadow-md transition-all h-full"
-            >
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                <Search className="h-5 w-5" />
-              </div>
-              <span className="text-xs font-medium text-center">Recherche globale</span>
-            </motion.button> */}
-          </div>
-        </div>
 
         {isLoading || !data ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
