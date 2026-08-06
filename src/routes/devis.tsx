@@ -4,15 +4,26 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, Search, FileDown } from "lucide-react";
+import {
+  FileText,
+  Pencil,
+  Trash2,
+  Eye,
+  FileDown,
+  Calendar,
+  Tag,
+  Loader2,
+  Plus,
+} from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
+import { PremiumResourceList } from "@/components/mms/PremiumResourceList";
+import { ResourceCard, type ResourceCardDetail, type ResourceCardFooterAction } from "@/components/mms/ResourceCard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency, formatDate } from "@/lib/mms/format";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/mms/format";
 import { generateDevisPDF } from "@/lib/mms/pdf-generator";
 import { useCompanySettings } from "@/hooks/use-company-settings";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
@@ -28,6 +39,16 @@ interface Devis {
   discount: number;
   total: number;
   created_at: string;
+  [k: string]: unknown;
+}
+
+interface DevisItem {
+  id: string;
+  name: string;
+  qty: number;
+  price: number;
+  line_total: number;
+  unit: string | null;
 }
 
 const STATUSES = ["brouillon", "envoyé", "accepté", "refusé"] as const;
@@ -47,6 +68,176 @@ export const Route = createFileRoute("/devis")({
     ],
   }),
 });
+
+function DevisCard({
+  row,
+  canDelete,
+  onEdit,
+  onDelete,
+  onDownloadPdf,
+}: {
+  row: Devis;
+  canDelete: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onDownloadPdf: () => void;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const qc = useQueryClient();
+
+  const setStatus = useMutation({
+    mutationFn: async (status: string | null) => {
+      const { error } = await (supabase.from("devis").update({ status }) as any).eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["devis"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const { data: items = [], isLoading: itemsLoading } = useQuery({
+    queryKey: ["devis_items", row.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("devis_items")
+        .select("id, name, qty, price, line_total, unit")
+        .eq("devis_id", row.id);
+      if (error) throw error;
+      return (data ?? []) as DevisItem[];
+    },
+    enabled: detailsOpen,
+  });
+
+  const title = row.client_name?.trim() || "Client inconnu";
+
+  const details: ResourceCardDetail[] = [
+    { icon: Calendar, label: "Échéance", value: formatDate(row.due_date) },
+    {
+      icon: Tag,
+      label: "Statut",
+      value: (
+        <select
+          value={row.status ?? ""}
+          onChange={(e) => setStatus.mutate(e.target.value || null)}
+          onClick={(e) => e.stopPropagation()}
+          className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none cursor-pointer ${
+            statusColor[row.status ?? ""] ?? "bg-muted text-muted-foreground"
+          }`}
+        >
+          <option value="">— Aucun —</option>
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+  ];
+
+  const footerActions: ResourceCardFooterAction[] = [
+    {
+      key: "view",
+      icon: Eye,
+      label: "Voir",
+      onClick: () => setDetailsOpen(true),
+      colorClass: "text-gray-600 hover:bg-gray-50 active:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-500/10",
+    },
+    {
+      key: "pdf",
+      icon: FileDown,
+      label: "PDF",
+      onClick: onDownloadPdf,
+      colorClass: "text-blue-600 hover:bg-blue-50 active:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-500/10",
+    },
+    {
+      key: "edit",
+      icon: Pencil,
+      label: "Modifier",
+      onClick: onEdit,
+      colorClass:
+        "text-violet-600 hover:bg-violet-50 active:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-500/10",
+    },
+    {
+      key: "delete",
+      icon: Trash2,
+      label: "Supprimer",
+      onClick: onDelete,
+      colorClass: "text-red-600 hover:bg-red-50 active:bg-red-100 dark:text-red-400 dark:hover:bg-red-500/10",
+      disabled: !canDelete,
+    },
+  ];
+
+  return (
+    <>
+      <ResourceCard
+        leading={{ variant: "icon", icon: FileText, className: "bg-violet-500" }}
+        title={title.toUpperCase()}
+        badge={{ label: row.number, className: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" }}
+        headerInfo={{ value: formatCurrency(Number(row.total)), className: "text-primary" }}
+        details={details}
+        footerActions={footerActions}
+      />
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500 text-white">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="truncate">{title}</DialogTitle>
+                <DialogDescription>Devis {row.number}</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <span className="text-muted-foreground">Date</span>
+              <span className="font-medium text-foreground">{formatDateTime(row.created_at)}</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <span className="text-muted-foreground">Échéance</span>
+              <span className="font-medium text-foreground">{formatDate(row.due_date)}</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <span className="text-muted-foreground">Total</span>
+              <span className="text-base font-bold text-primary">{formatCurrency(Number(row.total))}</span>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Lignes du devis
+              </p>
+              {itemsLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucune ligne.</p>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.qty} {item.unit || "unité"} × {formatCurrency(Number(item.price))}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold text-foreground">
+                        {formatCurrency(Number(item.line_total))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 function DevisPage() {
   const { profile, loading: tenantLoading } = useTenant();
@@ -160,20 +351,6 @@ function DevisPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const setStatus = useMutation({
-    mutationFn: async (v: { id: string; status: string | null }) => {
-      if (!tenantId) throw new Error("Locataire introuvable");
-      const { error } = await (supabase
-        .from("devis")
-        .update({ status: v.status }) as any)
-        .eq("id", v.id)
-        .eq("tenant_id", tenantId);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["devis"] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const filtered = data.filter(
     (d) =>
       !q ||
@@ -182,140 +359,70 @@ function DevisPage() {
   );
 
   return (
-    <TooltipProvider>
-      <AppShell title="Devis" subtitle="Propositions commerciales et suivi">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Rechercher un devis..."
-                className="w-full rounded-xl bg-muted/60 border border-border pl-10 pr-4 py-2 text-sm outline-none focus:border-primary/40"
-              />
-            </div>
-            {canCreateDevis && (
-                <button
+    <AppShell title="Devis" subtitle="Propositions commerciales et suivi">
+      <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
+        <PremiumResourceList<Devis>
+          items={filtered}
+          isLoading={isLoading}
+          singular="Devis"
+          plural="Devis"
+          searchValue={q}
+          onSearchChange={setQ}
+          nameField="client_name"
+          nameSortLabel="Client"
+          dateField="created_at"
+          emptyState={{
+            icon: <FileText className="h-10 w-10 text-muted-foreground/50" />,
+            title: "Aucun devis",
+            subtitle: "Créez votre premier devis pour commencer.",
+          }}
+          createSlot={
+            canCreateDevis ? (
+              <button
                 onClick={() => setCreating(true)}
-                className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-                >
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#3B82F6] px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-blue-500/25 transition-all duration-200 hover:shadow-md hover:shadow-blue-500/30 active:scale-[0.98]"
+              >
                 <Plus className="h-4 w-4" /> Nouveau devis
-                </button>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card overflow-x-auto w-full">
-            <table className="w-full text-sm min-w-max">
-              <thead className="bg-muted/40 text-muted-foreground text-xs uppercase tracking-wide">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium">Numéro</th>
-                  <th className="text-left px-4 py-3 font-medium">Client</th>
-                  <th className="text-left px-4 py-3 font-medium">Échéance</th>
-                  <th className="text-left px-4 py-3 font-medium">Statut</th>
-                  <th className="text-right px-4 py-3 font-medium">Total</th>
-                  <th className="w-24" />
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-12">
-                      <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
-                    </td>
-                  </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-12 text-muted-foreground">
-                      Aucun devis {q ? "trouvé" : "pour l'instant"}.
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((d) => (
-                    <tr key={d.id} className="border-t border-border hover:bg-muted/30">
-                      <td className="px-4 py-3 font-medium">{d.number}</td>
-                      <td className="px-4 py-3">{d.client_name ?? "-"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDate(d.due_date)}</td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={d.status ?? ""}
-                          onChange={(e) => setStatus.mutate({ id: d.id, status: e.target.value || null })}
-                          className={`text-xs px-2 py-1 rounded-full font-medium border-0 outline-none cursor-pointer ${statusColor[d.status ?? ""] ?? "bg-muted text-muted-foreground"}`}
-                        >
-                          <option value="">— Aucun —</option>
-                          {STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-primary">
-                        {formatCurrency(Number(d.total))}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="bg-[#2563EB] text-white hover:bg-[#2563EB]/90"
-                                onClick={() => downloadPDF(d)}
-                              >
-                                <FileDown className="h-4 w-4 mr-2" /> PDF
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Télécharger le devis</TooltipContent>
-                          </Tooltip>
-                          <button
-                            onClick={() => setEditId(d.id)}
-                            className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          {canDeleteDevis && (
-                            <button
-                                onClick={() => confirm("Supprimer ce devis ?") && del.mutate(d)}
-                                className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {(creating || editId) && (
-            <LineItemsDialog
-              headerTable="devis"
-              itemsTable="devis_items"
-              fkColumn="devis_id"
-              partnerTable="clients"
-              partnerLabel="Client"
-              numberPrefix="DEV"
-            singular="Devis"
-            tenantId={tenantId}
-              extraFields={[
-                { name: "status", label: "Statut", type: "select", options: [...STATUSES] },
-                { name: "due_date", label: "Échéance", type: "date" },
-              ]}
-              initialId={editId}
-              onClose={() => {
-                setEditId(null);
-                setCreating(false);
+              </button>
+            ) : undefined
+          }
+          renderCard={(row) => (
+            <DevisCard
+              row={row}
+              canDelete={canDeleteDevis}
+              onEdit={() => setEditId(row.id)}
+              onDelete={() => {
+                if (confirm("Supprimer ce devis ?")) del.mutate(row);
               }}
+              onDownloadPdf={() => downloadPDF(row)}
             />
           )}
-        </AnimatePresence>
-      </AppShell>
-    </TooltipProvider>
+        />
+      </div>
+
+      <AnimatePresence>
+        {(creating || editId) && (
+          <LineItemsDialog
+            headerTable="devis"
+            itemsTable="devis_items"
+            fkColumn="devis_id"
+            partnerTable="clients"
+            partnerLabel="Client"
+            numberPrefix="DEV"
+            singular="Devis"
+            tenantId={tenantId}
+            extraFields={[
+              { name: "status", label: "Statut", type: "select", options: [...STATUSES] },
+              { name: "due_date", label: "Échéance", type: "date" },
+            ]}
+            initialId={editId}
+            onClose={() => {
+              setEditId(null);
+              setCreating(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </AppShell>
   );
 }

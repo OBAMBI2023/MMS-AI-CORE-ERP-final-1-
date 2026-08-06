@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Plus, Trash2, Loader2, ShoppingCart, CheckCircle2 } from "lucide-react";
+import { X, Plus, Trash2, Loader2, ShoppingCart, CheckCircle2, FileText } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,6 +95,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
   const qc = useQueryClient();
   const isEdit = Boolean(initialId);
   const isAchats = headerTable === "achats";
+  const isDevis = headerTable === "devis";
   const permissionsQuery = usePermissions();
   const canManageSales = permissionsQuery.data?.role === "Administrateur";
 
@@ -424,24 +425,35 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
         </span>
       </div>
     </div>
+  ) : isDevis ? (
+    <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-2.5 text-sm">
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">Sous-total</span>
+        <span className="font-medium">{formatCurrency(subtotal)}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground">Remise</span>
+        <input
+          type="number"
+          min="0"
+          value={discount}
+          onChange={(e) => setDiscount(Number(e.target.value))}
+          className="w-28 text-right rounded-lg bg-background border border-border px-2 py-1 text-sm outline-none focus:border-primary/40"
+        />
+      </div>
+      <div className="flex items-center justify-between pt-2.5 border-t border-border">
+        <span className="text-sm font-semibold">Total</span>
+        <span className="text-2xl font-bold text-primary break-all text-right">
+          {formatCurrency(total)}
+        </span>
+      </div>
+    </div>
   ) : (
     <div className="rounded-xl bg-muted/40 p-4 space-y-2 text-sm">
       <div className="flex justify-between">
         <span className="text-muted-foreground">Sous-total</span>
         <span>{formatCurrency(subtotal)}</span>
       </div>
-      {headerTable === "devis" && (
-        <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">Remise</span>
-          <input
-            type="number"
-            min="0"
-            value={discount}
-            onChange={(e) => setDiscount(Number(e.target.value))}
-            className="w-28 text-right rounded-lg bg-background border border-border px-2 py-1 text-sm outline-none"
-          />
-        </div>
-      )}
       <div className="flex justify-between pt-2 border-t border-border font-semibold text-base">
         <span>Total</span>
         <span className="text-primary">{formatCurrency(total)}</span>
@@ -463,7 +475,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
         type="button"
         onClick={onClose}
         className={
-          isAchats
+          isAchats || isDevis
             ? "px-4 py-2.5 rounded-xl text-sm font-medium border border-border hover:bg-muted"
             : "px-4 py-2 rounded-xl text-sm font-medium hover:bg-muted"
         }
@@ -474,7 +486,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
         type="submit"
         disabled={saveMut.isPending}
         className={
-          isAchats
+          isAchats || isDevis
             ? "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-60"
             : "inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-60"
         }
@@ -484,7 +496,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
         ) : isAchats ? (
           <CheckCircle2 className="h-4 w-4" />
         ) : null}
-        {isEdit ? "Enregistrer" : isAchats ? "Créer l'achat" : "Créer"}
+        {isEdit ? "Enregistrer" : isAchats ? "Créer l'achat" : isDevis ? "Créer le devis" : "Créer"}
       </button>
     </>
   );
@@ -645,6 +657,177 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                   {notesField}
                 </label>
                 {summaryBlock}
+              </div>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-4 border-t border-border">
+              {footerButtons}
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (isDevis) {
+    return (
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="w-full max-w-4xl">
+          <DialogHeader className="flex-row items-start gap-3 space-y-0 pb-4 border-b border-border">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500 text-white">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <DialogTitle className="text-lg font-semibold">
+                {isEdit ? "Modifier le devis" : "Nouveau devis"}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {isEdit
+                  ? "Modifiez les informations de ce devis."
+                  : "Créez une nouvelle proposition commerciale."}
+              </p>
+            </div>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveMut.mutate();
+            }}
+            className="space-y-5"
+          >
+            <div className="max-h-[65vh] overflow-y-auto space-y-5 pr-1">
+              <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
+                <h4 className="text-sm font-semibold mb-3">Informations générales</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{partnerField}</div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold">Lignes du devis</h4>
+                  {addLineButton(
+                    "inline-flex items-center gap-1.5 rounded-lg border border-primary/30 text-primary px-3 py-1.5 text-xs font-medium hover:bg-primary/5",
+                  )}
+                </div>
+
+                {/* Desktop grid */}
+                <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+                  <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                    <div className="col-span-5">Désignation</div>
+                    <div className="col-span-2">Unité</div>
+                    <div className="col-span-1 text-right">Quantité</div>
+                    <div className="col-span-2 text-right">Prix unitaire</div>
+                    <div className="col-span-1 text-right">Total</div>
+                    <div className="col-span-1" />
+                  </div>
+                  {items.map((it, idx) => (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-12 gap-2 px-3 py-2 border-t border-border items-center"
+                    >
+                      {nameInput(
+                        idx,
+                        it,
+                        "col-span-5 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm outline-none focus:border-primary/40",
+                      )}
+                      {unitInput(
+                        idx,
+                        it,
+                        "col-span-2 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm outline-none focus:border-primary/40",
+                      )}
+                      {qtyInput(
+                        idx,
+                        it,
+                        "col-span-1 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
+                      )}
+                      {priceInput(
+                        idx,
+                        it,
+                        "col-span-2 rounded-lg bg-muted/60 border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
+                      )}
+                      <div className="col-span-1 text-right text-sm font-medium">
+                        {formatCurrency(Number(it.qty || 0) * Number(it.price || 0))}
+                      </div>
+                      <div className="col-span-1 text-right">
+                        {removeLineButton(idx, "p-1 text-muted-foreground hover:text-destructive")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Mobile cards */}
+                <div className="md:hidden space-y-3">
+                  {items.map((it, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-border p-3 space-y-2 bg-muted/20"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        {nameInput(
+                          idx,
+                          it,
+                          "flex-1 min-w-0 rounded-lg bg-background border border-border px-2 py-1.5 text-sm outline-none focus:border-primary/40",
+                        )}
+                        {removeLineButton(
+                          idx,
+                          "p-1.5 shrink-0 text-muted-foreground hover:text-destructive",
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase text-muted-foreground">
+                            Unité
+                          </span>
+                          {unitInput(
+                            idx,
+                            it,
+                            "w-full rounded-lg bg-background border border-border px-2 py-1.5 text-sm outline-none focus:border-primary/40",
+                          )}
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase text-muted-foreground">
+                            Quantité
+                          </span>
+                          {qtyInput(
+                            idx,
+                            it,
+                            "w-full rounded-lg bg-background border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
+                          )}
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-end">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase text-muted-foreground">
+                            Prix unitaire
+                          </span>
+                          {priceInput(
+                            idx,
+                            it,
+                            "w-full rounded-lg bg-background border border-border px-2 py-1.5 text-sm text-right outline-none focus:border-primary/40",
+                          )}
+                        </label>
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="text-[10px] uppercase text-muted-foreground">
+                            Total
+                          </span>
+                          <div className="rounded-lg bg-muted/50 px-2 py-1.5 text-sm text-right font-semibold truncate">
+                            {formatCurrency(Number(it.qty || 0) * Number(it.price || 0))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {svcDatalist}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
+                  <h4 className="text-sm font-semibold mb-3">Notes</h4>
+                  {notesField}
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold mb-3">Résumé</h4>
+                  {summaryBlock}
+                </div>
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-4 border-t border-border">
