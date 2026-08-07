@@ -4,10 +4,17 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
+import { logAction } from "@/lib/audit.server";
 
 type TenantRow = {
-  id: string; name: string; slug: string; is_active: boolean; created_at: string;
-  deleted_at: string | null; deletion_reason: string | null; suspended_at: string | null;
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  deleted_at: string | null;
+  deletion_reason: string | null;
+  suspended_at: string | null;
 };
 type PartnerTenantRow = { partner_id: string; tenant_id: string; assigned_at: string };
 type TenantMetricRow = {
@@ -21,6 +28,7 @@ type ModuleRow = {
   code: string;
   name: string;
   description: string | null;
+  icon: string | null;
   sort_order: number;
   is_active: boolean;
 };
@@ -35,34 +43,79 @@ type ModulePackRow = {
 type ModulePackItemRow = { pack_id: string; module_id: string };
 type TenantModulePackRow = { tenant_id: string; pack_id: string };
 type PartnerOfferRow = {
-  id: string; name: string; price: number | string; included_tenant_credits: number;
-  subscription_duration_days: number; module_pack_id: string; max_trials: number;
-  trial_duration_days: number; is_active: boolean;
+  id: string;
+  name: string;
+  price: number | string;
+  included_tenant_credits: number;
+  subscription_duration_days: number;
+  module_pack_id: string;
+  max_trials: number;
+  trial_duration_days: number;
+  is_active: boolean;
 };
 type CommercialPartnerRow = { id: string; name: string; code: string; is_active: boolean };
 type PartnerSubscriptionRow = {
-  id: string; partner_id: string; offer_id: string; status: string; starts_at: string; expires_at: string;
+  id: string;
+  partner_id: string;
+  offer_id: string;
+  status: string;
+  starts_at: string;
+  expires_at: string;
 };
 type PartnerPaymentRow = {
-  id: string; partner_id: string; offer_id: string; amount: number | string; currency: string;
-  status: string; external_reference: string; reason: string | null; validated_by: string; created_at: string;
+  id: string;
+  partner_id: string;
+  offer_id: string;
+  amount: number | string;
+  currency: string;
+  status: string;
+  external_reference: string;
+  reason: string | null;
+  validated_by: string;
+  created_at: string;
 };
 type CreditTransactionRow = {
-  id: string; partner_id: string; tenant_id: string | null; transaction_type: string;
-  credits: number; balance_after: number; reason: string; reference: string | null; actor_id: string; created_at: string;
+  id: string;
+  partner_id: string;
+  tenant_id: string | null;
+  transaction_type: string;
+  credits: number;
+  balance_after: number;
+  reason: string;
+  reference: string | null;
+  actor_id: string;
+  created_at: string;
 };
 type CreditPackRow = {
-  id: string; name: string; price: number | string; credit_count: number;
-  is_active: boolean; created_at: string;
+  id: string;
+  name: string;
+  price: number | string;
+  credit_count: number;
+  is_active: boolean;
+  created_at: string;
 };
 type CreditPurchaseRow = {
-  id: string; partner_id: string; credit_pack_id: string; credits: number;
-  amount: number | string; currency: string; reference: string; reason: string | null;
-  attributed_by: string; created_at: string;
+  id: string;
+  partner_id: string;
+  credit_pack_id: string;
+  credits: number;
+  amount: number | string;
+  currency: string;
+  reference: string;
+  reason: string | null;
+  attributed_by: string;
+  created_at: string;
 };
 type TrialUsageRow = {
-  id: string; partner_id: string; tenant_id: string; offer_id: string; client_email: string; status: string;
-  starts_at: string; expires_at: string; created_by: string;
+  id: string;
+  partner_id: string;
+  tenant_id: string;
+  offer_id: string;
+  client_email: string;
+  status: string;
+  starts_at: string;
+  expires_at: string;
+  created_by: string;
 };
 type AiPlanRow = {
   code: string;
@@ -200,11 +253,22 @@ export type TenantDeletionJob = {
 export type SuperAdminTenantModule = ModuleRow & { enabled: boolean };
 export type SuperAdminModulePack = ModulePackRow & { moduleIds: string[] };
 export type SuperAdminPartnerOffer = {
-  id: string; name: string; price: number; includedTenantCredits: number; durationDays: number;
-  modulePackId: string; maxTrials: number; trialDays: number; isActive: boolean;
+  id: string;
+  name: string;
+  price: number;
+  includedTenantCredits: number;
+  durationDays: number;
+  modulePackId: string;
+  maxTrials: number;
+  trialDays: number;
+  isActive: boolean;
 };
 export type SuperAdminCreditPack = {
-  id: string; name: string; price: number; creditCount: number; isActive: boolean;
+  id: string;
+  name: string;
+  price: number;
+  creditCount: number;
+  isActive: boolean;
 };
 
 export type SuperAdminDashboard = {
@@ -218,7 +282,13 @@ export type SuperAdminDashboard = {
   deletionJobs: TenantDeletionJob[];
   partnerCommerce: {
     offers: SuperAdminPartnerOffer[];
-    partners: { id: string; name: string; code: string; isActive: boolean; creditBalance: number }[];
+    partners: {
+      id: string;
+      name: string;
+      code: string;
+      isActive: boolean;
+      creditBalance: number;
+    }[];
     subscriptions: PartnerSubscriptionRow[];
     payments: PartnerPaymentRow[];
     credits: CreditTransactionRow[];
@@ -263,26 +333,25 @@ export const getPlatformAdminAccess = createServerFn({ method: "GET" })
 
 export const manageTenantLifecycle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(z.object({
-    tenantId: z.string().uuid(),
-    action: z.enum(["suspend", "reactivate", "soft_delete", "restore"]),
-    reason: z.string().trim().min(3).max(500),
-    exactName: z.string().max(200).optional(),
-    secondConfirmation: z.literal("CONFIRMER LA SUPPRESSION").optional(),
-  }))
+  .validator(
+    z.object({
+      tenantId: z.string().uuid(),
+      action: z.enum(["suspend", "reactivate", "soft_delete", "restore"]),
+      reason: z.string().trim().min(3).max(500),
+      exactName: z.string().max(200).optional(),
+      secondConfirmation: z.literal("CONFIRMER LA SUPPRESSION").optional(),
+    }),
+  )
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.supabase, context.userId);
-    const { data: result, error } = await (context.supabase as any).rpc(
-      "manage_tenant_lifecycle",
-      {
-        requested_tenant_id: data.tenantId,
-        requested_actor_id: context.userId,
-        requested_action: data.action,
-        requested_reason: data.reason,
-        requested_exact_name: data.exactName ?? null,
-        requested_second_confirmation: data.secondConfirmation ?? null,
-      },
-    );
+    const { data: result, error } = await (context.supabase as any).rpc("manage_tenant_lifecycle", {
+      requested_tenant_id: data.tenantId,
+      requested_actor_id: context.userId,
+      requested_action: data.action,
+      requested_reason: data.reason,
+      requested_exact_name: data.exactName ?? null,
+      requested_second_confirmation: data.secondConfirmation ?? null,
+    });
     if (error) throw new Error(formatSupabaseError(error));
     return result as {
       tenant_id: string;
@@ -352,7 +421,11 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       trialUsageRows,
       partnerTenantRows,
     ] = await Promise.all([
-      fetchRows<TenantRow>(supabaseAdmin, "tenants", "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at"),
+      fetchRows<TenantRow>(
+        supabaseAdmin,
+        "tenants",
+        "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at",
+      ),
       fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "tenant_id, created_at, updated_at"),
       fetchRows<SaleRow>(supabaseAdmin, "ventes", "tenant_id, total, created_at, updated_at"),
       fetchRows<TenantMetricRow>(supabaseAdmin, "clients", "tenant_id, created_at, updated_at"),
@@ -364,24 +437,16 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       fetchRows<ModuleRow>(
         supabaseAdmin,
         "erp_modules",
-        "id, code, name, description, sort_order, is_active",
+        "id, code, name, description, icon, sort_order, is_active",
       ),
-      fetchRows<TenantModuleRow>(
-        supabaseAdmin,
-        "tenant_modules",
-        "tenant_id, module_id, enabled",
-      ),
+      fetchRows<TenantModuleRow>(supabaseAdmin, "tenant_modules", "tenant_id, module_id, enabled"),
       fetchRows<ModulePackRow>(
         supabaseAdmin,
         "module_packs",
         "id, name, code, description, is_active",
       ),
       fetchRows<ModulePackItemRow>(supabaseAdmin, "module_pack_items", "pack_id, module_id"),
-      fetchRows<TenantModulePackRow>(
-        supabaseAdmin,
-        "tenant_module_packs",
-        "tenant_id, pack_id",
-      ),
+      fetchRows<TenantModulePackRow>(supabaseAdmin, "tenant_module_packs", "tenant_id, pack_id"),
       fetchRows<AiPlanRow>(
         supabaseAdmin,
         "ai_plans",
@@ -397,15 +462,47 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         "ai_usage_logs",
         "id, tenant_id, user_id, tool_name, request_type, input_tokens, output_tokens, total_tokens, estimated_cost, status, error_message, created_at",
       ),
-      fetchRows<PartnerOfferRow>(supabaseAdmin, "partner_offers", "id, name, price, included_tenant_credits, subscription_duration_days, module_pack_id, max_trials, trial_duration_days, is_active"),
+      fetchRows<PartnerOfferRow>(
+        supabaseAdmin,
+        "partner_offers",
+        "id, name, price, included_tenant_credits, subscription_duration_days, module_pack_id, max_trials, trial_duration_days, is_active",
+      ),
       fetchRows<CommercialPartnerRow>(supabaseAdmin, "partners", "id, name, code, is_active"),
-      fetchRows<PartnerSubscriptionRow>(supabaseAdmin, "partner_subscriptions", "id, partner_id, offer_id, status, starts_at, expires_at"),
-      fetchRows<PartnerPaymentRow>(supabaseAdmin, "partner_payments", "id, partner_id, offer_id, amount, currency, status, external_reference, reason, validated_by, created_at"),
-      fetchRows<CreditTransactionRow>(supabaseAdmin, "partner_credit_transactions", "id, partner_id, tenant_id, transaction_type, credits, balance_after, reason, reference, actor_id, created_at"),
-      fetchRows<CreditPackRow>(supabaseAdmin, "partner_credit_packs", "id, name, price, credit_count, is_active, created_at"),
-      fetchRows<CreditPurchaseRow>(supabaseAdmin, "partner_credit_purchases", "id, partner_id, credit_pack_id, credits, amount, currency, reference, reason, attributed_by, created_at"),
-      fetchRows<TrialUsageRow>(supabaseAdmin, "partner_trial_usage", "id, partner_id, tenant_id, offer_id, client_email, status, starts_at, expires_at, created_by"),
-      fetchRows<PartnerTenantRow>(supabaseAdmin, "partner_tenants", "partner_id, tenant_id, assigned_at"),
+      fetchRows<PartnerSubscriptionRow>(
+        supabaseAdmin,
+        "partner_subscriptions",
+        "id, partner_id, offer_id, status, starts_at, expires_at",
+      ),
+      fetchRows<PartnerPaymentRow>(
+        supabaseAdmin,
+        "partner_payments",
+        "id, partner_id, offer_id, amount, currency, status, external_reference, reason, validated_by, created_at",
+      ),
+      fetchRows<CreditTransactionRow>(
+        supabaseAdmin,
+        "partner_credit_transactions",
+        "id, partner_id, tenant_id, transaction_type, credits, balance_after, reason, reference, actor_id, created_at",
+      ),
+      fetchRows<CreditPackRow>(
+        supabaseAdmin,
+        "partner_credit_packs",
+        "id, name, price, credit_count, is_active, created_at",
+      ),
+      fetchRows<CreditPurchaseRow>(
+        supabaseAdmin,
+        "partner_credit_purchases",
+        "id, partner_id, credit_pack_id, credits, amount, currency, reference, reason, attributed_by, created_at",
+      ),
+      fetchRows<TrialUsageRow>(
+        supabaseAdmin,
+        "partner_trial_usage",
+        "id, partner_id, tenant_id, offer_id, client_email, status, starts_at, expires_at, created_by",
+      ),
+      fetchRows<PartnerTenantRow>(
+        supabaseAdmin,
+        "partner_tenants",
+        "partner_id, tenant_id, assigned_at",
+      ),
     ]);
     const subscriptionsByTenant = new Map(
       subscriptionRows.map((subscription) => [subscription.tenant_id, subscription]),
@@ -538,8 +635,9 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           })(),
           partnerOffer: (() => {
             const partnerId = creatorPartnerByTenant.get(tenant.id);
-            const offerId = trialByTenant.get(tenant.id)?.offer_id
-              ?? (partnerId ? partnerSubscriptionByPartner.get(partnerId)?.offer_id : undefined);
+            const offerId =
+              trialByTenant.get(tenant.id)?.offer_id ??
+              (partnerId ? partnerSubscriptionByPartner.get(partnerId)?.offer_id : undefined);
             const offer = offerId ? offersById.get(offerId) : undefined;
             return offer ? { id: offer.id, name: offer.name } : null;
           })(),
@@ -583,8 +681,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
               inputTokens: usage.input_tokens,
               outputTokens: usage.output_tokens,
               totalTokens: usage.total_tokens,
-              estimatedCost:
-                usage.estimated_cost === null ? null : Number(usage.estimated_cost),
+              estimatedCost: usage.estimated_cost === null ? null : Number(usage.estimated_cost),
               status: usage.status,
               errorMessage: usage.error_message,
               createdAt: usage.created_at,
@@ -596,7 +693,9 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
 
     const { data: deletionRows, error: deletionError } = await (supabaseAdmin as any)
       .from("tenant_deletion_jobs")
-      .select("id, tenant_id, tenant_slug, tenant_name, status, current_step, attempt_count, last_error, created_at, completed_at")
+      .select(
+        "id, tenant_id, tenant_slug, tenant_name, status, current_step, attempt_count, last_error, created_at, completed_at",
+      )
       .order("created_at", { ascending: false })
       .limit(50);
     if (deletionError) throw new Error(formatSupabaseError(deletionError));
@@ -653,13 +752,20 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       })),
       partnerCommerce: {
         offers: partnerOfferRows.map((offer) => ({
-          id: offer.id, name: offer.name, price: Number(offer.price),
+          id: offer.id,
+          name: offer.name,
+          price: Number(offer.price),
           includedTenantCredits: offer.included_tenant_credits,
-          durationDays: offer.subscription_duration_days, modulePackId: offer.module_pack_id,
-          maxTrials: offer.max_trials, trialDays: offer.trial_duration_days, isActive: offer.is_active,
+          durationDays: offer.subscription_duration_days,
+          modulePackId: offer.module_pack_id,
+          maxTrials: offer.max_trials,
+          trialDays: offer.trial_duration_days,
+          isActive: offer.is_active,
         })),
         partners: commercialPartnerRows.map((partner) => ({
-          id: partner.id, name: partner.name, code: partner.code,
+          id: partner.id,
+          name: partner.name,
+          code: partner.code,
           isActive: partner.is_active,
           creditBalance: creditTransactionRows
             .filter((transaction) => transaction.partner_id === partner.id)
@@ -669,8 +775,11 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
         payments: partnerPaymentRows,
         credits: creditTransactionRows,
         creditPacks: creditPackRows.map((pack) => ({
-          id: pack.id, name: pack.name, price: Number(pack.price),
-          creditCount: pack.credit_count, isActive: pack.is_active,
+          id: pack.id,
+          name: pack.name,
+          price: Number(pack.price),
+          creditCount: pack.credit_count,
+          isActive: pack.is_active,
         })),
         creditPurchases: creditPurchaseRows,
         trials: trialUsageRows,
@@ -681,7 +790,11 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
 const modulePackSchema = z.object({
   id: z.string().uuid().nullable(),
   name: z.string().trim().min(1).max(100),
-  code: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{1,49}$/),
+  code: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9][a-z0-9_-]{1,49}$/),
   description: z.string().trim().max(500).nullable(),
   isActive: z.boolean(),
   moduleIds: z.array(z.string().uuid()).max(100),
@@ -702,6 +815,14 @@ export const saveModulePack = createServerFn({ method: "POST" })
       requested_module_ids: [...new Set(data.moduleIds)],
     });
     if (error) throw new Error(formatSupabaseError(error));
+    await logAction(context.userId, null, "module_pack_saved", "module_packs", {
+      packId: packId as string,
+      name: data.name,
+      code: data.code,
+      isActive: data.isActive,
+      moduleCount: data.moduleIds.length,
+      actorEmail: (context.claims as { email?: string } | undefined)?.email ?? null,
+    });
     return { success: true, packId: packId as string };
   });
 
@@ -715,6 +836,10 @@ export const removeModulePack = createServerFn({ method: "POST" })
       requested_pack_id: data.packId,
     });
     if (error) throw new Error(formatSupabaseError(error));
+    await logAction(context.userId, null, "module_pack_removed", "module_packs", {
+      packId: data.packId,
+      actorEmail: (context.claims as { email?: string } | undefined)?.email ?? null,
+    });
     return { success: true };
   });
 
@@ -768,18 +893,26 @@ export const removePartnerOffer = createServerFn({ method: "POST" })
 
 export const validatePartnerPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(z.object({
-    partnerId: z.string().uuid(), offerId: z.string().uuid(),
-    amount: z.number().finite().nonnegative(), currency: z.string().trim().length(3),
-    reference: z.string().trim().min(1).max(160), reason: z.string().trim().max(500),
-  }))
+  .validator(
+    z.object({
+      partnerId: z.string().uuid(),
+      offerId: z.string().uuid(),
+      amount: z.number().finite().nonnegative(),
+      currency: z.string().trim().length(3),
+      reference: z.string().trim().min(1).max(160),
+      reason: z.string().trim().max(500),
+    }),
+  )
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: paymentId, error } = await supabaseAdmin.rpc("validate_partner_payment", {
-      requested_partner_id: data.partnerId, requested_offer_id: data.offerId,
-      requested_amount: data.amount, requested_currency: data.currency.toUpperCase(),
-      requested_reference: data.reference, requested_reason: data.reason,
+      requested_partner_id: data.partnerId,
+      requested_offer_id: data.offerId,
+      requested_amount: data.amount,
+      requested_currency: data.currency.toUpperCase(),
+      requested_reference: data.reference,
+      requested_reason: data.reason,
       requested_actor_id: context.userId,
     });
     if (error) throw new Error(formatSupabaseError(error));
@@ -788,16 +921,25 @@ export const validatePartnerPayment = createServerFn({ method: "POST" })
 
 export const adjustPartnerCredits = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(z.object({
-    partnerId: z.string().uuid(), credits: z.number().int().refine((value) => value !== 0),
-    reason: z.string().trim().min(1).max(500), reference: z.string().trim().max(160),
-  }))
+  .validator(
+    z.object({
+      partnerId: z.string().uuid(),
+      credits: z
+        .number()
+        .int()
+        .refine((value) => value !== 0),
+      reason: z.string().trim().min(1).max(500),
+      reference: z.string().trim().max(160),
+    }),
+  )
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: balance, error } = await supabaseAdmin.rpc("adjust_partner_credits", {
-      requested_partner_id: data.partnerId, requested_credits: data.credits,
-      requested_reason: data.reason, requested_reference: data.reference,
+      requested_partner_id: data.partnerId,
+      requested_credits: data.credits,
+      requested_reason: data.reason,
+      requested_reference: data.reference,
       requested_actor_id: context.userId,
     });
     if (error) throw new Error(formatSupabaseError(error));
@@ -806,39 +948,40 @@ export const adjustPartnerCredits = createServerFn({ method: "POST" })
 
 export const savePartnerCreditPack = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(z.object({
-    id: z.string().uuid().nullable(),
-    name: z.string().trim().min(1).max(120),
-    price: z.number().finite().nonnegative(),
-    creditCount: z.number().int().positive().max(1_000_000),
-    isActive: z.boolean(),
-  }))
+  .validator(
+    z.object({
+      id: z.string().uuid().nullable(),
+      name: z.string().trim().min(1).max(120),
+      price: z.number().finite().nonnegative(),
+      creditCount: z.number().int().positive().max(1_000_000),
+      isActive: z.boolean(),
+    }),
+  )
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: packId, error } = await (supabaseAdmin as any).rpc(
-      "manage_partner_credit_pack",
-      {
-        requested_pack_id: data.id,
-        requested_name: data.name,
-        requested_price: data.price,
-        requested_credit_count: data.creditCount,
-        requested_is_active: data.isActive,
-        requested_actor_id: context.userId,
-      },
-    );
+    const { data: packId, error } = await (supabaseAdmin as any).rpc("manage_partner_credit_pack", {
+      requested_pack_id: data.id,
+      requested_name: data.name,
+      requested_price: data.price,
+      requested_credit_count: data.creditCount,
+      requested_is_active: data.isActive,
+      requested_actor_id: context.userId,
+    });
     if (error) throw new Error(formatSupabaseError(error));
     return { packId: packId as string };
   });
 
 export const purchasePartnerCreditPack = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(z.object({
-    partnerId: z.string().uuid(),
-    packId: z.string().uuid(),
-    reference: z.string().trim().min(1).max(160),
-    reason: z.string().trim().max(500),
-  }))
+  .validator(
+    z.object({
+      partnerId: z.string().uuid(),
+      packId: z.string().uuid(),
+      reference: z.string().trim().min(1).max(160),
+      reason: z.string().trim().max(500),
+    }),
+  )
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -892,6 +1035,25 @@ export const manageTenantModule = createServerFn({ method: "POST" })
       { onConflict: "tenant_id,module_id" },
     );
     if (error) throw new Error(formatSupabaseError(error));
+    const [{ data: tenantRow }, { data: moduleRow }] = await Promise.all([
+      supabaseAdmin.from("tenants").select("name").eq("id", data.tenantId).maybeSingle(),
+      supabaseAdmin.from("erp_modules").select("code, name").eq("id", data.moduleId).maybeSingle(),
+    ]);
+    await logAction(
+      context.userId,
+      null,
+      data.enabled ? "tenant_module_enabled" : "tenant_module_disabled",
+      "tenant_modules",
+      {
+        tenantId: data.tenantId,
+        tenantName: tenantRow?.name ?? null,
+        moduleId: data.moduleId,
+        moduleCode: (moduleRow as { code?: string } | null)?.code ?? null,
+        moduleName: (moduleRow as { name?: string } | null)?.name ?? null,
+        enabled: data.enabled,
+        actorEmail: (context.claims as { email?: string } | undefined)?.email ?? null,
+      },
+    );
     return { success: true };
   });
 
@@ -958,6 +1120,17 @@ export const manageTenantSubscription = createServerFn({ method: "POST" })
       .update(update)
       .eq("id", subscription.id);
     if (updateError) throw new Error(formatSupabaseError(updateError));
+    const { data: tenantRow } = await supabaseAdmin
+      .from("tenants")
+      .select("name")
+      .eq("id", data.tenantId)
+      .maybeSingle();
+    await logAction(context.userId, null, "tenant_subscription_updated", "subscriptions", {
+      tenantId: data.tenantId,
+      tenantName: tenantRow?.name ?? null,
+      action: data.action,
+      actorEmail: (context.claims as { email?: string } | undefined)?.email ?? null,
+    });
     return { success: true };
   });
 
@@ -1032,13 +1205,68 @@ export const manageTenantAiSubscription = createServerFn({ method: "POST" })
         .eq("id", current.id);
       if (error) throw new Error(formatSupabaseError(error));
     } else {
-      const { error } = await (supabaseAdmin as any)
-        .from("tenant_ai_subscriptions")
-        .insert({
-          tenant_id: data.tenantId,
-          ...update,
-        });
+      const { error } = await (supabaseAdmin as any).from("tenant_ai_subscriptions").insert({
+        tenant_id: data.tenantId,
+        ...update,
+      });
       if (error) throw new Error(formatSupabaseError(error));
     }
     return { success: true };
+  });
+
+type AuditLogRow = {
+  id: string;
+  action: string;
+  module: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type SuperAdminActivityItem = {
+  id: string;
+  action: string;
+  module: string;
+  createdAt: string;
+  tenantId: string | null;
+  tenantName: string | null;
+  actorEmail: string | null;
+};
+
+const ACTIVITY_MODULES = ["tenant_modules", "module_packs", "subscriptions", "super_admin_tenants"];
+
+export const getSuperAdminActivity = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<SuperAdminActivityItem[]> => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: logRows, error: logError }, tenantRows] = await Promise.all([
+      supabaseAdmin
+        .from("audit_logs")
+        .select("id, action, module, metadata, created_at")
+        .in("module", ACTIVITY_MODULES)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      fetchRows<{ id: string; name: string }>(supabaseAdmin, "tenants", "id, name"),
+    ]);
+    if (logError) throw new Error(formatSupabaseError(logError));
+    const tenantNameById = new Map(tenantRows.map((tenant) => [tenant.id, tenant.name]));
+
+    return ((logRows ?? []) as AuditLogRow[]).map((row) => {
+      const metadata = row.metadata ?? {};
+      const tenantId =
+        (metadata.tenantId as string | undefined) ??
+        (metadata.tenant_id as string | undefined) ??
+        null;
+      return {
+        id: row.id,
+        action: row.action,
+        module: row.module,
+        createdAt: row.created_at,
+        tenantId,
+        tenantName:
+          (metadata.tenantName as string | undefined) ??
+          (tenantId ? (tenantNameById.get(tenantId) ?? null) : null),
+        actorEmail: (metadata.actorEmail as string | undefined) ?? null,
+      };
+    });
   });

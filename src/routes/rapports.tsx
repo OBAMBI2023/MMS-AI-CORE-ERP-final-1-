@@ -732,14 +732,14 @@ function RapportsPage() {
 
   return (
     <AppShell title="Rapports" subtitle="Analyse complète des performances de votre entreprise.">
-      <div className="-m-4 min-h-full bg-[#F8FAFC] p-4 dark:bg-transparent md:-m-8 md:p-8">
+      <div className="-m-4 min-h-full overflow-x-hidden bg-[#F8FAFC] p-4 pb-24 dark:bg-transparent md:-m-8 md:p-8 md:pb-8">
         <div className="sticky top-0 z-10 -mx-4 mb-6 border-b border-slate-200/70 bg-white/80 px-4 py-4 backdrop-blur-md dark:border-border dark:bg-background/80 md:-mx-8 md:rounded-b-[24px] md:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0">
-              <div className="shrink-0">
+            <div className="grid grid-cols-3 gap-2 overflow-x-hidden sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:overflow-visible">
+              <div className="min-w-0 sm:shrink-0">
                 <Select value={preset} onValueChange={(value) => setPreset(value as PeriodPreset)}>
-                  <SelectTrigger className="w-[190px] rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
-                    <CalendarRange className="mr-1 h-4 w-4 text-slate-400" />
+                  <SelectTrigger className="w-full rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40 sm:w-[190px]">
+                    <CalendarRange className="mr-1 h-4 w-4 shrink-0 text-slate-400" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -753,7 +753,7 @@ function RapportsPage() {
               </div>
 
               {preset === "week" && (
-                <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 dark:border-border dark:bg-muted/40">
+                <div className="col-span-3 flex items-center justify-between gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 dark:border-border dark:bg-muted/40 sm:col-span-1 sm:w-auto sm:shrink-0 sm:justify-start">
                   <button
                     type="button"
                     onClick={() => setWeekOffset((v) => v - 1)}
@@ -762,7 +762,7 @@ function RapportsPage() {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
-                  <span className="whitespace-nowrap px-1 text-sm font-medium text-slate-700 dark:text-foreground">
+                  <span className="truncate whitespace-nowrap px-1 text-sm font-medium text-slate-700 dark:text-foreground">
                     Semaine {getISOWeek(periodRange.start)} ({getISOWeekYear(periodRange.start)})
                   </span>
                   <button
@@ -778,7 +778,7 @@ function RapportsPage() {
               )}
 
               {preset === "quarter" && (
-                <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 dark:border-border dark:bg-muted/40">
+                <div className="col-span-3 flex items-center justify-between gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 dark:border-border dark:bg-muted/40 sm:col-span-1 sm:w-auto sm:shrink-0 sm:justify-start">
                   <button
                     type="button"
                     onClick={() => setQuarterOffset((v) => v - 1)}
@@ -787,7 +787,7 @@ function RapportsPage() {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
-                  <span className="whitespace-nowrap px-1 text-sm font-medium text-slate-700 dark:text-foreground">
+                  <span className="truncate whitespace-nowrap px-1 text-sm font-medium text-slate-700 dark:text-foreground">
                     {formatPeriodTitle("quarter", periodRange)}
                   </span>
                   <button
@@ -805,7 +805,7 @@ function RapportsPage() {
               {preset === "month" && (
                 <>
                   <Select value={String(month)} onValueChange={(value) => setMonth(Number(value))}>
-                    <SelectTrigger className="w-[140px] shrink-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                    <SelectTrigger className="w-full min-w-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40 sm:w-[140px] sm:shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -817,7 +817,7 @@ function RapportsPage() {
                     </SelectContent>
                   </Select>
                   <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
-                    <SelectTrigger className="w-[120px] shrink-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                    <SelectTrigger className="w-full min-w-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40 sm:w-[120px] sm:shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -833,7 +833,7 @@ function RapportsPage() {
 
               {preset === "year" && (
                 <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
-                  <SelectTrigger className="w-[120px] shrink-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                  <SelectTrigger className="w-full min-w-0 rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40 sm:w-[120px] sm:shrink-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -847,30 +847,30 @@ function RapportsPage() {
               )}
 
               {preset === "custom" && (
-                <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-border dark:bg-muted/40">
+                <div className="col-span-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-border dark:bg-muted/40 sm:col-span-1 sm:w-auto sm:shrink-0">
                   <input
                     type="date"
                     value={customFrom}
                     onChange={(e) => setCustomFrom(e.target.value)}
-                    className="bg-transparent text-sm text-slate-700 outline-none dark:text-foreground"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none dark:text-foreground"
                   />
-                  <span className="text-slate-400">→</span>
+                  <span className="shrink-0 text-slate-400">→</span>
                   <input
                     type="date"
                     value={customTo}
                     onChange={(e) => setCustomTo(e.target.value)}
-                    className="bg-transparent text-sm text-slate-700 outline-none dark:text-foreground"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none dark:text-foreground"
                   />
                 </div>
               )}
 
               {showMixed && (
-                <div className="shrink-0">
+                <div className="min-w-0 sm:shrink-0">
                   <Select
                     value={salesFilter}
                     onValueChange={(value) => setSalesFilter(value as SalesFilter)}
                   >
-                    <SelectTrigger className="w-[170px] rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
+                    <SelectTrigger className="w-full rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40 sm:w-[170px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -882,10 +882,10 @@ function RapportsPage() {
                 </div>
               )}
 
-              <div className="shrink-0">
+              <div className="min-w-0 sm:shrink-0">
                 <Select value={comparisonMode} onValueChange={(value) => setComparisonMode(value as ComparisonMode)}>
-                  <SelectTrigger className="w-[210px] rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40">
-                    <GitCompareArrows className="mr-1 h-4 w-4 text-slate-400" />
+                  <SelectTrigger className="w-full rounded-2xl border-slate-200 bg-slate-50 dark:border-border dark:bg-muted/40 sm:w-[210px]">
+                    <GitCompareArrows className="mr-1 h-4 w-4 shrink-0 text-slate-400" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -899,20 +899,20 @@ function RapportsPage() {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex items-center gap-3 sm:shrink-0 sm:gap-2">
               <Button
                 variant="outline"
-                className="gap-2 rounded-2xl border-slate-200 dark:border-border"
+                className="flex-1 gap-2 rounded-2xl border-slate-200 dark:border-border sm:flex-none"
                 onClick={handleRefresh}
                 disabled={isFetching}
               >
                 <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-                <span className="hidden sm:inline">Actualiser</span>
+                <span>Actualiser</span>
               </Button>
               {canExport && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button className="gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40">
+                    <Button className="flex-1 gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 sm:flex-none">
                       <Download className="h-4 w-4" /> Exporter
                     </Button>
                   </DropdownMenuTrigger>
@@ -934,21 +934,21 @@ function RapportsPage() {
         </div>
 
         {report && (
-          <div className="mb-6 flex flex-col gap-3 rounded-[24px] border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-white p-5 shadow-sm dark:border-border dark:from-blue-500/10 dark:via-transparent dark:to-transparent sm:flex-row sm:items-center sm:justify-between">
-            <div>
+          <div className="mb-6 flex flex-col gap-3 overflow-hidden rounded-[24px] border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-white p-4 shadow-sm dark:border-border dark:from-blue-500/10 dark:via-transparent dark:to-transparent sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
                 Période analysée
               </p>
-              <p className="mt-0.5 text-lg font-semibold text-slate-900 dark:text-foreground">
+              <p className="mt-0.5 truncate text-lg font-semibold text-slate-900 dark:text-foreground">
                 {periodTitle}
                 <span className="ml-2 text-sm font-normal text-slate-500 dark:text-muted-foreground">
                   {periodDates}
                 </span>
               </p>
             </div>
-            <div className="sm:text-right">
+            <div className="min-w-0 sm:text-right">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Comparée à</p>
-              <p className="mt-0.5 text-sm font-medium text-slate-600 dark:text-muted-foreground">
+              <p className="mt-0.5 truncate text-sm font-medium text-slate-600 dark:text-muted-foreground">
                 {comparisonTitle}
               </p>
             </div>
@@ -966,7 +966,7 @@ function RapportsPage() {
           <div className="text-muted-foreground">Aucune donnée disponible.</div>
         ) : (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
               {showMixed && (
                 <KpiTile
                   title="CA total"
