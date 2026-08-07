@@ -54,6 +54,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Tables } from "@/integrations/supabase/types";
 import { AuditCenter } from "@/components/mms/AuditCenter";
+import { RecentConnections } from "@/components/mms/RecentConnections";
 // import { PermissionsTab } from "@/components/mms/PermissionsTab";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTenant } from "@/providers/TenantProvider";
@@ -338,7 +339,10 @@ function ParametresPage() {
                 <SecurityTab />
               </TabsContent>
               <TabsContent value="audit">
-                <AuditCenter />
+                <div className="space-y-4 sm:space-y-6">
+                  <RecentConnections />
+                  <AuditCenter />
+                </div>
               </TabsContent>
             </Tabs>
           </div>
