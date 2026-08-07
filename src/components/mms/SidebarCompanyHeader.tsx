@@ -9,6 +9,7 @@ type SidebarCompanyHeaderProps = {
   logoUrl?: string | null;
   isLoading?: boolean;
   collapsed?: boolean;
+  compact?: boolean;
   className?: string;
 };
 
@@ -27,6 +28,7 @@ export function SidebarCompanyHeader({
   logoUrl,
   isLoading = false,
   collapsed = false,
+  compact = false,
   className,
 }: SidebarCompanyHeaderProps) {
   const { tenant, loading: tenantLoading } = useTenant();
@@ -36,14 +38,15 @@ export function SidebarCompanyHeader({
   const businessActivity =
     shortBusinessActivity(settings?.business_sector) || "Secteur non renseigné";
 
+  const logoSizeClass = compact ? "size-11" : "size-16";
   const logo = loading ? (
-    <Skeleton className="size-16 shrink-0 rounded-2xl" />
+    <Skeleton className={cn(logoSizeClass, "shrink-0 rounded-2xl")} />
   ) : (
     <BrandLogo
       context="sidebar"
       src={logoUrl}
       alt={companyName ? `Logo ${companyName}` : "Logo de l’entreprise"}
-      className="size-16 rounded-2xl bg-white p-[2px] shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
+      className={cn(logoSizeClass, "rounded-2xl bg-white p-[2px] shadow-[0_6px_18px_rgba(15,23,42,0.18)]")}
       imageClassName="size-[90%]"
     />
   );
@@ -74,7 +77,8 @@ export function SidebarCompanyHeader({
   return (
     <div
       className={cn(
-        "flex h-[100px] shrink-0 items-center gap-4 border-b border-[rgba(255,255,255,0.08)] px-4",
+        "flex shrink-0 items-center border-b border-[rgba(255,255,255,0.08)]",
+        compact ? "h-[68px] gap-3 px-4" : "h-[100px] gap-4 px-4",
         className,
       )}
     >
@@ -87,11 +91,19 @@ export function SidebarCompanyHeader({
           </div>
         ) : (
           <>
-            <p className="line-clamp-2 text-[18px] font-bold leading-[22px] text-white">
+            <p
+              className={cn(
+                "line-clamp-2 font-bold text-white",
+                compact ? "text-[15px] leading-[18px]" : "text-[18px] leading-[22px]",
+              )}
+            >
               {companyName}
             </p>
             <p
-              className="mt-1 truncate text-[13px] leading-[18px] text-[#A8B3CF]"
+              className={cn(
+                "truncate text-[#A8B3CF]",
+                compact ? "mt-0.5 text-[11px] leading-[14px]" : "mt-1 text-[13px] leading-[18px]",
+              )}
               title={businessActivity}
             >
               {businessActivity}

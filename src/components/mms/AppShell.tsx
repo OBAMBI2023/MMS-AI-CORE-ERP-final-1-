@@ -44,16 +44,17 @@ export function AppShell({
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="w-[300px] p-0 bg-sidebar text-sidebar-foreground"
+                className="h-[100dvh] w-[82vw] max-w-[300px] overflow-hidden bg-sidebar p-0 text-sidebar-foreground [&>button]:right-3 [&>button]:top-3 [&>button]:flex [&>button]:h-11 [&>button]:w-11 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full"
               >
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
-                <div className="flex h-full flex-col gap-2">
+                <div className="flex h-full flex-col overflow-hidden">
                   <SidebarCompanyHeader
                     logoUrl={logoUrl}
                     isLoading={isLoading}
+                    compact
                   />
-                  <div className="flex-1 px-4">
-                    <SidebarContent onItemClick={() => setOpen(false)} />
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch]">
+                    <SidebarContent onItemClick={() => setOpen(false)} compact />
                   </div>
                 </div>
               </SheetContent>

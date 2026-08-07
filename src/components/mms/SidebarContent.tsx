@@ -21,6 +21,7 @@ import { isAdminOnlyRoute, isAdministratorRole } from "@/lib/route-permissions";
 import { routeModules } from "@/lib/route-modules";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { catalogRouteEnabled } from "@/lib/catalog-settings";
+import { cn } from "@/lib/utils";
 
 const items = [
   { icon: Home, label: "Dashboard", to: "/app" },
@@ -38,7 +39,13 @@ const items = [
   { icon: Settings, label: "Paramètres", to: "/parametres" },
 ] as const;
 
-export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
+export function SidebarContent({
+  onItemClick,
+  compact = false,
+}: {
+  onItemClick?: () => void;
+  compact?: boolean;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data, isLoading } = usePermissions();
   const modulesQuery = useTenantModules();
@@ -57,7 +64,7 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   });
 
   return (
-    <nav className="flex-1 flex flex-col gap-1 mt-2">
+    <nav className={cn("flex-1 flex flex-col", compact ? "gap-0.5" : "gap-1 mt-2")}>
       {filteredItems.map((it, idx) => {
         const active =
           pathname === it.to ||
@@ -68,7 +75,10 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
             key={`${it.label}-${idx}`}
             to={it.to}
             onClick={onItemClick}
-            className="relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/75 transition-colors hover:text-white"
+            className={cn(
+              "relative flex items-center gap-3 rounded-xl text-sm font-medium text-sidebar-foreground/75 transition-colors hover:text-white touch-manipulation",
+              compact ? "min-h-[48px] px-3 py-2" : "px-3 py-2.5",
+            )}
           >
             {active && (
               <motion.div
@@ -77,8 +87,8 @@ export function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
                 transition={{ type: "spring", stiffness: 380, damping: 32 }}
               />
             )}
-            <it.icon className={`relative h-[18px] w-[18px] ${active ? "text-white" : ""}`} />
-            <span className={`relative ${active ? "text-white" : ""}`}>
+            <it.icon className={`relative h-[18px] w-[18px] shrink-0 ${active ? "text-white" : ""}`} />
+            <span className={`relative truncate ${active ? "text-white" : ""}`}>
               {it.to === "/services"
                 ? catalogSettingsQuery.data?.catalog_mode === "products"
                   ? "Produits"

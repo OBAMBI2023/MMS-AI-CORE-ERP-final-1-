@@ -557,55 +557,6 @@ export function UserManagement() {
         </div>
       </Card>
 
-      {/* Filters — mobile */}
-      <Card className="border-gray-100 bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:bg-card md:hidden">
-        <div className="flex flex-col gap-3">
-          <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un utilisateur (nom, email...)"
-              className="h-14 rounded-2xl pl-11 text-[15px]"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="h-11 w-full rounded-xl">
-                <SelectValue placeholder="Tous les rôles" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les rôles</SelectItem>
-                {roles?.map((role) => (
-                  <SelectItem key={role.id} value={role.id}>
-                    {role.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-11 w-full rounded-xl">
-                <SelectValue placeholder="Tous les statuts" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="active">Actif</SelectItem>
-                <SelectItem value="suspended">Suspendu</SelectItem>
-                <SelectItem value="archived">Archivé</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="outline"
-            className="h-11 w-full gap-2 rounded-xl"
-            onClick={resetFilters}
-            disabled={!hasActiveFilters}
-          >
-            <Filter className="h-4 w-4" /> Filtres avancés
-          </Button>
-        </div>
-      </Card>
-
       {/* Desktop / tablet table */}
       <Card className="hidden overflow-hidden border-gray-200 bg-white dark:bg-card md:block">
         <Table>
@@ -676,7 +627,7 @@ export function UserManagement() {
       </Card>
 
       {/* Mobile card list */}
-      <div className="space-y-3.5 md:hidden">
+      <div className="!mt-3 space-y-3.5 md:hidden">
         {paginatedUsers.map((user) => (
           <div
             key={user.id}
