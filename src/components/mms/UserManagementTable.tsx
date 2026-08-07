@@ -340,8 +340,8 @@ export function UserManagement() {
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-7xl space-y-5 sm:space-y-6">
-      {/* Header actions */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      {/* Header actions — desktop/tablet */}
+      <div className="hidden md:flex md:flex-wrap md:items-center md:justify-end md:gap-2">
         <Button
           variant="outline"
           size="icon"
@@ -367,12 +367,43 @@ export function UserManagement() {
         <UserFormDialog />
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
-        <Card className="border-gray-200 bg-white p-3.5 shadow-sm dark:bg-card sm:p-4">
+      {/* Header actions — mobile */}
+      <div className="grid grid-cols-3 gap-2 md:hidden">
+        <Button
+          variant="secondary"
+          className="h-11 flex-col gap-0.5 rounded-2xl px-1 text-[11px] font-medium leading-none shadow-sm [&_svg]:size-4"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          aria-label="Actualiser"
+        >
+          <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+          Actualiser
+        </Button>
+        {canExport ? (
+          <DataExportMenu
+            data={filteredUsers}
+            columns={exportColumns}
+            filename={`Utilisateurs_${companyName || "Entreprise"}`}
+            pdfTitle="Liste des utilisateurs"
+            companySettings={settings}
+            logoUrl={logoUrl}
+            triggerVariant="secondary"
+            triggerClassName="h-11 w-full flex-col gap-0.5 rounded-2xl px-1 text-[11px] font-medium leading-none shadow-sm [&_svg]:size-4"
+          />
+        ) : (
+          <div />
+        )}
+        <UserFormDialog
+          triggerClassName="h-11 w-full flex-col gap-0.5 rounded-2xl bg-blue-600 px-1 text-[11px] font-medium leading-none text-white shadow-md shadow-blue-600/25 hover:bg-blue-700 [&_svg]:size-4 [&_svg]:mr-0"
+        />
+      </div>
+
+      {/* KPI cards — desktop/tablet */}
+      <div className="hidden gap-4 md:grid md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-gray-200 bg-white p-4 shadow-sm dark:bg-card">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xl font-bold sm:text-2xl">{stats.total}</p>
+              <p className="text-2xl font-bold">{stats.total}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">Utilisateurs totaux</p>
             </div>
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -380,10 +411,10 @@ export function UserManagement() {
             </div>
           </div>
         </Card>
-        <Card className="border-gray-200 bg-white p-3.5 shadow-sm dark:bg-card sm:p-4">
+        <Card className="border-gray-200 bg-white p-4 shadow-sm dark:bg-card">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 sm:text-2xl">
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {stats.active}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">Utilisateurs actifs</p>
@@ -393,10 +424,10 @@ export function UserManagement() {
             </div>
           </div>
         </Card>
-        <Card className="border-gray-200 bg-white p-3.5 shadow-sm dark:bg-card sm:p-4">
+        <Card className="border-gray-200 bg-white p-4 shadow-sm dark:bg-card">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xl font-bold text-amber-600 dark:text-amber-400 sm:text-2xl">
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                 {stats.suspended}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">Utilisateurs suspendus</p>
@@ -406,10 +437,10 @@ export function UserManagement() {
             </div>
           </div>
         </Card>
-        <Card className="border-gray-200 bg-white p-3.5 shadow-sm dark:bg-card sm:p-4">
+        <Card className="border-gray-200 bg-white p-4 shadow-sm dark:bg-card">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xl font-bold text-violet-600 dark:text-violet-400 sm:text-2xl">
+              <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
                 {stats.rolesAssigned}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">Rôles attribués</p>
@@ -421,10 +452,76 @@ export function UserManagement() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card className="border-gray-200 bg-white p-3 dark:bg-card sm:p-4">
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="relative w-full sm:max-w-xs sm:flex-1">
+      {/* KPI cards — mobile */}
+      <div className="grid grid-cols-2 gap-3 md:hidden">
+        <Card className="overflow-hidden border-gray-100 bg-white p-0 shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:bg-card">
+          <div className="flex items-start justify-between gap-2 p-3.5">
+            <div className="min-w-0">
+              <p className="text-xl font-bold leading-tight">{stats.total}</p>
+              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
+                Utilisateurs totaux
+              </p>
+            </div>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <Users className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="h-1 w-full bg-blue-500" />
+        </Card>
+        <Card className="overflow-hidden border-gray-100 bg-white p-0 shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:bg-card">
+          <div className="flex items-start justify-between gap-2 p-3.5">
+            <div className="min-w-0">
+              <p className="text-xl font-bold leading-tight text-emerald-600 dark:text-emerald-400">
+                {stats.active}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
+                Utilisateurs actifs
+              </p>
+            </div>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="h-1 w-full bg-emerald-500" />
+        </Card>
+        <Card className="overflow-hidden border-gray-100 bg-white p-0 shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:bg-card">
+          <div className="flex items-start justify-between gap-2 p-3.5">
+            <div className="min-w-0">
+              <p className="text-xl font-bold leading-tight text-amber-600 dark:text-amber-400">
+                {stats.suspended}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
+                Utilisateurs suspendus
+              </p>
+            </div>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <UserX className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="h-1 w-full bg-amber-500" />
+        </Card>
+        <Card className="overflow-hidden border-gray-100 bg-white p-0 shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:bg-card">
+          <div className="flex items-start justify-between gap-2 p-3.5">
+            <div className="min-w-0">
+              <p className="text-xl font-bold leading-tight text-violet-600 dark:text-violet-400">
+                {stats.rolesAssigned}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
+                Rôles attribués
+              </p>
+            </div>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
+              <Shield className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="h-1 w-full bg-violet-500" />
+        </Card>
+      </div>
+
+      {/* Filters — desktop/tablet */}
+      <Card className="hidden border-gray-200 bg-white p-4 dark:bg-card md:block">
+        <div className="flex flex-row flex-wrap items-center gap-2.5">
+          <div className="relative max-w-xs flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -433,9 +530,9 @@ export function UserManagement() {
               className="pl-9"
             />
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+          <div className="flex w-auto items-center gap-2">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="sm:w-[170px]">
+              <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Tous les rôles" />
               </SelectTrigger>
               <SelectContent>
@@ -448,7 +545,7 @@ export function UserManagement() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="sm:w-[170px]">
+              <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Tous les statuts" />
               </SelectTrigger>
               <SelectContent>
@@ -462,11 +559,60 @@ export function UserManagement() {
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 sm:ml-auto"
+            className="gap-2 ml-auto"
             onClick={resetFilters}
             disabled={!hasActiveFilters}
           >
             <Filter className="h-4 w-4" /> Filtres
+          </Button>
+        </div>
+      </Card>
+
+      {/* Filters — mobile */}
+      <Card className="border-gray-100 bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:bg-card md:hidden">
+        <div className="flex flex-col gap-3">
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un utilisateur (nom, email...)"
+              className="h-14 rounded-2xl pl-11 text-[15px]"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="h-11 w-full rounded-xl">
+                <SelectValue placeholder="Tous les rôles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les rôles</SelectItem>
+                {roles?.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    {role.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-11 w-full rounded-xl">
+                <SelectValue placeholder="Tous les statuts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="active">Actif</SelectItem>
+                <SelectItem value="suspended">Suspendu</SelectItem>
+                <SelectItem value="archived">Archivé</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            variant="outline"
+            className="h-11 w-full gap-2 rounded-xl"
+            onClick={resetFilters}
+            disabled={!hasActiveFilters}
+          >
+            <Filter className="h-4 w-4" /> Filtres avancés
           </Button>
         </div>
       </Card>
@@ -541,11 +687,11 @@ export function UserManagement() {
       </Card>
 
       {/* Mobile card list */}
-      <div className="space-y-2.5 md:hidden">
+      <div className="space-y-3.5 md:hidden">
         {paginatedUsers.map((user) => (
           <div
             key={user.id}
-            className="w-full rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm dark:bg-card"
+            className="w-full rounded-[18px] border border-gray-100 bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)] dark:bg-card"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 items-center gap-3">
@@ -553,10 +699,10 @@ export function UserManagement() {
                   path={user.avatar_url}
                   name={user.full_name}
                   email={user.email}
-                  className="h-10 w-10 shrink-0"
+                  className="h-11 w-11 shrink-0"
                 />
                 <div className="min-w-0">
-                  <div className="truncate font-medium">{user.full_name}</div>
+                  <div className="truncate font-semibold">{user.full_name}</div>
                   <div className="truncate text-xs text-muted-foreground">{user.email}</div>
                 </div>
               </div>
@@ -570,27 +716,30 @@ export function UserManagement() {
                 onRequestDelete={() => requestDelete(user)}
               />
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <div className="mt-3.5 flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3 dark:border-white/10">
               <Badge
                 variant="outline"
-                className={cn("text-[11px] font-medium", roleBadgeClass((user.roles as any)?.name))}
+                className={cn("rounded-full text-[11px] font-medium", roleBadgeClass((user.roles as any)?.name))}
               >
                 {(user.roles as any)?.name ?? "—"}
               </Badge>
               <Badge
                 variant="outline"
-                className={cn("text-[11px] font-medium", STATUS_BADGE_CLASSES[user.status ?? ""] ?? "")}
+                className={cn(
+                  "rounded-full text-[11px] font-medium",
+                  STATUS_BADGE_CLASSES[user.status ?? ""] ?? "",
+                )}
               >
                 {(user.status && STATUS_LABELS[user.status]) ?? user.status}
               </Badge>
               <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                Depuis {formatDate(user.created_at)}
+                {formatDate(user.created_at)}
               </span>
             </div>
           </div>
         ))}
         {paginatedUsers.length === 0 && (
-          <Card className="border-gray-200 bg-white p-6 text-center text-sm text-muted-foreground dark:bg-card">
+          <Card className="rounded-[18px] border-gray-100 bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_2px_12px_rgba(0,0,0,0.05)] dark:bg-card">
             Aucun utilisateur ne correspond à ces critères.
           </Card>
         )}

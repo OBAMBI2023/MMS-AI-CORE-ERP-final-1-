@@ -35,7 +35,13 @@ const fieldSelectClass =
 
 const fieldLabelClass = "text-sm font-semibold text-gray-700";
 
-export function UserFormDialog({ user }: { user?: any }) {
+export function UserFormDialog({
+  user,
+  triggerClassName,
+}: {
+  user?: any;
+  triggerClassName?: string;
+}) {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
   const [open, setOpen] = useState(false);
@@ -160,7 +166,7 @@ export function UserFormDialog({ user }: { user?: any }) {
             <Pencil className="mr-2 h-4 w-4" /> Modifier
           </button>
         ) : (
-          <Button className="bg-[#2563EB] hover:bg-[#1D4ED8]">
+          <Button className={cn("bg-[#2563EB] hover:bg-[#1D4ED8]", triggerClassName)}>
             <Plus className="mr-2 h-4 w-4" /> Nouvel utilisateur
           </Button>
         )}

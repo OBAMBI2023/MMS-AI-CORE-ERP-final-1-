@@ -17,10 +17,10 @@ function SettingsUsersPage() {
       title="Utilisateurs"
       subtitle="Paramètres · Gérez les accès, les rôles et les permissions"
       actions={
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" size="icon" className="sm:h-9 sm:w-auto sm:px-4">
           <Link to="/parametres">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Paramètres
+            <ArrowLeft className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Paramètres</span>
           </Link>
         </Button>
       }
