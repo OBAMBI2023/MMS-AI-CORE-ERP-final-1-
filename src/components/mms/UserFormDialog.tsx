@@ -130,6 +130,10 @@ export function UserFormDialog({
       toast.success("Utilisateur mis à jour");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["users", tenantId] });
+      // Le rôle modifié peut être celui de l'utilisateur courant dans un autre
+      // onglet : on invalide les permissions pour que la navigation se
+      // resynchronise dès la prochaine lecture au lieu de rester périmée.
+      qc.invalidateQueries({ queryKey: ["current-user-permissions"] });
     },
     onError: (error: any) => {
       toast.error(formatSupabaseError(error));

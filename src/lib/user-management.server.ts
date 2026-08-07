@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getAuth } from "@/lib/auth.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { logAction } from "@/lib/audit.server";
 import { formatSupabaseError } from "@/lib/supabase-error";
@@ -34,13 +34,14 @@ async function logRejectedPrivilegeAttempt(
   });
 }
 
-async function getAdminTenantContext() {
-  const { user } = await getAuth();
-
+// L'authentification (session valide, non révoquée, profil non suspendu) est
+// vérifiée en amont par le middleware requireSupabaseAuth ; on ne fait ici que
+// confirmer que l'appelant est bien administrateur de son tenant.
+async function getAdminTenantContext(userId: string) {
   const { data: profile, error } = await (supabaseAdmin as any)
     .from("profiles")
     .select("tenant_id, role_id, roles!inner(name, tenant_id)")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
@@ -52,13 +53,13 @@ async function getAdminTenantContext() {
     throw new Error("Accès refusé : administrateur du tenant requis.");
   }
 
-  return { user, tenantId: profile.tenant_id as string };
+  return { tenantId: profile.tenant_id as string };
 }
 
 async function assertProfileInTenant(profileId: string, tenantId: string) {
   const { data, error } = await (supabaseAdmin as any)
     .from("profiles")
-    .select("id, name")
+    .select("id")
     .eq("id", profileId)
     .eq("tenant_id", tenantId)
     .single();
@@ -82,11 +83,13 @@ async function assertRoleInTenant(roleId: string, tenantId: string) {
 }
 
 export const deleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator(z.object({ id: z.string().uuid() }))
-  .handler(async ({ data }) => {
-    const { user: admin, tenantId } = await getAdminTenantContext();
+  .handler(async ({ data, context }) => {
+    const adminId = context.userId;
+    const { tenantId } = await getAdminTenantContext(adminId);
 
-    if (admin.id === data.id) {
+    if (adminId === data.id) {
       throw new Error("Action non autorisée sur son propre compte.");
     }
     await assertProfileInTenant(data.id, tenantId);
@@ -104,7 +107,7 @@ export const deleteUser = createServerFn({ method: "POST" })
       throw new Error("Impossible de supprimer le dernier administrateur actif.");
     }
 
-    await logAction(admin.id, null, "Suppression d'utilisateur", "utilisateurs", {
+    await logAction(adminId, null, "Suppression d'utilisateur", "utilisateurs", {
       targetUserId: data.id,
       tenantId,
     });
@@ -116,6 +119,7 @@ export const deleteUser = createServerFn({ method: "POST" })
   });
 
 export const createUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator(
     z.object({
       email: z.string().email(),
@@ -127,12 +131,13 @@ export const createUser = createServerFn({ method: "POST" })
       status: z.enum(["actif", "suspendu"]),
     }),
   )
-  .handler(async ({ data }) => {
-    const { user: admin, tenantId } = await getAdminTenantContext();
+  .handler(async ({ data, context }) => {
+    const adminId = context.userId;
+    const { tenantId } = await getAdminTenantContext(adminId);
     try {
       await assertRoleInTenant(data.role_id, tenantId);
     } catch (error) {
-      await logRejectedPrivilegeAttempt(admin.id, "role_not_allowed", {
+      await logRejectedPrivilegeAttempt(adminId, "role_not_allowed", {
         requestedRoleId: data.role_id, tenantId, operation: "create_user",
       });
       throw error;
@@ -168,7 +173,7 @@ export const createUser = createServerFn({ method: "POST" })
       throw new Error(formatSupabaseError(profileError));
     }
 
-    await logAction(admin.id, null, "Création d'utilisateur", "utilisateurs", {
+    await logAction(adminId, null, "Création d'utilisateur", "utilisateurs", {
       targetUserId: authData.user.id,
       tenantId,
     });
@@ -176,6 +181,7 @@ export const createUser = createServerFn({ method: "POST" })
   });
 
 export const updateUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator(
     z.object({
       id: z.string().uuid(),
@@ -186,11 +192,12 @@ export const updateUser = createServerFn({ method: "POST" })
       phone: z.string().optional(),
     }),
   )
-  .handler(async ({ data }) => {
-    const { user: admin, tenantId } = await getAdminTenantContext();
+  .handler(async ({ data, context }) => {
+    const adminId = context.userId;
+    const { tenantId } = await getAdminTenantContext(adminId);
     await assertProfileInTenant(data.id, tenantId);
-    if (data.role_id && admin.id === data.id) {
-      await logRejectedPrivilegeAttempt(admin.id, "self_role_change", {
+    if (data.role_id && adminId === data.id) {
+      await logRejectedPrivilegeAttempt(adminId, "self_role_change", {
         requestedRoleId: data.role_id, tenantId, operation: "update_user",
       });
       throw new Error("Vous ne pouvez pas modifier votre propre rôle.");
@@ -199,7 +206,7 @@ export const updateUser = createServerFn({ method: "POST" })
       try {
         await assertRoleInTenant(data.role_id, tenantId);
       } catch (error) {
-        await logRejectedPrivilegeAttempt(admin.id, "role_not_allowed", {
+        await logRejectedPrivilegeAttempt(adminId, "role_not_allowed", {
           targetUserId: data.id, requestedRoleId: data.role_id,
           tenantId, operation: "update_user",
         });
@@ -221,7 +228,7 @@ export const updateUser = createServerFn({ method: "POST" })
 
     if (error) throw new Error(formatSupabaseError(error));
 
-    await logAction(admin.id, null, "Mise à jour d'utilisateur", "utilisateurs", {
+    await logAction(adminId, null, "Mise à jour d'utilisateur", "utilisateurs", {
       targetUserId: data.id,
       tenantId,
     });
@@ -229,9 +236,11 @@ export const updateUser = createServerFn({ method: "POST" })
   });
 
 export const toggleStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator(z.object({ id: z.string().uuid(), status: z.enum(["actif", "suspendu"]) }))
-  .handler(async ({ data }) => {
-    const { user: admin, tenantId } = await getAdminTenantContext();
+  .handler(async ({ data, context }) => {
+    const adminId = context.userId;
+    const { tenantId } = await getAdminTenantContext(adminId);
     await assertProfileInTenant(data.id, tenantId);
 
     const { error } = await (supabaseAdmin as any)
@@ -241,7 +250,7 @@ export const toggleStatus = createServerFn({ method: "POST" })
       .eq("tenant_id", tenantId);
     if (error) throw new Error(formatSupabaseError(error));
 
-    await logAction(admin.id, null, "Changement de statut", "utilisateurs", {
+    await logAction(adminId, null, "Changement de statut", "utilisateurs", {
       targetUserId: data.id,
       tenantId,
     });
@@ -249,9 +258,11 @@ export const toggleStatus = createServerFn({ method: "POST" })
   });
 
 export const resetUserPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator(z.object({ id: z.string().uuid() }))
-  .handler(async ({ data }) => {
-    const { user: admin, tenantId } = await getAdminTenantContext();
+  .handler(async ({ data, context }) => {
+    const adminId = context.userId;
+    const { tenantId } = await getAdminTenantContext(adminId);
     await assertProfileInTenant(data.id, tenantId);
 
     const { data: profile, error: profileError } = await (supabaseAdmin as any)
@@ -269,7 +280,7 @@ export const resetUserPassword = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(formatSupabaseError(error));
 
-    await logAction(admin.id, null, "Réinitialisation de mot de passe", "utilisateurs", {
+    await logAction(adminId, null, "Réinitialisation de mot de passe", "utilisateurs", {
       targetUserId: data.id,
       tenantId,
     });

@@ -60,9 +60,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
-import { logAction } from "@/lib/audit.server";
 import { useTenant } from "@/providers/TenantProvider";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { formatSupabaseError } from "@/lib/supabase-error";
@@ -178,10 +176,6 @@ export function UserManagement() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
-  const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
-  const permissionsQuery = usePermissions();
-  const { roleId } = permissionsQuery.data || { roleId: null };
-  const userId = userData?.data?.user?.id;
   const canDeleteUser = useActionPermission("users.delete");
   const canExport = useActionPermission("users.export");
   const { profile, loading: tenantLoading } = useTenant();
@@ -232,12 +226,7 @@ export function UserManagement() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
-    onSuccess: async (_, variables) => {
-      if (userId && userToDeleteName) {
-        await logAction(userId, roleId ?? null, "delete", "users", {
-          user_name: userToDeleteName,
-        });
-      }
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["users", tenantId] });
       toast.success("Utilisateur supprimé");
       setUserToDelete(null);
@@ -853,8 +842,9 @@ export function UserManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. L'utilisateur sera supprimé de l'authentification et de
-              la base de données.
+              Cette action est irréversible.{" "}
+              {userToDeleteName ? <strong>{userToDeleteName}</strong> : "L'utilisateur"} sera supprimé
+              de l'authentification et de la base de données.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
