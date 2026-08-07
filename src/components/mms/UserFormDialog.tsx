@@ -20,11 +20,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Plus, User, Mail, Phone, Shield, Lock, Eye, EyeOff, Pencil } from "lucide-react";
+import { Loader2, Plus, UserRound, Eye, EyeOff, Pencil } from "lucide-react";
 import { createUser, updateUser } from "@/lib/user-management.server";
 import { useTenant } from "@/providers/TenantProvider";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { AvatarManager } from "@/components/mms/AvatarManager";
+import { cn } from "@/lib/utils";
+
+const fieldInputClass =
+  "h-12 rounded-[10px] border-gray-200 bg-white text-[15px] text-gray-900 shadow-none placeholder:text-gray-400 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0";
+
+const fieldSelectClass =
+  "h-12 rounded-[10px] border-gray-200 bg-white text-[15px] text-gray-900 shadow-none data-[placeholder]:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0";
+
+const fieldLabelClass = "text-sm font-semibold text-gray-700";
 
 export function UserFormDialog({ user }: { user?: any }) {
   const { profile, loading: tenantLoading } = useTenant();
@@ -156,43 +165,42 @@ export function UserFormDialog({ user }: { user?: any }) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-[760px] p-0 overflow-hidden rounded-[18px] shadow-2xl">
-        <DialogHeader className="p-6 pb-2 bg-[#F8FAFC]">
-          <div className="flex justify-between items-start">
-            <div className="flex gap-4 items-center">
-              <div className="p-3 bg-[#E0E7FF] rounded-full text-[#2563EB]">
-                <User className="h-6 w-6" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl">
-                  {isEdit ? "Modifier l'utilisateur" : "Nouvel utilisateur"}
-                </DialogTitle>
-                <p className="text-sm text-gray-500">
-                  {isEdit
-                    ? "Modifiez les informations du collaborateur."
-                    : "Créez un nouveau compte collaborateur et attribuez immédiatement ses permissions."}
-                </p>
-              </div>
+      <DialogContent className="flex w-[calc(100vw-24px)] max-w-[960px] flex-col gap-0 overflow-hidden rounded-2xl border-none p-0 shadow-2xl sm:w-[calc(100vw-48px)] max-h-[calc(100dvh-24px)]">
+        <DialogHeader className="shrink-0 border-b border-gray-100 bg-white px-[18px] py-5 pr-12 sm:px-8 sm:py-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+              <UserRound className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 text-left">
+              <DialogTitle className="text-lg font-semibold text-gray-900 sm:text-xl">
+                {isEdit ? "Modifier l'utilisateur" : "Nouvel utilisateur"}
+              </DialogTitle>
+              <p className="mt-0.5 text-sm text-gray-500">
+                {isEdit
+                  ? "Modifiez les informations du collaborateur."
+                  : "Créez un nouveau compte collaborateur et attribuez immédiatement ses permissions."}
+              </p>
             </div>
           </div>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          {isEdit && tenantId && (
-            <div className="border-b px-6 py-5">
-              <AvatarManager
-                userId={user.id}
-                tenantId={tenantId}
-                name={formData.full_name}
-                email={user.email}
-                avatarPath={user.avatar_url}
-              />
-            </div>
-          )}
-          <div className="p-6 grid grid-cols-2 gap-6">
-            <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-[18px] py-5 sm:px-8 sm:py-7">
+            {isEdit && tenantId && (
+              <div className="mb-6 border-b border-gray-100 pb-6">
+                <AvatarManager
+                  userId={user.id}
+                  tenantId={tenantId}
+                  name={formData.full_name}
+                  email={user.email}
+                  avatarPath={user.avatar_url}
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-1 gap-x-7 gap-y-[18px] sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>Nom complet</Label>
+                <Label className={fieldLabelClass}>Nom complet</Label>
                 <Input
+                  className={fieldInputClass}
                   placeholder="Ex : Ali Traoré"
                   value={formData.full_name}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
@@ -201,48 +209,14 @@ export function UserFormDialog({ user }: { user?: any }) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Nom d'utilisateur</Label>
-                <Input
-                  placeholder="Ex : ali.traore"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  required
-                  disabled={mutation.isPending}
-                />
-              </div>
-              {!isEdit && (
-                <div className="space-y-1.5">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    placeholder="Ex : ali@entreprise.ci"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                    disabled={mutation.isPending}
-                  />
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label>Téléphone</Label>
-                <Input
-                  placeholder="Ex : 07 58 48 37 26"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  disabled={mutation.isPending}
-                />
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Rôle</Label>
+                <Label className={fieldLabelClass}>Rôle</Label>
                 <Select
                   value={formData.role_id}
                   onValueChange={(value) => setFormData({ ...formData, role_id: value })}
                   required
                   disabled={mutation.isPending}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={fieldSelectClass}>
                     <SelectValue placeholder="Sélectionner un rôle" />
                   </SelectTrigger>
                   <SelectContent>
@@ -254,56 +228,87 @@ export function UserFormDialog({ user }: { user?: any }) {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label className={fieldLabelClass}>Nom d'utilisateur</Label>
+                <Input
+                  className={fieldInputClass}
+                  placeholder="Ex : ali.traore"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  required
+                  disabled={mutation.isPending}
+                />
+              </div>
               {!isEdit && (
-                <>
-                  <div className="space-y-1.5">
-                    <Label>Mot de passe</Label>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required
-                        disabled={mutation.isPending}
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-2.5 text-gray-400"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Confirmation</Label>
+                <div className="space-y-1.5">
+                  <Label className={fieldLabelClass}>Mot de passe</Label>
+                  <div className="relative">
                     <Input
+                      className={cn(fieldInputClass, "pr-11")}
                       type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
-                      value={formData.confirmPassword}
-                      onChange={(e) =>
-                        setFormData({ ...formData, confirmPassword: e.target.value })
-                      }
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       required
                       disabled={mutation.isPending}
                     />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
-                </>
+                </div>
+              )}
+              {!isEdit && (
+                <div className="space-y-1.5">
+                  <Label className={fieldLabelClass}>Email</Label>
+                  <Input
+                    className={fieldInputClass}
+                    type="email"
+                    placeholder="Ex : ali@entreprise.ci"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required
+                    disabled={mutation.isPending}
+                  />
+                </div>
+              )}
+              {!isEdit && (
+                <div className="space-y-1.5">
+                  <Label className={fieldLabelClass}>Confirmation</Label>
+                  <Input
+                    className={fieldInputClass}
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    required
+                    disabled={mutation.isPending}
+                  />
+                </div>
               )}
               <div className="space-y-1.5">
-                <Label>Statut</Label>
+                <Label className={fieldLabelClass}>Téléphone</Label>
+                <Input
+                  className={fieldInputClass}
+                  placeholder="Ex : 07 58 48 37 26"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  disabled={mutation.isPending}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className={fieldLabelClass}>Statut</Label>
                 <Select
                   value={formData.status}
                   onValueChange={(value) => setFormData({ ...formData, status: value })}
                   required
                   disabled={mutation.isPending}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={fieldSelectClass}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -314,29 +319,33 @@ export function UserFormDialog({ user }: { user?: any }) {
               </div>
             </div>
           </div>
-          <DialogFooter className="p-6 bg-[#F8FAFC] border-t">
+          <DialogFooter className="shrink-0 gap-2 border-t border-gray-100 bg-white px-[18px] py-4 sm:px-8 sm:py-5">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => setOpen(false)}
               disabled={mutation.isPending}
+              className="h-11 rounded-[10px] text-gray-600 hover:bg-gray-100 hover:text-gray-900"
             >
               Annuler
             </Button>
             <Button
               type="submit"
-              className="bg-[#2563EB] hover:bg-[#1D4ED8]"
+              className="h-11 rounded-[10px] bg-[#2563EB] px-5 font-medium hover:bg-[#1D4ED8]"
               disabled={mutation.isPending}
             >
               {mutation.isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {isEdit ? "Enregistrement..." : "Création..."}
                 </>
               ) : isEdit ? (
                 "Enregistrer les modifications"
               ) : (
-                "+ Créer l'utilisateur"
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Créer l'utilisateur
+                </>
               )}
             </Button>
           </DialogFooter>
