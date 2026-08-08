@@ -60,6 +60,10 @@ function isLicenseRoute(pathname: string) {
   return pathname === "/licence";
 }
 
+function isHotelRoute(pathname: string) {
+  return pathname === "/hotel" || pathname.startsWith("/hotel/");
+}
+
 const publicRoutes = new Set([
   "/",
   "/fonctionnalites",
@@ -252,6 +256,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           { requested_path: location.pathname },
         );
         if (catalogRouteError || !catalogRouteAllowed) {
+          throw redirect({ to: "/403" });
+        }
+      }
+
+      // Le module Hôtel est réservé aux tenants platform_type='HOTEL' ayant le
+      // pack Hôtel actif. hotel_module_enabled() applique déjà cette double
+      // condition côté RLS pour les tables hotel_*, on la réutilise ici pour
+      // garder /hotel et toutes ses sous-routes cohérentes avec l'accès aux
+      // données qu'elles affichent.
+      if (isHotelRoute(location.pathname)) {
+        const { data: hotelAccessEnabled, error: hotelAccessError } = await supabase.rpc(
+          "hotel_module_enabled",
+          { code: "hotel_dashboard" },
+        );
+        if (hotelAccessError || !hotelAccessEnabled) {
           throw redirect({ to: "/403" });
         }
       }

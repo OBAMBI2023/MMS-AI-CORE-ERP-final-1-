@@ -32,3 +32,12 @@ export function generateUUID(): string {
     hex.slice(10, 16).join(""),
   ].join("-");
 }
+
+/** Generates a Storage-safe id even when local HTTP does not expose Web Crypto. */
+export function generateSafeId(): string {
+  const nativeId = globalThis.crypto?.randomUUID?.();
+  if (nativeId) return nativeId;
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "");
+}

@@ -7,6 +7,7 @@ import { getRouteModule } from "./route-modules.ts";
 export type AuthenticatedDestination =
   | "/super-admin"
   | "/partner"
+  | "/hotel"
   | "/app"
   | "/app/assistant-ia"
   | "/ventes"
@@ -27,10 +28,14 @@ export type AuthenticatedDestination =
 
 // Ordre imposé par le produit : Dashboard puis les écrans opérationnels les
 // plus courants, avant tout le reste des routes protégées par permission.
+// /hotel est prioritaire : seuls les tenants platform_type='HOTEL' avec le
+// pack Hôtel actif y ont accès (cf. isRouteAccessible), donc son ajout ici
+// n'affecte pas la redirection des tenants ERP existants.
 const TENANT_LANDING_PRIORITY: readonly Exclude<
   AuthenticatedDestination,
   "/super-admin" | "/partner" | "/403"
 >[] = [
+  "/hotel",
   "/app",
   "/ventes",
   "/services",
@@ -62,6 +67,13 @@ async function isRouteAccessible(
       requested_code: requiredModule,
     });
     if (error || !moduleEnabled) return false;
+  }
+
+  if (path === "/hotel") {
+    const { data: hotelEnabled, error } = await supabase.rpc("hotel_module_enabled", {
+      code: "hotel_dashboard",
+    });
+    if (error || !hotelEnabled) return false;
   }
 
   if (CATALOG_GATED_ROUTES.has(path)) {

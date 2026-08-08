@@ -137,6 +137,39 @@
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
+/*
+ * SAOVIA HOTEL — scoped brand override (vert pétrole / émeraude).
+ * Applied via the `.hotel-theme` class on the hotel app shell only;
+ * every other ERP screen keeps its default blue palette untouched.
+ */
+.hotel-theme {
+  --primary: oklch(0.4 0.08 170);
+  --primary-foreground: oklch(1 0 0);
+  --primary-glow: oklch(0.696 0.149 162.5);
+  --ring: oklch(0.4 0.08 170);
+  --accent: oklch(0.94 0.03 165);
+  --accent-foreground: oklch(0.32 0.075 170);
+  --sidebar: oklch(0.223 0.031 180.8);
+  --sidebar-foreground: oklch(0.9 0.02 170);
+  --sidebar-primary: oklch(0.4 0.08 170);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.276 0.038 178.7);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.696 0.149 162.5);
+}
+
+.dark .hotel-theme {
+  --primary: oklch(0.696 0.149 162.5);
+  --primary-foreground: oklch(0.16 0.03 179);
+  --primary-glow: oklch(0.773 0.153 163.2);
+  --ring: oklch(0.696 0.149 162.5);
+  --accent: oklch(0.279 0.041 178.7);
+  --accent-foreground: oklch(0.92 0.02 165);
+  --sidebar: oklch(0.185 0.028 180.8);
+  --sidebar-border: oklch(1 0 0 / 10%);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

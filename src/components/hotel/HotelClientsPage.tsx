@@ -1,0 +1,1016 @@
+import { useMemo, useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Building2,
+  CalendarPlus,
+  ChevronDown,
+  Eye,
+  FileText,
+  Loader2,
+  Mail,
+  MapPin,
+  MoreVertical,
+  Pencil,
+  Phone,
+  Plus,
+  Search,
+  Sparkles,
+  Trash2,
+  User,
+  UserCheck,
+  Users,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { HotelAppShell } from "@/components/hotel/HotelAppShell";
+import { ImageField } from "@/components/hotel/HotelImageField";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useActionPermission } from "@/hooks/use-action-permission";
+import { useTenant } from "@/providers/TenantProvider";
+import { useCompanySettings } from "@/hooks/use-company-settings";
+import { formatCurrency, formatDate } from "@/lib/mms/format";
+import { createHotelListPdf } from "@/lib/mms/hotel-pdf-engine";
+import { downloadPdf } from "@/lib/mms/download-pdf";
+
+// The generated Supabase types do not include the recently provisioned hotel tables yet.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
+
+type ClientType = "individuel" | "entreprise" | "agence" | "comptoir";
+const CLIENT_TYPES: ClientType[] = ["individuel", "entreprise", "agence", "comptoir"];
+const clientTypeMeta: Record<ClientType, { label: string; className: string }> = {
+  individuel: {
+    label: "Individuel",
+    className:
+      "bg-emerald-50 text-emerald-700 ring-emerald-600/15 dark:bg-emerald-400/10 dark:text-emerald-300",
+  },
+  entreprise: {
+    label: "Entreprise",
+    className: "bg-sky-50 text-sky-700 ring-sky-600/15 dark:bg-sky-400/10 dark:text-sky-300",
+  },
+  agence: {
+    label: "Agence",
+    className:
+      "bg-violet-50 text-violet-700 ring-violet-600/15 dark:bg-violet-400/10 dark:text-violet-300",
+  },
+  comptoir: {
+    label: "Client comptoir",
+    className: "bg-amber-50 text-amber-700 ring-amber-600/15 dark:bg-amber-400/10 dark:text-amber-300",
+  },
+};
+const identityTypes = ["CNI", "Passeport", "Permis de conduire", "Autre"];
+
+type Guest = {
+  id: string;
+  tenant_id: string;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  identity_type: string | null;
+  identity_number: string | null;
+  identity_document_path: string | null;
+  nationality: string | null;
+  client_type: ClientType | null;
+  company: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type Stay = {
+  id: string;
+  guest_id: string;
+  room_id: string;
+  check_in: string;
+  check_out: string;
+  status: string;
+  nights: number;
+  grand_total: number;
+  paid_total: number;
+  balance_due: number;
+};
+type Room = { id: string; number: string };
+
+type GuestForm = {
+  first_name: string;
+  last_name: string;
+  client_type: ClientType;
+  company: string;
+  phone: string;
+  email: string;
+  nationality: string;
+  address: string;
+  identity_type: string;
+  identity_number: string;
+  identity_document_path: string;
+  notes: string;
+};
+const emptyForm: GuestForm = {
+  first_name: "",
+  last_name: "",
+  client_type: "individuel",
+  company: "",
+  phone: "",
+  email: "",
+  nationality: "",
+  address: "",
+  identity_type: "",
+  identity_number: "",
+  identity_document_path: "",
+  notes: "",
+};
+
+function guestName(g: Guest) {
+  return `${g.first_name} ${g.last_name}`.trim();
+}
+function initials(g: Guest) {
+  const name = guestName(g);
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+export function HotelClientsPage() {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { profile } = useTenant();
+  const tenantId = profile?.tenant_id;
+  const { settings, logoUrl } = useCompanySettings(tenantId);
+  const canCreate = useActionPermission("hotel.guests.create");
+  const canUpdate = useActionPermission("hotel.guests.update");
+  const canDelete = useActionPermission("hotel.guests.delete");
+  const [query, setQuery] = useState("");
+  const [type, setType] = useState<"all" | ClientType>("all");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Guest | null>(null);
+  const [viewing, setViewing] = useState<Guest | null>(null);
+  const [deleting, setDeleting] = useState<Guest | null>(null);
+
+  const guestsQuery = useQuery({
+    queryKey: ["hotel-clients", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("hotel_guests")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Guest[];
+    },
+  });
+
+  const contextQuery = useQuery({
+    queryKey: ["hotel-clients-context", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async () => {
+      const [stays, rooms] = await Promise.all([
+        db
+          .from("hotel_reservation_balances")
+          .select("id,guest_id,room_id,check_in,check_out,status,nights,grand_total,paid_total,balance_due")
+          .eq("tenant_id", tenantId)
+          .order("check_in", { ascending: false }),
+        db.from("hotel_rooms").select("id,number").eq("tenant_id", tenantId),
+      ]);
+      if (stays.error) throw stays.error;
+      if (rooms.error) throw rooms.error;
+      return { stays: (stays.data ?? []) as Stay[], rooms: (rooms.data ?? []) as Room[] };
+    },
+  });
+
+  const staysByGuest = useMemo(() => {
+    const map = new Map<string, Stay[]>();
+    for (const stay of contextQuery.data?.stays ?? []) {
+      const list = map.get(stay.guest_id) ?? [];
+      list.push(stay);
+      map.set(stay.guest_id, list);
+    }
+    return map;
+  }, [contextQuery.data]);
+  const roomsById = useMemo(
+    () => new Map((contextQuery.data?.rooms ?? []).map((r) => [r.id, r])),
+    [contextQuery.data],
+  );
+
+  const clients = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("fr");
+    return (guestsQuery.data ?? [])
+      .filter((g) => type === "all" || (g.client_type ?? "individuel") === type)
+      .filter(
+        (g) =>
+          !normalized ||
+          `${guestName(g)} ${g.phone ?? ""} ${g.email ?? ""} ${g.company ?? ""}`
+            .toLocaleLowerCase("fr")
+            .includes(normalized),
+      );
+  }, [guestsQuery.data, query, type]);
+
+  const now = new Date();
+  const totalClients = guestsQuery.data?.length ?? 0;
+  const individualCount = (guestsQuery.data ?? []).filter(
+    (g) => (g.client_type ?? "individuel") === "individuel",
+  ).length;
+  const businessCount = (guestsQuery.data ?? []).filter((g) =>
+    ["entreprise", "agence"].includes(g.client_type ?? ""),
+  ).length;
+  const newThisMonthCount = (guestsQuery.data ?? []).filter((g) => {
+    const created = new Date(g.created_at);
+    return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+  }).length;
+  const hasActiveFilters = Boolean(query || type !== "all");
+
+  const deleteGuest = useMutation({
+    mutationFn: async (guest: Guest) => {
+      if (!tenantId) throw new Error("Établissement introuvable.");
+      const { error } = await db
+        .from("hotel_guests")
+        .delete()
+        .eq("tenant_id", tenantId)
+        .eq("id", guest.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["hotel-clients", tenantId] });
+      setDeleting(null);
+      toast.success("Client supprimé");
+    },
+    onError: (error: { code?: string; message: string }) => {
+      toast.error(
+        error.code === "23503"
+          ? "Ce client a des réservations associées : impossible de le supprimer."
+          : error.message,
+      );
+    },
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setFormOpen(true);
+  };
+  const openEdit = (guest: Guest) => {
+    setEditing(guest);
+    setFormOpen(true);
+  };
+  const startReservation = () => {
+    void navigate({ to: "/hotel/reservations" });
+  };
+  const exportClients = async () => {
+    const pdf = await createHotelListPdf({
+      title: "Liste des clients",
+      filename: `clients-${new Date().toISOString().slice(0, 10)}.pdf`,
+      head: ["Client", "Type", "Téléphone", "Email", "Nationalité", "Séjours"],
+      body: clients.map((g) => [
+        guestName(g),
+        clientTypeMeta[g.client_type ?? "individuel"].label,
+        g.phone,
+        g.email,
+        g.nationality,
+        String((staysByGuest.get(g.id) ?? []).length),
+      ]),
+      settings,
+      logoUrl,
+    });
+    await downloadPdf(pdf.doc, pdf.filename);
+  };
+  const resetFilters = () => {
+    setQuery("");
+    setType("all");
+  };
+
+  return (
+    <HotelAppShell
+      title="Clients"
+      subtitle="Fiches clients, historique des séjours et coordonnées."
+      actions={
+        <>
+          <div className="hidden items-center gap-2 sm:flex">
+            <Button variant="outline" disabled={!clients.length} onClick={() => void exportClients()} className="rounded-xl">
+              <FileText className="size-4" /> Exporter PDF
+            </Button>
+            {canCreate ? (
+              <Button onClick={openCreate} className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]">
+                <Plus className="size-4" />
+                Ajouter un client
+              </Button>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2 sm:hidden">
+            {canCreate ? (
+              <Button size="icon" onClick={openCreate} aria-label="Ajouter un client" className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]">
+                <Plus className="size-4" />
+              </Button>
+            ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-xl" aria-label="Plus d’actions">
+                  <MoreVertical className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                <DropdownMenuItem disabled={!clients.length} onSelect={() => void exportClients()}>
+                  <FileText className="size-4" /> Exporter en PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </>
+      }
+    >
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {(
+          [
+            ["Total clients", totalClients, Users],
+            ["Individuels", individualCount, User],
+            ["Entreprises & agences", businessCount, Building2],
+            ["Nouveaux ce mois", newThisMonthCount, Sparkles],
+          ] as const
+        ).map(([label, value, Icon]) => (
+          <div
+            key={label}
+            className="group flex items-center gap-3 rounded-2xl border border-[#D8C99E]/40 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105">
+              <Icon className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold leading-none text-[#102A43] dark:text-white sm:text-xl">{value}</p>
+              <p className="mt-1.5 truncate text-[11px] text-muted-foreground">{label}</p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <div className="mt-4 rounded-2xl border bg-card p-3 shadow-sm">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto]">
+          <div className="relative min-w-0">
+            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Nom, téléphone, email ou entreprise…"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+            />
+          </div>
+          <FilterSelect
+            value={type}
+            onChange={(value) => setType(value as typeof type)}
+            options={[["all", "Tous les types"], ...CLIENT_TYPES.map((t) => [t, clientTypeMeta[t].label])]}
+          />
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={resetFilters}
+              aria-label="Réinitialiser les filtres"
+              className="h-11 w-11 shrink-0 justify-self-start rounded-xl text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {guestsQuery.isLoading ? (
+        <div className="grid min-h-72 place-items-center">
+          <Loader2 className="size-7 animate-spin text-[#B89236]" />
+        </div>
+      ) : clients.length ? (
+        <div className="mt-4 overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead className="bg-[#102A43] text-white">
+                <tr>
+                  {["Client", "Type", "Contact", "Nationalité", "Séjours", "Actions"].map((h) => (
+                    <th key={h} className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {clients.map((guest) => (
+                  <ClientRow
+                    key={guest.id}
+                    guest={guest}
+                    stays={staysByGuest.get(guest.id) ?? []}
+                    canUpdate={canUpdate}
+                    canDelete={canDelete}
+                    onView={() => setViewing(guest)}
+                    onEdit={() => openEdit(guest)}
+                    onReserve={() => startReservation()}
+                    onDelete={() => setDeleting(guest)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="divide-y md:hidden">
+            {clients.map((guest) => (
+              <ClientMobileCard
+                key={guest.id}
+                guest={guest}
+                stays={staysByGuest.get(guest.id) ?? []}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                onView={() => setViewing(guest)}
+                onEdit={() => openEdit(guest)}
+                onReserve={() => startReservation()}
+                onDelete={() => setDeleting(guest)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <EmptyState filtered={hasActiveFilters} canCreate={canCreate} onCreate={openCreate} />
+      )}
+
+      <ClientFormDialog
+        open={formOpen}
+        guest={editing}
+        tenantId={tenantId}
+        onOpenChange={setFormOpen}
+        onSaved={() => void qc.invalidateQueries({ queryKey: ["hotel-clients", tenantId] })}
+      />
+      <ClientDetails
+        guest={viewing}
+        stays={viewing ? (staysByGuest.get(viewing.id) ?? []) : []}
+        roomsById={roomsById}
+        onClose={() => setViewing(null)}
+        onEdit={
+          canUpdate && viewing
+            ? () => {
+                const guest = viewing;
+                setViewing(null);
+                openEdit(guest);
+              }
+            : undefined
+        }
+        onReserve={
+          viewing
+            ? () => {
+                setViewing(null);
+                startReservation();
+              }
+            : undefined
+        }
+      />
+      <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Voulez-vous vraiment supprimer{" "}
+              <span className="font-medium text-foreground">{deleting ? guestName(deleting) : ""}</span> ? Cette
+              action est irréversible et n’est possible que si le client n’a plus de réservation associée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleting && deleteGuest.mutate(deleting)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteGuest.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </HotelAppShell>
+  );
+}
+
+function FilterSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: string[][];
+}) {
+  return (
+    <label className="relative flex h-11 items-center rounded-xl border bg-background px-3 text-sm">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full appearance-none bg-transparent pr-7 outline-none"
+      >
+        {options.map(([key, label]) => (
+          <option key={key} value={key}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 size-3.5 text-muted-foreground" />
+    </label>
+  );
+}
+
+function ClientAvatar({ guest, size = "size-10" }: { guest: Guest; size?: string }) {
+  return (
+    <div
+      className={`grid ${size} shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-xs font-semibold text-white shadow-sm shadow-emerald-500/30`}
+    >
+      {initials(guest)}
+    </div>
+  );
+}
+
+function TypeBadge({ type }: { type: ClientType | null }) {
+  const meta = clientTypeMeta[type ?? "individuel"];
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${meta.className}`}>
+      {meta.label}
+    </span>
+  );
+}
+
+type ManageClientProps = {
+  guest: Guest;
+  stays: Stay[];
+  canUpdate: boolean;
+  canDelete: boolean;
+  onView: () => void;
+  onEdit: () => void;
+  onReserve: () => void;
+  onDelete: () => void;
+};
+
+function ClientActions({ guest, canUpdate, canDelete, onView, onEdit, onReserve, onDelete }: Omit<ManageClientProps, "stays">) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost" className="size-8 text-[#102A43] hover:bg-[#B89236]/10 hover:text-[#9D7927] dark:text-[#E2C66E]" aria-label="Plus d’actions">
+          <MoreVertical className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuItem onSelect={onView}>
+          <Eye className="size-4" /> Voir la fiche
+        </DropdownMenuItem>
+        {canUpdate && (
+          <DropdownMenuItem onSelect={onEdit}>
+            <Pencil className="size-4" /> Modifier
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={onReserve}>
+          <CalendarPlus className="size-4" /> Nouvelle réservation
+        </DropdownMenuItem>
+        {guest.phone && (
+          <DropdownMenuItem asChild>
+            <a href={`tel:${guest.phone}`}>
+              <Phone className="size-4" /> Appeler
+            </a>
+          </DropdownMenuItem>
+        )}
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onDelete}>
+              <Trash2 className="size-4" /> Supprimer
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ClientRow(props: ManageClientProps) {
+  const { guest, stays } = props;
+  return (
+    <tr className="hover:bg-muted/30">
+      <td className="px-3 py-2">
+        <div className="flex items-center gap-2.5">
+          <ClientAvatar guest={guest} />
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-[#102A43] dark:text-white">{guestName(guest)}</p>
+            {guest.company && <p className="truncate text-xs text-muted-foreground">{guest.company}</p>}
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-2">
+        <TypeBadge type={guest.client_type} />
+      </td>
+      <td className="px-3 py-2 text-muted-foreground">
+        <p>{guest.phone ?? "—"}</p>
+        {guest.email && <p className="text-xs">{guest.email}</p>}
+      </td>
+      <td className="px-3 py-2 text-muted-foreground">{guest.nationality ?? "—"}</td>
+      <td className="px-3 py-2 font-medium">{stays.length}</td>
+      <td className="px-3 py-2">
+        <ClientActions {...props} />
+      </td>
+    </tr>
+  );
+}
+
+function ClientMobileCard(props: ManageClientProps) {
+  const { guest, stays } = props;
+  return (
+    <article className="p-4 transition-colors active:bg-muted/20">
+      <div className="flex gap-3.5">
+        <ClientAvatar guest={guest} size="size-12" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate font-semibold text-[#102A43] dark:text-white">{guestName(guest)}</h3>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {guest.company || guest.phone || "Aucune coordonnée"}
+              </p>
+            </div>
+            <TypeBadge type={guest.client_type} />
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {stays.length} séjour{stays.length > 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-end border-t pt-2.5">
+        <ClientActions {...props} />
+      </div>
+    </article>
+  );
+}
+
+function EmptyState({ filtered, canCreate, onCreate }: { filtered: boolean; canCreate: boolean; onCreate: () => void }) {
+  return (
+    <div className="mt-6 grid min-h-72 place-items-center rounded-[24px] border border-dashed bg-muted/20 p-8 text-center">
+      <div>
+        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#B89236]/10 text-[#9D7927]">
+          <Users className="size-7" />
+        </div>
+        <h3 className="mt-4 font-semibold">{filtered ? "Aucun client trouvé" : "Aucun client enregistré"}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {filtered ? "Essayez de modifier vos critères." : "Ajoutez votre premier client pour commencer."}
+        </p>
+        {canCreate && !filtered && (
+          <Button onClick={onCreate} className="mt-5 rounded-xl">
+            <Plus className="size-4" />
+            Ajouter un client
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ClientFormDialog({
+  open,
+  guest,
+  tenantId,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean;
+  guest: Guest | null;
+  tenantId?: string;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState<GuestForm>(emptyForm);
+  const isEdit = Boolean(guest);
+  const reset = () =>
+    setForm(
+      guest
+        ? {
+            first_name: guest.first_name,
+            last_name: guest.last_name,
+            client_type: guest.client_type ?? "individuel",
+            company: guest.company ?? "",
+            phone: guest.phone ?? "",
+            email: guest.email ?? "",
+            nationality: guest.nationality ?? "",
+            address: guest.address ?? "",
+            identity_type: guest.identity_type ?? "",
+            identity_number: guest.identity_number ?? "",
+            identity_document_path: guest.identity_document_path ?? "",
+            notes: guest.notes ?? "",
+          }
+        : emptyForm,
+    );
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!tenantId) throw new Error("Aucun établissement actif.");
+      const firstName = form.first_name.trim();
+      const lastName = form.last_name.trim();
+      if (!firstName || !lastName) throw new Error("Le nom et le prénom sont obligatoires.");
+      const payload = {
+        first_name: firstName,
+        last_name: lastName,
+        client_type: form.client_type,
+        company: form.company.trim() || null,
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
+        nationality: form.nationality.trim() || null,
+        address: form.address.trim() || null,
+        identity_type: form.identity_type || null,
+        identity_number: form.identity_number.trim() || null,
+        identity_document_path: form.identity_document_path || null,
+        notes: form.notes.trim() || null,
+      };
+      const result = guest
+        ? await db.from("hotel_guests").update(payload).eq("tenant_id", tenantId).eq("id", guest.id)
+        : await db.from("hotel_guests").insert({ ...payload, tenant_id: tenantId });
+      if (result.error) throw result.error;
+    },
+    onSuccess: () => {
+      toast.success(isEdit ? "Client mis à jour" : "Client ajouté");
+      onSaved();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) reset();
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[24px] p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b p-6 pb-4">
+          <DialogTitle>{isEdit ? "Modifier le client" : "Ajouter un client"}</DialogTitle>
+          <DialogDescription>Renseignez les informations du client et de son séjour.</DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            save.mutate();
+          }}
+          className="space-y-5 p-6 pt-4"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Prénom" required>
+              <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} placeholder="Awa" />
+            </Field>
+            <Field label="Nom" required>
+              <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} placeholder="Diallo" />
+            </Field>
+            <Field label="Type de client">
+              <Select value={form.client_type} onValueChange={(v) => setForm({ ...form, client_type: v as ClientType })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLIENT_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {clientTypeMeta[t].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            {(form.client_type === "entreprise" || form.client_type === "agence") && (
+              <Field label="Entreprise / agence">
+                <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Nom de l’entreprise" />
+              </Field>
+            )}
+            <Field label="Téléphone">
+              <Input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+            </Field>
+            <Field label="Email">
+              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="client@email.com" />
+            </Field>
+            <Field label="Nationalité">
+              <Input value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} placeholder="Ivoirienne" />
+            </Field>
+            <Field label="Adresse">
+              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Adresse complète" />
+            </Field>
+            <Field label="Type de pièce d’identité">
+              <Select value={form.identity_type} onValueChange={(v) => setForm({ ...form, identity_type: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner" />
+                </SelectTrigger>
+                <SelectContent>
+                  {identityTypes.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Numéro de pièce">
+              <Input value={form.identity_number} onChange={(e) => setForm({ ...form, identity_number: e.target.value })} placeholder="N° document" />
+            </Field>
+            <div className="sm:col-span-2">
+              <Label className="mb-1.5 block">Photo de la pièce d’identité</Label>
+              <ImageField value={form.identity_document_path} onChange={(v) => setForm({ ...form, identity_document_path: v })} />
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="mb-1.5 block">Notes</Label>
+              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Préférences, remarques…" rows={3} />
+            </div>
+          </div>
+          <DialogFooter className="border-t pt-5">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={save.isPending} className="rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]">
+              {save.isPending && <Loader2 className="size-4 animate-spin" />}
+              {isEdit ? "Mettre à jour" : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
+  return (
+    <div>
+      <Label className="mb-1.5 block">
+        {label}
+        {required && <span className="ml-1 text-destructive">*</span>}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+const stayStatusLabel: Record<string, string> = {
+  pending: "En attente",
+  confirmed: "Confirmée",
+  checked_in: "En séjour",
+  checked_out: "Terminée",
+  cancelled: "Annulée",
+  no_show: "Non présenté",
+};
+
+function ClientDetails({
+  guest,
+  stays,
+  roomsById,
+  onClose,
+  onEdit,
+  onReserve,
+}: {
+  guest: Guest | null;
+  stays: Stay[];
+  roomsById: Map<string, Room>;
+  onClose: () => void;
+  onEdit?: () => void;
+  onReserve?: () => void;
+}) {
+  if (!guest) return null;
+  const totalSpent = stays.reduce((sum, s) => sum + Number(s.paid_total ?? 0), 0);
+  const sortedStays = [...stays].sort((a, b) => b.check_in.localeCompare(a.check_in));
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[24px] p-0 sm:max-w-3xl">
+        <div className="relative bg-gradient-to-br from-[#102A43] to-[#1B4B3A] px-6 py-7 text-white">
+          <div className="flex items-center gap-4">
+            <div className="grid size-16 shrink-0 place-items-center rounded-full bg-white/15 text-xl font-semibold backdrop-blur">
+              {initials(guest)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-[.2em] text-white/70">Fiche client</p>
+              <h2 className="mt-1 truncate text-2xl font-semibold">{guestName(guest)}</h2>
+              {guest.company && <p className="mt-0.5 text-sm text-white/80">{guest.company}</p>}
+            </div>
+            <div className="ml-auto">
+              <TypeBadge type={guest.client_type} />
+            </div>
+          </div>
+        </div>
+        <div className="grid gap-5 p-6 sm:grid-cols-3">
+          <Detail icon={Phone} label="Téléphone" value={guest.phone ?? "—"} />
+          <Detail icon={Mail} label="Email" value={guest.email ?? "—"} />
+          <Detail icon={MapPin} label="Adresse" value={guest.address ?? "—"} />
+          <Detail icon={UserCheck} label="Nationalité" value={guest.nationality ?? "—"} />
+          <Detail
+            label="Pièce d’identité"
+            value={guest.identity_type ? `${guest.identity_type}${guest.identity_number ? ` · ${guest.identity_number}` : ""}` : "—"}
+          />
+          <Detail label="Client depuis" value={formatDate(guest.created_at)} />
+        </div>
+        {guest.identity_document_path && (
+          <div className="px-6 pb-2">
+            <DetailSection title="Document d’identité">
+              {guest.identity_document_path.startsWith("data:image/") ? (
+                <img src={guest.identity_document_path} alt="Pièce d’identité" className="max-h-56 rounded-xl border object-contain" />
+              ) : (
+                <p className="text-sm text-muted-foreground">{guest.identity_document_path}</p>
+              )}
+            </DetailSection>
+          </div>
+        )}
+        <div className="space-y-5 border-t px-6 py-5">
+          {guest.notes && (
+            <DetailSection title="Notes">
+              <p className="text-sm text-muted-foreground">{guest.notes}</p>
+            </DetailSection>
+          )}
+          <DetailSection title={`Historique des séjours (${stays.length})`}>
+            {sortedStays.length ? (
+              <div className="divide-y rounded-lg border">
+                {sortedStays.map((stay) => (
+                  <div key={stay.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-xs">
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        Chambre {roomsById.get(stay.room_id)?.number ?? "—"} · {stayStatusLabel[stay.status] ?? stay.status}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {formatDate(stay.check_in)} → {formatDate(stay.check_out)} · {stay.nights} nuit(s)
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-semibold">{formatCurrency(Number(stay.grand_total))}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Aucun séjour enregistré pour ce client.</p>
+            )}
+            {stays.length > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">Total réglé sur l’historique : {formatCurrency(totalSpent)}</p>
+            )}
+          </DetailSection>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t p-5">
+          <Button variant="ghost" onClick={onClose}>
+            Fermer
+          </Button>
+          {onReserve && (
+            <Button variant="outline" onClick={onReserve} className="rounded-xl">
+              <CalendarPlus className="size-4" />
+              Nouvelle réservation
+            </Button>
+          )}
+          {onEdit && (
+            <Button onClick={onEdit} className="rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]">
+              <Pencil className="size-4" />
+              Modifier
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h3 className="mb-2 text-sm font-semibold text-[#102A43] dark:text-white">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function Detail({ icon: Icon, label, value }: { icon?: typeof Phone; label: string; value: string }) {
+  return (
+    <div>
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {Icon && <Icon className="size-3.5" />}
+        {label}
+      </p>
+      <p className="mt-1 truncate font-semibold">{value}</p>
+    </div>
+  );
+}
