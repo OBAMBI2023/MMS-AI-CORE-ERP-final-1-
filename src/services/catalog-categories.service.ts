@@ -5,6 +5,7 @@ export type CatalogCategory = {
   tenant_id: string;
   type: CatalogCategoryType;
   name: string;
+  icon: string | null;
   sort_order: number;
   active: boolean;
   created_at: string;
@@ -14,7 +15,7 @@ export type CatalogCategory = {
 export type CatalogCategoryType = "product" | "service";
 
 const categoryColumns =
-  "id, tenant_id, name, type, sort_order, active, created_at, updated_at" as const;
+  "id, tenant_id, name, icon, type, sort_order, active, created_at, updated_at" as const;
 
 function normalizeName(name: string) {
   const normalized = name.trim().replace(/\s+/g, " ");
@@ -42,20 +43,29 @@ export const catalogCategoriesService = {
     );
   },
 
-  async create(tenantId: string, name: string, type: CatalogCategoryType) {
+  async create(
+    tenantId: string,
+    name: string,
+    type: CatalogCategoryType,
+    icon?: string | null,
+  ) {
     const { data, error } = await supabase
       .from("catalog_categories")
-      .insert({ tenant_id: tenantId, name: normalizeName(name), type })
+      .insert({ tenant_id: tenantId, name: normalizeName(name), type, icon: icon ?? null })
       .select(categoryColumns)
       .single();
     if (error) throw categoryError(error);
     return data as CatalogCategory;
   },
 
-  async rename(tenantId: string, id: string, name: string) {
+  async update(
+    tenantId: string,
+    id: string,
+    updates: { name: string; icon?: string | null },
+  ) {
     const { data, error } = await supabase
       .from("catalog_categories")
-      .update({ name: normalizeName(name) })
+      .update({ name: normalizeName(updates.name), icon: updates.icon ?? null })
       .eq("tenant_id", tenantId)
       .eq("id", id)
       .select(categoryColumns)

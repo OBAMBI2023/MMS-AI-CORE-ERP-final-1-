@@ -17,11 +17,14 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NewCategoryDialog } from "@/components/mms/NewCategoryDialog";
+import { CategoryIcon } from "@/components/mms/CategoryIcon";
+import { CategoryIconPicker } from "@/components/mms/CategoryIconPicker";
 import {
   useCatalogCategories,
   useCatalogCategoryMutations,
 } from "@/hooks/use-catalog-categories";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import type { CatalogCategoryIconId } from "@/lib/catalog-category-icons";
 import type {
   CatalogCategory,
   CatalogCategoryType,
@@ -45,6 +48,7 @@ export function CategoriesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogCategory | null>(null);
   const [editedName, setEditedName] = useState("");
+  const [editedIcon, setEditedIcon] = useState<CatalogCategoryIconId | null>(null);
   const [deleting, setDeleting] = useState<CatalogCategory | null>(null);
   const [usageCount, setUsageCount] = useState<number | null>(null);
   const [replacementId, setReplacementId] = useState("");
@@ -242,7 +246,12 @@ export function CategoriesPage() {
                 <tr><td colSpan={3} className="py-12 text-center text-muted-foreground">Aucune catégorie.</td></tr>
               ) : filtered.map((category) => (
                 <tr key={category.id} className="border-t">
-                  <td className="px-4 py-3 font-medium">{category.name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      <CategoryIcon icon={category.icon} className="size-4 text-muted-foreground" />
+                      {category.name}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Switch
@@ -270,6 +279,7 @@ export function CategoriesPage() {
                         <Button variant="ghost" size="icon" onClick={() => {
                           setEditing(category);
                           setEditedName(category.name);
+                          setEditedIcon(category.icon as CatalogCategoryIconId | null);
                         }}>
                           <Pencil className="size-4" />
                         </Button>
@@ -304,14 +314,18 @@ export function CategoriesPage() {
             <Label htmlFor="category-edit-name">Nom</Label>
             <Input id="category-edit-name" value={editedName} onChange={(event) => setEditedName(event.target.value)} />
           </label>
+          <div className="space-y-2">
+            <Label>Icône</Label>
+            <CategoryIconPicker value={editedIcon} onChange={setEditedIcon} />
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Annuler</Button>
             <Button
-              disabled={!editedName.trim() || mutations.rename.isPending}
-              onClick={() => editing && mutations.rename.mutate(
-                { id: editing.id, name: editedName },
+              disabled={!editedName.trim() || mutations.update.isPending}
+              onClick={() => editing && mutations.update.mutate(
+                { id: editing.id, name: editedName, icon: editedIcon },
                 {
-                  onSuccess: () => { toast.success("Catégorie renommée."); setEditing(null); },
+                  onSuccess: () => { toast.success("Catégorie modifiée."); setEditing(null); },
                   onError: (error) => toast.error(formatSupabaseError(error)),
                 },
               )}

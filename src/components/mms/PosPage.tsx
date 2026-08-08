@@ -32,6 +32,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Sidebar } from "@/components/mms/Sidebar";
+import { CategoryIcon } from "@/components/mms/CategoryIcon";
 import {
   Sheet,
   SheetClose,
@@ -197,6 +198,13 @@ export function PosPage() {
       "Tous",
       ...(catalogCategoriesQuery.data ?? []).map((item) => item.name),
     ],
+    [catalogCategoriesQuery.data],
+  );
+  // Categories are already loaded for the filter chips above — reuse that
+  // same data as a lookup instead of firing a query per product/category.
+  const categoryIconByName = useMemo(
+    () =>
+      new Map((catalogCategoriesQuery.data ?? []).map((item) => [item.name, item.icon])),
     [catalogCategoriesQuery.data],
   );
 
@@ -438,12 +446,13 @@ export function PosPage() {
                 <button
                   key={c}
                   onClick={() => setCategory(c)}
-                  className={`px-3 py-1 rounded-full text-[10px] md:text-xs font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] md:text-xs font-medium transition-colors ${
                     category === c
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted/60 text-muted-foreground hover:text-foreground"
                   }`}
                 >
+                  <CategoryIcon icon={categoryIconByName.get(c)} className="size-3" />
                   {c}
                 </button>
               ))}
@@ -482,7 +491,10 @@ export function PosPage() {
                           {s.type === "product" ? "Produit" : "Service"}
                         </span>
                       )}
-                      <div className="mt-1 text-[10px] text-muted-foreground">{s.category}</div>
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <CategoryIcon icon={categoryIconByName.get(s.category)} className="size-3" />
+                        {s.category}
+                      </div>
                       <div className="mt-1 md:mt-2 flex items-baseline justify-between gap-2">
                         <span className="text-primary font-semibold text-xs md:text-sm">
                           {formatCurrency(s.price)}

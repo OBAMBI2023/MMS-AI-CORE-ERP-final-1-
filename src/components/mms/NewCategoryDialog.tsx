@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CategoryIconPicker } from "@/components/mms/CategoryIconPicker";
 import { useCatalogCategoryMutations } from "@/hooks/use-catalog-categories";
+import type { CatalogCategoryIconId } from "@/lib/catalog-category-icons";
 import type {
   CatalogCategory,
   CatalogCategoryType,
@@ -31,14 +33,18 @@ export function NewCategoryDialog({
   type: CatalogCategoryType;
 }) {
   const [name, setName] = useState("");
+  const [icon, setIcon] = useState<CatalogCategoryIconId | null>(null);
   const { create } = useCatalogCategoryMutations();
 
   useEffect(() => {
-    if (!open) setName("");
+    if (!open) {
+      setName("");
+      setIcon(null);
+    }
   }, [open]);
 
   const submit = () => {
-    create.mutate({ name, type }, {
+    create.mutate({ name, type, icon }, {
       onSuccess: (category) => {
         toast.success("Catégorie créée.");
         onCreated?.(category);
@@ -72,6 +78,10 @@ export function NewCategoryDialog({
             }}
           />
         </label>
+        <div className="space-y-2">
+          <Label>Icône</Label>
+          <CategoryIconPicker value={icon} onChange={setIcon} />
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annuler

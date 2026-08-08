@@ -47,8 +47,15 @@ export function useCatalogCategoryMutations() {
 
   return {
     create: useMutation({
-      mutationFn: ({ name, type }: { name: string; type: CatalogCategoryType }) =>
-        catalogCategoriesService.create(requireTenant(), name, type),
+      mutationFn: ({
+        name,
+        type,
+        icon,
+      }: {
+        name: string;
+        type: CatalogCategoryType;
+        icon?: string | null;
+      }) => catalogCategoriesService.create(requireTenant(), name, type, icon),
       onSuccess: (created) => {
         queryClient.setQueryData<CatalogCategory[]>(
           catalogCategoriesKey(tenantId),
@@ -60,9 +67,16 @@ export function useCatalogCategoryMutations() {
       },
       onSettled: refresh,
     }),
-    rename: useMutation({
-      mutationFn: ({ id, name }: { id: string; name: string }) =>
-        catalogCategoriesService.rename(requireTenant(), id, name),
+    update: useMutation({
+      mutationFn: ({
+        id,
+        name,
+        icon,
+      }: {
+        id: string;
+        name: string;
+        icon?: string | null;
+      }) => catalogCategoriesService.update(requireTenant(), id, { name, icon }),
       onSuccess: refresh,
     }),
     setActive: useMutation({
