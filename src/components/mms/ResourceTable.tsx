@@ -26,7 +26,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PremiumResourceList, type MobileEmptyState } from "@/components/mms/PremiumResourceList";
+import {
+  PremiumResourceList,
+  type MobileEmptyState,
+  type MobileSort as ListSort,
+} from "@/components/mms/PremiumResourceList";
+import {
+  usePaginatedTable,
+  useDebouncedValue,
+  fetchAllMatching,
+  type PaginatedFilter,
+} from "@/hooks/use-paginated-table";
+import type { ExportDataSource } from "@/components/mms/DataExportMenu";
 
 // Dynamic table access — cast client so table names typed as string are accepted.
 const db = supabase as unknown as {
@@ -93,7 +104,10 @@ export interface ResourceTableProps<T extends { id: string }> {
   searchFields?: string[];
   orderBy?: { column: string; ascending?: boolean };
   defaultValues?: Partial<T>;
-  renderActions?: (data: T[]) => ReactNode;
+  /** Receives the current page's rows in client mode (unchanged), or a lazy
+   * fetcher of every row matching the current search/filters when
+   * `serverPaginated` is on — both are valid `DataExportMenu` data sources. */
+  renderActions?: (data: ExportDataSource<T>) => ReactNode;
   deletePermission?: string;
   entityName?: string;
   /** Opt-in premium mobile card list (<768px). When provided, the table is hidden on
@@ -120,6 +134,23 @@ export interface ResourceTableProps<T extends { id: string }> {
   formCreateSubtitle?: string;
   /** Submit button label when creating a record, premium variant only. */
   formSubmitLabel?: string;
+  /**
+   * Opt-in server-side pagination + search (`.range()` + `count: 'exact'` +
+   * `.ilike()`/`.or()`) instead of fetching the whole table and
+   * filtering/paginating in the browser. Only wired into the
+   * `premiumLayout` + `renderMobileCard` rendering path (the only one any
+   * current consumer uses); omit to keep the exact previous full-fetch
+   * behavior.
+   */
+  serverPaginated?: boolean;
+  /** Page size when `serverPaginated` is on. Defaults to 20. */
+  serverPageSize?: number;
+  /** Extra server-side filters applied before search/pagination (e.g. a
+   * status or category dropdown). Only used when `serverPaginated` is on. */
+  serverFilters?: PaginatedFilter[];
+  /** Columns fetched server-side when `serverPaginated` is on. Defaults to
+   * "*" (unchanged from the full-fetch behavior). */
+  serverSelectColumns?: string;
 }
 
 type MobileSort = "default" | "name-asc" | "name-desc" | "recent" | "oldest";
@@ -162,15 +193,22 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
     formIcon,
     formCreateSubtitle,
     formSubmitLabel,
+    serverPaginated = false,
+    serverPageSize = 20,
+    serverFilters = [],
+    serverSelectColumns = "*",
   } = props;
   const hasMobileCards = Boolean(renderMobileCard);
   const useUnifiedCards = hasMobileCards && premiumLayout;
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 300);
   const [editing, setEditing] = useState<T | null>(null);
   const [creating, setCreating] = useState(false);
   const [mobilePage, setMobilePage] = useState(1);
   const [mobileSort, setMobileSort] = useState<MobileSort>("default");
+  const [serverPage, setServerPage] = useState(1);
+  const [serverSort, setServerSort] = useState<ListSort>("default");
   const nameField = searchFields[0];
   const dateField = orderBy?.column;
   const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
@@ -180,8 +218,35 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
   const canDelete = deletePermission ? useActionPermission(deletePermission) : true;
   const canCreate = entityName ? useActionPermission(`${entityName}.create`) : true;
   const canEdit = entityName ? useActionPermission(`${entityName}.edit`) : true;
+  const { profile } = useTenant();
+  const tenantId = profile?.tenant_id;
 
-  const { data = [], isLoading } = useQuery({
+  useEffect(() => {
+    setServerPage(1);
+  }, [debouncedQ, serverSort, serverFilters]);
+
+  const serverOrderBy = useMemo(() => {
+    if (serverSort === "name-asc" && nameField) return { column: nameField, ascending: true };
+    if (serverSort === "name-desc" && nameField) return { column: nameField, ascending: false };
+    if (serverSort === "recent" && dateField) return { column: dateField, ascending: false };
+    if (serverSort === "oldest" && dateField) return { column: dateField, ascending: true };
+    return orderBy;
+  }, [serverSort, nameField, dateField, orderBy]);
+
+  const serverQuery = usePaginatedTable<T>({
+    table,
+    tenantId,
+    selectColumns: serverSelectColumns,
+    searchFields,
+    search: debouncedQ,
+    orderBy: serverOrderBy,
+    page: serverPage,
+    pageSize: serverPageSize,
+    filters: serverFilters,
+    enabled: serverPaginated,
+  });
+
+  const { data: fullData = [], isLoading: fullLoading } = useQuery({
     queryKey: [table],
     queryFn: async () => {
       const query = db.from(table).select("*");
@@ -191,9 +256,15 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
       if (error) throw error;
       return (data ?? []) as T[];
     },
+    enabled: !serverPaginated,
   });
 
+  const data = serverPaginated ? (serverQuery.data?.rows ?? []) : fullData;
+  const isLoading = serverPaginated ? serverQuery.isLoading : fullLoading;
+  const serverTotalCount = serverQuery.data?.count ?? 0;
+
   const filtered = useMemo(() => {
+    if (serverPaginated) return data;
     const s = q.trim().toLowerCase();
     if (!s) return data;
     return data.filter((row) =>
@@ -203,7 +274,20 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
           .includes(s),
       ),
     );
-  }, [data, q, searchFields]);
+  }, [data, q, searchFields, serverPaginated]);
+
+  const exportSource: ExportDataSource<T> = serverPaginated
+    ? () =>
+        fetchAllMatching<T>({
+          table,
+          tenantId,
+          selectColumns: serverSelectColumns,
+          searchFields,
+          search: debouncedQ,
+          orderBy: serverOrderBy,
+          filters: serverFilters,
+        })
+    : filtered;
 
   const sortedForMobile = useMemo(() => {
     if (!hasMobileCards || mobileSort === "default") return filtered;
@@ -282,11 +366,24 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
           }
           emptyState={mobileEmptyState}
           pageSize={mobilePageSize}
-          actionsSlot={renderActions ? renderActions(filtered) : undefined}
+          actionsSlot={renderActions ? renderActions(exportSource) : undefined}
           createSlot={createButton}
           nameField={nameField}
           nameSortLabel={nameSortLabel}
           dateField={dateField}
+          serverPagination={
+            serverPaginated
+              ? {
+                  page: serverPage,
+                  pageSize: serverPageSize,
+                  totalCount: serverTotalCount,
+                  onPageChange: setServerPage,
+                  isFetching: serverQuery.isFetching,
+                }
+              : undefined
+          }
+          sort={serverPaginated ? serverSort : undefined}
+          onSortChange={serverPaginated ? setServerSort : undefined}
         />
       ) : (
         <>

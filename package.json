@@ -10,7 +10,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "test": "node --test src/lib/catalog-settings.test.ts src/lib/preserve-auth-session.test.ts src/lib/tenant-login-access.test.ts src/lib/partner-invitation.test.ts src/lib/company-assets-security.test.ts src/lib/signed-url-lease.test.ts src/lib/profile-access.test.ts src/lib/tenant-landing-route.test.ts src/lib/mms/whatsapp-receipt.test.ts scripts/migrate-legacy-company-assets.test.mjs",
+    "test": "node --test src/lib/catalog-settings.test.ts src/lib/preserve-auth-session.test.ts src/lib/tenant-login-access.test.ts src/lib/partner-invitation.test.ts src/lib/company-assets-security.test.ts src/lib/signed-url-lease.test.ts src/lib/profile-access.test.ts src/lib/tenant-landing-route.test.ts src/lib/mms/whatsapp-receipt.test.ts src/lib/critical-security-fixes.test.ts scripts/migrate-legacy-company-assets.test.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

@@ -394,6 +394,8 @@ function DepensesPage() {
           deletePermission="depenses.delete"
           entityName="depenses"
           premiumLayout
+          serverPaginated
+          serverPageSize={20}
           nameSortLabel="Catégorie"
           renderMobileCard={(row, actions) => <DepenseMobileCard row={row} actions={actions} />}
           mobileEmptyState={{

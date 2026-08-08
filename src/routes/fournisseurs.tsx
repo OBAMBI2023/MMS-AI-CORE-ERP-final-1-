@@ -83,18 +83,17 @@ function useFournisseursAchatsStats() {
   return useQuery({
     queryKey: ["fournisseurs_achats_stats"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("achats").select("fournisseur_id, created_at");
+      // Server-side GROUP BY (get_fournisseur_achats_stats) instead of
+      // fetching every achats row and aggregating in the browser.
+      const { data, error } = await (supabase as any).rpc("get_fournisseur_achats_stats");
       if (error) throw error;
       const stats: Record<string, AchatsStat> = {};
-      for (const row of data ?? []) {
-        if (!row.fournisseur_id) continue;
-        const existing = stats[row.fournisseur_id];
-        if (!existing) {
-          stats[row.fournisseur_id] = { count: 1, lastDate: row.created_at };
-        } else {
-          existing.count += 1;
-          if (row.created_at > existing.lastDate) existing.lastDate = row.created_at;
-        }
+      for (const row of (data ?? []) as {
+        fournisseur_id: string;
+        achats_count: number;
+        last_achat_at: string;
+      }[]) {
+        stats[row.fournisseur_id] = { count: Number(row.achats_count), lastDate: row.last_achat_at };
       }
       return stats;
     },
@@ -273,6 +272,8 @@ function FournisseursPage() {
           deletePermission="fournisseurs.delete"
           entityName="fournisseurs"
           premiumLayout
+          serverPaginated
+          serverPageSize={20}
           formVariant="premium"
           formIcon={Building2}
           formCreateSubtitle="Ajoutez les informations de votre fournisseur"

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronLeft,
@@ -48,7 +48,8 @@ import { formatSupabaseError } from "@/lib/supabase-error";
 import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 import { NewCategoryDialog } from "@/components/mms/NewCategoryDialog";
 import type { CatalogCategory } from "@/services/catalog-categories.service";
-import { useCatalogItems, type CatalogItem } from "@/hooks/use-catalog-items";
+import { type CatalogItem } from "@/hooks/use-catalog-items";
+import { usePaginatedTable, useDebouncedValue } from "@/hooks/use-paginated-table";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { catalogTypeEnabled } from "@/lib/catalog-settings";
 
@@ -146,7 +147,63 @@ export function CatalogPage() {
     console.log({ loading, profile, tenant });
   }, [loading, profile, tenant]);
 
-  const itemsQuery = useCatalogItems();
+  const qc = useQueryClient();
+  const tenantId = tenant?.id;
+  const debouncedSearch = useDebouncedValue(search, 300);
+
+  const ITEMS_SELECT_COLUMNS =
+    "id, type, category_id, category, name, price, cost_price, unit, photo_url, stock, manage_stock, stock_alert_threshold, active, created_at";
+
+  const itemsQuery = usePaginatedTable<CatalogItem>({
+    table: "services",
+    tenantId,
+    selectColumns: ITEMS_SELECT_COLUMNS,
+    searchFields: ["name", "category", "unit"],
+    search: debouncedSearch,
+    orderBy: { column: "created_at", ascending: false },
+    page,
+    pageSize: ITEMS_PER_PAGE,
+    filters: [
+      { column: "type", op: "eq", value: activeType },
+      { column: "category_id", op: "eq", value: categoryFilter !== "all" ? categoryFilter : undefined },
+      {
+        column: "active",
+        op: "eq",
+        value: statusFilter === "all" ? undefined : statusFilter === "active",
+      },
+    ],
+  });
+
+  // Tab badge counts are independent of the active tab/filters/pagination,
+  // so they're two lightweight head-only counts instead of a full fetch.
+  const productCountQuery = useQuery({
+    queryKey: ["services", "count", "product", tenantId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("services")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId as string)
+        .eq("type", "product");
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: Boolean(tenantId),
+  });
+  const serviceCountQuery = useQuery({
+    queryKey: ["services", "count", "service", tenantId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("services")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId as string)
+        .eq("type", "service");
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: Boolean(tenantId),
+  });
+
+  const invalidateCatalogQueries = () => qc.invalidateQueries({ queryKey: ["services"] });
 
   const requireConnectedTenant = async () => {
     console.log({ loading, profile, tenant });
@@ -206,37 +263,22 @@ export function CatalogPage() {
 
   const itemCounts = useMemo(
     () => ({
-      product: (itemsQuery.data ?? []).filter((item) => item.type === "product").length,
-      service: (itemsQuery.data ?? []).filter((item) => item.type === "service").length,
+      product: productCountQuery.data ?? 0,
+      service: serviceCountQuery.data ?? 0,
     }),
-    [itemsQuery.data],
+    [productCountQuery.data, serviceCountQuery.data],
   );
 
-  const filteredItems = useMemo(() => {
-    const value = search.trim().toLocaleLowerCase("fr");
-    return (itemsQuery.data ?? []).filter((item) => {
-      if (item.type !== activeType) return false;
-      if (categoryFilter !== "all" && item.category_id !== categoryFilter) return false;
-      if (statusFilter === "active" && !item.active) return false;
-      if (statusFilter === "inactive" && item.active) return false;
-      return (
-        !value ||
-        [item.name, item.category, item.unit].some((field) =>
-          field.toLocaleLowerCase("fr").includes(value),
-        )
-      );
-    });
-  }, [activeType, categoryFilter, itemsQuery.data, search, statusFilter]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
-  const paginatedItems = filteredItems.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE,
-  );
+  const paginatedItems = itemsQuery.data?.rows ?? [];
+  const totalCount = itemsQuery.data?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  // Kept as an alias so the JSX below (empty-state / "X–Y sur Z" text)
+  // reads the true server-side total rather than just the current page.
+  const filteredItems = { length: totalCount };
 
   useEffect(() => {
     setPage(1);
-  }, [activeType, categoryFilter, search, statusFilter]);
+  }, [activeType, categoryFilter, debouncedSearch, statusFilter]);
 
   useEffect(() => {
     setCategoryFilter("all");
@@ -364,7 +406,7 @@ export function CatalogPage() {
     onSuccess: async () => {
       toast.success(editing ? "Article mis à jour." : "Article créé.");
       setItemDialogOpen(false);
-      await itemsQuery.reload();
+      invalidateCatalogQueries();
     },
     onError: (error: Error) => {
       logCatalogError("enregistrement d’article", error);
@@ -384,7 +426,7 @@ export function CatalogPage() {
     },
     onSuccess: async () => {
       toast.success("Article supprimé.");
-      await itemsQuery.reload();
+      invalidateCatalogQueries();
     },
     onError: (error: Error) => {
       logCatalogError("suppression d’article", error);
@@ -392,12 +434,12 @@ export function CatalogPage() {
     },
   });
 
-  const isLoading = loading || categoriesQuery.isLoading || itemsQuery.loading || catalogSettingsQuery.isLoading;
-  const loadError =
-    itemsQuery.error ??
-    (categoriesQuery.error
+  const isLoading = loading || categoriesQuery.isLoading || itemsQuery.isLoading || catalogSettingsQuery.isLoading;
+  const loadError = itemsQuery.error
+    ? formatSupabaseError(itemsQuery.error)
+    : categoriesQuery.error
       ? `Échec du chargement des catégories : ${formatSupabaseError(categoriesQuery.error)}`
-      : null);
+      : null;
 
   return (
     <div className="space-y-5">

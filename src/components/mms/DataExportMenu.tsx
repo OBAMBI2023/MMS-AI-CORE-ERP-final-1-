@@ -28,12 +28,22 @@ export interface ExportContext {
   successMessage?: string;
 }
 
+/** Either the already-loaded rows (existing behavior, unchanged) or a lazy
+ * fetcher — used by server-paginated lists whose on-screen `data` is only
+ * the current page, so export must fetch every matching row on demand
+ * instead of exporting just what happens to be on screen. */
+export type ExportDataSource<T> = T[] | (() => Promise<T[]>);
+
 type DataExportMenuProps<T> = ExportContext & {
-  data: T[];
+  data: ExportDataSource<T>;
   columns: ExportColumn<T>[];
   triggerVariant?: ButtonProps["variant"];
   triggerClassName?: string;
 };
+
+async function resolveExportData<T>(data: ExportDataSource<T>): Promise<T[]> {
+  return typeof data === "function" ? await (data as () => Promise<T[]>)() : data;
+}
 
 const safeFilename = (filename: string) =>
   filename
@@ -139,10 +149,13 @@ export function DataExportMenu<T>({
   const [pending, setPending] = useState<"pdf" | "xlsx" | "csv" | null>(null);
   const ctx: ExportContext = { filename, pdfTitle, companySettings, logoUrl };
 
-  const run = async (kind: "pdf" | "xlsx" | "csv", action: () => void | Promise<void>) => {
+  const run = async (kind: "pdf" | "xlsx" | "csv", action: (rows: T[]) => void | Promise<void>) => {
     setPending(kind);
     try {
-      await action();
+      const rows = await resolveExportData(data);
+      await action(rows);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible de récupérer les données à exporter.");
     } finally {
       setPending(null);
     }
@@ -161,13 +174,13 @@ export function DataExportMenu<T>({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => void run("pdf", () => exportRowsToPdf(data, columns, ctx))}>
+        <DropdownMenuItem onClick={() => void run("pdf", (rows) => exportRowsToPdf(rows, columns, ctx))}>
           <FileText className="h-4 w-4" /> PDF
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void run("xlsx", () => exportRowsToXlsx(data, columns, ctx))}>
+        <DropdownMenuItem onClick={() => void run("xlsx", (rows) => exportRowsToXlsx(rows, columns, ctx))}>
           <FileSpreadsheet className="h-4 w-4" /> Excel (.xlsx)
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void run("csv", () => exportRowsToCsv(data, columns, ctx))}>
+        <DropdownMenuItem onClick={() => void run("csv", (rows) => exportRowsToCsv(rows, columns, ctx))}>
           <Download className="h-4 w-4" /> CSV
         </DropdownMenuItem>
       </DropdownMenuContent>

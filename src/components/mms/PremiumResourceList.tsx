@@ -20,7 +20,7 @@ export interface MobileEmptyState {
   subtitle: string;
 }
 
-type MobileSort = "default" | "name-asc" | "name-desc" | "recent" | "oldest";
+export type MobileSort = "default" | "name-asc" | "name-desc" | "recent" | "oldest";
 
 function getPageWindow(current: number, total: number): (number | "ellipsis")[] {
   if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
@@ -34,6 +34,14 @@ function getPageWindow(current: number, total: number): (number | "ellipsis")[] 
     prev = p;
   }
   return result;
+}
+
+export interface ServerPaginationState {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  onPageChange: (page: number) => void;
+  isFetching?: boolean;
 }
 
 export interface PremiumResourceListProps<T extends { id: string; [k: string]: unknown }> {
@@ -51,6 +59,19 @@ export interface PremiumResourceListProps<T extends { id: string; [k: string]: u
   nameField?: string;
   nameSortLabel?: string;
   dateField?: string;
+  /**
+   * Opt-in server-driven pagination. When provided, `items` MUST already be
+   * exactly the current page's rows (server-filtered/sorted/paginated) —
+   * all internal client-side slicing is skipped and this state drives the
+   * pager UI instead. Omit entirely to keep the original, byte-identical
+   * client-side pagination behavior (existing consumers are unaffected).
+   */
+  serverPagination?: ServerPaginationState;
+  /** Current sort, only meaningful together with `serverPagination` (the
+   * sort menu becomes controlled and calls `onSortChange` instead of
+   * re-sorting `items` locally, since the caller owns the server query). */
+  sort?: MobileSort;
+  onSortChange?: (sort: MobileSort) => void;
 }
 
 /**
@@ -68,18 +89,30 @@ export function PremiumResourceList<T extends { id: string; [k: string]: unknown
   onSearchChange,
   renderCard,
   emptyState,
-  pageSize = 10,
+  pageSize: pageSizeProp = 10,
   actionsSlot,
   createSlot,
   nameField,
   nameSortLabel = "Nom",
   dateField,
+  serverPagination,
+  sort: sortProp,
+  onSortChange,
 }: PremiumResourceListProps<T>) {
-  const [page, setPage] = useState(1);
-  const [sort, setSort] = useState<MobileSort>("default");
+  const isServer = Boolean(serverPagination);
+  const [localPage, setLocalPage] = useState(1);
+  const [localSort, setLocalSort] = useState<MobileSort>("default");
 
+  const sort = isServer ? (sortProp ?? "default") : localSort;
+  const setSort = (value: MobileSort) => {
+    if (isServer) onSortChange?.(value);
+    else setLocalSort(value);
+  };
+
+  // Server-paginated mode: `items` is already exactly the current page,
+  // filtered/sorted/paginated server-side — no local re-slicing or re-sorting.
   const sorted = useMemo(() => {
-    if (sort === "default") return items;
+    if (isServer || sort === "default") return items;
     const arr = [...items];
     if (sort === "name-asc" && nameField) {
       arr.sort((a, b) => String(a[nameField] ?? "").localeCompare(String(b[nameField] ?? "")));
@@ -91,22 +124,33 @@ export function PremiumResourceList<T extends { id: string; [k: string]: unknown
       arr.sort((a, b) => String(a[dateField] ?? "").localeCompare(String(b[dateField] ?? "")));
     }
     return arr;
-  }, [items, sort, nameField, dateField]);
+  }, [items, sort, nameField, dateField, isServer]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const pageSize = isServer ? serverPagination!.pageSize : pageSizeProp;
+  const page = isServer ? serverPagination!.page : localPage;
+  const totalCount = isServer ? serverPagination!.totalCount : sorted.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const setPage = (updater: number | ((p: number) => number)) => {
+    const next = typeof updater === "function" ? updater(page) : updater;
+    if (isServer) serverPagination!.onPageChange(next);
+    else setLocalPage(next);
+  };
 
   useEffect(() => {
-    setPage(1);
-  }, [searchValue, sort]);
+    if (!isServer) setLocalPage(1);
+  }, [searchValue, sort, isServer]);
 
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+    if (!isServer && page > totalPages) setLocalPage(totalPages);
+  }, [isServer, page, totalPages]);
 
   const pageItems = useMemo(() => {
+    if (isServer) return items;
     const start = (page - 1) * pageSize;
     return sorted.slice(start, start + pageSize);
-  }, [sorted, page, pageSize]);
+  }, [isServer, items, sorted, page, pageSize]);
+
+  const effectiveLoading = isLoading || Boolean(serverPagination?.isFetching);
 
   return (
     <div className="space-y-4">
@@ -170,11 +214,11 @@ export function PremiumResourceList<T extends { id: string; [k: string]: unknown
         </div>
       )}
 
-      {isLoading ? (
+      {effectiveLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
-      ) : sorted.length === 0 ? (
+      ) : totalCount === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-16 px-6 text-center">
           {emptyState?.icon}
           <p className="font-medium text-foreground">{emptyState?.title ?? `Aucun ${plural.toLowerCase()}`}</p>
@@ -193,8 +237,8 @@ export function PremiumResourceList<T extends { id: string; [k: string]: unknown
 
           <div className="mt-5 flex flex-col items-center gap-3 pb-1">
             <p className="text-sm text-muted-foreground">
-              {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, sorted.length)} sur{" "}
-              {sorted.length} {plural.toLowerCase()}
+              {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} sur{" "}
+              {totalCount} {plural.toLowerCase()}
             </p>
             {totalPages > 1 && (
               <div className="flex items-center gap-1.5">

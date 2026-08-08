@@ -205,6 +205,8 @@ function ClientsPage() {
           deletePermission="clients.delete"
           entityName="clients"
           premiumLayout
+          serverPaginated
+          serverPageSize={20}
           formVariant="premium"
           formIcon={UserPlus}
           formCreateSubtitle="Ajoutez les informations de votre nouveau client"

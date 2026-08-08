@@ -107,6 +107,13 @@ type ReportSale = {
   created_at: string;
   vente_items: ReportSaleItem[];
 };
+type PerformanceRow = {
+  item_type: string;
+  item_name: string;
+  quantity: number;
+  revenue: number;
+  cost: number;
+};
 type ReportExpense = {
   amount: number;
   category: string;
@@ -174,35 +181,248 @@ export const Route = createFileRoute("/rapports")({
   }),
 });
 
-function useData() {
+/** Trailing-7-days window (fixed, independent of the selected period) — the
+ * only slice of ventes/vente_items still fetched at item granularity, since
+ * the 7-day KPI sparklines and the "last 7 days" chart need per-day
+ * product/service splits that a period-level aggregate can't provide. */
+function trailingWindow(): DateRange {
+  const now = new Date();
+  return { start: startOfDay(subDays(now, 6)), end: endOfDay(now) };
+}
+
+/** Financial aggregates (CA produits/services, coûts, top produits/services)
+ * now come from get_ventes_performance_by_period() — a single indexed
+ * JOIN+GROUP BY run entirely in Postgres — instead of downloading every
+ * vente_items row in the period (117,953 rows / 1.14s at MEDIUM "Année" scale)
+ * just to reduce them into the same numbers client-side. The formula is
+ * identical: revenue = SUM(line_total * vente.total/vente.subtotal), cost =
+ * cost_price*qty for products only, grouped by (item_type, name) — see the
+ * RPC's own migration comment. Only three things are still fetched at row
+ * level: depenses/achats/devis in the fetch window (already small & indexed,
+ * unchanged), the trailing-7-days vente_items (for the always-shown 7-day
+ * sparklines/daily chart), and the top-10 most recent sales in the *target*
+ * period (for the "Dernières ventes" table, which needs per-sale
+ * number/client/payment/type — a bounded fetch, not the whole period). */
+function useData(periodRange: DateRange, compareRange: DateRange | null) {
   const { profile, loading } = useTenant();
   const tenantId = profile?.tenant_id;
+  const trailing = trailingWindow();
+  const periodStartISO = periodRange.start.toISOString();
+  const periodEndISO = periodRange.end.toISOString();
+  const compareStartISO = compareRange?.start.toISOString() ?? null;
+  const compareEndISO = compareRange?.end.toISOString() ?? null;
+  const trailingStartISO = trailing.start.toISOString();
+  const trailingEndISO = trailing.end.toISOString();
+  // depenses/achats/devis still need the full window (period ∪ compare ∪
+  // trailing 7 days) so calculate()'s date-filtering over them keeps working
+  // unchanged for both the target and comparison periods.
+  const fetchStart = new Date(
+    Math.min(periodRange.start.getTime(), compareRange?.start.getTime() ?? Infinity, trailing.start.getTime()),
+  );
+  const fetchEnd = new Date(
+    Math.max(periodRange.end.getTime(), compareRange?.end.getTime() ?? -Infinity, trailing.end.getTime()),
+  );
+  const fetchStartISO = fetchStart.toISOString();
+  const fetchEndISO = fetchEnd.toISOString();
+  const fetchStartDate = format(fetchStart, "yyyy-MM-dd");
+  const fetchEndDate = format(fetchEnd, "yyyy-MM-dd");
 
   return useQuery({
-    queryKey: ["reports", tenantId],
+    queryKey: [
+      "reports",
+      tenantId,
+      periodStartISO,
+      periodEndISO,
+      compareStartISO,
+      compareEndISO,
+      trailingStartISO,
+      trailingEndISO,
+    ],
     enabled: !loading && Boolean(tenantId),
     queryFn: async () => {
       if (!tenantId) throw new Error("Tenant actif introuvable.");
-      const [ventes, depenses, achats, devis] = await Promise.all([
+      const [targetPerfRes, comparePerfRes, depensesRes, achatsRes, devisRes, trailingItemsRes, topSalesRes] =
+        await Promise.all([
+          (supabase.rpc as any)("get_ventes_performance_by_period", {
+            p_start: periodStartISO,
+            p_end: periodEndISO,
+          }) as Promise<{ data: PerformanceRow[] | null; error: Error | null }>,
+          compareRange
+            ? ((supabase.rpc as any)("get_ventes_performance_by_period", {
+                p_start: compareStartISO,
+                p_end: compareEndISO,
+              }) as Promise<{ data: PerformanceRow[] | null; error: Error | null }>)
+            : Promise.resolve({ data: [] as PerformanceRow[], error: null }),
+          supabase
+            .from("depenses")
+            .select("amount, category, paid_at")
+            .eq("tenant_id", tenantId)
+            .gte("paid_at", fetchStartDate)
+            .lte("paid_at", fetchEndDate),
+          supabase
+            .from("achats")
+            .select("total, created_at")
+            .eq("tenant_id", tenantId)
+            .gte("created_at", fetchStartISO)
+            .lte("created_at", fetchEndISO),
+          supabase
+            .from("devis")
+            .select("id, status, total, created_at")
+            .eq("tenant_id", tenantId)
+            .gte("created_at", fetchStartISO)
+            .lte("created_at", fetchEndISO),
+          (supabase.from("vente_items") as any)
+            .select(
+              "id, vente_id, name, item_type, qty, cost_price, line_total, ventes!inner(created_at, total, subtotal)",
+            )
+            .eq("tenant_id", tenantId)
+            .gte("ventes.created_at", trailingStartISO)
+            .lte("ventes.created_at", trailingEndISO),
+          // Bounded candidate set for the "Dernières ventes" table: 15 is a
+          // safety margin over the 10 displayed, in case salesFilter (mixed
+          // catalogs only) excludes a few of the most recent sales.
+          supabase
+            .from("ventes")
+            .select("id, number, client_name, payment_method, total, subtotal, created_at")
+            .eq("tenant_id", tenantId)
+            .gte("created_at", periodStartISO)
+            .lte("created_at", periodEndISO)
+            .order("created_at", { ascending: false })
+            .limit(15),
+        ]);
+      const error =
+        targetPerfRes.error ??
+        comparePerfRes.error ??
+        depensesRes.error ??
+        achatsRes.error ??
+        devisRes.error ??
+        trailingItemsRes.error ??
+        topSalesRes.error;
+      if (error) throw error;
+
+      const topSaleIds = (topSalesRes.data ?? []).map((s: { id: string }) => s.id);
+      const topItemsRes = topSaleIds.length
+        ? await supabase
+            .from("vente_items")
+            .select("vente_id, item_type")
+            .eq("tenant_id", tenantId)
+            .in("vente_id", topSaleIds)
+        : { data: [] as { vente_id: string; item_type: string }[], error: null };
+      if (topItemsRes.error) throw topItemsRes.error;
+
+      const topTypesByVente = new Map<string, Set<string>>();
+      for (const row of topItemsRes.data ?? []) {
+        const set = topTypesByVente.get(row.vente_id) ?? new Set<string>();
+        set.add(row.item_type);
+        topTypesByVente.set(row.vente_id, set);
+      }
+      // Reconstructs just enough of the old ReportSale shape (vente_items
+      // reduced to their item_type only — that's all saleType()/the
+      // salesFilter membership check need) for the top-10 table.
+      const topSales: ReportSale[] = ((topSalesRes.data ?? []) as Omit<ReportSale, "vente_items">[]).map(
+        (sale) => ({
+          ...sale,
+          vente_items: [...(topTypesByVente.get(sale.id) ?? [])].map((item_type) => ({
+            id: `${sale.id}-${item_type}`,
+            name: "",
+            item_type,
+            qty: 0,
+            cost_price: 0,
+            line_total: 0,
+          })),
+        }),
+      );
+
+      const trailingItemsByVenteId = new Map<string, ReportSaleItem[]>();
+      const trailingSaleMeta = new Map<string, { created_at: string; total: number; subtotal: number }>();
+      for (const row of (trailingItemsRes.data ?? []) as (ReportSaleItem & {
+        vente_id: string;
+        ventes: { created_at: string; total: number; subtotal: number };
+      })[]) {
+        const list = trailingItemsByVenteId.get(row.vente_id);
+        const item: ReportSaleItem = {
+          id: row.id,
+          name: row.name,
+          item_type: row.item_type,
+          qty: row.qty,
+          cost_price: row.cost_price,
+          line_total: row.line_total,
+        };
+        if (list) list.push(item);
+        else trailingItemsByVenteId.set(row.vente_id, [item]);
+        if (!trailingSaleMeta.has(row.vente_id)) trailingSaleMeta.set(row.vente_id, row.ventes);
+      }
+      const trailingSales: ReportSale[] = [...trailingItemsByVenteId.entries()].map(([id, items]) => {
+        const meta = trailingSaleMeta.get(id)!;
+        return {
+          id,
+          number: "",
+          client_name: null,
+          payment_method: "",
+          total: meta.total,
+          subtotal: meta.subtotal,
+          created_at: meta.created_at,
+          vente_items: items,
+        };
+      });
+
+      return {
+        targetPerformance: targetPerfRes.data ?? [],
+        comparePerformance: comparePerfRes.data ?? [],
+        topSales,
+        trailingSales,
+        depenses: (depensesRes.data ?? []) as ReportExpense[],
+        achats: achatsRes.data ?? [],
+        devis: (devisRes.data ?? []) as ReportQuote[],
+      };
+    },
+  });
+}
+
+/** The "Année" period selector needs to know every year that has any data at
+ * all, including years outside the currently fetched window — so it's kept
+ * as its own tiny min-date lookup (4 single-row indexed queries) instead of
+ * being derived from the (now date-bounded) report data. */
+function useEarliestYear(tenantId: string | undefined, currentYear: number) {
+  return useQuery({
+    queryKey: ["reports", "earliest-year", tenantId],
+    enabled: Boolean(tenantId),
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const [v, d, a, q] = await Promise.all([
         supabase
           .from("ventes")
-          .select(
-            "id, number, client_name, payment_method, total, subtotal, created_at, vente_items(id, name, item_type, qty, cost_price, line_total)",
-          )
-          .eq("tenant_id", tenantId)
-          .order("created_at", { ascending: false }),
-        supabase.from("depenses").select("amount, category, paid_at").eq("tenant_id", tenantId),
-        supabase.from("achats").select("total, created_at").eq("tenant_id", tenantId),
-        supabase.from("devis").select("id, status, total, created_at").eq("tenant_id", tenantId),
+          .select("created_at")
+          .eq("tenant_id", tenantId as string)
+          .order("created_at", { ascending: true })
+          .limit(1),
+        supabase
+          .from("depenses")
+          .select("paid_at")
+          .eq("tenant_id", tenantId as string)
+          .order("paid_at", { ascending: true })
+          .limit(1),
+        supabase
+          .from("achats")
+          .select("created_at")
+          .eq("tenant_id", tenantId as string)
+          .order("created_at", { ascending: true })
+          .limit(1),
+        supabase
+          .from("devis")
+          .select("created_at")
+          .eq("tenant_id", tenantId as string)
+          .order("created_at", { ascending: true })
+          .limit(1),
       ]);
-      const error = ventes.error ?? depenses.error ?? achats.error ?? devis.error;
-      if (error) throw error;
-      return {
-        ventes: (ventes.data ?? []) as ReportSale[],
-        depenses: (depenses.data ?? []) as ReportExpense[],
-        achats: achats.data ?? [],
-        devis: (devis.data ?? []) as ReportQuote[],
-      };
+      const dates = [
+        v.data?.[0]?.created_at,
+        d.data?.[0]?.paid_at,
+        a.data?.[0]?.created_at,
+        q.data?.[0]?.created_at,
+      ].filter((value): value is string => Boolean(value));
+      if (dates.length === 0) return currentYear;
+      return Math.min(...dates.map((value) => new Date(value).getFullYear()));
     },
   });
 }
@@ -230,32 +450,6 @@ function saleType(sale: ReportSale) {
   if (types.has("product")) return "Produit";
   if (types.has("service")) return "Service";
   return "Non classée";
-}
-
-function buildPerformance(sales: ReportSale[], type: SaleItemType): Performance[] {
-  const rows = new Map<string, Performance>();
-  sales.forEach((sale) => {
-    const factor = Number(sale.subtotal) > 0 ? Number(sale.total) / Number(sale.subtotal) : 0;
-    sale.vente_items
-      .filter((item) => item.item_type === type)
-      .forEach((item) => {
-        const current = rows.get(item.name) ?? {
-          name: item.name,
-          quantity: 0,
-          revenue: 0,
-          cost: 0,
-          margin: 0,
-        };
-        const revenue = Number(item.line_total) * factor;
-        const cost = type === "product" ? Number(item.cost_price) * Number(item.qty) : 0;
-        current.quantity += Number(item.qty);
-        current.revenue += revenue;
-        current.cost += cost;
-        current.margin += revenue - cost;
-        rows.set(item.name, current);
-      });
-  });
-  return [...rows.values()].sort((a, b) => b.revenue - a.revenue);
 }
 
 function quoteBucket(status: string | null) {
@@ -396,7 +590,7 @@ function lastNDaysSpark(days: number, valueFn: (day: DateRange) => number): Spar
 }
 
 function RapportsPage() {
-  const { data, isLoading, isFetching, error, dataUpdatedAt, refetch } = useData();
+  const { profile } = useTenant();
   const [preset, setPreset] = useState<PeriodPreset>("month");
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const currentYear = new Date().getFullYear();
@@ -431,36 +625,27 @@ function RapportsPage() {
     [comparisonMode, rangeParams, periodRange],
   );
 
+  const { data, isLoading, isFetching, error, dataUpdatedAt, refetch } = useData(periodRange, compareRange);
+  const earliestYearQuery = useEarliestYear(profile?.tenant_id, currentYear);
+
   const report = useMemo(() => {
     if (!data) return null;
-    const calculate = (range: DateRange) => {
-      const periodSales = data.ventes.filter((sale) => inRange(sale.created_at, range));
-      const sales = periodSales.filter(
-        (sale) =>
-          salesFilter === "all" || sale.vente_items.some((item) => item.item_type === salesFilter),
-      );
-      const productRevenue =
-        salesFilter === "service"
-          ? 0
-          : sales.reduce((sum, sale) => sum + revenueForType(sale, "product"), 0);
-      const serviceRevenue =
-        salesFilter === "product"
-          ? 0
-          : sales.reduce((sum, sale) => sum + revenueForType(sale, "service"), 0);
+    // Financial totals/top-lists now come pre-aggregated per (item_type, name)
+    // from get_ventes_performance_by_period() for `range` — summing across
+    // names for a given item_type is mathematically identical to the old
+    // sales.reduce(revenueForType) (a sale with no matching item contributed
+    // 0 either way), so switching from "sum over filtered sales" to "sum over
+    // filtered item rows" changes zero results.
+    const calculate = (perfRows: PerformanceRow[]) => {
+      const sumType = (type: "product" | "service", key: "revenue" | "cost") =>
+        perfRows.filter((r) => r.item_type === type).reduce((sum, r) => sum + Number(r[key]), 0);
+      const productRevenue = salesFilter === "service" ? 0 : sumType("product", "revenue");
+      const serviceRevenue = salesFilter === "product" ? 0 : sumType("service", "revenue");
+      const productCost = salesFilter === "service" ? 0 : sumType("product", "cost");
+      const range = perfRows === data.targetPerformance ? periodRange : compareRange!;
       const expenses = data.depenses
         .filter((row) => inRange(row.paid_at, range))
         .reduce((sum, row) => sum + Number(row.amount), 0);
-      const productCost =
-        salesFilter === "service"
-          ? 0
-          : sales.reduce(
-              (saleSum, sale) =>
-                saleSum +
-                sale.vente_items
-                  .filter((item) => item.item_type === "product")
-                  .reduce((sum, item) => sum + Number(item.cost_price) * Number(item.qty), 0),
-              0,
-            );
       const periodExpenses = data.depenses.filter((row) => inRange(row.paid_at, range));
       const expenseCategories = [
         ...periodExpenses.reduce((rows, row) => {
@@ -481,7 +666,6 @@ function RapportsPage() {
       );
       const totalRevenue = productRevenue + serviceRevenue;
       return {
-        sales,
         productRevenue,
         serviceRevenue,
         totalRevenue,
@@ -495,8 +679,8 @@ function RapportsPage() {
       };
     };
 
-    const target = calculate(periodRange);
-    const previous = compareRange ? calculate(compareRange) : null;
+    const target = calculate(data.targetPerformance);
+    const previous = compareRange ? calculate(data.comparePerformance) : null;
     const compare = (value: number, oldValue: number) => ({
       diff: value - oldValue,
       pct: oldValue === 0 ? 0 : ((value - oldValue) / oldValue) * 100,
@@ -504,8 +688,29 @@ function RapportsPage() {
     const trend = (key: keyof typeof target) =>
       previous ? compare(Number(target[key]), Number(previous[key])).pct : null;
 
+    // "Dernières ventes" table: same salesFilter membership rule as before
+    // (a sale qualifies if it has ≥1 item of the selected type), applied to
+    // the bounded top-15 candidates fetched for the target period.
+    const tableSales = data.topSales
+      .filter(
+        (sale) => salesFilter === "all" || sale.vente_items.some((item) => item.item_type === salesFilter),
+      )
+      .slice(0, 10);
+
+    const toPerformance = (type: SaleItemType): Performance[] =>
+      data.targetPerformance
+        .filter((r) => r.item_type === type)
+        .map((r) => ({
+          name: r.item_name,
+          quantity: Number(r.quantity),
+          revenue: Number(r.revenue),
+          cost: Number(r.cost),
+          margin: Number(r.revenue) - Number(r.cost),
+        }))
+        .sort((a, b) => b.revenue - a.revenue);
+
     return {
-      target,
+      target: { ...target, sales: tableSales },
       previous,
       trends: {
         totalRevenue: trend("totalRevenue"),
@@ -517,14 +722,17 @@ function RapportsPage() {
         netResult: trend("netResult"),
         quoteCount: trend("quoteCount"),
       },
-      products: salesFilter === "service" ? [] : buildPerformance(target.sales, "product"),
-      services: salesFilter === "product" ? [] : buildPerformance(target.sales, "service"),
+      products: salesFilter === "service" ? [] : toPerformance("product"),
+      services: salesFilter === "product" ? [] : toPerformance("service"),
     };
   }, [data, periodRange, compareRange, salesFilter]);
 
+  // Trailing-7-days-only sparklines/daily chart — data.trailingSales is
+  // already scoped to exactly this window (see useData), so no further
+  // date-range fetch is needed here; only the day-bucketing below changes.
   const trends = useMemo(() => {
     if (!data) return null;
-    const ventes = data.ventes;
+    const ventes = data.trailingSales;
     const depenses = data.depenses;
     const revenueSpark = (type: SaleItemType | "all") =>
       lastNDaysSpark(7, (day) =>
@@ -574,7 +782,7 @@ function RapportsPage() {
     for (let i = 6; i >= 0; i--) {
       const day = subDays(now, i);
       const dayRange = { start: startOfDay(day), end: endOfDay(day) };
-      const daySales = data.ventes.filter((sale) => inRange(sale.created_at, dayRange));
+      const daySales = data.trailingSales.filter((sale) => inRange(sale.created_at, dayRange));
       out.push({
         name: format(day, "dd MMM", { locale: fr }),
         produits: showProducts
@@ -589,20 +797,10 @@ function RapportsPage() {
   }, [data, showProducts, showServices]);
 
   const years = useMemo(() => {
-    const dates = data
-      ? [
-          ...data.ventes.map((row) => row.created_at),
-          ...data.depenses.map((row) => row.paid_at),
-          ...data.achats.map((row) => row.created_at),
-          ...data.devis.map((row) => row.created_at),
-        ]
-      : [];
-    const validYears = dates
-      .map((date) => new Date(date).getFullYear())
-      .filter((value) => Number.isFinite(value) && value <= currentYear);
-    const firstYear = validYears.length > 0 ? Math.min(...validYears) : currentYear;
+    // Independent of the (now date-bounded) report data — see useEarliestYear.
+    const firstYear = earliestYearQuery.data ?? currentYear;
     return Array.from({ length: currentYear - firstYear + 1 }, (_, index) => currentYear - index);
-  }, [currentYear, data]);
+  }, [currentYear, earliestYearQuery.data]);
 
   const periodTitle = formatPeriodTitle(preset, periodRange);
   const periodDates = formatRangeLabel(periodRange);

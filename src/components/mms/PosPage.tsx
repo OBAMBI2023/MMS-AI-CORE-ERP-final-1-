@@ -46,7 +46,8 @@ import { SalesHistoryModal } from "@/components/mms/SalesHistoryModal";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { History } from "lucide-react";
 import { useTenant } from "@/providers/TenantProvider";
-import { useCatalogItems } from "@/hooks/use-catalog-items";
+import { useCatalogItemsSearch } from "@/hooks/use-catalog-items";
+import { useDebouncedValue } from "@/hooks/use-paginated-table";
 import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
@@ -90,12 +91,25 @@ export function PosPage() {
   const catalogSettingsQuery = useCatalogSettings();
   const catalogSettings = catalogSettingsQuery.data;
 
+  // Debounced so typing doesn't fire a server search per keystroke — the
+  // search itself queries the tenant's entire catalog server-side (not just
+  // whatever page is already loaded), so a product outside the first page(s)
+  // is exactly as findable as one on the first screen.
+  const debouncedQuery = useDebouncedValue(query, 300);
   const {
     data: dbServices,
     loading: catalogLoading,
     error: catalogError,
+    fetchNextPage: fetchNextCatalogPage,
+    hasNextPage: hasNextCatalogPage,
+    isFetchingNextPage: isFetchingNextCatalogPage,
     reload: reloadCatalog,
-  } = useCatalogItems({ activeOnly: true });
+  } = useCatalogItemsSearch({
+    type: activeTab,
+    category: category === "Tous" ? null : category,
+    search: debouncedQuery,
+    activeOnly: true,
+  });
   const catalogCategoriesQuery = useCatalogCategories({
     activeOnly: true,
     type: activeTab,
@@ -186,14 +200,18 @@ export function PosPage() {
     [catalogCategoriesQuery.data],
   );
 
-  const filtered = useMemo(() => {
-    return catalog.filter((s) => {
-      const matchType = s.type === activeTab;
-      const matchCat = category === "Tous" || s.category === category;
-      const matchQ = s.name.toLowerCase().includes(query.toLowerCase());
-      return matchType && matchCat && matchQ;
-    });
-  }, [activeTab, query, category, catalog]);
+  // type/category/search are now applied server-side (see
+  // useCatalogItemsSearch) — `catalog` already only contains matching rows
+  // for whichever page(s) have loaded so far.
+  const filtered = catalog;
+
+  const handleCatalogScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    if (!hasNextCatalogPage || isFetchingNextCatalogPage) return;
+    const el = event.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 400) {
+      void fetchNextCatalogPage();
+    }
+  };
 
   const selectTab = (tab: CatalogTab) => {
     setActiveTab(tab);
@@ -432,7 +450,10 @@ export function PosPage() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto scrollbar-thin p-3 md:p-6">
+          <div
+            className="flex-1 overflow-y-auto scrollbar-thin p-3 md:p-6"
+            onScroll={handleCatalogScroll}
+          >
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
               {filtered.map((s) => {
                 const outOfStock = s.type === "product" && s.stock !== null && s.stock < 1;
@@ -494,6 +515,11 @@ export function PosPage() {
               {!catalogLoading && catalogError && (
                 <div className="col-span-full rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-6 text-center text-sm text-destructive">
                   {catalogError}
+                </div>
+              )}
+              {!catalogLoading && isFetchingNextCatalogPage && (
+                <div className="col-span-full py-4 text-center text-xs text-muted-foreground">
+                  Chargement de produits supplémentaires...
                 </div>
               )}
             </div>

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PLATFORM_BRANDING } from "@/config/branding";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
-import { PremiumResourceList } from "@/components/mms/PremiumResourceList";
+import { PremiumResourceList, type MobileSort } from "@/components/mms/PremiumResourceList";
+import { usePaginatedTable, useDebouncedValue, fetchAllMatching } from "@/hooks/use-paginated-table";
 import { ResourceCard, type ResourceCardDetail, type ResourceCardMenuAction } from "@/components/mms/ResourceCard";
 import {
   DataExportMenu,
@@ -229,6 +230,10 @@ function AchatsPage() {
   const tenantId = profile?.tenant_id;
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 300);
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<MobileSort>("default");
+  const pageSize = 20;
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const { settings, logoUrl, companyName } = useCompanySettings(tenantLoading ? null : tenantId);
@@ -240,30 +245,41 @@ function AchatsPage() {
   const canCreateAchat = useActionPermission("achats.create");
   const canExportAchat = useActionPermission("achats.export");
 
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["achats", tenantId],
-    queryFn: async () => {
-      if (!tenantId) throw new Error("Locataire introuvable");
-      const { data, error } = await (supabase
-        .from("achats")
-        .select("*") as any)
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as Achat[];
-    },
-    enabled: !tenantLoading && Boolean(tenantId),
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQ, sort]);
+
+  const orderBy = useMemo(() => {
+    if (sort === "name-asc") return { column: "fournisseur_name", ascending: true };
+    if (sort === "name-desc") return { column: "fournisseur_name", ascending: false };
+    if (sort === "oldest") return { column: "created_at", ascending: true };
+    return { column: "created_at", ascending: false };
+  }, [sort]);
+
+  const listQuery = usePaginatedTable<Achat>({
+    table: "achats",
+    tenantId,
+    searchFields: ["number", "fournisseur_name"],
+    search: debouncedQ,
+    orderBy,
+    page,
+    pageSize,
+    enabled: !tenantLoading,
   });
+  const data = listQuery.data?.rows ?? [];
+  const totalCount = listQuery.data?.count ?? 0;
+  const isLoading = listQuery.isLoading;
 
   const { data: lineCounts = {} } = useQuery({
     queryKey: ["achat_items_counts", tenantId],
     queryFn: async () => {
-      if (!tenantId) return {} as Record<string, number>;
-      const { data, error } = await supabase.from("achat_items").select("achat_id").eq("tenant_id", tenantId);
+      // Server-side GROUP BY (get_achat_items_counts) instead of fetching
+      // every achat_items row and counting in the browser.
+      const { data, error } = await (supabase as any).rpc("get_achat_items_counts");
       if (error) throw error;
       const counts: Record<string, number> = {};
-      for (const item of data ?? []) {
-        counts[item.achat_id] = (counts[item.achat_id] ?? 0) + 1;
+      for (const row of (data ?? []) as { achat_id: string; items_count: number }[]) {
+        counts[row.achat_id] = Number(row.items_count);
       }
       return counts;
     },
@@ -301,18 +317,20 @@ function AchatsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const filtered = data.filter(
-    (d) =>
-      !q ||
-      (d.number ?? "").toLowerCase().includes(q.toLowerCase()) ||
-      (d.fournisseur_name ?? "").toLowerCase().includes(q.toLowerCase()),
-  );
+  const exportSource = () =>
+    fetchAllMatching<Achat>({
+      table: "achats",
+      tenantId,
+      searchFields: ["number", "fournisseur_name"],
+      search: debouncedQ,
+      orderBy,
+    });
 
   return (
     <AppShell title="Achats" subtitle="Approvisionnements et commandes fournisseurs">
       <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
         <PremiumResourceList<Achat>
-          items={filtered}
+          items={data}
           isLoading={isLoading}
           singular="Achat"
           plural="Achats"
@@ -321,6 +339,15 @@ function AchatsPage() {
           nameField="fournisseur_name"
           nameSortLabel="Fournisseur"
           dateField="created_at"
+          serverPagination={{
+            page,
+            pageSize,
+            totalCount,
+            onPageChange: setPage,
+            isFetching: listQuery.isFetching,
+          }}
+          sort={sort}
+          onSortChange={setSort}
           emptyState={{
             icon: <ShoppingCart className="h-10 w-10 text-muted-foreground/50" />,
             title: "Aucun achat",
@@ -329,7 +356,7 @@ function AchatsPage() {
           actionsSlot={
             canExportAchat ? (
               <DataExportMenu
-                data={filtered}
+                data={exportSource}
                 columns={exportColumns}
                 filename={`Liste_achats_${companyName}`}
                 pdfTitle="Liste des achats"

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PLATFORM_BRANDING } from "@/config/branding";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/mms/AppShell";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
-import { PremiumResourceList } from "@/components/mms/PremiumResourceList";
+import { PremiumResourceList, type MobileSort } from "@/components/mms/PremiumResourceList";
+import { usePaginatedTable, useDebouncedValue } from "@/hooks/use-paginated-table";
 import { ResourceCard, type ResourceCardDetail, type ResourceCardFooterAction } from "@/components/mms/ResourceCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -245,6 +246,10 @@ function DevisPage() {
   const { settings } = useCompanySettings(tenantLoading ? null : tenantId);
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 300);
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<MobileSort>("default");
+  const pageSize = 20;
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
@@ -253,6 +258,17 @@ function DevisPage() {
   const userId = userData?.data?.user?.id;
   const canDeleteDevis = useActionPermission("devis.delete");
   const canCreateDevis = useActionPermission("devis.create");
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQ, sort]);
+
+  const orderBy = useMemo(() => {
+    if (sort === "name-asc") return { column: "client_name", ascending: true };
+    if (sort === "name-desc") return { column: "client_name", ascending: false };
+    if (sort === "oldest") return { column: "created_at", ascending: true };
+    return { column: "created_at", ascending: false };
+  }, [sort]);
 
   const downloadPDF = async (devis: Devis) => {
     if (!tenantId) {
@@ -313,20 +329,19 @@ function DevisPage() {
     );
   };
 
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["devis", tenantId],
-    queryFn: async () => {
-      if (!tenantId) throw new Error("Locataire introuvable");
-      const { data, error } = await (supabase
-        .from("devis")
-        .select("*") as any)
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as Devis[];
-    },
-    enabled: !tenantLoading && Boolean(tenantId),
+  const listQuery = usePaginatedTable<Devis>({
+    table: "devis",
+    tenantId,
+    searchFields: ["number", "client_name"],
+    search: debouncedQ,
+    orderBy,
+    page,
+    pageSize,
+    enabled: !tenantLoading,
   });
+  const data = listQuery.data?.rows ?? [];
+  const totalCount = listQuery.data?.count ?? 0;
+  const isLoading = listQuery.isLoading;
 
   const del = useMutation({
     mutationFn: async (devis: Devis) => {
@@ -351,18 +366,11 @@ function DevisPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const filtered = data.filter(
-    (d) =>
-      !q ||
-      (d.number ?? "").toLowerCase().includes(q.toLowerCase()) ||
-      (d.client_name ?? "").toLowerCase().includes(q.toLowerCase()),
-  );
-
   return (
     <AppShell title="Devis" subtitle="Propositions commerciales et suivi">
       <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
         <PremiumResourceList<Devis>
-          items={filtered}
+          items={data}
           isLoading={isLoading}
           singular="Devis"
           plural="Devis"
@@ -371,6 +379,15 @@ function DevisPage() {
           nameField="client_name"
           nameSortLabel="Client"
           dateField="created_at"
+          serverPagination={{
+            page,
+            pageSize,
+            totalCount,
+            onPageChange: setPage,
+            isFetching: listQuery.isFetching,
+          }}
+          sort={sort}
+          onSortChange={setSort}
           emptyState={{
             icon: <FileText className="h-10 w-10 text-muted-foreground/50" />,
             title: "Aucun devis",

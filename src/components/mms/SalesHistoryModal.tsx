@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import {
@@ -67,7 +67,11 @@ interface SalesHistoryModalProps {
   onEdit: (id: string) => void;
 }
 
-type SaleRow = Tables<"ventes"> & { vente_items: Tables<"vente_items">[] };
+type SaleRow = Tables<"ventes">;
+
+function escapeIlike(value: string): string {
+  return value.replace(/[%_,]/g, (c) => `\\${c}`);
+}
 
 const PAYMENT_STYLES: Record<string, { icon: LucideIcon; className: string }> = {
   "Espèces": {
@@ -110,20 +114,6 @@ function StatusBadge() {
       <CheckCircle2 className="h-3 w-3" /> Validée
     </span>
   );
-}
-
-function getPageWindow(current: number, total: number): (number | "ellipsis")[] {
-  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages = new Set<number>([1, total, current - 1, current, current + 1]);
-  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
-  const result: (number | "ellipsis")[] = [];
-  let prev = 0;
-  for (const p of sorted) {
-    if (prev && p - prev > 1) result.push("ellipsis");
-    result.push(p);
-    prev = p;
-  }
-  return result;
 }
 
 function SaleMobileCard({
@@ -203,13 +193,25 @@ function SaleMobileCard({
   );
 }
 
+type Cursor = { created_at: string; id: string } | null;
+
 export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModalProps) {
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  // Keyset/cursor pagination: OFFSET-based `.range()` degrades linearly with
+  // page depth (40–208ms at page ~5000 on a 50k-row MEDIUM-volume tenant,
+  // scanning/skipping every prior row every time); get_ventes_keyset_page()
+  // seeks directly via the (created_at, id) index instead, so page cost stays
+  // ~constant regardless of depth. The tradeoff: a keyset cursor only knows
+  // how to go to the *next*/*previous* page from where it is, not jump to an
+  // arbitrary page number — so pageIndex/cursors below intentionally replace
+  // the old numbered-page-buttons UI with Précédent/Suivant. cursors[i] is
+  // the cursor needed to fetch page i (cursors[0] is always null = first page).
+  const [pageIndex, setPageIndex] = useState(0);
+  const [cursors, setCursors] = useState<Cursor[]>([null]);
   const permissionsQuery = usePermissions();
   const queryClient = useQueryClient();
   const { profile, loading: tenantLoading } = useTenant();
@@ -218,19 +220,87 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
 
-  const { data: sales, isLoading } = useQuery({
-    queryKey: ["ventes", "history", profile?.tenant_id],
+  // Debounce search so every keystroke doesn't trigger a new request.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+
+  useEffect(() => {
+    setPageIndex(0);
+    setCursors([null]);
+  }, [debouncedSearch, paymentFilter, itemsPerPage]);
+
+  function applyListFilters(query: any): any {
+    let q = query;
+    if (debouncedSearch) {
+      const escaped = escapeIlike(debouncedSearch);
+      q = q.or(`number.ilike.%${escaped}%,client_name.ilike.%${escaped}%`);
+    }
+    if (paymentFilter.length > 0) {
+      q = q.in("payment_method", paymentFilter);
+    }
+    return q;
+  }
+
+  const currentCursor = cursors[pageIndex] ?? null;
+
+  const { data: sales = [], isLoading } = useQuery({
+    queryKey: [
+      "ventes",
+      "history",
+      "keyset",
+      profile?.tenant_id,
+      pageIndex,
+      itemsPerPage,
+      debouncedSearch,
+      paymentFilter,
+      currentCursor?.created_at ?? null,
+      currentCursor?.id ?? null,
+    ],
     queryFn: async () => {
       if (!profile?.tenant_id) {
         throw new Error("Impossible de charger les ventes : aucun tenant courant n'est disponible.");
       }
-      const { data, error } = await (supabase
-        .from("ventes") as any)
-        .select("*, vente_items(*)")
-        .eq("tenant_id", profile.tenant_id)
-        .order("created_at", { ascending: false });
+      const { data, error } = await (supabase.rpc as any)("get_ventes_keyset_page", {
+        p_cursor_created_at: currentCursor?.created_at ?? null,
+        p_cursor_id: currentCursor?.id ?? null,
+        p_limit: itemsPerPage,
+        p_search: debouncedSearch ? escapeIlike(debouncedSearch) : null,
+        p_payment_methods: paymentFilter.length > 0 ? paymentFilter : null,
+      });
       if (error) throw error;
-      return (data || []) as Array<Tables<"ventes"> & { vente_items: Tables<"vente_items">[] }>;
+      return (data ?? []) as SaleRow[];
+    },
+    enabled: isOpen && !tenantLoading && Boolean(profile?.tenant_id),
+    placeholderData: keepPreviousData,
+  });
+
+  // Lightweight count-only query (same filters, no rows) — keeps the "X–Y sur
+  // Z ventes" display and the Suivant/Précédent enabled state accurate without
+  // ever fetching (or OFFSET-skipping) the underlying rows themselves.
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ["ventes", "history", "count", profile?.tenant_id, debouncedSearch, paymentFilter],
+    queryFn: async () => {
+      if (!profile?.tenant_id) return 0;
+      let query = (supabase.from("ventes") as any)
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", profile.tenant_id);
+      query = applyListFilters(query);
+      const { count, error } = await query;
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: isOpen && !tenantLoading && Boolean(profile?.tenant_id),
+  });
+
+  const { data: paymentMethods = [] } = useQuery({
+    queryKey: ["ventes", "history", "payment-methods", profile?.tenant_id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_distinct_ventes_payment_methods");
+      if (error) throw error;
+      return ((data ?? []) as { payment_method: string }[]).map((r) => r.payment_method);
     },
     enabled: isOpen && !tenantLoading && Boolean(profile?.tenant_id),
   });
@@ -241,27 +311,25 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
   // configurable : seul le rôle Administrateur peut la modifier ou la supprimer.
   const canManageSales = role === "Administrateur";
 
-  const paymentMethods = useMemo(() => {
-    if (!sales) return [];
-    return Array.from(new Set(sales.map((s) => s.payment_method).filter(Boolean))) as string[];
-  }, [sales]);
+  const paginatedSales = sales;
+  // A full page (== itemsPerPage rows) means there may be more after it;
+  // a short page is unambiguously the last one. Doesn't require totalCount,
+  // so it stays correct even if that separate count query hasn't resolved yet.
+  const hasNextPage = sales.length === itemsPerPage;
+  const rangeStart = sales.length === 0 ? 0 : pageIndex * itemsPerPage + 1;
+  const rangeEnd = pageIndex * itemsPerPage + sales.length;
 
-  const filteredSales = useMemo(() => {
-    if (!sales) return [];
-    return sales.filter(
-      (s) =>
-        (s.number.toLowerCase().includes(search.toLowerCase()) ||
-          s.client_name?.toLowerCase().includes(search.toLowerCase())) &&
-        (paymentFilter.length === 0 || paymentFilter.includes(s.payment_method)),
-    );
-  }, [sales, search, paymentFilter]);
-
-  const paginatedSales = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredSales.slice(start, start + itemsPerPage);
-  }, [filteredSales, currentPage, itemsPerPage]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredSales.length / itemsPerPage));
+  const goToNextPage = () => {
+    if (!hasNextPage) return;
+    const last = sales[sales.length - 1];
+    setCursors((prev) => {
+      const next = [...prev];
+      next[pageIndex + 1] = { created_at: last.created_at as string, id: last.id as string };
+      return next;
+    });
+    setPageIndex((p) => p + 1);
+  };
+  const goToPrevPage = () => setPageIndex((p) => Math.max(0, p - 1));
 
   const togglePaymentFilter = (method: string) => {
     setPaymentFilter((prev) =>
@@ -269,19 +337,33 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     );
   };
 
+  // Export/print cover every sale matching the current search+filter (not just
+  // the page on screen), so this fetches its own unpaginated copy on demand.
+  const fetchAllMatchingSales = async (): Promise<SaleRow[]> => {
+    if (!profile?.tenant_id) return [];
+    let query = (supabase.from("ventes") as any)
+      .select("*")
+      .eq("tenant_id", profile.tenant_id);
+    query = applyListFilters(query);
+    const { data, error } = await query.order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as SaleRow[];
+  };
+
   const handleExportPDF = async () => {
+    const allMatching = await fetchAllMatchingSales();
     const doc = new jsPDF();
     const tenant = tenantFromSettings(settings, logoUrl);
-    const total = filteredSales.reduce((sum, sale) => sum + Number(sale.total), 0);
+    const total = allMatching.reduce((sum, sale) => sum + Number(sale.total), 0);
     const y = await PdfLayoutEngine.header(doc, tenant, "Historique des ventes", [
-      { label: "Nombre de ventes", value: String(filteredSales.length) },
+      { label: "Nombre de ventes", value: String(allMatching.length) },
       { label: "Montant total", value: formatCurrency(total) },
       { label: "Période", value: "Toutes" },
       { label: "Statut", value: "Validées" },
     ]);
 
     // Sales Table
-    const tableData = filteredSales.map((s) => [
+    const tableData = allMatching.map((s) => [
       s.number,
       new Date(s.created_at).toLocaleDateString(),
       s.client_name || "-",
@@ -306,7 +388,17 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
 
   const canPrint = (_sale: any) => true;
 
-  const handlePrint = async (sale: any) => {
+  const handlePrint = async (sale: SaleRow) => {
+    // Line items are only needed for the printed ticket, so they're fetched
+    // on demand here instead of being embedded in the (paginated) list query.
+    const { data: items, error: itemsError } = await supabase
+      .from("vente_items")
+      .select("*")
+      .eq("vente_id", sale.id);
+    if (itemsError) {
+      toast.error("Impossible de charger les articles de cette vente.");
+      return;
+    }
     const doc = new jsPDF({ format: "a4", unit: "mm" });
     const tenant = tenantFromSettings(settings, logoUrl);
     const y = await PdfLayoutEngine.header(doc, tenant, "Ticket de caisse", [
@@ -321,7 +413,7 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     const finalY = PdfLayoutEngine.table(
       doc,
       ["Article", "Quantité", "Prix unitaire", "Montant"],
-      (sale.vente_items ?? []).map((item: any) => [
+      (items ?? []).map((item) => [
         item.name,
         item.qty,
         formatCurrency(item.price),
@@ -459,8 +551,8 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
 
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <TrendingUp className="h-4 w-4" />
-              {filteredSales.length} vente{filteredSales.length > 1 ? "s" : ""} enregistrée
-              {filteredSales.length > 1 ? "s" : ""}
+              {totalCount} vente{totalCount > 1 ? "s" : ""} enregistrée
+              {totalCount > 1 ? "s" : ""}
             </div>
           </div>
 
@@ -586,45 +678,28 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
 
           <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-4 sm:flex-row">
             <div className="text-sm text-muted-foreground">
-              {filteredSales.length === 0
+              {rangeEnd === 0
                 ? "0 vente"
-                : `${(currentPage - 1) * itemsPerPage + 1}–${Math.min(currentPage * itemsPerPage, filteredSales.length)} sur ${filteredSales.length} ventes`}
+                : `${rangeStart}–${rangeEnd} sur ${totalCount} vente${totalCount > 1 ? "s" : ""}`}
             </div>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
+                onClick={goToPrevPage}
+                disabled={pageIndex === 0}
                 aria-label="Page précédente"
                 className="inline-flex h-9 items-center gap-1 rounded-lg border border-border px-2.5 text-sm text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" /> Précédent
               </button>
-              {getPageWindow(currentPage, totalPages).map((p, i) =>
-                p === "ellipsis" ? (
-                  <span key={`e-${i}`} className="px-1 text-sm text-muted-foreground">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setCurrentPage(p)}
-                    aria-current={p === currentPage ? "page" : undefined}
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-sm font-medium transition-colors duration-200 ${
-                      p === currentPage
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ),
-              )}
+              <span className="px-1 text-sm text-muted-foreground">
+                Page {pageIndex + 1}
+                {totalCount > 0 ? ` / ${Math.max(1, Math.ceil(totalCount / itemsPerPage))}` : ""}
+              </span>
               <button
                 type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
+                onClick={goToNextPage}
+                disabled={!hasNextPage}
                 aria-label="Page suivante"
                 className="inline-flex h-9 items-center gap-1 rounded-lg border border-border px-2.5 text-sm text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
               >
@@ -636,7 +711,6 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
                 value={itemsPerPage}
                 onChange={(e) => {
                   setItemsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
                 }}
               >
                 {[10, 25, 50, 100].map((size) => (

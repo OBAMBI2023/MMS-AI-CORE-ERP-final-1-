@@ -181,6 +181,14 @@ export const startTenantDeletion = createServerFn({ method: "POST" })
     slug: z.string().trim().min(1).max(120),
   }))
   .handler(async ({ context, data }) => {
+    const { data: membership, error: membershipError } = await context.supabase
+      .from("platform_admins")
+      .select("user_id")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (membershipError) throw new Error(formatSupabaseError(membershipError));
+    if (!membership) throw new Error("Accès refusé : super administrateur requis.");
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: jobId, error } = await (supabaseAdmin as any).rpc("start_tenant_deletion", {
       requested_tenant_id: data.tenantId,

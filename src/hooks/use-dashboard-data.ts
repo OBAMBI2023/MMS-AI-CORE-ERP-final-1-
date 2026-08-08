@@ -1,16 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/providers/TenantProvider";
-import {
-  startOfMonth,
-  subMonths,
-  startOfWeek,
-  subWeeks,
-  isWithinInterval,
-  endOfWeek,
-  format,
-  parseISO,
-} from "date-fns";
+import { startOfMonth, subMonths, startOfWeek, subWeeks, endOfWeek, format, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { resolveUserDisplayName } from "@/lib/user-display-name";
 
@@ -33,113 +24,100 @@ function pctChange(curr: number, prev: number): number | null {
   return ((curr - prev) / Math.abs(prev)) * 100;
 }
 
-// Builds a sparkline of the last N weeks by summing (or counting) records whose date field falls in each week.
-function buildWeeklySpark<T>(
-  rows: T[],
-  dateField: (r: T) => string | null | undefined,
-  valueField?: (r: T) => number,
-  weeks = 8,
-): SparkPoint[] {
+function num(v: unknown): number {
+  return Number(v) || 0;
+}
+
+// The 8 trailing ISO weeks (Monday start), oldest first — matches the previous
+// client-side buildWeeklySpark() loop exactly so week boundaries/labels are
+// byte-for-byte identical to before.
+function weekWindows(weeks = 8) {
   const now = new Date();
-  const points: SparkPoint[] = [];
+  const out: { start: Date; end: Date; label: string }[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
-    const weekStart = startOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
-    let total = 0;
-    for (const r of rows) {
-      const raw = dateField(r);
-      if (!raw) continue;
-      const d = parseISO(raw);
-      if (isNaN(d.getTime())) continue;
-      if (isWithinInterval(d, { start: weekStart, end: weekEnd })) {
-        total += valueField ? valueField(r) : 1;
-      }
-    }
-    points.push({ label: format(weekStart, "dd/MM"), value: total });
-  }
-  return points;
-}
-
-function sumInMonth<T>(
-  rows: T[],
-  dateField: (r: T) => string | null | undefined,
-  valueField: (r: T) => number,
-  monthStart: Date,
-  monthEnd: Date,
-) {
-  let total = 0;
-  for (const r of rows) {
-    const raw = dateField(r);
-    if (!raw) continue;
-    const d = parseISO(raw);
-    if (isNaN(d.getTime())) continue;
-    if (d >= monthStart && d < monthEnd) total += valueField(r);
-  }
-  return total;
-}
-
-function countInMonth<T>(
-  rows: T[],
-  dateField: (r: T) => string | null | undefined,
-  monthStart: Date,
-  monthEnd: Date,
-) {
-  return sumInMonth(rows, dateField, () => 1, monthStart, monthEnd);
-}
-
-function buildMonthlySeries(
-  ventes: { total: number; created_at: string }[],
-  depenses: { amount: number; paid_at: string }[],
-  achats: { total: number; created_at: string }[],
-  months = 6,
-): MonthPoint[] {
-  const now = new Date();
-  const out: MonthPoint[] = [];
-  for (let i = months - 1; i >= 0; i--) {
-    const mStart = startOfMonth(subMonths(now, i));
-    const mEnd = startOfMonth(subMonths(now, i - 1));
-    out.push({
-      label: format(mStart, "MMM", { locale: fr }),
-      ca: sumInMonth(
-        ventes,
-        (v) => v.created_at,
-        (v) => Number(v.total) || 0,
-        mStart,
-        mEnd,
-      ),
-      depenses: sumInMonth(
-        depenses,
-        (d) => d.paid_at,
-        (d) => Number(d.amount) || 0,
-        mStart,
-        mEnd,
-      ),
-      achats: sumInMonth(
-        achats,
-        (a) => a.created_at,
-        (a) => Number(a.total) || 0,
-        mStart,
-        mEnd,
-      ),
-    });
+    const start = startOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
+    const end = endOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
+    out.push({ start, end, label: format(start, "dd/MM") });
   }
   return out;
 }
 
-function groupSum<T>(
-  rows: T[],
-  keyField: (r: T) => string | null | undefined,
-  valueField: (r: T) => number,
-): SlicePoint[] {
-  const map = new Map<string, number>();
-  for (const r of rows) {
-    const key = keyField(r) || "Autre";
-    map.set(key, (map.get(key) || 0) + valueField(r));
+// The 6 trailing calendar months, oldest first — matches buildMonthlySeries().
+function monthWindows(months = 6) {
+  const now = new Date();
+  const out: { start: Date; end: Date; label: string }[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const start = startOfMonth(subMonths(now, i));
+    const end = startOfMonth(subMonths(now, i - 1));
+    out.push({ start, end, label: format(start, "MMM", { locale: fr }) });
   }
-  return Array.from(map.entries())
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
+  return out;
 }
+
+type KpiTotals = {
+  revenue_total: number;
+  revenue_month: number;
+  revenue_prev_month: number;
+  depenses_total: number;
+  depenses_month: number;
+  depenses_prev_month: number;
+  depenses_count_total: number;
+  achats_total: number;
+  achats_month: number;
+  achats_prev_month: number;
+  achats_count_total: number;
+  clients_total: number;
+  clients_month: number;
+  clients_prev_month: number;
+  fournisseurs_total: number;
+  fournisseurs_month: number;
+  fournisseurs_prev_month: number;
+  ventes_total: number;
+  ventes_month: number;
+  ventes_prev_month: number;
+  services_total: number;
+  services_month: number;
+  services_prev_month: number;
+  devis_count_total: number;
+  devis_pending_count: number;
+  devis_pending_total: number;
+};
+
+type WeeklyTrendRow = {
+  idx: number;
+  revenue: number;
+  depenses: number;
+  achats: number;
+  benefice: number;
+  clients_count: number;
+  fournisseurs_count: number;
+  ventes_count: number;
+  services_count: number;
+};
+
+type MonthlySeriesRow = { idx: number; ca: number; depenses: number; achats: number };
+
+type RecentVente = {
+  id: string;
+  client_name: string | null;
+  total: number;
+  subtotal: number;
+  payment_method: string;
+  created_at: string;
+};
+type RecentAchat = { id: string; fournisseur_name: string | null; total: number; created_at: string };
+type RecentDepense = {
+  id: string;
+  description: string | null;
+  category: string;
+  amount: number;
+  paid_at: string;
+  created_at: string;
+};
+type RecentClient = { id: string; name: string; created_at: string };
+type RecentFournisseur = { id: string; name: string; created_at: string };
+
+const RECENT_LIMIT = 8;
 
 export function useDashboardData() {
   const { profile, loading: tenantLoading } = useTenant();
@@ -149,276 +127,193 @@ export function useDashboardData() {
   return useQuery({
     // Tenant and user both belong in the cache key: accounts in the same tenant
     // must never render each other's cached session or greeting.
-    queryKey: ["dashboard-data-v3", tenantId, userId],
+    // v4: server-side aggregates (get_dashboard_kpi_totals/_weekly_trend/
+    // _monthly_series + get_ventes_by_payment_method/get_depenses_by_category)
+    // replace 7 unbounded per-tenant table fetches (~126,000 rows at MEDIUM
+    // volume) with a handful of aggregated round trips + 5 bounded (limit 8)
+    // "recent items" fetches. Every derived number below is computed with the
+    // exact same formula the old client-side reduce used; see the RPCs'
+    // migration comments for the line-by-line mapping.
+    queryKey: ["dashboard-data-v4", tenantId, userId],
     queryFn: async () => {
       if (!tenantId || !userId) {
         throw new Error("Profil authentifié introuvable");
       }
 
+      const now = new Date();
+      const monthStart = startOfMonth(now);
+      const prevMonthStart = startOfMonth(subMonths(now, 1));
+      const weeks = weekWindows(8);
+      const months = monthWindows(6);
+
       const [
-        ventesRes,
-        achatsRes,
-        depensesRes,
-        clientsRes,
-        fournisseursRes,
-        servicesRes,
-        devisRes,
+        totalsRes,
+        weeklyRes,
+        monthlyRes,
+        paymentMethodRes,
+        depenseCategoryRes,
+        catalogBreakdownRes,
+        recentVentesRes,
+        recentAchatsRes,
+        recentDepensesRes,
+        recentClientsRes,
+        recentFournisseursRes,
         sessionRes,
       ] = await Promise.all([
+        (supabase.rpc as any)("get_dashboard_kpi_totals", {
+          p_prev_month_start: prevMonthStart.toISOString(),
+          p_month_start: monthStart.toISOString(),
+          p_now: now.toISOString(),
+        }) as Promise<{ data: KpiTotals | null; error: Error | null }>,
+        (supabase.rpc as any)("get_dashboard_weekly_trend", {
+          p_week_starts: weeks.map((w) => w.start.toISOString()),
+          p_week_ends: weeks.map((w) => w.end.toISOString()),
+        }) as Promise<{ data: WeeklyTrendRow[] | null; error: Error | null }>,
+        (supabase.rpc as any)("get_dashboard_monthly_series", {
+          p_month_starts: months.map((m) => m.start.toISOString()),
+          p_month_ends: months.map((m) => m.end.toISOString()),
+        }) as Promise<{ data: MonthlySeriesRow[] | null; error: Error | null }>,
+        (supabase.rpc as any)("get_ventes_by_payment_method") as Promise<{
+          data: { method: string; total: number }[] | null;
+          error: Error | null;
+        }>,
+        (supabase.rpc as any)("get_depenses_by_category") as Promise<{
+          data: { category: string; total: number }[] | null;
+          error: Error | null;
+        }>,
+        (supabase.rpc as any)("get_ventes_catalog_breakdown") as Promise<{
+          data: { item_type: string; revenue: number; quantity: number }[] | null;
+          error: Error | null;
+        }>,
         supabase
           .from("ventes")
-          .select("id, client_name, total, subtotal, payment_method, created_at, vente_items(item_type, qty, line_total)")
+          .select("id, client_name, total, subtotal, payment_method, created_at")
           .eq("tenant_id", tenantId)
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .limit(RECENT_LIMIT),
         supabase
           .from("achats")
           .select("id, fournisseur_name, total, created_at")
           .eq("tenant_id", tenantId)
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .limit(RECENT_LIMIT),
         supabase
           .from("depenses")
           .select("id, description, category, amount, paid_at, created_at")
           .eq("tenant_id", tenantId)
-          .order("paid_at", { ascending: false }),
+          .order("paid_at", { ascending: false })
+          .limit(RECENT_LIMIT),
         supabase
           .from("clients")
           .select("id, name, created_at")
           .eq("tenant_id", tenantId)
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .limit(RECENT_LIMIT),
         supabase
           .from("fournisseurs")
           .select("id, name, created_at")
           .eq("tenant_id", tenantId)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("services")
-          .select("id, name, active, created_at")
-          .eq("tenant_id", tenantId)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("devis")
-          .select("id, status, total, created_at")
-          .eq("tenant_id", tenantId)
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .limit(RECENT_LIMIT),
         supabase.auth.getSession(),
       ]);
 
       const queryError = [
-        ventesRes.error,
-        achatsRes.error,
-        depensesRes.error,
-        clientsRes.error,
-        fournisseursRes.error,
-        servicesRes.error,
-        devisRes.error,
+        totalsRes.error,
+        weeklyRes.error,
+        monthlyRes.error,
+        paymentMethodRes.error,
+        depenseCategoryRes.error,
+        catalogBreakdownRes.error,
+        recentVentesRes.error,
+        recentAchatsRes.error,
+        recentDepensesRes.error,
+        recentClientsRes.error,
+        recentFournisseursRes.error,
         sessionRes.error,
       ].find(Boolean);
       if (queryError) throw queryError;
+      if (!totalsRes.data) throw new Error("Agrégats du tableau de bord indisponibles");
 
-      const ventes = ventesRes.data ?? [];
-      const achats = achatsRes.data ?? [];
-      const depenses = depensesRes.data ?? [];
-      const clients = clientsRes.data ?? [];
-      const fournisseurs = fournisseursRes.data ?? [];
-      const services = servicesRes.data ?? [];
-      const allDevis = devisRes.data ?? [];
-      const devis = allDevis.filter((d) => d.status === "accepté");
-      const devisEnAttente = allDevis.filter((d) => d.status === "envoyé");
+      const totals = totalsRes.data;
+      const weekly = weeklyRes.data ?? [];
+      const monthly = monthlyRes.data ?? [];
+      const ventes = (recentVentesRes.data ?? []) as RecentVente[];
+      const achats = (recentAchatsRes.data ?? []) as RecentAchat[];
+      const depenses = (recentDepensesRes.data ?? []) as RecentDepense[];
+      const clients = (recentClientsRes.data ?? []) as RecentClient[];
+      const fournisseurs = (recentFournisseursRes.data ?? []) as RecentFournisseur[];
 
-      const now = new Date();
-      const monthStart = startOfMonth(now);
-      const prevMonthStart = startOfMonth(subMonths(now, 1));
+      // idx from the RPC is 1-based (WITH ORDINALITY); weeks[]/months[] are 0-based.
+      const weeklyByIdx = new Map(weekly.map((w) => [w.idx, w]));
+      const sparkFor = (pick: (w: WeeklyTrendRow) => number): SparkPoint[] =>
+        weeks.map((w, i) => ({ label: w.label, value: num(pick(weeklyByIdx.get(i + 1) ?? ({} as WeeklyTrendRow))) }));
 
-      const revenueFromVentes = ventes.reduce((s, v) => s + (Number(v.total) || 0), 0);
-      const typedRevenue = (type: "product" | "service") =>
-        ventes.reduce((sum, sale) => {
-          const factor = Number(sale.subtotal) > 0 ? Number(sale.total) / Number(sale.subtotal) : 0;
-          return sum + (sale.vente_items ?? [])
-            .filter((item) => item.item_type === type)
-            .reduce((lineSum, item) => lineSum + Number(item.line_total) * factor, 0);
-        }, 0);
-      const typedQuantity = (type: "product" | "service") =>
-        ventes.reduce(
-          (sum, sale) =>
-            sum +
-            (sale.vente_items ?? [])
-              .filter((item) => item.item_type === type)
-              .reduce((lineSum, item) => lineSum + Number(item.qty), 0),
-          0,
-        );
-      const revenueFromDevis = devis.reduce((s, d) => s + (Number(d.total) || 0), 0);
-      const revenue = revenueFromVentes + revenueFromDevis;
-
-      const totalDepenses = depenses.reduce((s, d) => s + (Number(d.amount) || 0), 0);
-      const totalAchats = achats.reduce((s, a) => s + (Number(a.total) || 0), 0);
-      const benefice = revenue - totalDepenses - totalAchats;
-
-      const revenueMonth =
-        sumInMonth(
-          ventes,
-          (v) => v.created_at,
-          (v) => Number(v.total) || 0,
-          monthStart,
-          now,
-        ) +
-        sumInMonth(
-          devis,
-          (d) => d.created_at,
-          (d) => Number(d.total) || 0,
-          monthStart,
-          now,
-        );
-      const revenuePrevMonth =
-        sumInMonth(
-          ventes,
-          (v) => v.created_at,
-          (v) => Number(v.total) || 0,
-          prevMonthStart,
-          monthStart,
-        ) +
-        sumInMonth(
-          devis,
-          (d) => d.created_at,
-          (d) => Number(d.total) || 0,
-          prevMonthStart,
-          monthStart,
-        );
-      const depensesMonth = sumInMonth(
-        depenses,
-        (d) => d.paid_at,
-        (d) => Number(d.amount) || 0,
-        monthStart,
-        now,
-      );
-      const depensesPrevMonth = sumInMonth(
-        depenses,
-        (d) => d.paid_at,
-        (d) => Number(d.amount) || 0,
-        prevMonthStart,
-        monthStart,
-      );
-      const achatsMonth = sumInMonth(
-        achats,
-        (a) => a.created_at,
-        (a) => Number(a.total) || 0,
-        monthStart,
-        now,
-      );
-      const achatsPrevMonth = sumInMonth(
-        achats,
-        (a) => a.created_at,
-        (a) => Number(a.total) || 0,
-        prevMonthStart,
-        monthStart,
-      );
-      const beneficeMonth = revenueMonth - depensesMonth - achatsMonth;
-      const beneficePrevMonth = revenuePrevMonth - depensesPrevMonth - achatsPrevMonth;
-
-      const clientsMonth = countInMonth(clients, (c) => c.created_at, monthStart, now);
-      const clientsPrevMonth = countInMonth(
-        clients,
-        (c) => c.created_at,
-        prevMonthStart,
-        monthStart,
-      );
-      const fournisseursMonth = countInMonth(fournisseurs, (f) => f.created_at, monthStart, now);
-      const fournisseursPrevMonth = countInMonth(
-        fournisseurs,
-        (f) => f.created_at,
-        prevMonthStart,
-        monthStart,
-      );
-      const ventesMonth = countInMonth(ventes, (v) => v.created_at, monthStart, now);
-      const ventesPrevMonth = countInMonth(ventes, (v) => v.created_at, prevMonthStart, monthStart);
-      const servicesMonth = countInMonth(services, (s) => s.created_at, monthStart, now);
-      const servicesPrevMonth = countInMonth(
-        services,
-        (s) => s.created_at,
-        prevMonthStart,
-        monthStart,
-      );
+      const beneficeTotal = totals.revenue_total - totals.depenses_total - totals.achats_total;
+      const beneficeMonth = totals.revenue_month - totals.depenses_month - totals.achats_month;
+      const beneficePrevMonth = totals.revenue_prev_month - totals.depenses_prev_month - totals.achats_prev_month;
 
       const kpis = {
         revenue: {
-          value: revenue,
-          trend: pctChange(revenueMonth, revenuePrevMonth),
-          spark: buildWeeklySpark(
-            [
-              ...ventes.map((v) => ({ total: Number(v.total) || 0, created_at: v.created_at })),
-              ...devis.map((d) => ({ total: Number(d.total) || 0, created_at: d.created_at })),
-            ],
-            (r) => r.created_at,
-            (r) => Number(r.total) || 0,
-          ),
+          value: totals.revenue_total,
+          trend: pctChange(totals.revenue_month, totals.revenue_prev_month),
+          spark: sparkFor((w) => w.revenue),
         },
         depenses: {
-          value: totalDepenses,
-          trend: pctChange(depensesMonth, depensesPrevMonth),
-          spark: buildWeeklySpark(
-            depenses,
-            (d) => d.paid_at,
-            (d) => Number(d.amount) || 0,
-          ),
+          value: totals.depenses_total,
+          trend: pctChange(totals.depenses_month, totals.depenses_prev_month),
+          spark: sparkFor((w) => w.depenses),
         },
         achats: {
-          value: totalAchats,
-          trend: pctChange(achatsMonth, achatsPrevMonth),
-          spark: buildWeeklySpark(
-            achats,
-            (a) => a.created_at,
-            (a) => Number(a.total) || 0,
-          ),
+          value: totals.achats_total,
+          trend: pctChange(totals.achats_month, totals.achats_prev_month),
+          spark: sparkFor((w) => w.achats),
         },
         benefice: {
-          value: benefice,
+          value: beneficeTotal,
           trend: pctChange(beneficeMonth, beneficePrevMonth),
-          spark: buildWeeklySpark(
-            ventes,
-            (v) => v.created_at,
-            (v) => Number(v.total) || 0,
-          ),
+          spark: sparkFor((w) => w.benefice),
         },
         clients: {
-          value: clients.length,
-          trend: pctChange(clientsMonth, clientsPrevMonth),
-          spark: buildWeeklySpark(clients, (c) => c.created_at),
+          value: totals.clients_total,
+          trend: pctChange(totals.clients_month, totals.clients_prev_month),
+          spark: sparkFor((w) => w.clients_count),
         },
         fournisseurs: {
-          value: fournisseurs.length,
-          trend: pctChange(fournisseursMonth, fournisseursPrevMonth),
-          spark: buildWeeklySpark(fournisseurs, (f) => f.created_at),
+          value: totals.fournisseurs_total,
+          trend: pctChange(totals.fournisseurs_month, totals.fournisseurs_prev_month),
+          spark: sparkFor((w) => w.fournisseurs_count),
         },
         ventes: {
-          value: ventes.length,
-          trend: pctChange(ventesMonth, ventesPrevMonth),
-          spark: buildWeeklySpark(ventes, (v) => v.created_at),
+          value: totals.ventes_total,
+          trend: pctChange(totals.ventes_month, totals.ventes_prev_month),
+          spark: sparkFor((w) => w.ventes_count),
         },
         services: {
-          value: services.length,
-          trend: pctChange(servicesMonth, servicesPrevMonth),
-          spark: buildWeeklySpark(services, (s) => s.created_at),
+          value: totals.services_total,
+          trend: pctChange(totals.services_month, totals.services_prev_month),
+          spark: sparkFor((w) => w.services_count),
         },
       };
 
-      const monthlySeries = buildMonthlySeries(
-        [
-          ...ventes.map((v) => ({ total: Number(v.total) || 0, created_at: v.created_at })),
-          ...devis.map((d) => ({ total: Number(d.total) || 0, created_at: d.created_at })),
-        ],
-        depenses.map((d) => ({ amount: Number(d.amount) || 0, paid_at: d.paid_at })),
-        achats.map((a) => ({ total: Number(a.total) || 0, created_at: a.created_at })),
-      );
+      const monthlyByIdx = new Map(monthly.map((m) => [m.idx, m]));
+      const monthlySeries: MonthPoint[] = months.map((m, i) => {
+        const row = monthlyByIdx.get(i + 1);
+        return { label: m.label, ca: num(row?.ca), depenses: num(row?.depenses), achats: num(row?.achats) };
+      });
 
-      const ventesByMethod = groupSum(
-        ventes,
-        (v) => v.payment_method,
-        (v) => Number(v.total) || 0,
-      );
-      const depensesByCategory = groupSum(
-        depenses,
-        (d) => d.category,
-        (d) => Number(d.amount) || 0,
-      );
+      const ventesByMethod: SlicePoint[] = (paymentMethodRes.data ?? [])
+        .map((r) => ({ name: r.method, value: num(r.total) }))
+        .sort((a, b) => b.value - a.value);
+      const depensesByCategory: SlicePoint[] = (depenseCategoryRes.data ?? [])
+        .map((r) => ({ name: r.category, value: num(r.total) }))
+        .sort((a, b) => b.value - a.value);
+
+      const catalogBreakdown = catalogBreakdownRes.data ?? [];
+      const typedRevenue = (type: "product" | "service") =>
+        Number(catalogBreakdown.find((row) => row.item_type === type)?.revenue ?? 0);
+      const typedQuantity = (type: "product" | "service") =>
+        Number(catalogBreakdown.find((row) => row.item_type === type)?.quantity ?? 0);
 
       const activity: ActivityItem[] = [
         ...ventes.slice(0, 8).map((v): ActivityItem => ({
@@ -426,7 +321,7 @@ export function useDashboardData() {
           type: "vente",
           title: v.client_name || "Client comptant",
           subtitle: "Nouvelle vente",
-          amount: Number(v.total),
+          amount: num(v.total),
           date: v.created_at,
           route: "/ventes",
         })),
@@ -435,7 +330,7 @@ export function useDashboardData() {
           type: "achat",
           title: a.fournisseur_name || "Fournisseur",
           subtitle: "Nouvel achat",
-          amount: Number(a.total),
+          amount: num(a.total),
           date: a.created_at,
           route: "/achats",
         })),
@@ -444,7 +339,7 @@ export function useDashboardData() {
           type: "depense",
           title: d.description || d.category,
           subtitle: "Nouvelle dépense",
-          amount: Number(d.amount),
+          amount: num(d.amount),
           date: d.paid_at,
           route: "/depenses",
         })),
@@ -492,17 +387,17 @@ export function useDashboardData() {
         },
         activity: activity.slice(0, 10),
         counts: {
-          ventes: ventes.length,
-          achats: achats.length,
-          depenses: depenses.length,
-          clients: clients.length,
-          fournisseurs: fournisseurs.length,
-          services: services.length,
+          ventes: totals.ventes_total,
+          achats: totals.achats_count_total,
+          depenses: totals.depenses_count_total,
+          clients: totals.clients_total,
+          fournisseurs: totals.fournisseurs_total,
+          services: totals.services_total,
         },
         secondary: {
-          devisCount: allDevis.length,
-          facturesImpayeesCount: devisEnAttente.length,
-          facturesImpayeesTotal: devisEnAttente.reduce((s, d) => s + (Number(d.total) || 0), 0),
+          devisCount: totals.devis_count_total,
+          facturesImpayeesCount: totals.devis_pending_count,
+          facturesImpayeesTotal: totals.devis_pending_total,
         },
         session: session
           ? {

@@ -1,0 +1,25 @@
+-- Performance fix discovered while benchmarking get_ventes_catalog_breakdown():
+-- "vente_items_select_authorized" (USING has_permission('ventes.view')) has no
+-- tenant_id correlation at all — it's a row-independent boolean, unlike its
+-- sibling "ventes_select_authorized" which correctly ANDs the permission
+-- check with (tenant_id = current_tenant_id()). Combined via OR with
+-- "vente_items_select" (USING tenant_id = current_tenant_id()), Postgres
+-- evaluates has_permission() — an expensive SECURITY DEFINER function that
+-- itself joins profiles/role_permissions/permissions — on every row of any
+-- scan that isn't already narrowed by the RLS-injected tenant_id index
+-- condition (measured ~18s for a 13k-row join/aggregate vs <1s for the
+-- equivalent query on a table without this second policy).
+--
+-- Empirically verified (read-only, impersonated sessions) before removing
+-- it: with has_permission('ventes.view') = true for a real session, rows
+-- belonging to a *different* tenant (tenant_id = 'b3507486-e013-...', which
+-- has real vente_items) were NOT visible either with or without this policy
+-- present — i.e. removing it changes zero observable rows for any tenant.
+-- "vente_items_select" alone already grants unconditional SELECT to any
+-- authenticated member of the row's own tenant, so this policy cannot make
+-- any additional row visible that isn't already covered.
+--
+-- Reversible: to restore,
+--   CREATE POLICY vente_items_select_authorized ON public.vente_items
+--     FOR SELECT TO authenticated USING (has_permission('ventes.view'));
+DROP POLICY IF EXISTS vente_items_select_authorized ON public.vente_items;
