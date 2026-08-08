@@ -83,6 +83,22 @@ export function CategoriesPage() {
     [categoriesQuery.data],
   );
 
+  const handleToggleActive = (category: CatalogCategory, active: boolean) => {
+    mutations.setActive.mutate(
+      { id: category.id, active },
+      {
+        onSuccess: () => toast.success(active ? "Catégorie activée." : "Catégorie désactivée."),
+        onError: (error) => toast.error(formatSupabaseError(error)),
+      },
+    );
+  };
+
+  const openEdit = (category: CatalogCategory) => {
+    setEditing(category);
+    setEditedName(category.name);
+    setEditedIcon(category.icon as CatalogCategoryIconId | null);
+  };
+
   const openDelete = async (category: CatalogCategory) => {
     setDeleting(category);
     setUsageCount(null);
@@ -230,10 +246,70 @@ export function CategoriesPage() {
             </Button>
           )}
         </div>
-        <div className="overflow-x-auto">
+        {/* Mobile: compact cards, no horizontal scroll */}
+        <div className="flex flex-col gap-3 p-3 md:hidden">
+          {categoriesQuery.isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">Aucune catégorie.</div>
+          ) : (
+            filtered.map((category) => (
+              <div
+                key={category.id}
+                className="rounded-2xl border border-border/70 bg-background p-3 shadow-sm"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <CategoryIcon icon={category.icon} className="size-5 shrink-0 text-blue-600" />
+                  <span className="truncate text-sm font-semibold">{category.name}</span>
+                </div>
+                <div className="mt-3 flex items-center gap-3">
+                  <Switch
+                    checked={category.active}
+                    disabled={!canEdit || mutations.setActive.isPending}
+                    onCheckedChange={(active) => handleToggleActive(category, active)}
+                    aria-label={`${category.active ? "Désactiver" : "Activer"} ${category.name}`}
+                  />
+                  <Badge variant={category.active ? "default" : "secondary"}>
+                    {category.active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 gap-1.5"
+                      onClick={() => openEdit(category)}
+                    >
+                      <Pencil className="size-3.5" />
+                      Modifier
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => void openDelete(category)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Supprimer
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop: table view */}
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
+                <th className="w-12 px-4 py-3">Icône</th>
                 <th className="px-4 py-3">Nom</th>
                 <th className="px-4 py-3">Statut</th>
                 <th className="w-32 px-4 py-3 text-right">Actions</th>
@@ -241,31 +317,21 @@ export function CategoriesPage() {
             </thead>
             <tbody>
               {categoriesQuery.isLoading ? (
-                <tr><td colSpan={3} className="py-12 text-center"><Loader2 className="mx-auto size-5 animate-spin" /></td></tr>
+                <tr><td colSpan={4} className="py-12 text-center"><Loader2 className="mx-auto size-5 animate-spin" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={3} className="py-12 text-center text-muted-foreground">Aucune catégorie.</td></tr>
+                <tr><td colSpan={4} className="py-12 text-center text-muted-foreground">Aucune catégorie.</td></tr>
               ) : filtered.map((category) => (
                 <tr key={category.id} className="border-t">
-                  <td className="px-4 py-3 font-medium">
-                    <div className="flex items-center gap-2">
-                      <CategoryIcon icon={category.icon} className="size-4 text-muted-foreground" />
-                      {category.name}
-                    </div>
+                  <td className="px-4 py-3">
+                    <CategoryIcon icon={category.icon} className="size-4 text-muted-foreground" />
                   </td>
+                  <td className="px-4 py-3 font-medium">{category.name}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Switch
                         checked={category.active}
                         disabled={!canEdit || mutations.setActive.isPending}
-                        onCheckedChange={(active) =>
-                          mutations.setActive.mutate(
-                            { id: category.id, active },
-                            {
-                              onSuccess: () => toast.success(active ? "Catégorie activée." : "Catégorie désactivée."),
-                              onError: (error) => toast.error(formatSupabaseError(error)),
-                            },
-                          )
-                        }
+                        onCheckedChange={(active) => handleToggleActive(category, active)}
                         aria-label={`${category.active ? "Désactiver" : "Activer"} ${category.name}`}
                       />
                       <Badge variant={category.active ? "default" : "secondary"}>
@@ -276,11 +342,7 @@ export function CategoriesPage() {
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
                       {canEdit && (
-                        <Button variant="ghost" size="icon" onClick={() => {
-                          setEditing(category);
-                          setEditedName(category.name);
-                          setEditedIcon(category.icon as CatalogCategoryIconId | null);
-                        }}>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(category)}>
                           <Pencil className="size-4" />
                         </Button>
                       )}

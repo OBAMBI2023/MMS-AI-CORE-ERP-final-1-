@@ -30,6 +30,7 @@ import {
   Menu,
   Package,
   Wrench,
+  LayoutGrid,
 } from "lucide-react";
 import { Sidebar } from "@/components/mms/Sidebar";
 import { CategoryIcon } from "@/components/mms/CategoryIcon";
@@ -71,6 +72,12 @@ type Service = {
 type CartItem = Service & { qty: number };
 type PayMethod = "Espèces" | "Wave" | "Orange Money" | "Carte";
 type CatalogTab = Service["type"];
+
+/** Strips a short technical prefix (e.g. "ST • Alimentation") some seeded
+ * categories carry, for display only — the stored name is never changed. */
+function displayCategoryName(name: string) {
+  return name.replace(/^\S{1,8}\s*•\s*/, "").trim() || name;
+}
 
 // ---------------- POS Page ----------------
 export function PosPage() {
@@ -348,7 +355,7 @@ export function PosPage() {
       <main className="flex-1 flex flex-col md:flex-row min-h-0 min-w-0">
         {/* Catalogue */}
         <section className="flex-1 flex flex-col min-h-0 min-w-0 border-b md:border-b-0 md:border-r border-border pb-36 md:pb-0">
-          <header className="px-4 md:px-6 pt-4 md:pt-6 pb-4 border-b border-border">
+          <header className="px-4 md:px-6 pt-4 md:pt-6 pb-3 border-b border-border">
             <div className="mb-3 flex items-center md:hidden">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
@@ -441,21 +448,35 @@ export function PosPage() {
                 className="w-full rounded-xl md:rounded-2xl bg-muted/60 border border-border pl-10 pr-4 py-2 text-sm outline-none focus:border-primary/40 transition"
               />
             </div>
-            <div className="flex flex-wrap gap-1.5 md:gap-2 mt-3">
-              {categories.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setCategory(c)}
-                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] md:text-xs font-medium transition-colors ${
-                    category === c
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <CategoryIcon icon={categoryIconByName.get(c)} className="size-3" />
-                  {c}
-                </button>
-              ))}
+            <div className="mt-2 flex flex-nowrap gap-2 overflow-x-auto overflow-y-hidden scrollbar-none scroll-smooth snap-x snap-proximity touch-pan-x md:gap-3">
+              {categories.map((c) => {
+                const isSelected = category === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCategory(c)}
+                    aria-pressed={isSelected}
+                    className={`flex h-[92px] min-h-[88px] w-[105px] shrink-0 snap-start flex-col items-center justify-center gap-1.5 rounded-[14px] border px-[5px] py-2 text-center shadow-sm transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                    }`}
+                  >
+                    {c === "Tous" ? (
+                      <LayoutGrid className="h-6 w-6 md:h-7 md:w-7" aria-hidden="true" />
+                    ) : (
+                      <CategoryIcon
+                        icon={categoryIconByName.get(c)}
+                        className="h-6 w-6 md:h-7 md:w-7"
+                      />
+                    )}
+                    <span className="line-clamp-2 text-[11px] font-semibold leading-tight md:text-[12px]">
+                      {c === "Tous" ? c : displayCategoryName(c)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </header>
 
@@ -493,7 +514,7 @@ export function PosPage() {
                       )}
                       <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                         <CategoryIcon icon={categoryIconByName.get(s.category)} className="size-3" />
-                        {s.category}
+                        {displayCategoryName(s.category)}
                       </div>
                       <div className="mt-1 md:mt-2 flex items-baseline justify-between gap-2">
                         <span className="text-primary font-semibold text-xs md:text-sm">
