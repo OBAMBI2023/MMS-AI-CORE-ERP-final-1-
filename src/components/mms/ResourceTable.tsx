@@ -667,6 +667,24 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
   );
 }
 
+// Backstop for the "clients" table: if the pre-submit duplicate check (RPC
+// check_client_duplicate) is bypassed by a race condition, the per-tenant
+// unique index (when present — see clients_tenant_email_key /
+// clients_tenant_phone_key) still rejects the write with a 23505. Surface
+// that as the same friendly message instead of a raw Postgres error.
+function toClientDuplicateError(table: string, error: Error): Error {
+  if (table !== "clients") return error;
+  if ((error as { code?: string }).code !== "23505") return error;
+  const message = error.message ?? "";
+  if (message.includes("clients_tenant_email_key")) {
+    return new Error("Un client avec cette adresse e-mail existe déjà.");
+  }
+  if (message.includes("clients_tenant_phone_key")) {
+    return new Error("Un client avec ce numéro de téléphone existe déjà.");
+  }
+  return error;
+}
+
 function ResourceFormDialog<T extends { id: string }>({
   table,
   singular,
@@ -706,18 +724,39 @@ function ResourceFormDialog<T extends { id: string }>({
         if (v === "") v = null;
         payload[f.name] = v;
       }
+      if (table === "clients" && profile?.tenant_id) {
+        const email = typeof payload.email === "string" ? payload.email : "";
+        const phone = typeof payload.phone === "string" ? payload.phone : "";
+        if (email || phone) {
+          const { data: dup, error: dupError } = await supabase.rpc("check_client_duplicate", {
+            p_tenant_id: profile.tenant_id,
+            p_email: email,
+            p_phone: phone,
+            p_exclude_id: isEdit ? (initial as T).id : undefined,
+          });
+          if (dupError) throw dupError;
+          const result = dup?.[0];
+          if (result?.duplicate_email) {
+            throw new Error("Un client avec cette adresse e-mail existe déjà.");
+          }
+          if (result?.duplicate_phone) {
+            throw new Error("Un client avec ce numéro de téléphone existe déjà.");
+          }
+        }
+      }
+
       if (isEdit) {
         const { error } = await db
           .from(table)
           .update(payload)
           .eq("id", (initial as T).id);
-        if (error) throw error;
+        if (error) throw toClientDuplicateError(table, error);
       } else {
         if (profile?.tenant_id) {
             payload.tenant_id = profile.tenant_id;
         }
         const { error } = await db.from(table).insert(payload);
-        if (error) throw error;
+        if (error) throw toClientDuplicateError(table, error);
       }
     },
     onSuccess: () => {
