@@ -7,7 +7,7 @@ import { formatSupabaseError } from "@/lib/supabase-error";
 
 const TENANT_ROLE_NAMES = [
   "Administrateur", "Gérant", "Manager", "Comptable",
-  "Commercial", "Caissier", "Employé",
+  "Commercial", "Caissier", "Employé", "Réceptionniste",
 ] as const;
 
 // L'UI affiche des libellés français ("Actif", "Désactivé") mais la contrainte

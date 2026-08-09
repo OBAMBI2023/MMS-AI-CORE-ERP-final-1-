@@ -13,7 +13,12 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { isAdminOnlyRoute, isAdministratorRole } from "@/lib/route-permissions";
+import {
+  isAdminOnlyRoute,
+  isAdministratorRole,
+  isErpParametresRoute,
+  isHotelSettingsRoute,
+} from "@/lib/route-permissions";
 import { getRouteModule } from "@/lib/route-modules";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TenantProvider } from "@/providers/TenantProvider";
@@ -239,6 +244,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         throw redirect({ to: "/licence" });
       }
 
+      // Paramètres ERP (/parametres) et Paramètres Hôtel (/hotel/parametres)
+      // sont deux interfaces distinctes qui ne doivent jamais se substituer
+      // l'une à l'autre. Le choix dépend uniquement de tenants.platform_type
+      // du tenant courant, jamais du rôle de l'utilisateur ni de la manière
+      // dont la route a été atteinte (sidebar, menu compte, lien direct...).
+      const { data: tenantRow } = await supabase
+        .from("tenants")
+        .select("platform_type")
+        .eq("id", profile.tenant_id)
+        .maybeSingle();
+      const platformType = tenantRow?.platform_type ?? null;
+
+      if (platformType === "HOTEL" && isErpParametresRoute(location.pathname)) {
+        throw redirect({ to: "/hotel/parametres" });
+      }
+
+      if (platformType === "ERP" && isHotelSettingsRoute(location.pathname)) {
+        throw redirect({ to: "/parametres" });
+      }
+
       const requiredModule = getRouteModule(location.pathname);
       if (requiredModule) {
         const { data: moduleEnabled, error: moduleError } = await supabase.rpc(
@@ -275,7 +300,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         }
       }
 
-      // Paramètres et gestion des utilisateurs restent exclusifs à
+      // /hotel/parametres est gouverné par la permission RBAC
+      // hotel.settings.view, pas par le nom du rôle : un rôle secondaire
+      // (ex: "Gérant") peut légitimement s'être vu attribuer cette
+      // permission pour le tenant. public.has_permission() inclut déjà le
+      // bypass Administrateur (public.is_admin()) et applique l'isolation
+      // tenant (public.current_tenant_id()), donc ce contrôle reste
+      // équivalent à la RLS qui protège les données affichées par la page.
+      if (isHotelSettingsRoute(location.pathname)) {
+        const { data: canViewHotelSettings, error: hotelSettingsError } = await supabase.rpc(
+          "has_permission",
+          { required_permission: "hotel.settings.view" },
+        );
+        if (hotelSettingsError || !canViewHotelSettings) {
+          throw redirect({ to: "/403" });
+        }
+      }
+
+      // Paramètres et gestion des utilisateurs (ERP) restent exclusifs à
       // l'Administrateur. Tout autre module métier actif du tenant est
       // ouvert à tout rôle secondaire (cf. le contrôle de module actif
       // ci-dessus, qui s'applique déjà à cette route).

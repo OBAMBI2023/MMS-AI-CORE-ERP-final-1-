@@ -1,4 +1,6 @@
 import { Building2 } from "lucide-react";
+import { useTenant } from "@/providers/TenantProvider";
+import { useCompanySettings } from "@/hooks/use-company-settings";
 import { cn } from "@/lib/utils";
 
 export function HotelSidebarHeader({
@@ -8,6 +10,10 @@ export function HotelSidebarHeader({
   compact?: boolean;
   className?: string;
 }) {
+  const { profile } = useTenant();
+  const { settings, logoUrl } = useCompanySettings(profile?.tenant_id);
+  const establishmentName = settings?.company_name?.trim() || "SAOVIA HOTEL";
+
   return (
     <div
       className={cn(
@@ -16,14 +22,22 @@ export function HotelSidebarHeader({
         className,
       )}
     >
-      <div
-        className={cn(
-          "grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary-glow text-white shadow-[0_6px_18px_rgba(0,0,0,0.25)]",
-          compact ? "size-11" : "size-16",
-        )}
-      >
-        <Building2 className={compact ? "h-5 w-5" : "h-7 w-7"} />
-      </div>
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt={`Logo ${establishmentName}`}
+          className={cn("shrink-0 rounded-xl object-contain", compact ? "size-10" : "size-11")}
+        />
+      ) : (
+        <div
+          className={cn(
+            "grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary-glow text-white shadow-[0_6px_18px_rgba(0,0,0,0.25)]",
+            compact ? "size-11" : "size-16",
+          )}
+        >
+          <Building2 className={compact ? "h-5 w-5" : "h-7 w-7"} />
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <p
           className={cn(
@@ -31,7 +45,7 @@ export function HotelSidebarHeader({
             compact ? "text-[15px] leading-[18px]" : "text-[18px] leading-[22px]",
           )}
         >
-          SAOVIA HOTEL
+          {establishmentName}
         </p>
         <p
           className={cn(

@@ -11,10 +11,16 @@ export function isAdministratorRole(roleName: string | null | undefined): boolea
 }
 
 /**
- * Paramètres et gestion des utilisateurs restent exclusifs à l'Administrateur,
- * quel que soit l'état des permissions RBAC individuelles du rôle secondaire.
- * Tous les autres modules métier actifs pour le tenant sont ouverts à tout
- * rôle secondaire dès lors que le module est actif (cf. route-modules.ts).
+ * Paramètres et gestion des utilisateurs (ERP) restent exclusifs à
+ * l'Administrateur, quel que soit l'état des permissions RBAC individuelles
+ * du rôle secondaire. Tous les autres modules métier actifs pour le tenant
+ * sont ouverts à tout rôle secondaire dès lors que le module est actif
+ * (cf. route-modules.ts).
+ *
+ * /hotel/parametres n'en fait PAS partie : cette route est gérée par les
+ * permissions RBAC hotel.settings.view / hotel.settings.update (cf.
+ * isHotelSettingsRoute ci-dessous), car des rôles secondaires (ex: "Gérant")
+ * peuvent légitimement s'y voir accorder ces permissions en base.
  */
 export function isAdminOnlyRoute(pathname: string): boolean {
   return (
@@ -25,4 +31,26 @@ export function isAdminOnlyRoute(pathname: string): boolean {
     pathname.startsWith("/utilisateurs/") ||
     pathname.startsWith("/settings/")
   );
+}
+
+/**
+ * Paramètres Hôtel : accès gouverné par la permission RBAC
+ * hotel.settings.view (lecture) / hotel.settings.update (écriture), pas par
+ * le nom du rôle. L'Administrateur y a toujours accès via le bypass
+ * public.is_admin() intégré à public.has_permission(). Un rôle secondaire
+ * (ex: "Gérant") y accède uniquement si le tenant lui a explicitement
+ * attribué hotel.settings.view.
+ */
+export function isHotelSettingsRoute(pathname: string): boolean {
+  return pathname === "/hotel/parametres" || pathname.startsWith("/hotel/parametres/");
+}
+
+/**
+ * Paramètres ERP : /parametres, réservé aux tenants platform_type='ERP'. Un
+ * tenant HOTEL ne doit jamais afficher cette route (cf. isHotelSettingsRoute
+ * pour son équivalent Hôtel) — le garde de src/routes/__root.tsx redirige
+ * vers /hotel/parametres dès que tenants.platform_type === 'HOTEL'.
+ */
+export function isErpParametresRoute(pathname: string): boolean {
+  return pathname === "/parametres" || pathname.startsWith("/parametres/");
 }

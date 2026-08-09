@@ -17,6 +17,9 @@ export type HotelBillingReservation = {
   discount: number;
   status: string;
   notes: string | null;
+  updated_at: string;
+  actual_check_in_at: string | null;
+  actual_check_out_at: string | null;
   accommodation_total: number;
   extras_total: number;
   paid_total: number;

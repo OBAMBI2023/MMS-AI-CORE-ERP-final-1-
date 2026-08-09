@@ -1782,6 +1782,7 @@ export type Database = {
       }
       hotel_settings: {
         Row: {
+          booking_terms: string | null
           cancellation_policy: string | null
           check_in_time: string
           check_out_time: string
@@ -1790,9 +1791,11 @@ export type Database = {
           payment_methods: string[]
           tax_rate: number
           tenant_id: string
+          timezone: string
           updated_at: string
         }
         Insert: {
+          booking_terms?: string | null
           cancellation_policy?: string | null
           check_in_time?: string
           check_out_time?: string
@@ -1801,9 +1804,11 @@ export type Database = {
           payment_methods?: string[]
           tax_rate?: number
           tenant_id: string
+          timezone?: string
           updated_at?: string
         }
         Update: {
+          booking_terms?: string | null
           cancellation_policy?: string | null
           check_in_time?: string
           check_out_time?: string
@@ -1812,6 +1817,7 @@ export type Database = {
           payment_methods?: string[]
           tax_rate?: number
           tenant_id?: string
+          timezone?: string
           updated_at?: string
         }
         Relationships: [

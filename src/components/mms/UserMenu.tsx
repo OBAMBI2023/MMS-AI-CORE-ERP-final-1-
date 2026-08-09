@@ -26,7 +26,11 @@ import { useState } from "react";
 export function UserMenu() {
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
-  const { refreshTenant } = useTenant();
+  const { tenant, refreshTenant } = useTenant();
+  // /parametres (ERP) et /hotel/parametres (Hôtel) sont deux interfaces
+  // distinctes : le menu compte est partagé entre les deux plateformes, donc
+  // sa destination doit suivre tenants.platform_type plutôt qu'être figée.
+  const parametresRoute = tenant?.platform_type === "HOTEL" ? "/hotel/parametres" : "/parametres";
 
   const { data: profile } = useQuery({
     queryKey: ["userProfile"],
@@ -87,7 +91,7 @@ export function UserMenu() {
           <User className="mr-2 h-4 w-4" />
           <span>Mon profil</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate({ to: "/parametres" })}>
+        <DropdownMenuItem onClick={() => navigate({ to: parametresRoute })}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Paramètres</span>
         </DropdownMenuItem>
