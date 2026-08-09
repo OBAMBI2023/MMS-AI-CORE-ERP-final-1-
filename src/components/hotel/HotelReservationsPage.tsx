@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BedDouble,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -8,18 +9,23 @@ import {
   ChevronsUpDown,
   FileDown,
   List,
+  type LucideIcon,
   MoreVertical,
+  NotebookPen,
   Pencil,
   Plus,
   Search,
   Trash2,
   MessageSquareText,
+  User,
+  Wallet,
   X,
 } from "lucide-react";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -116,6 +122,7 @@ export function HotelReservationsPage() {
   const [planningType, setPlanningType] = useState("all");
   const [planningFloor, setPlanningFloor] = useState("all");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [deleting, setDeleting] = useState<any | null>(null);
   const [smsReservation, setSmsReservation] = useState<any | null>(null);
   const [calendarIntentApplied, setCalendarIntentApplied] = useState(false);
@@ -281,6 +288,7 @@ export function HotelReservationsPage() {
       toast.success(editingId ? "Réservation mise à jour" : "Réservation créée");
       setEditingId(null);
       setForm(emptyForm);
+      setAttemptedSubmit(false);
       refresh();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -388,8 +396,15 @@ export function HotelReservationsPage() {
   const advance = Number(form.advance || 0);
   const remainingBalance = total - advance;
   const invalidAdvance = !Number.isFinite(advance) || advance < 0 || advance > total;
+  const submitReservation = () => {
+    setAttemptedSubmit(true);
+    if (!form.guest_id || !form.room_id || selectedRoomUnavailable || nights < 1 || invalidAdvance)
+      return;
+    save.mutate();
+  };
   const edit = (r: any) => {
     setEditingId(r.id);
+    setAttemptedSubmit(false);
     setForm({
       guest_id: r.guest_id ?? "",
       room_id: r.room_id,
@@ -462,38 +477,49 @@ export function HotelReservationsPage() {
   };
   return (
     <HotelAppShell title="Réservations" subtitle="Liste, planning, arrivées et départs">
-      <section className="hotel-panel mb-5">
-        <div className="mb-4 flex items-center justify-between">
+      <section className="mb-5 space-y-3">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold">
+            <h2 className="text-base font-semibold sm:text-lg">
               {editingId ? "Modifier la réservation" : "Nouvelle réservation"}
             </h2>
-            <p className="text-xs text-slate-400">Renseignez le séjour et le tarif appliqué.</p>
+            <p className="text-xs text-muted-foreground sm:text-sm">
+              Renseignez le séjour et le tarif appliqué.
+            </p>
           </div>
           {editingId && (
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => {
                 setEditingId(null);
                 setForm(emptyForm);
+                setAttemptedSubmit(false);
               }}
             >
               Annuler
             </Button>
           )}
         </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="md:col-span-2">
-            <Label className="mb-1.5 block">Client *</Label>
-            <GuestPicker
-              guests={data?.guests ?? []}
-              value={form.guest_id}
-              tenantId={profile?.tenant_id}
-              onChange={(guestId) => setForm({ ...form, guest_id: guestId })}
-              onCreated={refresh}
-            />
-          </div>
-          <Field label="Chambre">
+
+        <FormSection icon={User} title="Client">
+          <Label className="mb-1.5 block">Client *</Label>
+          <GuestPicker
+            guests={data?.guests ?? []}
+            value={form.guest_id}
+            tenantId={profile?.tenant_id}
+            onChange={(guestId) => setForm({ ...form, guest_id: guestId })}
+            onCreated={refresh}
+          />
+          {attemptedSubmit && !form.guest_id && (
+            <p className="mt-1.5 text-xs font-medium text-destructive">
+              Sélectionnez un client existant ou créez un nouveau client.
+            </p>
+          )}
+        </FormSection>
+
+        <FormSection icon={BedDouble} title="Chambre">
+          <Field label="Logement">
             <Select
               value={form.room_id}
               onValueChange={(v) => {
@@ -501,8 +527,8 @@ export function HotelReservationsPage() {
                 setForm({ ...form, room_id: v, nightly_rate: String(room?.rate ?? "") });
               }}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner" />
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Sélectionner une chambre" />
               </SelectTrigger>
               <SelectContent>
                 {availableRooms.map((r: any) => (
@@ -512,6 +538,11 @@ export function HotelReservationsPage() {
                 ))}
               </SelectContent>
             </Select>
+            {attemptedSubmit && !form.room_id && (
+              <p className="mt-1.5 text-xs font-medium text-destructive">
+                Sélectionnez une chambre.
+              </p>
+            )}
             {selectedRoomUnavailable && (
               <p className="mt-1.5 text-xs font-medium text-destructive">
                 {conflictingReservation
@@ -527,85 +558,148 @@ export function HotelReservationsPage() {
               </p>
             )}
           </Field>
-          <Field label="Arrivée">
-            <Input
-              type="date"
-              value={form.check_in}
-              onChange={(e) => setForm({ ...form, check_in: e.target.value })}
-            />
-          </Field>
-          <Field label="Départ">
-            <Input
-              type="date"
-              value={form.check_out}
-              onChange={(e) => setForm({ ...form, check_out: e.target.value })}
-            />
-          </Field>
-          <Field label="Tarif / nuit">
-            <Input
-              type="number"
-              min="0"
-              value={form.nightly_rate}
-              onChange={(e) => setForm({ ...form, nightly_rate: e.target.value })}
-            />
-          </Field>
-          <Field label="Remise">
-            <Input
-              type="number"
-              min="0"
-              value={form.discount}
-              onChange={(e) => setForm({ ...form, discount: e.target.value })}
-            />
-          </Field>
-          <Field label="Avance versée">
-            <Input
-              type="number"
-              min="0"
-              max={total}
-              value={form.advance}
-              onChange={(e) => setForm({ ...form, advance: e.target.value })}
-            />
-          </Field>
-          <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
-            <span className="text-muted-foreground">Total</span>
-            <b className="block">{formatCurrency(total)}</b>
+        </FormSection>
+
+        <FormSection title="Séjour">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Arrivée">
+              <Input
+                type="date"
+                className="h-11"
+                value={form.check_in}
+                onChange={(e) => setForm({ ...form, check_in: e.target.value })}
+              />
+            </Field>
+            <Field label="Départ">
+              <Input
+                type="date"
+                className="h-11"
+                value={form.check_out}
+                onChange={(e) => setForm({ ...form, check_out: e.target.value })}
+              />
+            </Field>
           </div>
-          <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
-            <span className="text-muted-foreground">Solde restant</span>
-            <b className="block">{formatCurrency(Math.max(0, remainingBalance))}</b>
+          {attemptedSubmit && (!form.check_in || !form.check_out) && (
+            <p className="mt-1.5 text-xs font-medium text-destructive">
+              Renseignez les dates d’arrivée et de départ.
+            </p>
+          )}
+          {attemptedSubmit && form.check_in && form.check_out && nights < 1 && (
+            <p className="mt-1.5 text-xs font-medium text-destructive">
+              La date de départ doit être postérieure à la date d’arrivée.
+            </p>
+          )}
+        </FormSection>
+
+        <FormSection icon={Wallet} title="Tarif & paiement">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Field label="Tarif / nuit">
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  className="h-11 pr-14"
+                  value={form.nightly_rate}
+                  onChange={(e) => setForm({ ...form, nightly_rate: e.target.value })}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                  FCFA
+                </span>
+              </div>
+            </Field>
+            <Field label="Remise">
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  className="h-11 pr-14"
+                  value={form.discount}
+                  onChange={(e) => setForm({ ...form, discount: e.target.value })}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                  FCFA
+                </span>
+              </div>
+            </Field>
+            <Field label="Avance versée">
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  max={total}
+                  className="h-11 pr-14"
+                  value={form.advance}
+                  onChange={(e) => setForm({ ...form, advance: e.target.value })}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                  FCFA
+                </span>
+              </div>
+              {attemptedSubmit && invalidAdvance && (
+                <p className="mt-1.5 text-xs font-medium text-destructive">
+                  L’avance ne peut pas être négative ni dépasser le total.
+                </p>
+              )}
+            </Field>
           </div>
-          <Field label="Statut">
-            <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {statuses.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {statusLabel[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="rounded-xl border bg-muted/30 px-3.5 py-2.5">
+              <span className="text-xs text-muted-foreground">Total</span>
+              <b className="block text-sm sm:text-base">{formatCurrency(total)}</b>
+            </div>
+            <div className="rounded-xl border bg-muted/30 px-3.5 py-2.5">
+              <span className="text-xs text-muted-foreground">Solde restant</span>
+              <b className="block text-sm sm:text-base">
+                {formatCurrency(Math.max(0, remainingBalance))}
+              </b>
+            </div>
+          </div>
+          <div className="mt-3">
+            <Field label="Statut">
+              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                <SelectTrigger className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statuses.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {statusLabel[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+        </FormSection>
+
+        <FormSection icon={NotebookPen} title="Informations supplémentaires">
+          <Field label="Notes (optionnel)">
+            <Textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Demandes particulières, précisions utiles…"
+              rows={3}
+              className="resize-none"
+            />
           </Field>
-          <div className="flex items-end">
-            <Button
-              className="w-full"
-              disabled={
-                save.isPending ||
-                !form.room_id ||
-                selectedRoomUnavailable ||
-                nights < 1 ||
-                invalidAdvance
-              }
-              onClick={() => save.mutate()}
-            >
-              {save.isPending
-                ? "Enregistrement…"
-                : `${editingId ? "Enregistrer" : "Créer"} · ${formatCurrency(total)}`}
-            </Button>
-          </div>
-        </div>
+        </FormSection>
+
+        <Button
+          size="lg"
+          className="w-full"
+          disabled={
+            save.isPending ||
+            !form.room_id ||
+            selectedRoomUnavailable ||
+            nights < 1 ||
+            invalidAdvance
+          }
+          onClick={submitReservation}
+        >
+          {save.isPending
+            ? "Enregistrement…"
+            : `${editingId ? "Enregistrer" : "Créer"} · ${formatCurrency(total)}`}
+        </Button>
       </section>
       <section className="hotel-panel">
         <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -913,6 +1007,30 @@ function GuestPicker({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function FormSection({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon?: LucideIcon;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+      <div className="mb-3.5 flex items-center gap-2.5">
+        {Icon && (
+          <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Icon className="size-4" />
+          </span>
+        )}
+        <h3 className="text-sm font-semibold">{title}</h3>
+      </div>
+      {children}
     </div>
   );
 }
