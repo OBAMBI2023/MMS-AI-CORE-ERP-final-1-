@@ -1,22 +1,32 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { startOfDay, startOfMonth, subDays, subMonths, addDays } from "date-fns";
 import {
   Percent,
-  BedDouble,
   LogIn,
   LogOut,
   CalendarPlus,
-  DoorOpen,
+  ArrowLeftRight,
   Wallet,
   Sparkles,
   Building2,
+  CalendarDays,
+  ArrowRight,
 } from "lucide-react";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardKpiCard } from "@/components/mms/dashboard/DashboardKpiCard";
+import { HotelAvailabilityCalendar } from "@/components/hotel/HotelAvailabilityCalendar";
 import { formatCurrency } from "@/lib/mms/format";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/providers/TenantProvider";
+import { useHotelBillingData } from "@/hooks/use-hotel-billing";
+
+const db = supabase as any;
 
 type ActionColor = "primary" | "emerald" | "sky" | "amber";
 
@@ -28,10 +38,16 @@ const ACTION_COLOR_CLASSES: Record<ActionColor, string> = {
 };
 
 const QUICK_ACTIONS = [
-  { title: "Nouvelle réservation", icon: CalendarPlus, route: "/hotel/reservations", color: "primary" as ActionColor },
-  { title: "Walk-in", icon: DoorOpen, route: "/hotel/reservations", color: "emerald" as ActionColor },
-  { title: "Check-in", icon: LogIn, route: "/hotel/checkin-checkout", color: "sky" as ActionColor },
-  { title: "Check-out", icon: LogOut, route: "/hotel/checkin-checkout", color: "amber" as ActionColor },
+  { title: "Nouvelle réservation", subtitle: null as string | null, icon: CalendarPlus, route: "/hotel/reservations", color: "primary" as ActionColor },
+  { title: "Arrivées / Départs", subtitle: "Check-in & Check-out", icon: ArrowLeftRight, route: "/hotel/checkin-checkout", color: "sky" as ActionColor },
+];
+
+type RevenuePeriod = "today" | "week" | "month";
+
+const REVENUE_PERIODS: { key: RevenuePeriod; label: string }[] = [
+  { key: "today", label: "Aujourd'hui" },
+  { key: "week", label: "7 jours" },
+  { key: "month", label: "Ce mois" },
 ];
 
 const TODAY_RESERVATIONS = [
@@ -46,27 +62,6 @@ const RESERVATION_STATUS_CLASSES: Record<(typeof TODAY_RESERVATIONS)[number]["st
   "En attente": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
 };
 
-type RoomStatus = "libre" | "occupee" | "nettoyage" | "maintenance" | "reservee";
-
-const ROOM_STATUS_META: Record<RoomStatus, { label: string; className: string }> = {
-  libre: { label: "Libre", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
-  occupee: { label: "Occupée", className: "bg-primary/15 text-primary" },
-  nettoyage: { label: "Nettoyage", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  maintenance: { label: "Maintenance", className: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
-  reservee: { label: "Réservée", className: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
-};
-
-const ROOM_GRID: { number: string; status: RoomStatus }[] = [
-  { number: "101", status: "occupee" }, { number: "102", status: "libre" }, { number: "103", status: "nettoyage" },
-  { number: "104", status: "occupee" }, { number: "105", status: "reservee" }, { number: "106", status: "libre" },
-  { number: "107", status: "occupee" }, { number: "108", status: "reservee" }, { number: "109", status: "libre" },
-  { number: "110", status: "occupee" }, { number: "111", status: "maintenance" }, { number: "112", status: "libre" },
-  { number: "201", status: "occupee" }, { number: "202", status: "libre" }, { number: "203", status: "occupee" },
-  { number: "204", status: "reservee" }, { number: "205", status: "nettoyage" }, { number: "206", status: "libre" },
-  { number: "207", status: "occupee" }, { number: "208", status: "libre" }, { number: "209", status: "occupee" },
-  { number: "210", status: "libre" }, { number: "211", status: "occupee" }, { number: "212", status: "libre" },
-];
-
 const HOUSEKEEPING_TASKS = [
   { id: 1, room: "Chambre 205", task: "Nettoyage complet", progress: 100 },
   { id: 2, room: "Chambre 111", task: "Maintenance plomberie", progress: 40 },
@@ -75,11 +70,131 @@ const HOUSEKEEPING_TASKS = [
 ];
 
 const CARD_CLASS = "rounded-[24px] dark:bg-[#0F2E28] dark:border-white/5";
+const MAX_TODAY_LIST_ITEMS = 5;
+
+function formatFrShortDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return "—";
+  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long" });
+}
+
+function formatFrTime(isoStr: string | null | undefined): string | null {
+  if (!isoStr) return null;
+  const date = new Date(isoStr);
+  if (isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
 
 function HotelDashboard() {
-  const occupiedRooms = ROOM_GRID.filter((r) => r.status === "occupee").length;
-  const totalRooms = ROOM_GRID.length;
-  const occupancyRate = Math.round((occupiedRooms / totalRooms) * 100);
+  const { profile } = useTenant();
+  const tenantId = profile?.tenant_id;
+  const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("today");
+
+  const roomsQuery = useQuery({
+    queryKey: ["hotel_rooms", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("hotel_rooms")
+        .select("*,hotel_room_types(name,amenities)")
+        .eq("tenant_id", tenantId)
+        .order("number", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as { id: string; status: string }[];
+    },
+  });
+
+  const paymentsQuery = useQuery({
+    queryKey: ["hotel-payments-dashboard", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("hotel_reservation_payments")
+        .select("amount,paid_at")
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      return (data ?? []) as { amount: number; paid_at: string }[];
+    },
+  });
+
+  const totalRooms = roomsQuery.data?.length ?? 0;
+  const occupiedRooms = (roomsQuery.data ?? []).filter((r) => r.status === "occupied").length;
+  const availableRooms = (roomsQuery.data ?? []).filter((r) => r.status === "available").length;
+  const occupancyRate = totalRooms ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+
+  const revenueByPeriod = useMemo(() => {
+    const payments = paymentsQuery.data ?? [];
+    const sumBetween = (start: Date, end: Date) =>
+      payments.reduce((sum, p) => {
+        const t = new Date(p.paid_at).getTime();
+        return t >= start.getTime() && t < end.getTime() ? sum + Number(p.amount || 0) : sum;
+      }, 0);
+
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const tomorrowStart = addDays(todayStart, 1);
+    const yesterdayStart = subDays(todayStart, 1);
+    const sevenDaysAgoStart = subDays(todayStart, 6);
+    const prevSevenStart = subDays(sevenDaysAgoStart, 7);
+    const monthStart = startOfMonth(now);
+    const prevMonthStart = startOfMonth(subMonths(now, 1));
+
+    return {
+      today: { value: sumBetween(todayStart, tomorrowStart), previous: sumBetween(yesterdayStart, todayStart) },
+      week: { value: sumBetween(sevenDaysAgoStart, tomorrowStart), previous: sumBetween(prevSevenStart, sevenDaysAgoStart) },
+      month: { value: sumBetween(monthStart, tomorrowStart), previous: sumBetween(prevMonthStart, monthStart) },
+    };
+  }, [paymentsQuery.data]);
+
+  const activeRevenue = revenueByPeriod[revenuePeriod];
+  const revenueTrend = activeRevenue.previous > 0
+    ? ((activeRevenue.value - activeRevenue.previous) / activeRevenue.previous) * 100
+    : null;
+
+  const billing = useHotelBillingData();
+  const reservations = billing.data?.reservations ?? [];
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+  const arrivalsToday = reservations.filter(
+    (r) => ["pending", "confirmed"].includes(r.status) && r.check_in === todayIso,
+  ).length;
+  const departuresToday = reservations.filter(
+    (r) => r.status === "checked_in" && r.check_out === todayIso,
+  ).length;
+
+  const guestsById = useMemo(
+    () => new Map((billing.data?.guests ?? []).map((g) => [g.id, g])),
+    [billing.data?.guests],
+  );
+  const roomsById = useMemo(
+    () => new Map((billing.data?.rooms ?? []).map((r: any) => [r.id, r])),
+    [billing.data?.rooms],
+  );
+  const calendarRooms = useMemo(
+    () =>
+      (billing.data?.rooms ?? [])
+        .map((r: any) => ({ id: r.id, number: r.number, typeName: r.hotel_room_types?.name ?? null }))
+        .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true })),
+    [billing.data?.rooms],
+  );
+
+  const roomLabel = (roomId: string) => {
+    const room = roomsById.get(roomId) as any;
+    return room ? room.number : "—";
+  };
+  const guestLabel = (guestId: string | null) => {
+    const guest = guestId ? guestsById.get(guestId) : null;
+    return guest ? `${guest.first_name} ${guest.last_name}`.trim() : "Client de passage";
+  };
+  const arrivalsTodayList = reservations.filter(
+    (r) => ["pending", "confirmed"].includes(r.status) && r.check_in === todayIso,
+  );
+  const departuresTodayList = reservations.filter(
+    (r) => r.status === "checked_in" && r.check_out === todayIso,
+  );
 
   const today = useMemo(
     () =>
@@ -114,8 +229,8 @@ function HotelDashboard() {
             <div className="mt-5 flex divide-x divide-white/15 overflow-hidden rounded-2xl bg-white/10">
               {[
                 { key: "occupation", icon: Percent, label: "Occupation", value: `${occupancyRate}%` },
-                { key: "arrivees", icon: LogIn, label: "Arrivées", value: 8 },
-                { key: "departs", icon: LogOut, label: "Départs", value: 5 },
+                { key: "arrivees", icon: LogIn, label: "Arrivées", value: arrivalsToday },
+                { key: "departs", icon: LogOut, label: "Départs", value: departuresToday },
               ].map((stat) => (
                 <div key={stat.key} className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 sm:px-3">
                   <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
@@ -134,7 +249,7 @@ function HotelDashboard() {
         {/* Actions Rapides */}
         <div className="space-y-3">
           <h2 className="text-lg font-bold">Actions rapides</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {QUICK_ACTIONS.map((action, i) => (
               <motion.div
                 key={action.title}
@@ -152,6 +267,9 @@ function HotelDashboard() {
                     <action.icon className="h-4 w-4" />
                   </div>
                   <span className="text-center text-[11px] font-medium leading-tight">{action.title}</span>
+                  {action.subtitle && (
+                    <span className="text-center text-[10px] leading-tight text-muted-foreground">{action.subtitle}</span>
+                  )}
                 </Link>
               </motion.div>
             ))}
@@ -159,43 +277,144 @@ function HotelDashboard() {
         </div>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <DashboardKpiCard
             index={0}
             title="Taux d'occupation"
             value={`${occupancyRate}%`}
             icon={Percent}
             route="/hotel/chambres"
-            trend={4.2}
+            trend={null}
             accent="primary"
           />
           <DashboardKpiCard
             index={1}
-            title="Chambres occupées"
-            value={`${occupiedRooms} / ${totalRooms}`}
-            icon={BedDouble}
-            route="/hotel/chambres"
-            trend={2.1}
-            accent="emerald"
-          />
-          <DashboardKpiCard
-            index={2}
             title="Arrivées du jour"
-            value="8"
+            value={String(arrivalsToday)}
             icon={LogIn}
             route="/hotel/checkin-checkout"
             trend={null}
             accent="sky"
           />
           <DashboardKpiCard
-            index={3}
+            index={2}
             title="Départs du jour"
-            value="5"
+            value={String(departuresToday)}
             icon={LogOut}
             route="/hotel/checkin-checkout"
             trend={null}
             accent="amber"
           />
+        </div>
+
+        {/* Disponibilité des logements */}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-4">
+          <Card className={cn("p-4 sm:p-6 lg:col-span-3", CARD_CLASS)}>
+            <HotelAvailabilityCalendar
+              rooms={calendarRooms}
+              reservations={reservations as any}
+              guestsById={guestsById as any}
+            />
+          </Card>
+
+          <div className="flex flex-col gap-4 sm:gap-6 lg:col-span-1">
+            <Card className={cn("p-4 sm:p-6", CARD_CLASS)}>
+              <h3 className="font-bold mb-2 flex items-center gap-2">
+                <LogIn className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                Arrivées du jour{arrivalsTodayList.length > 0 ? ` · ${arrivalsTodayList.length}` : ""}
+              </h3>
+              {arrivalsTodayList.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Aucune arrivée prévue aujourd'hui.</p>
+              ) : (
+                <>
+                  <ul className="divide-y divide-border">
+                    {arrivalsTodayList.slice(0, MAX_TODAY_LIST_ITEMS).map((r) => {
+                      const arrivalTime = formatFrTime(r.actual_check_in_at);
+                      return (
+                        <li key={r.id}>
+                          <Link
+                            to="/hotel/checkin-checkout"
+                            className="-mx-1 flex flex-col gap-1 rounded-lg px-1 py-2.5 text-sm transition-colors hover:bg-muted/60"
+                          >
+                            <p className="truncate font-semibold">{guestLabel(r.guest_id)}</p>
+                            <p className="truncate text-xs text-muted-foreground">Chambre {roomLabel(r.room_id)}</p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+                              <span className="text-xs font-medium">{formatFrShortDate(r.check_in)}</span>
+                              {arrivalTime && <span className="text-xs text-muted-foreground">à {arrivalTime}</span>}
+                              <span className="rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400">
+                                Aujourd'hui
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              Départ le {formatFrShortDate(r.check_out)}
+                            </p>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {arrivalsTodayList.length > MAX_TODAY_LIST_ITEMS && (
+                    <Link
+                      to="/hotel/checkin-checkout"
+                      className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
+                    >
+                      Voir les {arrivalsTodayList.length} arrivées <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  )}
+                </>
+              )}
+            </Card>
+
+            <Card className={cn("p-4 sm:p-6", CARD_CLASS)}>
+              <h3 className="font-bold mb-2 flex items-center gap-2">
+                <LogOut className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                Départs du jour{departuresTodayList.length > 0 ? ` · ${departuresTodayList.length}` : ""}
+              </h3>
+              {departuresTodayList.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Aucun départ prévu aujourd'hui.</p>
+              ) : (
+                <>
+                  <ul className="divide-y divide-border">
+                    {departuresTodayList.slice(0, MAX_TODAY_LIST_ITEMS).map((r) => {
+                      const departureTime = formatFrTime(r.actual_check_out_at);
+                      return (
+                        <li key={r.id}>
+                          <Link
+                            to="/hotel/checkin-checkout"
+                            className="-mx-1 flex flex-col gap-1 rounded-lg px-1 py-2.5 text-sm transition-colors hover:bg-muted/60"
+                          >
+                            <p className="truncate font-semibold">{guestLabel(r.guest_id)}</p>
+                            <p className="truncate text-xs text-muted-foreground">Chambre {roomLabel(r.room_id)}</p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                              <span className="text-xs font-medium">{formatFrShortDate(r.check_out)}</span>
+                              {departureTime && <span className="text-xs text-muted-foreground">à {departureTime}</span>}
+                              <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                Aujourd'hui
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              Arrivé le {formatFrShortDate(r.check_in)}
+                            </p>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {departuresTodayList.length > MAX_TODAY_LIST_ITEMS && (
+                    <Link
+                      to="/hotel/checkin-checkout"
+                      search={{ tab: "departures" } as never}
+                      className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold text-amber-600 hover:underline dark:text-amber-400"
+                    >
+                      Voir les {departuresTodayList.length} départs <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  )}
+                </>
+              )}
+            </Card>
+          </div>
         </div>
 
         {/* Widgets */}
@@ -213,23 +432,48 @@ function HotelDashboard() {
                   />
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {occupiedRooms} chambres occupées sur {totalRooms}
+                  {occupiedRooms} / {totalRooms} chambres occupées
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {availableRooms} chambres disponibles
                 </p>
               </div>
             </div>
           </Card>
 
-          {/* Revenus du jour */}
+          {/* Revenus */}
           <Card className={cn("p-4 sm:p-6", CARD_CLASS)}>
-            <h3 className="font-bold mb-4 flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-primary" /> Revenus du jour
-            </h3>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(1245000)}</p>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-bold flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-primary" /> Revenus
+              </h3>
+              <Tabs value={revenuePeriod} onValueChange={(v) => setRevenuePeriod(v as RevenuePeriod)}>
+                <TabsList className="h-8 grid grid-cols-3 w-full sm:inline-flex sm:w-auto">
+                  {REVENUE_PERIODS.map((period) => (
+                    <TabsTrigger key={period.key} value={period.key} className="px-2 py-1 text-[11px] sm:text-xs">
+                      {period.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(activeRevenue.value)}</p>
+            {revenueTrend !== null && (
+              <p
+                className={cn(
+                  "mt-1 text-xs font-semibold",
+                  revenueTrend >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
+                )}
+              >
+                {revenueTrend >= 0 ? "+" : ""}
+                {revenueTrend.toFixed(1)}% vs période précédente
+              </p>
+            )}
             <p className="mt-2 text-xs text-muted-foreground">Hébergement, restauration et services inclus</p>
           </Card>
 
           {/* Réservations du jour */}
-          <Card className={cn("p-4 sm:p-6 lg:row-span-2", CARD_CLASS)}>
+          <Card className={cn("p-4 sm:p-6", CARD_CLASS)}>
             <h3 className="font-bold mb-4">Réservations du jour</h3>
             <ul className="divide-y divide-border">
               {TODAY_RESERVATIONS.map((r) => (
@@ -249,33 +493,6 @@ function HotelDashboard() {
                 </li>
               ))}
             </ul>
-          </Card>
-
-          {/* Statut chambres */}
-          <Card className={cn("p-4 sm:p-6 lg:col-span-2", CARD_CLASS)}>
-            <h3 className="font-bold mb-4">Statut des chambres</h3>
-            <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
-              {ROOM_GRID.map((room) => (
-                <div
-                  key={room.number}
-                  title={ROOM_STATUS_META[room.status].label}
-                  className={cn(
-                    "grid aspect-square place-items-center rounded-xl text-xs font-semibold",
-                    ROOM_STATUS_META[room.status].className,
-                  )}
-                >
-                  {room.number}
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-              {(Object.keys(ROOM_STATUS_META) as RoomStatus[]).map((status) => (
-                <div key={status} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className={cn("h-2.5 w-2.5 rounded-full", ROOM_STATUS_META[status].className)} />
-                  {ROOM_STATUS_META[status].label}
-                </div>
-              ))}
-            </div>
           </Card>
 
           {/* Housekeeping */}

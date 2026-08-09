@@ -1,9 +1,9 @@
--- Run after migrations. Covers the public /essai-gratuit ERP-only signup
--- flow: profiles.status uses the canonical 'active' value, the trial lasts
+-- Run after migrations. Covers the public /essai-gratuit signup flow:
+-- profiles.status uses the canonical 'active' value, the trial lasts
 -- 7 days, only the Pack Commerce générale modules get enabled, the created
--- tenant is linked back to the profile, and hôtel-like activities still
--- provision the same ERP workspace (no HOTEL branching yet). Any failed
--- assertion aborts the transaction.
+-- tenant is linked back to the profile, and the "hotel" activity is the only
+-- one that provisions a HOTEL platform_type tenant (every other activity
+-- still provisions ERP). Any failed assertion aborts the transaction.
 BEGIN;
 SELECT plan(21);
 
@@ -54,18 +54,18 @@ BEGIN
 END;
 $$;
 
--- --- platform_type stays ERP for every activity today, including hôtel ---
+-- --- platform_type is HOTEL only for the "hotel" activity ---
 SELECT is(
   (SELECT platform_type FROM public.tenants
    WHERE id = current_setting('trial_signup_test.hotel_tenant_id')::uuid),
-  'ERP',
-  'a hôtel activity still provisions an ERP platform_type tenant for now'
+  'HOTEL',
+  'the hotel activity provisions a HOTEL platform_type tenant'
 );
 SELECT is(
   (SELECT signup_activity FROM public.tenants
    WHERE id = current_setting('trial_signup_test.hotel_tenant_id')::uuid),
   'hotel',
-  'the chosen activity is persisted for a future HOTEL branch'
+  'the chosen activity is persisted on the tenant'
 );
 SELECT is(
   (SELECT platform_type FROM public.tenants

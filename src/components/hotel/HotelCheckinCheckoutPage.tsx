@@ -71,6 +71,11 @@ function todayISO() {
 }
 
 type Tab = "arrivals" | "inhouse" | "departures" | "history";
+
+function initialTabFromUrl(): Tab {
+  const requested = new URLSearchParams(window.location.search).get("tab");
+  return requested === "departures" || requested === "inhouse" || requested === "history" ? requested : "arrivals";
+}
 type ActionState = { mode: "checkin" | "checkout"; reservation: HotelBillingReservation } | null;
 
 export function HotelCheckinCheckoutPage() {
@@ -85,7 +90,7 @@ export function HotelCheckinCheckoutPage() {
   const { data: userData } = useQuery({ queryKey: ["user"], queryFn: () => supabase.auth.getUser() });
   const userId = userData?.data?.user?.id;
 
-  const [tab, setTab] = useState<Tab>("arrivals");
+  const [tab, setTab] = useState<Tab>(initialTabFromUrl);
   const [query, setQuery] = useState("");
   const [action, setAction] = useState<ActionState>(null);
 

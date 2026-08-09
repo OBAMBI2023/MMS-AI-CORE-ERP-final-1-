@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   BedDouble,
@@ -25,6 +25,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,9 +34,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -80,8 +89,31 @@ type Reservation = {
 };
 type Guest = { id: string; first_name: string; last_name: string };
 
-type RoomForm = { name: string; price: string; status: RoomStatus; coverFile: File | null };
-const emptyForm: RoomForm = { name: "", price: "", status: "available", coverFile: null };
+type RoomForm = {
+  name: string;
+  price: string;
+  status: RoomStatus;
+  roomTypeId: string;
+  propertyType: string;
+  capacity: string;
+  coverFile: File | null;
+};
+const emptyForm: RoomForm = {
+  name: "",
+  price: "",
+  status: "available",
+  roomTypeId: "",
+  propertyType: "",
+  capacity: "1",
+  coverFile: null,
+};
+const PROPERTY_TYPE_OPTIONS: [string, string][] = [
+  ["studio", "Studio"],
+  ["2-pieces", "2 pièces"],
+  ["3-pieces", "3 pièces"],
+  ["4-pieces", "4 pièces"],
+  ["5-pieces", "5 pièces"],
+];
 // The generated Supabase types do not include the recently provisioned hotel tables yet.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -148,6 +180,7 @@ export function HotelRoomsPage() {
   const [editing, setEditing] = useState<HotelRoom | null>(null);
   const [viewing, setViewing] = useState<HotelRoom | null>(null);
   const [deleting, setDeleting] = useState<HotelRoom | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     if (tenantId) localStorage.removeItem(`saovia:hotel-room-covers:${tenantId}`);
@@ -177,6 +210,20 @@ export function HotelRoomsPage() {
       if (reservations.error) throw reservations.error;
       if (guests.error) throw guests.error;
       return { reservations: (reservations.data ?? []) as Reservation[], guests: (guests.data ?? []) as Guest[] };
+    },
+  });
+
+  const roomTypesQuery = useQuery({
+    queryKey: ["hotel-room-types-catalog", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("hotel_room_types")
+        .select("id,name")
+        .eq("tenant_id", tenantId)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string }[];
     },
   });
 
@@ -290,6 +337,7 @@ export function HotelRoomsPage() {
     .filter((r) => r.status === "occupied")
     .reduce((sum, r) => sum + Number(r.rate || 0), 0);
   const hasActiveFilters = Boolean(query || status !== "all" || type !== "all" || floor !== "all");
+  const hasFilterSelections = status !== "all" || type !== "all" || floor !== "all" || sort !== "name";
   const resetFilters = () => {
     setQuery("");
     setStatus("all");
@@ -347,7 +395,7 @@ export function HotelRoomsPage() {
         </>
       }
     >
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {([
           ["Total", totalRooms, BedDouble],
           ["Disponibles", (roomsQuery.data ?? []).filter((r) => r.status === "available" && !activeReservationRoomIds.has(r.id)).length, Eye],
@@ -357,24 +405,95 @@ export function HotelRoomsPage() {
           ["Maintenance", (roomsQuery.data ?? []).filter((r) => ["maintenance", "out_of_service"].includes(r.status)).length, Wrench],
           ["Taux d’occupation", `${occupancyRate}%`, TrendingUp],
           ["Revenu estimé", formatCurrency(estimatedRevenue), Wallet],
-        ] as const).map(([label, value, Icon]) => (
+        ] as const).map(([label, value, Icon], index) => (
           <div
             key={label}
-            className="group flex items-center gap-3 rounded-2xl border border-[#D8C99E]/40 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+            className={cn(
+              "group items-center gap-2.5 rounded-2xl border border-[#D8C99E]/40 bg-card px-3 py-2.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:gap-3 sm:px-4 sm:py-3.5",
+              index < 4 ? "flex" : "hidden sm:flex",
+            )}
           >
-            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105">
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105 sm:size-10">
               <Icon className="size-4" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-lg font-bold leading-none text-[#102A43] dark:text-white sm:text-xl">{value}</p>
-              <p className="mt-1.5 truncate text-[11px] text-muted-foreground">{label}</p>
+              <p className="truncate text-base font-bold leading-none text-[#102A43] dark:text-white sm:text-lg lg:text-xl">{value}</p>
+              <p className="mt-1 truncate text-[10px] text-muted-foreground sm:mt-1.5 sm:text-[11px]">{label}</p>
             </div>
           </div>
         ))}
       </section>
 
-      <div className="mt-4 rounded-2xl border bg-card p-3 shadow-sm">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))]">
+      <div className="mt-3 rounded-2xl border bg-card p-3 shadow-sm sm:mt-4">
+        {/* Mobile : recherche + bouton Filtres compacts sur une seule ligne */}
+        <div className="flex items-center gap-2 sm:hidden">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Rechercher un logement…"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+            />
+          </div>
+          <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="relative h-11 shrink-0 rounded-xl px-3.5">
+                <SlidersHorizontal className="size-4" />
+                Filtres
+                {hasFilterSelections && (
+                  <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-[#B89236]" />
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl">
+              <SheetHeader>
+                <SheetTitle>Filtres</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 space-y-3">
+                <FilterSelect value={type} onChange={setType} options={[["all", "Tous les types"], ...roomTypes.map((v) => [v, v])]} />
+                <FilterSelect
+                  icon={<SlidersHorizontal className="size-4" />}
+                  value={status}
+                  onChange={(value) => setStatus(value as typeof status)}
+                  options={[
+                    ["all", "Tous les statuts"],
+                    ["available", "Disponible"],
+                    ["occupied", "Occupé"],
+                    ["reserved", "Réservé"],
+                    ["cleaning", "Nettoyage"],
+                    ["maintenance", "Maintenance"],
+                    ["out_of_service", "Hors service"],
+                  ]}
+                />
+                <FilterSelect value={floor} onChange={setFloor} options={[["all", "Tous les étages"], ...floors.map((v) => [v, v === "—" ? "Étage non défini" : `Étage ${v}`])]} />
+                <FilterSelect
+                  value={sort}
+                  onChange={(value) => setSort(value as typeof sort)}
+                  options={[
+                    ["name", "Trier par nom"],
+                    ["price", "Trier par tarif"],
+                  ]}
+                />
+              </div>
+              <SheetFooter className="mt-5">
+                {hasActiveFilters && (
+                  <Button variant="ghost" onClick={resetFilters} className="rounded-xl">
+                    <X className="size-4" /> Réinitialiser
+                  </Button>
+                )}
+                <SheetClose asChild>
+                  <Button className="rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]">
+                    Appliquer
+                  </Button>
+                </SheetClose>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
+
+        {/* Tablette / desktop : disposition inchangée */}
+        <div className="hidden sm:grid sm:grid-cols-2 sm:gap-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))]">
           <div className="relative min-w-0 sm:col-span-2 lg:col-span-1">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -429,7 +548,7 @@ export function HotelRoomsPage() {
           <Loader2 className="size-7 animate-spin text-[#B89236]" />
         </div>
       ) : rooms.length ? (
-        <div className="mt-4 overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="mt-3 overflow-hidden rounded-xl border bg-card shadow-sm sm:mt-4">
           <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[1050px] text-sm"><thead className="bg-[#102A43] text-white"><tr>{["Photo", "Nom ou numéro", "Type", "Prix par nuit", "Capacité", "Statut", "État ménage", "Actions"].map((h) => <th key={h} className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">{h}</th>)}</tr></thead><tbody className="divide-y">
           {rooms.map((room) => (
             <RoomRow
@@ -462,6 +581,7 @@ export function HotelRoomsPage() {
         room={editing}
         image={editing ? imageFor(editing) : undefined}
         tenantId={tenantId}
+        roomTypeOptions={roomTypesQuery.data ?? []}
         onOpenChange={setFormOpen}
         onSaved={() => {
           void qc.invalidateQueries({ queryKey: ["hotel_rooms", tenantId] });
@@ -557,8 +677,10 @@ function effectiveMeta(room: HotelRoom, reserved: boolean) {
     : statusMeta[room.status as RoomStatus] ?? { label: room.status, className: "bg-slate-100 text-slate-600 ring-slate-500/15" };
 }
 
-function RoomThumbnail({ room, image }: { room: HotelRoom; image?: string }) {
-  return image ? <img src={image} alt="" className="size-12 rounded-lg object-cover" /> : <div className="grid size-12 place-items-center rounded-lg bg-[#102A43]/10 text-[#102A43]"><BedDouble className="size-5" /></div>;
+function RoomThumbnail({ room, image, size = "sm" }: { room: HotelRoom; image?: string; size?: "sm" | "lg" }) {
+  const dims = size === "lg" ? "size-24" : "size-12";
+  const iconSize = size === "lg" ? "size-8" : "size-5";
+  return image ? <img src={image} alt="" className={`${dims} rounded-lg object-cover`} /> : <div className={`grid ${dims} place-items-center rounded-lg bg-[#102A43]/10 text-[#102A43]`}><BedDouble className={iconSize} /></div>;
 }
 
 type ManageRoomProps = {
@@ -652,31 +774,35 @@ function RoomMobileCard(props: ManageRoomProps) {
   const { room, image, reserved } = props;
   const meta = effectiveMeta(room, reserved);
   return (
-    <article className="p-4 transition-colors active:bg-muted/20">
-      <div className="flex gap-3.5">
-        <div className="overflow-hidden rounded-xl">
-          <RoomThumbnail room={room} image={image} />
+    <article className="p-3.5 transition-colors active:bg-muted/20">
+      <div className="flex gap-3">
+        <div className="shrink-0 overflow-hidden rounded-xl">
+          <RoomThumbnail room={room} image={image} size="lg" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="truncate font-semibold text-[#102A43] dark:text-white">{room.number}</h3>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {room.hotel_room_types?.name ?? "Type non défini"} · {room.capacity} pers.
+                {room.hotel_room_types?.name ?? "Type non défini"}
               </p>
+              <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Users className="size-3.5" />
+                {room.capacity} pers.
+              </span>
             </div>
             <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${meta.className}`}>
               {meta.label}
             </span>
           </div>
-          <p className="mt-1.5 text-sm font-semibold text-[#9D7927] dark:text-[#E2C66E]">
-            {formatCurrency(Number(room.rate))}{" "}
-            <span className="text-[10px] font-normal text-muted-foreground">/ nuit</span>
-          </p>
+          <div className="mt-2 flex items-center justify-between border-t pt-2">
+            <p className="text-sm font-semibold text-[#9D7927] dark:text-[#E2C66E]">
+              {formatCurrency(Number(room.rate))}{" "}
+              <span className="text-[10px] font-normal text-muted-foreground">/ nuit</span>
+            </p>
+            <RoomActions {...props} />
+          </div>
         </div>
-      </div>
-      <div className="mt-3 flex items-center justify-end border-t pt-2.5">
-        <RoomActions {...props} />
       </div>
     </article>
   );
@@ -817,6 +943,7 @@ function RoomFormDialog({
   room,
   image,
   tenantId,
+  roomTypeOptions,
   onOpenChange,
   onSaved,
 }: {
@@ -824,11 +951,13 @@ function RoomFormDialog({
   room: HotelRoom | null;
   image?: string;
   tenantId?: string;
+  roomTypeOptions: { id: string; name: string }[];
   onOpenChange: (open: boolean) => void;
   onSaved: (room: HotelRoom) => void;
 }) {
   const [form, setForm] = useState<RoomForm>(emptyForm);
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(image);
+  const [attempted, setAttempted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isEdit = Boolean(room);
   const reset = () =>
@@ -838,6 +967,9 @@ function RoomFormDialog({
             name: room.number,
             price: String(room.rate),
             status: room.status as RoomStatus,
+            roomTypeId: room.room_type_id ?? "",
+            propertyType: "",
+            capacity: String(room.capacity ?? 1),
             coverFile: null,
           }
         : emptyForm,
@@ -846,6 +978,7 @@ function RoomFormDialog({
     if (open) {
       reset();
       setPreviewUrl(image);
+      setAttempted(false);
     }
   }, [open, room, image]);
   useEffect(
@@ -854,16 +987,38 @@ function RoomFormDialog({
     },
     [previewUrl],
   );
+  const errors = useMemo(() => {
+    const e: Partial<Record<"name" | "price" | "capacity" | "photo" | "propertyType", string>> = {};
+    if (!form.name.trim()) e.name = "Le nom du logement est obligatoire.";
+    const price = Number(form.price);
+    if (!form.price.trim() || !Number.isFinite(price) || price <= 0)
+      e.price = "Le tarif doit être supérieur à 0.";
+    const capacity = Number(form.capacity);
+    if (!form.capacity.trim() || !Number.isInteger(capacity) || capacity <= 0)
+      e.capacity = "Indiquez un nombre entier de personnes supérieur à 0.";
+    if (!form.propertyType) e.propertyType = "Le type de logement est obligatoire.";
+    if (!room && !form.coverFile) e.photo = "La photo de couverture est obligatoire.";
+    return e;
+  }, [form, room]);
   const save = useMutation({
     mutationFn: async () => {
       const name = form.name.trim();
       const price = Number(form.price);
+      const capacity = Number(form.capacity);
       if (!name) throw new Error("Le nom du logement est obligatoire.");
       if (!Number.isFinite(price) || price <= 0)
         throw new Error("Le tarif doit être supérieur à 0.");
+      if (!Number.isInteger(capacity) || capacity <= 0)
+        throw new Error("Le nombre de personnes doit être un entier supérieur à 0.");
       if (!room && !form.coverFile) throw new Error("La photo de couverture est obligatoire.");
       if (!tenantId) throw new Error("Aucun établissement actif.");
-      const payload = { number: name, rate: price, status: form.status };
+      const payload = {
+        number: name,
+        rate: price,
+        status: form.status,
+        capacity,
+        room_type_id: form.roomTypeId || null,
+      };
       if (room) {
         assertRoomTenant(room, tenantId);
         const newPath = form.coverFile
@@ -894,7 +1049,7 @@ function RoomFormDialog({
       }
       const { data: created, error } = await db
         .from("hotel_rooms")
-        .insert({ ...payload, tenant_id: tenantId, capacity: 1 })
+        .insert({ ...payload, tenant_id: tenantId })
         .select("*")
         .single();
       if (error) throw error;
@@ -935,6 +1090,13 @@ function RoomFormDialog({
       return URL.createObjectURL(file);
     });
   };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setAttempted(true);
+    if (Object.keys(errors).length) return;
+    save.mutate();
+  };
+
   return (
     <Dialog
       open={open}
@@ -943,103 +1105,169 @@ function RoomFormDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[24px] p-0 sm:max-w-xl">
-        <DialogHeader className="border-b p-6 pb-4">
+      <DialogContent className="grid h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.25rem)] max-w-[calc(100vw-1.25rem)] grid-rows-[auto_1fr] gap-0 overflow-hidden rounded-2xl p-0 sm:h-auto sm:max-h-[min(640px,90vh)] sm:w-full sm:max-w-lg sm:rounded-[24px]">
+        <DialogHeader className="border-b p-3.5 pb-3 sm:p-5 sm:pb-3">
           <DialogTitle>{isEdit ? "Modifier le logement" : "Ajouter un logement"}</DialogTitle>
-          <DialogDescription>
-            Renseignez les informations essentielles du logement.
-          </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            save.mutate();
-          }}
-          className="space-y-5 p-6 pt-1"
-        >
-          <div>
-            <Label text="Photo de couverture" required />
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="relative mt-2 grid aspect-[16/7] w-full place-items-center overflow-hidden rounded-2xl border border-dashed bg-muted/30 text-muted-foreground transition hover:border-[#B89236] hover:bg-[#B89236]/5"
-            >
-              {previewUrl ? (
-                <img src={previewUrl} alt="Aperçu" className="size-full object-cover" />
-              ) : (
-                <div className="text-center">
-                  <ImagePlus className="mx-auto size-7" />
-                  <p className="mt-2 text-sm font-medium">Choisir une photo</p>
-                  <p className="text-xs">JPG, PNG ou WebP · 5 Mo max.</p>
-                </div>
-              )}
-            </button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              onChange={fileChanged}
-              className="hidden"
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label text="Nom du logement" required />
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Suite 201"
-                className="field-input"
-              />
-            </div>
+        <form onSubmit={submit} className="grid grid-rows-[1fr_auto] overflow-hidden">
+          <div className="space-y-3.5 overflow-y-auto p-3.5 sm:p-5">
             <div>
-              <Label text="Tarif" required />
-              <div className="relative">
+              <Label text="Photo de couverture" required />
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={save.isPending}
+                className="group relative mt-1.5 grid h-[130px] w-full place-items-center overflow-hidden rounded-xl border border-dashed bg-muted/30 text-muted-foreground transition hover:border-[#B89236] hover:bg-[#B89236]/5 disabled:pointer-events-none disabled:opacity-60"
+              >
+                {previewUrl ? (
+                  <>
+                    <img src={previewUrl} alt="Aperçu" className="size-full object-cover" />
+                    <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                    <span className="absolute bottom-2 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                      <ImagePlus className="size-3.5" />
+                      Changer la photo
+                    </span>
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <ImagePlus className="mx-auto size-5" />
+                    <p className="mt-1.5 text-xs font-medium">Choisir une photo</p>
+                    <p className="text-[11px]">JPG, PNG ou WebP · 5 Mo max.</p>
+                  </div>
+                )}
+              </button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                onChange={fileChanged}
+                className="hidden"
+              />
+              {attempted && errors.photo && <FieldError text={errors.photo} />}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Label text="Nom du logement" required />
                 <input
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  placeholder="0"
-                  className="field-input pr-16"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Suite 201"
+                  disabled={save.isPending}
+                  className={fieldClass(attempted && Boolean(errors.name))}
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
-                  FCFA
-                </span>
+                {attempted && errors.name && <FieldError text={errors.name} />}
+              </div>
+              <div>
+                <Label text="Tarif par nuit" required />
+                <div className="relative">
+                  <input
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0"
+                    disabled={save.isPending}
+                    className={cn(fieldClass(attempted && Boolean(errors.price)), "pr-16")}
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                    FCFA
+                  </span>
+                </div>
+                {attempted && errors.price && <FieldError text={errors.price} />}
+              </div>
+              <div>
+                <Label text="Statut" required />
+                <FormSelect
+                  value={form.status}
+                  onChange={(value) => setForm({ ...form, status: value as RoomStatus })}
+                  disabled={save.isPending}
+                  options={[
+                    ["available", "Disponible"],
+                    ["occupied", "Occupé"],
+                    ["cleaning", "Nettoyage"],
+                    ["maintenance", "Maintenance"],
+                    ["out_of_service", "Hors service"],
+                  ]}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label text="Type de logement" required />
+                <FormSelect
+                  value={form.propertyType}
+                  onChange={(value) => setForm({ ...form, propertyType: value })}
+                  disabled={save.isPending}
+                  options={[["", "Sélectionner…"], ...PROPERTY_TYPE_OPTIONS]}
+                />
+                {attempted && errors.propertyType && <FieldError text={errors.propertyType} />}
               </div>
             </div>
-            <div>
-              <Label text="Statut" required />
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value as RoomStatus })}
-                className="field-input"
-              >
-                <option value="available">Disponible</option>
-                <option value="occupied">Occupé</option>
-                <option value="cleaning">Nettoyage</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="out_of_service">Hors service</option>
-              </select>
-            </div>
           </div>
-          <DialogFooter className="border-t pt-5">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="gap-2 border-t p-3.5 sm:p-5">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              disabled={save.isPending}
+              className="w-full rounded-xl sm:w-auto"
+            >
               Annuler
             </Button>
             <Button
               type="submit"
               disabled={save.isPending}
-              className="rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]"
+              className="w-full rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927] sm:w-auto"
             >
               {save.isPending && <Loader2 className="size-4 animate-spin" />}
-              {isEdit ? "Mettre à jour" : "Enregistrer"}
+              {isEdit ? "Mettre à jour" : "Ajouter le logement"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function fieldClass(hasError: boolean) {
+  return cn(
+    "mt-2 h-11 w-full rounded-xl border bg-background px-3.5 text-sm outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60",
+    hasError
+      ? "border-destructive focus:border-destructive focus:ring-destructive/15"
+      : "focus:border-[#B89236] focus:ring-[#B89236]/15",
+  );
+}
+
+function FieldError({ text }: { text: string }) {
+  return <p className="mt-1.5 text-xs text-destructive">{text}</p>;
+}
+
+function FormSelect({
+  value,
+  onChange,
+  options,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: [string, string][];
+  disabled?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={cn(fieldClass(false), "appearance-none pr-9")}
+      >
+        {options.map(([key, label]) => (
+          <option key={key} value={key}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+    </div>
   );
 }
 

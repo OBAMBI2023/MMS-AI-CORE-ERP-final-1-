@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,6 +15,7 @@ import {
   Phone,
   Plus,
   Search,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   User,
@@ -29,13 +30,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +55,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { useTenant } from "@/providers/TenantProvider";
@@ -95,7 +98,13 @@ const clientTypeMeta: Record<ClientType, { label: string; className: string }> =
     className: "bg-amber-50 text-amber-700 ring-amber-600/15 dark:bg-amber-400/10 dark:text-amber-300",
   },
 };
-const identityTypes = ["CNI", "Passeport", "Permis de conduire", "Autre"];
+type SortBy = "recent" | "name" | "stays";
+const SORT_OPTIONS: { key: SortBy; label: string }[] = [
+  { key: "recent", label: "Plus récents" },
+  { key: "name", label: "Nom (A→Z)" },
+  { key: "stays", label: "Nombre de séjours" },
+];
+const CLIENTS_PAGE_SIZE = 10;
 
 type Guest = {
   id: string;
@@ -130,8 +139,7 @@ type Stay = {
 type Room = { id: string; number: string };
 
 type GuestForm = {
-  first_name: string;
-  last_name: string;
+  full_name: string;
   client_type: ClientType;
   company: string;
   phone: string;
@@ -144,8 +152,7 @@ type GuestForm = {
   notes: string;
 };
 const emptyForm: GuestForm = {
-  first_name: "",
-  last_name: "",
+  full_name: "",
   client_type: "individuel",
   company: "",
   phone: "",
@@ -157,6 +164,11 @@ const emptyForm: GuestForm = {
   identity_document_path: "",
   notes: "",
 };
+
+function splitFullName(fullName: string): { first_name: string; last_name: string } {
+  const [firstName = "", ...rest] = fullName.trim().replace(/\s+/g, " ").split(" ");
+  return { first_name: firstName, last_name: rest.join(" ") };
+}
 
 function guestName(g: Guest) {
   return `${g.first_name} ${g.last_name}`.trim();
@@ -180,6 +192,9 @@ export function HotelClientsPage() {
   const canDelete = useActionPermission("hotel.guests.delete");
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"all" | ClientType>("all");
+  const [sortBy, setSortBy] = useState<SortBy>("recent");
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(CLIENTS_PAGE_SIZE);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Guest | null>(null);
   const [viewing, setViewing] = useState<Guest | null>(null);
@@ -233,7 +248,7 @@ export function HotelClientsPage() {
 
   const clients = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("fr");
-    return (guestsQuery.data ?? [])
+    const filtered = (guestsQuery.data ?? [])
       .filter((g) => type === "all" || (g.client_type ?? "individuel") === type)
       .filter(
         (g) =>
@@ -242,7 +257,23 @@ export function HotelClientsPage() {
             .toLocaleLowerCase("fr")
             .includes(normalized),
       );
-  }, [guestsQuery.data, query, type]);
+    if (sortBy === "name") {
+      return [...filtered].sort((a, b) => guestName(a).localeCompare(guestName(b), "fr"));
+    }
+    if (sortBy === "stays") {
+      return [...filtered].sort(
+        (a, b) => (staysByGuest.get(b.id)?.length ?? 0) - (staysByGuest.get(a.id)?.length ?? 0),
+      );
+    }
+    return filtered;
+  }, [guestsQuery.data, query, type, sortBy, staysByGuest]);
+
+  useEffect(() => {
+    setVisibleCount(CLIENTS_PAGE_SIZE);
+  }, [query, type, sortBy]);
+
+  const mobileClients = useMemo(() => clients.slice(0, visibleCount), [clients, visibleCount]);
+  const hasMoreMobileClients = visibleCount < clients.length;
 
   const now = new Date();
   const totalClients = guestsQuery.data?.length ?? 0;
@@ -257,6 +288,7 @@ export function HotelClientsPage() {
     return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
   }).length;
   const hasActiveFilters = Boolean(query || type !== "all");
+  const hasActiveMobileFilters = type !== "all" || sortBy !== "recent";
 
   const deleteGuest = useMutation({
     mutationFn: async (guest: Guest) => {
@@ -314,6 +346,7 @@ export function HotelClientsPage() {
   const resetFilters = () => {
     setQuery("");
     setType("all");
+    setSortBy("recent");
   };
 
   return (
@@ -358,15 +391,17 @@ export function HotelClientsPage() {
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {(
           [
-            ["Total clients", totalClients, Users],
-            ["Individuels", individualCount, User],
-            ["Entreprises & agences", businessCount, Building2],
-            ["Nouveaux ce mois", newThisMonthCount, Sparkles],
+            ["Total clients", totalClients, Users, false],
+            ["Individuels", individualCount, User, false],
+            ["Entreprises & agences", businessCount, Building2, true],
+            ["Nouveaux ce mois", newThisMonthCount, Sparkles, true],
           ] as const
-        ).map(([label, value, Icon]) => (
+        ).map(([label, value, Icon, hideOnMobile]) => (
           <div
             key={label}
-            className="group flex items-center gap-3 rounded-2xl border border-[#D8C99E]/40 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+            className={`group items-center gap-3 rounded-2xl border border-[#D8C99E]/40 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
+              hideOnMobile ? "hidden sm:flex" : "flex"
+            }`}
           >
             <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105">
               <Icon className="size-4" />
@@ -380,7 +415,44 @@ export function HotelClientsPage() {
       </section>
 
       <div className="mt-4 rounded-2xl border bg-card p-3 shadow-sm">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto]">
+        {/* Mobile (<640px): full-width search + filter/sort bottom sheet trigger */}
+        <div className="flex items-center gap-2 sm:hidden">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Nom, téléphone, email ou entreprise…"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-9 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Effacer la recherche"
+                className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setFilterSheetOpen(true)}
+            aria-label="Filtres et tri"
+            className="relative h-11 w-11 shrink-0 rounded-xl"
+          >
+            <SlidersHorizontal className="size-4" />
+            {hasActiveMobileFilters && (
+              <span className="absolute right-2 top-2 size-2 rounded-full bg-[#B89236]" />
+            )}
+          </Button>
+        </div>
+
+        {/* Desktop / tablet (>=640px): unchanged inline filters */}
+        <div className="hidden sm:grid sm:grid-cols-2 sm:gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto]">
           <div className="relative min-w-0">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -409,9 +481,106 @@ export function HotelClientsPage() {
         </div>
       </div>
 
+      <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-[24px] sm:hidden">
+          <SheetHeader>
+            <SheetTitle>Filtrer les clients</SheetTitle>
+            <SheetDescription>Affinez la liste par type de client ou par tri.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-5">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Type de client
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [["all", "Tous les types"], ...CLIENT_TYPES.map((t) => [t, clientTypeMeta[t].label])] as [
+                    "all" | ClientType,
+                    string,
+                  ][]
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setType(key)}
+                    className={`h-11 rounded-xl px-3.5 text-sm font-medium ring-1 transition-colors ${
+                      type === key
+                        ? "bg-[#B89236] text-white ring-[#B89236]"
+                        : "bg-background text-foreground ring-border hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Trier par
+              </p>
+              <div className="flex flex-col gap-2">
+                {SORT_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setSortBy(option.key)}
+                    className={`flex h-11 items-center justify-between rounded-xl border px-3.5 text-sm font-medium transition-colors ${
+                      sortBy === option.key
+                        ? "border-[#B89236] bg-[#B89236]/10 text-[#9D7927]"
+                        : "border-border text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {option.label}
+                    {sortBy === option.key && <span className="size-2 rounded-full bg-[#B89236]" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <SheetFooter className="mt-6 flex-row gap-2">
+            <Button type="button" variant="ghost" onClick={resetFilters} className="flex-1 rounded-xl">
+              Réinitialiser
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setFilterSheetOpen(false)}
+              className="flex-1 rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]"
+            >
+              Voir {clients.length} client{clients.length > 1 ? "s" : ""}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
       {guestsQuery.isLoading ? (
-        <div className="grid min-h-72 place-items-center">
-          <Loader2 className="size-7 animate-spin text-[#B89236]" />
+        <>
+          <div className="hidden min-h-72 place-items-center md:grid">
+            <Loader2 className="size-7 animate-spin text-[#B89236]" />
+          </div>
+          <div className="mt-4 space-y-3 md:hidden">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-xl border bg-card p-3.5 shadow-sm">
+                <Skeleton className="size-11 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-2/3 rounded" />
+                  <Skeleton className="h-3 w-1/2 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : guestsQuery.isError ? (
+        <div className="mt-4 grid min-h-72 place-items-center rounded-[24px] border border-dashed bg-muted/20 p-8 text-center">
+          <div>
+            <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-destructive/10 text-destructive">
+              <Users className="size-7" />
+            </div>
+            <h3 className="mt-4 font-semibold">Impossible de charger les clients</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Vérifiez votre connexion puis réessayez.</p>
+            <Button variant="outline" onClick={() => void guestsQuery.refetch()} className="mt-5 rounded-xl">
+              Réessayer
+            </Button>
+          </div>
         </div>
       ) : clients.length ? (
         <div className="mt-4 overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -444,7 +613,7 @@ export function HotelClientsPage() {
             </table>
           </div>
           <div className="divide-y md:hidden">
-            {clients.map((guest) => (
+            {mobileClients.map((guest) => (
               <ClientMobileCard
                 key={guest.id}
                 guest={guest}
@@ -457,6 +626,18 @@ export function HotelClientsPage() {
                 onDelete={() => setDeleting(guest)}
               />
             ))}
+            {hasMoreMobileClients && (
+              <div className="p-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setVisibleCount((count) => count + CLIENTS_PAGE_SIZE)}
+                  className="h-11 w-full rounded-xl"
+                >
+                  Charger plus ({clients.length - mobileClients.length} restants)
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -580,7 +761,7 @@ function ClientActions({ guest, canUpdate, canDelete, onView, onEdit, onReserve,
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" className="size-8 text-[#102A43] hover:bg-[#B89236]/10 hover:text-[#9D7927] dark:text-[#E2C66E]" aria-label="Plus d’actions">
+        <Button size="icon" variant="ghost" className="size-11 text-[#102A43] hover:bg-[#B89236]/10 hover:text-[#9D7927] dark:text-[#E2C66E] md:size-8" aria-label="Plus d’actions">
           <MoreVertical className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -646,27 +827,43 @@ function ClientRow(props: ManageClientProps) {
 }
 
 function ClientMobileCard(props: ManageClientProps) {
-  const { guest, stays } = props;
+  const { guest, stays, onView } = props;
+  const lastStayDate = stays.length
+    ? stays.reduce((latest, s) => (s.check_in > latest ? s.check_in : latest), stays[0].check_in)
+    : null;
   return (
-    <article className="p-4 transition-colors active:bg-muted/20">
-      <div className="flex gap-3.5">
-        <ClientAvatar guest={guest} size="size-12" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="truncate font-semibold text-[#102A43] dark:text-white">{guestName(guest)}</h3>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {guest.company || guest.phone || "Aucune coordonnée"}
-              </p>
-            </div>
-            <TypeBadge type={guest.client_type} />
-          </div>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {stays.length} séjour{stays.length > 1 ? "s" : ""}
-          </p>
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={onView}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onView();
+        }
+      }}
+      className="flex cursor-pointer items-center gap-3 p-3.5 text-left transition-colors active:bg-muted/20"
+    >
+      <ClientAvatar guest={guest} size="size-11" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="truncate text-sm font-semibold text-[#102A43] dark:text-white">{guestName(guest)}</h3>
+          <TypeBadge type={guest.client_type} />
         </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+          <span className="truncate">{guest.phone ?? "Sans téléphone"}</span>
+          <span>·</span>
+          <span className="shrink-0">
+            {stays.length} séjour{stays.length > 1 ? "s" : ""}
+          </span>
+        </div>
+        {lastStayDate && (
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            Dernier séjour : {formatDate(lastStayDate)}
+          </p>
+        )}
       </div>
-      <div className="mt-3 flex items-center justify-end border-t pt-2.5">
+      <div onClick={(event) => event.stopPropagation()} className="shrink-0">
         <ClientActions {...props} />
       </div>
     </article>
@@ -714,8 +911,7 @@ function ClientFormDialog({
     setForm(
       guest
         ? {
-            first_name: guest.first_name,
-            last_name: guest.last_name,
+            full_name: guestName(guest),
             client_type: guest.client_type ?? "individuel",
             company: guest.company ?? "",
             phone: guest.phone ?? "",
@@ -733,15 +929,18 @@ function ClientFormDialog({
   const save = useMutation({
     mutationFn: async () => {
       if (!tenantId) throw new Error("Aucun établissement actif.");
-      const firstName = form.first_name.trim();
-      const lastName = form.last_name.trim();
-      if (!firstName || !lastName) throw new Error("Le nom et le prénom sont obligatoires.");
+      const { first_name, last_name } = splitFullName(form.full_name);
+      if (!first_name || !last_name) {
+        throw new Error("Merci d’indiquer le prénom et le nom (ex : Awa Diallo).");
+      }
+      const phone = form.phone.trim();
+      if (!phone) throw new Error("Le téléphone est obligatoire.");
       const payload = {
-        first_name: firstName,
-        last_name: lastName,
+        first_name,
+        last_name,
         client_type: form.client_type,
         company: form.company.trim() || null,
-        phone: form.phone.trim() || null,
+        phone,
         email: form.email.trim() || null,
         nationality: form.nationality.trim() || null,
         address: form.address.trim() || null,
@@ -771,89 +970,63 @@ function ClientFormDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[24px] p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b p-6 pb-4">
-          <DialogTitle>{isEdit ? "Modifier le client" : "Ajouter un client"}</DialogTitle>
-          <DialogDescription>Renseignez les informations du client et de son séjour.</DialogDescription>
+      <DialogContent className="flex w-[calc(100vw-24px)] max-h-[90dvh] flex-col gap-0 overflow-hidden rounded-[20px] p-0 sm:w-full sm:max-w-[520px]">
+        <DialogHeader className="shrink-0 border-b px-4 py-4 sm:px-6">
+          <DialogTitle>{isEdit ? "Modifier le client" : "Nouveau client"}</DialogTitle>
+          <DialogDescription>Renseignez les informations essentielles du client.</DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            save.mutate();
+            if (!save.isPending) save.mutate();
           }}
-          className="space-y-5 p-6 pt-4"
+          className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Prénom" required>
-              <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} placeholder="Awa" />
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+            <Field label="Nom complet" required>
+              <Input
+                value={form.full_name}
+                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                placeholder="Ex : Awa Diallo"
+                className="h-11"
+                autoFocus
+              />
             </Field>
-            <Field label="Nom" required>
-              <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} placeholder="Diallo" />
+            <Field label="Téléphone" required>
+              <Input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="+225 07 00 00 00 00"
+                className="h-11"
+              />
             </Field>
-            <Field label="Type de client">
-              <Select value={form.client_type} onValueChange={(v) => setForm({ ...form, client_type: v as ClientType })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CLIENT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {clientTypeMeta[t].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            {(form.client_type === "entreprise" || form.client_type === "agence") && (
-              <Field label="Entreprise / agence">
-                <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Nom de l’entreprise" />
-              </Field>
-            )}
-            <Field label="Téléphone">
-              <Input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+225 07 00 00 00 00" />
-            </Field>
-            <Field label="Email">
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="client@email.com" />
-            </Field>
-            <Field label="Nationalité">
-              <Input value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} placeholder="Ivoirienne" />
-            </Field>
-            <Field label="Adresse">
-              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Adresse complète" />
-            </Field>
-            <Field label="Type de pièce d’identité">
-              <Select value={form.identity_type} onValueChange={(v) => setForm({ ...form, identity_type: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner" />
-                </SelectTrigger>
-                <SelectContent>
-                  {identityTypes.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Numéro de pièce">
-              <Input value={form.identity_number} onChange={(e) => setForm({ ...form, identity_number: e.target.value })} placeholder="N° document" />
-            </Field>
-            <div className="sm:col-span-2">
-              <Label className="mb-1.5 block">Photo de la pièce d’identité</Label>
+            <div>
+              <Label className="mb-1.5 block">Pièce d’identité</Label>
               <ImageField value={form.identity_document_path} onChange={(v) => setForm({ ...form, identity_document_path: v })} />
             </div>
-            <div className="sm:col-span-2">
+            <div>
               <Label className="mb-1.5 block">Notes</Label>
-              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Préférences, remarques…" rows={3} />
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value.slice(0, 500) })}
+                placeholder="Préférences, remarques…"
+                rows={3}
+                maxLength={500}
+              />
             </div>
           </div>
-          <DialogFooter className="border-t pt-5">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="shrink-0 border-t px-4 py-4 sm:flex-row sm:justify-end sm:gap-2 sm:px-6">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="h-11 w-full rounded-xl sm:w-auto">
               Annuler
             </Button>
-            <Button type="submit" disabled={save.isPending} className="rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]">
+            <Button
+              type="submit"
+              disabled={save.isPending}
+              className="h-11 w-full rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927] sm:w-auto"
+            >
               {save.isPending && <Loader2 className="size-4 animate-spin" />}
-              {isEdit ? "Mettre à jour" : "Enregistrer"}
+              {isEdit ? "Mettre à jour" : "Enregistrer le client"}
             </Button>
           </DialogFooter>
         </form>

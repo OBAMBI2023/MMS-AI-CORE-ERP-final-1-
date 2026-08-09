@@ -49,7 +49,7 @@ export function FeaturesPage() {
           ))}
         </div>
       </section>
-      <MarketingCta />
+      <MarketingCta ctaHref="/essai-gratuit" />
     </>
   );
 }
