@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,14 +18,12 @@ import {
   Loader2,
   Lock,
   Mail,
-  Menu,
   Phone,
   ShieldCheck,
   Sparkles,
   Timer,
   Users,
   UserRound,
-  X,
 } from "lucide-react";
 import { z } from "zod";
 import { Turnstile, type TurnstileHandle } from "@/components/Turnstile";
@@ -44,13 +42,6 @@ function resolvePostSignupRoute(_platformType: string): "/app" {
   // redirection dédiée le jour où cette expérience existera.
   return "/app";
 }
-
-const navigationItems = [
-  { label: "Accueil", to: "/" },
-  { label: "Fonctionnalités", to: "/fonctionnalites" },
-  { label: "Tarifs", to: "/tarifs" },
-  { label: "Démonstration", to: "/demo" },
-] as const;
 
 const trustBadges = [
   { icon: Calendar, label: "Essai gratuit 7 jours" },
@@ -117,9 +108,8 @@ type SignupValues = z.infer<typeof signupSchema>;
 export function TrialSignupPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -149,6 +139,18 @@ export function TrialSignupPage() {
     document
       .getElementById("formulaire-essai")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const handleGoogleSignIn = async () => {
+    setGoogleBusy(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/app` },
+    });
+    if (error) {
+      toast.error(error.message);
+      setGoogleBusy(false);
+    }
+  };
 
   const handleSignup = async (values: SignupValues) => {
     if (submissionInFlightRef.current || !turnstileToken) return;
@@ -205,107 +207,26 @@ export function TrialSignupPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[#070B18] text-white">
-      {/* Header sombre premium */}
+      {/* Header sombre premium (simplifié pour la page d'essai gratuit) */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#070B18]/95 backdrop-blur-xl">
         <nav
           aria-label="Navigation principale"
-          className="mx-auto grid h-20 max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-5 lg:px-10"
+          className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 lg:px-10"
         >
-          <Link to="/" className="flex items-center" onClick={() => setMobileNavOpen(false)}>
+          <Link to="/" className="flex items-center">
             <BrandLogo context="header" className="size-12 md:size-14" />
           </Link>
 
-          <div className="hidden items-center justify-center gap-9 lg:flex">
-            {navigationItems.map((item) => {
-              const active = pathname === item.to;
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={`group relative inline-block pb-1 text-sm font-medium transition-colors hover:text-blue-400 ${
-                    active ? "text-blue-400" : "text-slate-300"
-                  }`}
-                >
-                  {item.label}
-                  <span
-                    aria-hidden="true"
-                    className={`absolute inset-x-0 -bottom-0.5 h-0.5 origin-left rounded-full bg-gradient-to-r from-blue-400 to-violet-400 transition-transform duration-300 group-hover:scale-x-100 ${
-                      active ? "scale-x-100" : "scale-x-0"
-                    }`}
-                  />
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-end gap-2 lg:gap-3">
+          <div className="flex items-center gap-3">
+            <span className="hidden text-sm text-slate-300 sm:inline">Déjà un compte ?</span>
             <Link
               to="/login"
-              className="hidden rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 lg:inline-flex"
+              className="inline-flex rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
             >
               Se connecter
             </Link>
-            <Link
-              to="/demo"
-              className="hidden items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 lg:inline-flex"
-              style={{
-                border: "1px solid transparent",
-                backgroundImage:
-                  "linear-gradient(#070B18, #070B18), linear-gradient(to right, #3b82f6, #8b5cf6)",
-                backgroundOrigin: "border-box",
-                backgroundClip: "padding-box, border-box",
-              }}
-            >
-              Demander une démo
-            </Link>
-            <button
-              type="button"
-              className="grid h-10 w-10 place-items-center rounded-xl text-slate-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 lg:hidden"
-              onClick={() => setMobileNavOpen((open) => !open)}
-              aria-expanded={mobileNavOpen}
-              aria-controls="mobile-navigation"
-              aria-label={mobileNavOpen ? "Fermer le menu" : "Ouvrir le menu"}
-            >
-              {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
           </div>
         </nav>
-
-        {mobileNavOpen && (
-          <div
-            id="mobile-navigation"
-            className="border-t border-white/10 bg-[#070B18] px-5 py-5 lg:hidden"
-          >
-            <div className="mx-auto flex max-w-7xl flex-col gap-1">
-              {navigationItems.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setMobileNavOpen(false)}
-                  className="rounded-xl px-3 py-3 text-sm font-semibold text-slate-200 hover:bg-white/10"
-                >
-                  {item.label}
-                </Link>
-              ))}
-              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
-                <Link
-                  to="/login"
-                  onClick={() => setMobileNavOpen(false)}
-                  className="rounded-xl border border-white/15 px-4 py-3 text-center text-sm font-semibold text-slate-100"
-                >
-                  Se connecter
-                </Link>
-                <Link
-                  to="/demo"
-                  onClick={() => setMobileNavOpen(false)}
-                  className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white"
-                >
-                  Demander une démo
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
       </header>
 
       <main className="relative">
@@ -420,7 +341,23 @@ export function TrialSignupPage() {
                 </span>
               </div>
 
-              <form onSubmit={handleSubmit(handleSignup)} noValidate className="mt-7 space-y-5">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleBusy}
+                className="mt-7 flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <GoogleIcon className="h-5 w-5" />
+                Continuer avec Google
+              </button>
+
+              <div className="my-4 flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-slate-200" />
+                <span className="text-xs font-medium text-slate-400">ou</span>
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+
+              <form onSubmit={handleSubmit(handleSignup)} noValidate className="space-y-5">
                 <LightField
                   id="companyName"
                   label="Nom de l'entreprise"
@@ -702,6 +639,29 @@ export function TrialSignupPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.17.29-1.7V4.97H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.03l3-2.33Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.97l3 2.33C4.66 5.17 6.65 3.58 9 3.58Z"
+      />
+    </svg>
   );
 }
 
