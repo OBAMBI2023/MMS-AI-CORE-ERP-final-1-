@@ -165,6 +165,23 @@ const emptyForm: GuestForm = {
   notes: "",
 };
 
+// Backstop for the "hotel_guests" table: if the pre-submit duplicate check
+// (RPC check_hotel_guest_duplicate) is bypassed by a race condition, the
+// per-tenant unique index (hotel_guests_tenant_email_key /
+// hotel_guests_tenant_phone_key) still rejects the write with a 23505.
+// Surface that as the same friendly message instead of a raw Postgres error.
+function toHotelGuestDuplicateError(error: { code?: string; message?: string }): Error {
+  if (error.code !== "23505") return error as Error;
+  const message = error.message ?? "";
+  if (message.includes("hotel_guests_tenant_email_key")) {
+    return new Error("Un client avec cette adresse email existe déjà.");
+  }
+  if (message.includes("hotel_guests_tenant_phone_key")) {
+    return new Error("Un client avec ce numéro de téléphone existe déjà.");
+  }
+  return new Error("Ce client existe déjà.");
+}
+
 function splitFullName(fullName: string): { first_name: string; last_name: string } {
   const [firstName = "", ...rest] = fullName.trim().replace(/\s+/g, " ").split(" ");
   return { first_name: firstName, last_name: rest.join(" ") };
@@ -935,13 +952,30 @@ function ClientFormDialog({
       }
       const phone = form.phone.trim();
       if (!phone) throw new Error("Le téléphone est obligatoire.");
+      const email = form.email.trim();
+      if (phone || email) {
+        const { data: dup, error: dupError } = await db.rpc("check_hotel_guest_duplicate", {
+          p_tenant_id: tenantId,
+          p_email: email,
+          p_phone: phone,
+          p_exclude_id: guest ? guest.id : undefined,
+        });
+        if (dupError) throw dupError;
+        const result = dup?.[0];
+        if (result?.duplicate_phone) {
+          throw new Error("Un client avec ce numéro de téléphone existe déjà.");
+        }
+        if (result?.duplicate_email) {
+          throw new Error("Un client avec cette adresse email existe déjà.");
+        }
+      }
       const payload = {
         first_name,
         last_name,
         client_type: form.client_type,
         company: form.company.trim() || null,
         phone,
-        email: form.email.trim() || null,
+        email: email || null,
         nationality: form.nationality.trim() || null,
         address: form.address.trim() || null,
         identity_type: form.identity_type || null,
@@ -952,7 +986,7 @@ function ClientFormDialog({
       const result = guest
         ? await db.from("hotel_guests").update(payload).eq("tenant_id", tenantId).eq("id", guest.id)
         : await db.from("hotel_guests").insert({ ...payload, tenant_id: tenantId });
-      if (result.error) throw result.error;
+      if (result.error) throw toHotelGuestDuplicateError(result.error);
     },
     onSuccess: () => {
       toast.success(isEdit ? "Client mis à jour" : "Client ajouté");

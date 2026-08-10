@@ -15,6 +15,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      _clients_cleanup_backup_20260809: {
+        Row: {
+          address: string | null
+          backup_taken_at: string
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string | null
+          notes: string | null
+          phone: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          backup_taken_at?: string
+          created_at?: string | null
+          email?: string | null
+          id: string
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          backup_taken_at?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       achat_items: {
         Row: {
           achat_id: string
@@ -1283,6 +1322,65 @@ export type Database = {
           },
         ]
       }
+      hotel_expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string
+          expense_date: string
+          id: string
+          notes: string | null
+          payee: string | null
+          payment_method: string | null
+          receipt_path: string | null
+          reference: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          payee?: string | null
+          payment_method?: string | null
+          receipt_path?: string | null
+          reference?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          payee?: string | null
+          payment_method?: string | null
+          receipt_path?: string | null
+          reference?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_expenses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_guest_companions: {
         Row: {
           full_name: string
@@ -1737,7 +1835,9 @@ export type Database = {
           created_at: string
           id: string
           number: string
+          property_type: string | null
           rate: number
+          room_count: number | null
           room_type_id: string | null
           status: string
           tenant_id: string
@@ -1750,7 +1850,9 @@ export type Database = {
           created_at?: string
           id?: string
           number: string
+          property_type?: string | null
           rate?: number
+          room_count?: number | null
           room_type_id?: string | null
           status?: string
           tenant_id: string
@@ -1763,7 +1865,9 @@ export type Database = {
           created_at?: string
           id?: string
           number?: string
+          property_type?: string | null
           rate?: number
+          room_count?: number | null
           room_type_id?: string | null
           status?: string
           tenant_id?: string
@@ -4268,6 +4372,18 @@ export type Database = {
         }[]
       }
       check_fournisseur_duplicate: {
+        Args: {
+          p_email: string
+          p_exclude_id?: string
+          p_phone: string
+          p_tenant_id: string
+        }
+        Returns: {
+          duplicate_email: boolean
+          duplicate_phone: boolean
+        }[]
+      }
+      check_hotel_guest_duplicate: {
         Args: {
           p_email: string
           p_exclude_id?: string

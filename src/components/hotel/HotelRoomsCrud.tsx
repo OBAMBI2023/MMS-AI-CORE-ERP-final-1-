@@ -1,4 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { motion } from "framer-motion";
 import {
   BedDouble,
@@ -79,6 +89,8 @@ type HotelRoom = {
   updated_at: string;
   cover_image_path: string | null;
   room_type_id: string | null;
+  property_type: string | null;
+  room_count: number | null;
   amenities: string[];
   hotel_room_types?: { name: string; amenities: string[] } | null;
 };
@@ -95,6 +107,7 @@ type RoomForm = {
   status: RoomStatus;
   roomTypeId: string;
   propertyType: string;
+  roomCount: string;
   capacity: string;
   coverFile: File | null;
 };
@@ -104,16 +117,28 @@ const emptyForm: RoomForm = {
   status: "available",
   roomTypeId: "",
   propertyType: "",
+  roomCount: "",
   capacity: "1",
   coverFile: null,
 };
+// Broad property category — independent from the free-form room count and from the
+// tenant-defined hotel_room_types catalog (e.g. "Suite Deluxe"). Studio always has 1 room.
 const PROPERTY_TYPE_OPTIONS: [string, string][] = [
   ["studio", "Studio"],
-  ["2-pieces", "2 pièces"],
-  ["3-pieces", "3 pièces"],
-  ["4-pieces", "4 pièces"],
-  ["5-pieces", "5 pièces"],
+  ["chambre", "Chambre"],
+  ["appartement", "Appartement"],
+  ["suite", "Suite"],
+  ["villa", "Villa"],
+  ["maison", "Maison"],
+  ["autre", "Autre"],
 ];
+const PROPERTY_TYPE_LABELS: Record<string, string> = Object.fromEntries(PROPERTY_TYPE_OPTIONS);
+// Studio is always a single room; other property types take a free room count (1-99).
+function resolveRoomCount(propertyType: string, roomCountInput: string): number | null {
+  if (propertyType === "studio") return 1;
+  const value = Number(roomCountInput);
+  return Number.isInteger(value) && value >= 1 && value <= 99 ? value : null;
+}
 // The generated Supabase types do not include the recently provisioned hotel tables yet.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -174,7 +199,6 @@ export function HotelRoomsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | RoomStatus | "reserved">("all");
   const [type, setType] = useState("all");
-  const [floor, setFloor] = useState("all");
   const [sort, setSort] = useState<"name" | "price">("name");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<HotelRoom | null>(null);
@@ -255,22 +279,19 @@ export function HotelRoomsPage() {
     ).map((r) => r.room_id));
   }, [contextQuery.data]);
   const roomTypes = useMemo(() => Array.from(new Set((roomsQuery.data ?? []).map((r) => r.hotel_room_types?.name).filter(Boolean) as string[])).sort(), [roomsQuery.data]);
-  const roomFloor = (room: HotelRoom) => room.number.match(/\d+/)?.[0]?.slice(0, -2) || "—";
-  const floors = useMemo(() => Array.from(new Set((roomsQuery.data ?? []).map(roomFloor))).sort(), [roomsQuery.data]);
 
   const rooms = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("fr");
     return (roomsQuery.data ?? [])
       .filter((room) => status === "all" || (status === "reserved" ? activeReservationRoomIds.has(room.id) : room.status === status))
       .filter((room) => type === "all" || room.hotel_room_types?.name === type)
-      .filter((room) => floor === "all" || roomFloor(room) === floor)
       .filter((room) => !normalized || room.number.toLocaleLowerCase("fr").includes(normalized))
       .sort((a, b) =>
         sort === "price"
           ? Number(a.rate) - Number(b.rate)
           : a.number.localeCompare(b.number, "fr", { numeric: true }),
       );
-  }, [activeReservationRoomIds, floor, query, roomsQuery.data, sort, status, type]);
+  }, [activeReservationRoomIds, query, roomsQuery.data, sort, status, type]);
 
   const changeRoomStatus = useMutation({
     mutationFn: async ({ room, status }: { room: HotelRoom; status: RoomStatus }) => {
@@ -336,13 +357,12 @@ export function HotelRoomsPage() {
   const estimatedRevenue = (roomsQuery.data ?? [])
     .filter((r) => r.status === "occupied")
     .reduce((sum, r) => sum + Number(r.rate || 0), 0);
-  const hasActiveFilters = Boolean(query || status !== "all" || type !== "all" || floor !== "all");
-  const hasFilterSelections = status !== "all" || type !== "all" || floor !== "all" || sort !== "name";
+  const hasActiveFilters = Boolean(query || status !== "all" || type !== "all");
+  const hasFilterSelections = status !== "all" || type !== "all" || sort !== "name";
   const resetFilters = () => {
     setQuery("");
     setStatus("all");
     setType("all");
-    setFloor("all");
     setSort("name");
   };
 
@@ -466,7 +486,6 @@ export function HotelRoomsPage() {
                     ["out_of_service", "Hors service"],
                   ]}
                 />
-                <FilterSelect value={floor} onChange={setFloor} options={[["all", "Tous les étages"], ...floors.map((v) => [v, v === "—" ? "Étage non défini" : `Étage ${v}`])]} />
                 <FilterSelect
                   value={sort}
                   onChange={(value) => setSort(value as typeof sort)}
@@ -493,7 +512,7 @@ export function HotelRoomsPage() {
         </div>
 
         {/* Tablette / desktop : disposition inchangée */}
-        <div className="hidden sm:grid sm:grid-cols-2 sm:gap-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))]">
+        <div className="hidden sm:grid sm:grid-cols-2 sm:gap-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
           <div className="relative min-w-0 sm:col-span-2 lg:col-span-1">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -518,7 +537,6 @@ export function HotelRoomsPage() {
               ["out_of_service", "Hors service"],
             ]}
           />
-          <FilterSelect value={floor} onChange={setFloor} options={[["all", "Tous les étages"], ...floors.map((v) => [v, v === "—" ? "Étage non défini" : `Étage ${v}`])]} />
           <div className="flex items-center gap-2">
             <FilterSelect
               value={sort}
@@ -549,7 +567,7 @@ export function HotelRoomsPage() {
         </div>
       ) : rooms.length ? (
         <div className="mt-3 overflow-hidden rounded-xl border bg-card shadow-sm sm:mt-4">
-          <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[1050px] text-sm"><thead className="bg-[#102A43] text-white"><tr>{["Photo", "Nom ou numéro", "Type", "Prix par nuit", "Capacité", "Statut", "État ménage", "Actions"].map((h) => <th key={h} className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">{h}</th>)}</tr></thead><tbody className="divide-y">
+          <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[820px] text-sm"><thead className="bg-[#102A43] text-white"><tr>{["Photo", "Nom ou numéro", "Type", "Prix par nuit", "Statut", "Actions"].map((h) => <th key={h} className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">{h}</th>)}</tr></thead><tbody className="divide-y">
           {rooms.map((room) => (
             <RoomRow
               key={room.id}
@@ -570,7 +588,7 @@ export function HotelRoomsPage() {
         </div>
       ) : (
         <EmptyState
-          filtered={Boolean(query || status !== "all" || type !== "all" || floor !== "all")}
+          filtered={Boolean(query || status !== "all" || type !== "all")}
           canCreate={canCreate}
           onCreate={openCreate}
         />
@@ -678,9 +696,16 @@ function effectiveMeta(room: HotelRoom, reserved: boolean) {
 }
 
 function RoomThumbnail({ room, image, size = "sm" }: { room: HotelRoom; image?: string; size?: "sm" | "lg" }) {
-  const dims = size === "lg" ? "size-24" : "size-12";
-  const iconSize = size === "lg" ? "size-8" : "size-5";
-  return image ? <img src={image} alt="" className={`${dims} rounded-lg object-cover`} /> : <div className={`grid ${dims} place-items-center rounded-lg bg-[#102A43]/10 text-[#102A43]`}><BedDouble className={iconSize} /></div>;
+  // Uniform 16:9 crop everywhere a room photo appears (table, mobile card, detail banner).
+  const dims = size === "lg" ? "aspect-video h-16" : "aspect-video h-10";
+  const iconSize = size === "lg" ? "size-6" : "size-4";
+  return image ? (
+    <img src={image} alt="" className={`${dims} rounded-lg object-cover`} />
+  ) : (
+    <div className={`grid ${dims} shrink-0 place-items-center rounded-lg bg-[#102A43]/10 text-[#102A43]`}>
+      <BedDouble className={iconSize} />
+    </div>
+  );
 }
 
 type ManageRoomProps = {
@@ -760,12 +785,10 @@ function RoomRow(props: ManageRoomProps) {
   const { room, image, reserved } = props; const meta = effectiveMeta(room, reserved);
   return <tr className="hover:bg-muted/30">
     <td className="px-3 py-2"><RoomThumbnail room={room} image={image} /></td>
-    <td className="px-3 py-2 font-semibold text-[#102A43] dark:text-white">{room.number}</td>
-    <td className="px-3 py-2 text-muted-foreground">{room.hotel_room_types?.name ?? "—"}</td>
+    <td className="min-w-[160px] px-3 py-2 font-semibold text-[#102A43] dark:text-white">{room.number}</td>
+    <td className="min-w-[140px] px-3 py-2 text-muted-foreground">{room.hotel_room_types?.name ?? "—"}</td>
     <td className="px-3 py-2 font-medium">{formatCurrency(Number(room.rate))}</td>
-    <td className="px-3 py-2"><span className="inline-flex items-center gap-1"><Users className="size-3.5 text-muted-foreground" />{room.capacity}</span></td>
     <td className="px-3 py-2"><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ring-1 ${meta.className}`}>{meta.label}</span></td>
-    <td className="px-3 py-2 text-xs text-muted-foreground">{room.status === "cleaning" ? "À nettoyer" : "—"}</td>
     <td className="px-3 py-2"><RoomActions {...props} /></td>
   </tr>;
 }
@@ -968,7 +991,8 @@ function RoomFormDialog({
             price: String(room.rate),
             status: room.status as RoomStatus,
             roomTypeId: room.room_type_id ?? "",
-            propertyType: "",
+            propertyType: room.property_type ?? "",
+            roomCount: room.room_count != null ? String(room.room_count) : "",
             capacity: String(room.capacity ?? 1),
             coverFile: null,
           }
@@ -988,7 +1012,7 @@ function RoomFormDialog({
     [previewUrl],
   );
   const errors = useMemo(() => {
-    const e: Partial<Record<"name" | "price" | "capacity" | "photo" | "propertyType", string>> = {};
+    const e: Partial<Record<"name" | "price" | "capacity" | "photo" | "propertyType" | "roomCount", string>> = {};
     if (!form.name.trim()) e.name = "Le nom du logement est obligatoire.";
     const price = Number(form.price);
     if (!form.price.trim() || !Number.isFinite(price) || price <= 0)
@@ -997,6 +1021,8 @@ function RoomFormDialog({
     if (!form.capacity.trim() || !Number.isInteger(capacity) || capacity <= 0)
       e.capacity = "Indiquez un nombre entier de personnes supérieur à 0.";
     if (!form.propertyType) e.propertyType = "Le type de logement est obligatoire.";
+    else if (resolveRoomCount(form.propertyType, form.roomCount) === null)
+      e.roomCount = "Indiquez un nombre de pièces entre 1 et 99.";
     if (!room && !form.coverFile) e.photo = "La photo de couverture est obligatoire.";
     return e;
   }, [form, room]);
@@ -1010,6 +1036,9 @@ function RoomFormDialog({
         throw new Error("Le tarif doit être supérieur à 0.");
       if (!Number.isInteger(capacity) || capacity <= 0)
         throw new Error("Le nombre de personnes doit être un entier supérieur à 0.");
+      if (!form.propertyType) throw new Error("Le type de logement est obligatoire.");
+      const roomCount = resolveRoomCount(form.propertyType, form.roomCount);
+      if (roomCount === null) throw new Error("Indiquez un nombre de pièces entre 1 et 99.");
       if (!room && !form.coverFile) throw new Error("La photo de couverture est obligatoire.");
       if (!tenantId) throw new Error("Aucun établissement actif.");
       const payload = {
@@ -1018,6 +1047,8 @@ function RoomFormDialog({
         status: form.status,
         capacity,
         room_type_id: form.roomTypeId || null,
+        property_type: form.propertyType,
+        room_count: roomCount,
       };
       if (room) {
         assertRoomTenant(room, tenantId);
@@ -1078,9 +1109,7 @@ function RoomFormDialog({
     },
     onError: (error: Error) => toast.error(error.message),
   });
-  const fileChanged = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const applyFile = (file: File) => {
     if (!ALLOWED_IMAGE_TYPES.has(file.type))
       return toast.error("Formats acceptés : JPG, PNG et WebP.");
     if (file.size > MAX_IMAGE_SIZE) return toast.error("La photo ne doit pas dépasser 5 Mo.");
@@ -1089,6 +1118,31 @@ function RoomFormDialog({
       if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
       return URL.createObjectURL(file);
     });
+  };
+  const fileChanged = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) applyFile(file);
+    event.target.value = "";
+  };
+  const removeFile = () => {
+    setForm((current) => ({ ...current, coverFile: null }));
+    setPreviewUrl((current) => {
+      if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
+      return image;
+    });
+  };
+  const [dragActive, setDragActive] = useState(false);
+  const dropzoneKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      inputRef.current?.click();
+    }
+  };
+  const dropFile = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) applyFile(file);
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -1113,29 +1167,60 @@ function RoomFormDialog({
           <div className="space-y-3.5 overflow-y-auto p-3.5 sm:p-5">
             <div>
               <Label text="Photo de couverture" required />
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                disabled={save.isPending}
-                className="group relative mt-1.5 grid h-[130px] w-full place-items-center overflow-hidden rounded-xl border border-dashed bg-muted/30 text-muted-foreground transition hover:border-[#B89236] hover:bg-[#B89236]/5 disabled:pointer-events-none disabled:opacity-60"
+              <div
+                role="button"
+                tabIndex={save.isPending ? -1 : 0}
+                aria-label="Sélectionner une photo de couverture"
+                onClick={() => !save.isPending && inputRef.current?.click()}
+                onKeyDown={dropzoneKeyDown}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (!save.isPending) setDragActive(true);
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(event) => (save.isPending ? event.preventDefault() : dropFile(event))}
+                className={cn(
+                  "group relative mt-1.5 flex aspect-video w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed text-muted-foreground transition",
+                  dragActive
+                    ? "border-[#B89236] bg-[#B89236]/10"
+                    : "border-border bg-muted/30 hover:border-[#B89236] hover:bg-[#B89236]/5",
+                  save.isPending && "pointer-events-none opacity-60",
+                )}
               >
                 {previewUrl ? (
                   <>
                     <img src={previewUrl} alt="Aperçu" className="size-full object-cover" />
-                    <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                    <span className="absolute bottom-2 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                    <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeFile();
+                      }}
+                      disabled={save.isPending}
+                      aria-label="Supprimer la photo sélectionnée"
+                      className="absolute right-2.5 top-2.5 grid size-7 place-items-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-black/80"
+                    >
+                      <X className="size-4" />
+                    </button>
+                    <span className="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
                       <ImagePlus className="size-3.5" />
                       Changer la photo
                     </span>
                   </>
                 ) : (
-                  <div className="text-center">
-                    <ImagePlus className="mx-auto size-5" />
-                    <p className="mt-1.5 text-xs font-medium">Choisir une photo</p>
-                    <p className="text-[11px]">JPG, PNG ou WebP · 5 Mo max.</p>
+                  <div className="px-4 text-center">
+                    <div className="mx-auto grid size-11 place-items-center rounded-full bg-[#B89236]/10 text-[#B89236]">
+                      <ImagePlus className="size-6" />
+                    </div>
+                    <p className="mt-2.5 text-sm font-semibold text-foreground">
+                      Glissez-déposez une photo ou cliquez pour sélectionner
+                    </p>
+                    <p className="mt-1 text-[11px]">Formats acceptés : JPG, PNG, WebP</p>
+                    <p className="text-[11px]">Taille max. 5 Mo · Ratio recommandé 16:9 (ex. 1600×900)</p>
                   </div>
                 )}
-              </button>
+              </div>
               <input
                 ref={inputRef}
                 type="file"
@@ -1143,6 +1228,11 @@ function RoomFormDialog({
                 onChange={fileChanged}
                 className="hidden"
               />
+              {form.coverFile && (
+                <p className="mt-1.5 truncate text-[11px] text-muted-foreground">
+                  Fichier sélectionné : {form.coverFile.name}
+                </p>
+              )}
               {attempted && errors.photo && <FieldError text={errors.photo} />}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1191,15 +1281,36 @@ function RoomFormDialog({
                   ]}
                 />
               </div>
-              <div className="sm:col-span-2">
+              <div>
                 <Label text="Type de logement" required />
                 <FormSelect
                   value={form.propertyType}
-                  onChange={(value) => setForm({ ...form, propertyType: value })}
+                  onChange={(value) =>
+                    setForm({
+                      ...form,
+                      propertyType: value,
+                      roomCount: value === "studio" ? "1" : form.roomCount,
+                    })
+                  }
                   disabled={save.isPending}
                   options={[["", "Sélectionner…"], ...PROPERTY_TYPE_OPTIONS]}
                 />
                 {attempted && errors.propertyType && <FieldError text={errors.propertyType} />}
+              </div>
+              <div>
+                <Label text="Nombre de pièces" required />
+                <input
+                  value={form.roomCount}
+                  onChange={(e) => setForm({ ...form, roomCount: e.target.value })}
+                  type="number"
+                  min="1"
+                  max="99"
+                  step="1"
+                  placeholder="Ex : 10"
+                  disabled={save.isPending || form.propertyType === "studio"}
+                  className={fieldClass(attempted && Boolean(errors.roomCount))}
+                />
+                {attempted && errors.roomCount && <FieldError text={errors.roomCount} />}
               </div>
             </div>
           </div>
@@ -1309,7 +1420,7 @@ function RoomDetails({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[24px] p-0 sm:max-w-3xl">
-        <div className="relative h-44 bg-gradient-to-br from-[#D8C99E] to-[#53665D]">
+        <div className="relative aspect-[21/9] overflow-hidden rounded-t-[24px] bg-gradient-to-br from-[#D8C99E] to-[#53665D]">
           {image ? (
             <img src={image} alt={room.number} className="size-full object-cover" />
           ) : (
@@ -1317,7 +1428,7 @@ function RoomDetails({
               <BedDouble className="size-16 text-white/60" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <div className="absolute bottom-5 left-6 text-white">
             <p className="text-xs uppercase tracking-[.2em] text-white/70">Détail du logement</p>
             <h2 className="mt-1 text-2xl font-semibold">{room.number}</h2>
@@ -1327,6 +1438,12 @@ function RoomDetails({
           <Detail label="Tarif par nuit" value={formatCurrency(Number(room.rate))} />
           <Detail label="Type" value={room.hotel_room_types?.name ?? "Non défini"} />
           <Detail label="Capacité" value={`${room.capacity} personne${room.capacity > 1 ? "s" : ""}`} />
+          {room.property_type && (
+            <Detail label="Type de logement" value={PROPERTY_TYPE_LABELS[room.property_type] ?? room.property_type} />
+          )}
+          {room.room_count != null && (
+            <Detail label="Nombre de pièces" value={`${room.room_count} pièce${room.room_count > 1 ? "s" : ""}`} />
+          )}
           <div>
             <p className="text-xs text-muted-foreground">Statut</p>
             <span

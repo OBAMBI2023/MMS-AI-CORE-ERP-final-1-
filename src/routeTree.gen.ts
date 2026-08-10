@@ -53,6 +53,7 @@ import { Route as HotelPersonnelRouteImport } from './routes/hotel.personnel'
 import { Route as HotelParametresRouteImport } from './routes/hotel.parametres'
 import { Route as HotelHousekeepingRouteImport } from './routes/hotel.housekeeping'
 import { Route as HotelFacturationRouteImport } from './routes/hotel.facturation'
+import { Route as HotelDepensesRouteImport } from './routes/hotel.depenses'
 import { Route as HotelComptabiliteRouteImport } from './routes/hotel.comptabilite'
 import { Route as HotelClientsRouteImport } from './routes/hotel.clients'
 import { Route as HotelCheckinCheckoutRouteImport } from './routes/hotel.checkin-checkout'
@@ -281,6 +282,11 @@ const HotelFacturationRoute = HotelFacturationRouteImport.update({
   path: '/hotel/facturation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HotelDepensesRoute = HotelDepensesRouteImport.update({
+  id: '/hotel/depenses',
+  path: '/hotel/depenses',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HotelComptabiliteRoute = HotelComptabiliteRouteImport.update({
   id: '/hotel/comptabilite',
   path: '/hotel/comptabilite',
@@ -353,6 +359,7 @@ export interface FileRoutesByFullPath {
   '/hotel/checkin-checkout': typeof HotelCheckinCheckoutRoute
   '/hotel/clients': typeof HotelClientsRoute
   '/hotel/comptabilite': typeof HotelComptabiliteRoute
+  '/hotel/depenses': typeof HotelDepensesRoute
   '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/housekeeping': typeof HotelHousekeepingRoute
   '/hotel/parametres': typeof HotelParametresRoute
@@ -406,6 +413,7 @@ export interface FileRoutesByTo {
   '/hotel/checkin-checkout': typeof HotelCheckinCheckoutRoute
   '/hotel/clients': typeof HotelClientsRoute
   '/hotel/comptabilite': typeof HotelComptabiliteRoute
+  '/hotel/depenses': typeof HotelDepensesRoute
   '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/housekeeping': typeof HotelHousekeepingRoute
   '/hotel/parametres': typeof HotelParametresRoute
@@ -460,6 +468,7 @@ export interface FileRoutesById {
   '/hotel/checkin-checkout': typeof HotelCheckinCheckoutRoute
   '/hotel/clients': typeof HotelClientsRoute
   '/hotel/comptabilite': typeof HotelComptabiliteRoute
+  '/hotel/depenses': typeof HotelDepensesRoute
   '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/housekeeping': typeof HotelHousekeepingRoute
   '/hotel/parametres': typeof HotelParametresRoute
@@ -515,6 +524,7 @@ export interface FileRouteTypes {
     | '/hotel/checkin-checkout'
     | '/hotel/clients'
     | '/hotel/comptabilite'
+    | '/hotel/depenses'
     | '/hotel/facturation'
     | '/hotel/housekeeping'
     | '/hotel/parametres'
@@ -568,6 +578,7 @@ export interface FileRouteTypes {
     | '/hotel/checkin-checkout'
     | '/hotel/clients'
     | '/hotel/comptabilite'
+    | '/hotel/depenses'
     | '/hotel/facturation'
     | '/hotel/housekeeping'
     | '/hotel/parametres'
@@ -621,6 +632,7 @@ export interface FileRouteTypes {
     | '/hotel/checkin-checkout'
     | '/hotel/clients'
     | '/hotel/comptabilite'
+    | '/hotel/depenses'
     | '/hotel/facturation'
     | '/hotel/housekeeping'
     | '/hotel/parametres'
@@ -675,6 +687,7 @@ export interface RootRouteChildren {
   HotelCheckinCheckoutRoute: typeof HotelCheckinCheckoutRoute
   HotelClientsRoute: typeof HotelClientsRoute
   HotelComptabiliteRoute: typeof HotelComptabiliteRoute
+  HotelDepensesRoute: typeof HotelDepensesRoute
   HotelFacturationRoute: typeof HotelFacturationRoute
   HotelHousekeepingRoute: typeof HotelHousekeepingRoute
   HotelParametresRoute: typeof HotelParametresRoute
@@ -1000,6 +1013,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelFacturationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hotel/depenses': {
+      id: '/hotel/depenses'
+      path: '/hotel/depenses'
+      fullPath: '/hotel/depenses'
+      preLoaderRoute: typeof HotelDepensesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hotel/comptabilite': {
       id: '/hotel/comptabilite'
       path: '/hotel/comptabilite'
@@ -1104,6 +1124,7 @@ const rootRouteChildren: RootRouteChildren = {
   HotelCheckinCheckoutRoute: HotelCheckinCheckoutRoute,
   HotelClientsRoute: HotelClientsRoute,
   HotelComptabiliteRoute: HotelComptabiliteRoute,
+  HotelDepensesRoute: HotelDepensesRoute,
   HotelFacturationRoute: HotelFacturationRoute,
   HotelHousekeepingRoute: HotelHousekeepingRoute,
   HotelParametresRoute: HotelParametresRoute,

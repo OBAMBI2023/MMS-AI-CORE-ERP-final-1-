@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardKpiCard } from "@/components/mms/dashboard/DashboardKpiCard";
 import { HotelAvailabilityCalendar } from "@/components/hotel/HotelAvailabilityCalendar";
@@ -50,16 +51,24 @@ const REVENUE_PERIODS: { key: RevenuePeriod; label: string }[] = [
   { key: "month", label: "Ce mois" },
 ];
 
-const TODAY_RESERVATIONS = [
-  { id: 1, name: "M. Diallo Mamadou", room: "Chambre 204", time: "14:00", status: "Confirmée" as const },
-  { id: 2, name: "Mme Camara Aïssatou", room: "Chambre 108", time: "15:30", status: "En attente" as const },
-  { id: 3, name: "M. Traoré Ibrahim", room: "Suite 302", time: "16:00", status: "Confirmée" as const },
-  { id: 4, name: "Mme Bah Fatoumata", room: "Chambre 115", time: "18:00", status: "Confirmée" as const },
-];
+const RESERVATION_STATUS_LABEL: Record<string, string> = {
+  pending: "En attente",
+  confirmed: "Confirmée",
+  checked_in: "En séjour",
+  checked_out: "Terminée",
+  completed: "Terminée",
+  cancelled: "Annulée",
+  no_show: "Non présenté",
+};
 
-const RESERVATION_STATUS_CLASSES: Record<(typeof TODAY_RESERVATIONS)[number]["status"], string> = {
-  Confirmée: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  "En attente": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+const RESERVATION_STATUS_CLASSES: Record<string, string> = {
+  pending: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  confirmed: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  checked_in: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  checked_out: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  completed: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  cancelled: "bg-red-500/10 text-red-600 dark:text-red-400",
+  no_show: "bg-red-500/10 text-red-600 dark:text-red-400",
 };
 
 const HOUSEKEEPING_TASKS = [
@@ -194,6 +203,18 @@ function HotelDashboard() {
   );
   const departuresTodayList = reservations.filter(
     (r) => r.status === "checked_in" && r.check_out === todayIso,
+  );
+
+  const todayReservationsList = useMemo(
+    () =>
+      reservations
+        .filter((r) => r.check_in === todayIso && r.status !== "cancelled")
+        .sort((a, b) => {
+          const aTime = a.actual_check_in_at ? new Date(a.actual_check_in_at).getTime() : Infinity;
+          const bTime = b.actual_check_in_at ? new Date(b.actual_check_in_at).getTime() : Infinity;
+          return aTime - bTime;
+        }),
+    [reservations, todayIso],
   );
 
   const today = useMemo(
@@ -475,24 +496,60 @@ function HotelDashboard() {
           {/* Réservations du jour */}
           <Card className={cn("p-4 sm:p-6", CARD_CLASS)}>
             <h3 className="font-bold mb-4">Réservations du jour</h3>
-            <ul className="divide-y divide-border">
-              {TODAY_RESERVATIONS.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{r.name}</p>
-                    <p className="text-xs text-muted-foreground">{r.room} · {r.time}</p>
-                  </div>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                      RESERVATION_STATUS_CLASSES[r.status],
-                    )}
+            {billing.isLoading ? (
+              <ul className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <li key={i} className="flex items-center justify-between gap-3 py-1">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Skeleton className="h-4 w-2/3 rounded" />
+                      <Skeleton className="h-3 w-1/2 rounded" />
+                    </div>
+                    <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+                  </li>
+                ))}
+              </ul>
+            ) : billing.isError ? (
+              <p className="text-xs text-muted-foreground">
+                Impossible de charger les réservations du jour pour le moment.
+              </p>
+            ) : todayReservationsList.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Aucune réservation aujourd’hui</p>
+            ) : (
+              <>
+                <ul className="divide-y divide-border">
+                  {todayReservationsList.slice(0, MAX_TODAY_LIST_ITEMS).map((r) => {
+                    const arrivalTime = formatFrTime(r.actual_check_in_at);
+                    return (
+                      <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{guestLabel(r.guest_id)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Chambre {roomLabel(r.room_id)} · {arrivalTime ?? "—"}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                            RESERVATION_STATUS_CLASSES[r.status] ??
+                              "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+                          )}
+                        >
+                          {RESERVATION_STATUS_LABEL[r.status] ?? r.status}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {todayReservationsList.length > MAX_TODAY_LIST_ITEMS && (
+                  <Link
+                    to="/hotel/reservations"
+                    className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold text-primary hover:underline"
                   >
-                    {r.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                    Voir toutes <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
+              </>
+            )}
           </Card>
 
           {/* Housekeeping */}
