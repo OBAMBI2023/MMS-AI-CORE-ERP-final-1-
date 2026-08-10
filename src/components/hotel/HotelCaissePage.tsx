@@ -56,7 +56,16 @@ import { HotelComingSoon } from "@/components/hotel/HotelComingSoon";
 
 const db = supabase as any;
 const WALK_IN_LABEL = "Client de passage";
-const todayInputValue = () => new Date().toISOString().slice(0, 10);
+// Local calendar date (not toISOString(), which is UTC and can read as
+// tomorrow — or still yesterday — depending on the browser's timezone
+// offset relative to UTC around local midnight).
+const todayInputValue = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const emptyPaymentForm = {
   amount: "",
