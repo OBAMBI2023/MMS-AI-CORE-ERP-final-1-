@@ -10,7 +10,6 @@ import {
   CalendarPlus,
   ArrowLeftRight,
   Wallet,
-  Building2,
   ArrowRight,
   Ban,
   History,
@@ -397,7 +396,6 @@ function HotelDashboard() {
         <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#0F4C42] via-[#0E6B58] to-[#10B981] p-6 shadow-lg shadow-emerald-950/20 sm:p-7">
           <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-14 right-16 h-32 w-32 rounded-full bg-white/10 blur-xl" />
-          <Building2 className="pointer-events-none absolute right-6 top-6 h-9 w-9 text-white/25 sm:h-10 sm:w-10" />
           <div className="relative">
             <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
               {greeting} {userName} 👋

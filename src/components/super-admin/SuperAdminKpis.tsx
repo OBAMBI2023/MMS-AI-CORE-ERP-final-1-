@@ -23,13 +23,13 @@ function KpiCard({ title, value, icon: Icon, tone, note }: KpiCardProps) {
       transition={{ duration: 0.35 }}
       whileHover={{ y: -2 }}
     >
-      <Card className="group relative overflow-hidden rounded-xl border-border/70 bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+      <Card className="group relative h-full overflow-hidden rounded-xl border-border/70 bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex h-full items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium text-muted-foreground">{title}</p>
-            <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-1.5 text-[11px] text-muted-foreground">{note}</p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{note}</p>
           </div>
           <div
             className={cn("flex size-11 shrink-0 items-center justify-center rounded-2xl", tone)}
@@ -44,7 +44,7 @@ function KpiCard({ title, value, icon: Icon, tone, note }: KpiCardProps) {
 
 export function SuperAdminKpis({ kpis }: { kpis: SuperAdminDashboard["kpis"] }) {
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <section className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <KpiCard
         title="Total tenants"
         value={numberFormatter.format(kpis.tenants)}

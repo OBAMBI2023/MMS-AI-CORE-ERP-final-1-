@@ -1,7 +1,19 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Building2, LifeBuoy, Loader2, Search, Send } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  ChevronLeft,
+  LifeBuoy,
+  Loader2,
+  MoreVertical,
+  Paperclip,
+  Search,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
 import { toast } from "sonner";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import {
   getSupportTicketThread,
@@ -62,6 +80,12 @@ const STATUS_BADGE: Record<SupportStatus, string> = {
   closed: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
 };
 
+function tenantInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
 function Pill({ tone, children }: { tone: string; children: React.ReactNode }) {
   return (
     <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-semibold", tone)}>
@@ -84,34 +108,42 @@ function TicketRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full rounded-xl border px-3.5 py-3 text-left transition-colors",
-        active ? "border-primary bg-primary/5" : "border-transparent bg-card hover:bg-muted/50",
+        "w-full rounded-xl border px-3 py-2.5 text-left transition-colors",
+        active
+          ? "border-primary bg-blue-50 dark:bg-blue-950/30"
+          : "border-transparent bg-card hover:bg-muted/50",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-            <Building2 className="size-3" />
-            <span className="truncate">{ticket.tenantName}</span>
-          </p>
+      <div className="flex items-start gap-2.5">
+        <Avatar className="size-8 shrink-0">
+          <AvatarFallback className="bg-primary/10 text-[11px] font-semibold text-primary">
+            {tenantInitials(ticket.tenantName)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="truncate text-[11px] font-medium text-muted-foreground">
+              {ticket.tenantName}
+            </p>
+            {ticket.unreadFromTenant > 0 && (
+              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {ticket.unreadFromTenant > 9 ? "9+" : ticket.unreadFromTenant}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 truncate text-sm font-semibold">{ticket.subject}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <Pill tone={STATUS_BADGE[ticket.status]}>{STATUS_LABEL[ticket.status]}</Pill>
+            <Pill tone={PRIORITY_BADGE[ticket.priority]}>{PRIORITY_LABEL[ticket.priority]}</Pill>
+            {!ticket.hasSupportReply && (
+              <Pill tone="bg-red-500/10 text-red-600 dark:text-red-400">Sans réponse</Pill>
+            )}
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            {formatDateTime(ticket.lastMessageAt)}
+          </p>
         </div>
-        {ticket.unreadFromTenant > 0 && (
-          <span className="grid size-5 shrink-0 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-            {ticket.unreadFromTenant > 9 ? "9+" : ticket.unreadFromTenant}
-          </span>
-        )}
       </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <Pill tone={STATUS_BADGE[ticket.status]}>{STATUS_LABEL[ticket.status]}</Pill>
-        <Pill tone={PRIORITY_BADGE[ticket.priority]}>{PRIORITY_LABEL[ticket.priority]}</Pill>
-        {!ticket.hasSupportReply && (
-          <Pill tone="bg-red-500/10 text-red-600 dark:text-red-400">Sans réponse</Pill>
-        )}
-      </div>
-      <p className="mt-1.5 text-[11px] text-muted-foreground">
-        {formatDateTime(ticket.lastMessageAt)}
-      </p>
     </button>
   );
 }
@@ -233,8 +265,8 @@ export function SupportConsoleView() {
           </p>
         </div>
 
-        <Card className="rounded-xl p-4">
-          <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_180px_170px_220px_auto]">
+        <Card className="rounded-xl p-3">
+          <div className="grid gap-2 xl:grid-cols-[minmax(220px,1fr)_180px_170px_220px_auto]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -299,8 +331,22 @@ export function SupportConsoleView() {
           </div>
         </Card>
 
-        <div className="grid h-[70vh] min-h-[420px] gap-4 xl:grid-cols-[380px_1fr]">
-          <Card className="flex flex-col overflow-hidden rounded-xl p-0">
+        <div
+          className={cn(
+            "grid gap-4 xl:h-[70vh] xl:min-h-[480px] xl:grid-cols-[3fr_7fr]",
+            selectedTicketId ? "h-[calc(100vh-180px)]" : "h-[70vh] min-h-[480px]",
+          )}
+        >
+          <Card
+            className={cn(
+              "flex-col overflow-hidden rounded-xl p-0",
+              selectedTicketId ? "hidden xl:flex" : "flex",
+            )}
+          >
+            <div className="flex items-center justify-between border-b px-3.5 py-2.5">
+              <p className="text-sm font-semibold">Tickets ({tickets.length})</p>
+              <p className="text-[11px] text-muted-foreground">Tri : Les plus récents</p>
+            </div>
             {ticketsQuery.isLoading ? (
               <div className="grid flex-1 place-items-center">
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -332,7 +378,12 @@ export function SupportConsoleView() {
             )}
           </Card>
 
-          <Card className="flex flex-col overflow-hidden rounded-xl p-0">
+          <Card
+            className={cn(
+              "flex-col overflow-hidden rounded-xl p-0",
+              selectedTicketId ? "flex" : "hidden xl:flex",
+            )}
+          >
             {!selectedTicketId ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
                 <LifeBuoy className="size-8" />
@@ -346,13 +397,22 @@ export function SupportConsoleView() {
               <>
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b p-3.5 sm:p-4">
                   <div className="min-w-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-2 mb-1 h-7 px-2 text-xs xl:hidden"
+                      onClick={() => setSelectedTicketId(null)}
+                    >
+                      <ChevronLeft className="size-3.5" /> Tickets
+                    </Button>
                     <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                       <Building2 className="size-3.5" /> {thread.ticket.tenantName}
                     </p>
                     <p className="mt-0.5 truncate font-semibold">{thread.ticket.subject}</p>
-                    <span className="mt-1 inline-block text-[11px] text-muted-foreground">
-                      {thread.ticket.category}
-                    </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>{thread.ticket.category}</span>
+                      <span>Créé le {formatDateTime(thread.ticket.createdAt)}</span>
+                    </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <Select
@@ -387,6 +447,25 @@ export function SupportConsoleView() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-9 shrink-0">
+                          <MoreVertical className="size-4" />
+                          <span className="sr-only">Actions rapides</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => void changeStatus("resolved")}>
+                          Marquer résolu
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void changeStatus("closed")}>
+                          Marquer fermé
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void changeStatus("open")}>
+                          Rouvrir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
                 <ScrollArea className="flex-1 p-3.5 sm:p-4">
@@ -396,14 +475,33 @@ export function SupportConsoleView() {
                       return (
                         <div
                           key={message.id}
-                          className={cn("flex", isSupport ? "justify-end" : "justify-start")}
+                          className={cn(
+                            "flex items-end gap-2",
+                            isSupport ? "flex-row-reverse" : "flex-row",
+                          )}
                         >
+                          <Avatar className="size-7 shrink-0">
+                            <AvatarFallback
+                              className={cn(
+                                "text-[10px] font-semibold",
+                                isSupport
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-primary/10 text-primary",
+                              )}
+                            >
+                              {isSupport ? (
+                                <ShieldCheck className="size-3.5" />
+                              ) : (
+                                tenantInitials(thread.ticket.tenantName)
+                              )}
+                            </AvatarFallback>
+                          </Avatar>
                           <div
                             className={cn(
                               "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm sm:max-w-[70%]",
                               isSupport
-                                ? "rounded-br-sm bg-primary text-primary-foreground"
-                                : "rounded-bl-sm bg-muted",
+                                ? "rounded-br-sm border border-border/60 bg-white dark:bg-card"
+                                : "rounded-bl-sm bg-blue-50 dark:bg-blue-950/20",
                             )}
                           >
                             <p className="whitespace-pre-wrap break-words">{message.message}</p>
@@ -412,21 +510,13 @@ export function SupportConsoleView() {
                                 href={message.attachmentUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className={cn(
-                                  "mt-2 inline-block text-xs underline underline-offset-2",
-                                  isSupport ? "text-primary-foreground/90" : "text-foreground",
-                                )}
+                                className="mt-2 inline-block text-xs text-foreground underline underline-offset-2"
                               >
                                 {message.attachmentName ?? "Pièce jointe"}
                               </a>
                             )}
-                            <p
-                              className={cn(
-                                "mt-1.5 text-[10px]",
-                                isSupport ? "text-primary-foreground/70" : "text-muted-foreground",
-                              )}
-                            >
-                              {isSupport ? "Équipe SAOVIA" : thread.ticket.tenantName} ·{" "}
+                            <p className="mt-1.5 text-[10px] text-muted-foreground">
+                              {isSupport ? "Support" : "Tenant"} ·{" "}
                               {formatDateTime(message.createdAt)}
                             </p>
                           </div>
@@ -435,15 +525,26 @@ export function SupportConsoleView() {
                     })}
                   </div>
                 </ScrollArea>
-                <div className="border-t p-3 sm:p-4">
+                <div className="shrink-0 border-t p-3 sm:p-4">
                   <Label className="mb-1.5 block text-xs text-muted-foreground">
                     Répondre en tant qu'équipe SAOVIA
                   </Label>
                   <div className="flex items-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      disabled
+                      title="Pièce jointe non disponible pour l'instant"
+                    >
+                      <Paperclip className="size-4" />
+                      <span className="sr-only">Joindre un fichier</span>
+                    </Button>
                     <Textarea
                       value={replyMessage}
                       onChange={(e) => setReplyMessage(e.target.value)}
-                      placeholder="Écrivez votre réponse…"
+                      placeholder="Écrire une réponse..."
                       rows={2}
                       className="flex-1 resize-none"
                       onKeyDown={(e) => {
@@ -457,13 +558,14 @@ export function SupportConsoleView() {
                       type="button"
                       onClick={() => void sendReply()}
                       disabled={replyPending || !replyMessage.trim()}
-                      className="shrink-0"
+                      className="shrink-0 gap-1.5"
                     >
                       {replyPending ? (
                         <Loader2 className="size-4 animate-spin" />
                       ) : (
                         <Send className="size-4" />
                       )}
+                      Répondre
                     </Button>
                   </div>
                 </div>

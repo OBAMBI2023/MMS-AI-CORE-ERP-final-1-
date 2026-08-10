@@ -52,8 +52,8 @@ export function SuperAdminSidebar({ mobile = false }: { mobile?: boolean }) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5" aria-label="Navigation">
-        <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200/50">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-6" aria-label="Navigation">
+        <p className="mb-4 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200/50">
           Espace plateforme
         </p>
         {navItems.map(({ label, icon: Icon, href }) => {
@@ -69,21 +69,21 @@ export function SuperAdminSidebar({ mobile = false }: { mobile?: boolean }) {
               key={label}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all",
+                "flex items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-[13px] font-medium transition-colors",
                 active
-                  ? "bg-blue-600 text-white shadow-[0_4px_16px_rgba(37,99,235,.35)]"
+                  ? "border-blue-400 bg-blue-500/15 text-white"
                   : "text-blue-100/70 hover:bg-white/5 hover:text-white",
               )}
             >
               <Icon className="size-[18px]" />
               <span>{label}</span>
-              {active && <ChevronRight className="ml-auto size-4" />}
+              {active && <ChevronRight className="ml-auto size-4 text-blue-300" />}
             </a>
           );
         })}
       </nav>
 
-      <div className="space-y-3 border-t border-white/10 p-3">
+      <div className="space-y-3 border-t border-white/10 p-3 pt-4">
         <Button
           className="h-10 w-full justify-start rounded-lg bg-white text-black shadow-[0_8px_30px_rgba(255,255,255,.08)] hover:bg-zinc-200"
           disabled

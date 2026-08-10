@@ -118,11 +118,11 @@ export function SuperAdminDashboardView({
 
   return (
     <div className="min-h-screen bg-muted/30 text-foreground dark:bg-background">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] lg:block">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[228px] lg:block">
         <SuperAdminSidebar />
       </aside>
 
-      <div className="lg:pl-[248px]">
+      <div className="lg:pl-[228px]">
         <SuperAdminHeader
           query={tenantQuery}
           onQueryChange={setTenantQuery}
@@ -171,8 +171,8 @@ export function SuperAdminDashboardView({
 
 export function SuperAdminDashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-muted/30 lg:pl-[248px] dark:bg-background">
-      <div className="fixed inset-y-0 left-0 hidden w-[248px] bg-[#070d1f] lg:block" />
+    <div className="min-h-screen bg-muted/30 lg:pl-[228px] dark:bg-background">
+      <div className="fixed inset-y-0 left-0 hidden w-[228px] bg-[#070d1f] lg:block" />
       <div className="h-[72px] border-b border-border bg-background" />
       <main className="space-y-7 p-4 sm:p-6 xl:p-8">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -180,10 +180,12 @@ export function SuperAdminDashboardSkeleton() {
             <Skeleton key={index} className="h-36 rounded-xl" />
           ))}
         </div>
-        <div className="grid gap-4 xl:grid-cols-12">
-          <Skeleton className="h-80 rounded-xl xl:col-span-6" />
-          <Skeleton className="h-80 rounded-xl xl:col-span-3" />
-          <Skeleton className="h-80 rounded-xl xl:col-span-3" />
+        <div className="space-y-4">
+          <div className="grid gap-4 xl:grid-cols-12">
+            <Skeleton className="h-80 rounded-xl xl:col-span-8" />
+            <Skeleton className="h-80 rounded-xl xl:col-span-4" />
+          </div>
+          <Skeleton className="h-80 rounded-xl" />
         </div>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <Skeleton className="h-96 rounded-xl" />
