@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BadgeCheck,
   BedDouble,
   CalendarDays,
   ChevronLeft,
@@ -74,6 +75,7 @@ import { createHotelReservationDetailPdf } from "@/lib/mms/hotel-reservation-det
 import { createHotelReservationConfirmationPdf } from "@/lib/mms/hotel-reservation-confirmation-pdf";
 import { downloadPdf } from "@/lib/mms/download-pdf";
 import { HotelSmsDialog } from "@/components/hotel/HotelSmsDialog";
+import { HotelReservationDetailSheet } from "@/components/hotel/HotelReservationDetailSheet";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import {
   BLOCKING_RESERVATION_STATUSES,
@@ -129,6 +131,7 @@ export function HotelReservationsPage() {
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [deleting, setDeleting] = useState<any | null>(null);
   const [smsReservation, setSmsReservation] = useState<any | null>(null);
+  const [detailReservationId, setDetailReservationId] = useState<string | null>(null);
   const [calendarIntentApplied, setCalendarIntentApplied] = useState(false);
   const canUpdate = useActionPermission("hotel.reservations.update");
   const canDelete = useActionPermission("hotel.reservations.delete");
@@ -827,6 +830,7 @@ export function HotelReservationsPage() {
             canDelete={canDelete}
             downloadPdf={downloadReservationPdf}
             downloadConfirmation={downloadConfirmationPdf}
+            openDocuments={(r: any) => setDetailReservationId(r.id)}
             sendSms={setSmsReservation}
             canSendSms={canSendSms && smsModuleEnabled}
             changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
@@ -865,6 +869,10 @@ export function HotelReservationsPage() {
           tenantId={profile?.tenant_id}
         />
       )}
+      <HotelReservationDetailSheet
+        reservationId={detailReservationId}
+        onOpenChange={(open) => !open && setDetailReservationId(null)}
+      />
     </HotelAppShell>
   );
 }
@@ -1092,6 +1100,7 @@ function ReservationTable({
   canDelete,
   downloadPdf,
   downloadConfirmation,
+  openDocuments,
   sendSms,
   canSendSms,
   changeStatus,
@@ -1163,6 +1172,9 @@ function ReservationTable({
                         </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => void downloadConfirmation(r)}>
                           <FileCheck2 /> Confirmation de réservation
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => openDocuments(r)}>
+                          <BadgeCheck /> Documents (certificat, facture…)
                         </DropdownMenuItem>
                         {canSendSms && (
                           <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!g?.phone}>
