@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
@@ -83,6 +83,51 @@ const AVAILABILITY_BADGE: Record<AvailabilityStatus, string> = {
   unavailable: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
 };
 
+// WhatsApp is stored in the existing `whatsapp` column as a normalized
+// international number ("+225XXXXXXXXXX") — no new field/column. The picker
+// below just splits that single stored string into a country dial code +
+// local part for editing, and rejoins them on save.
+const COUNTRY_CODES = [
+  { dial: "225", label: "Côte d'Ivoire", flag: "🇨🇮" },
+  { dial: "221", label: "Sénégal", flag: "🇸🇳" },
+  { dial: "223", label: "Mali", flag: "🇲🇱" },
+  { dial: "226", label: "Burkina Faso", flag: "🇧🇫" },
+  { dial: "224", label: "Guinée", flag: "🇬🇳" },
+  { dial: "233", label: "Ghana", flag: "🇬🇭" },
+  { dial: "229", label: "Bénin", flag: "🇧🇯" },
+  { dial: "228", label: "Togo", flag: "🇹🇬" },
+  { dial: "234", label: "Nigéria", flag: "🇳🇬" },
+  { dial: "33", label: "France", flag: "🇫🇷" },
+  { dial: "1", label: "États-Unis / Canada", flag: "🇺🇸" },
+] as const;
+const DEFAULT_COUNTRY_DIAL = COUNTRY_CODES[0].dial;
+
+/** Splits a stored WhatsApp value into { country, local }. Matches known
+ * dial codes longest-first so e.g. a number under "225" is never mistaken
+ * for the single-digit "1" code. Legacy values saved before this picker
+ * existed have no "+" prefix at all — those fall back to the default
+ * country with the full value as the local part, never dropping digits. */
+function splitWhatsapp(stored: string | null | undefined): { country: string; local: string } {
+  const digits = (stored ?? "").replace(/[^\d]/g, "");
+  if (!digits) return { country: DEFAULT_COUNTRY_DIAL, local: "" };
+  const byLength = [...COUNTRY_CODES].sort((a, b) => b.dial.length - a.dial.length);
+  for (const code of byLength) {
+    if (digits.startsWith(code.dial)) {
+      return { country: code.dial, local: digits.slice(code.dial.length) };
+    }
+  }
+  return { country: DEFAULT_COUNTRY_DIAL, local: digits };
+}
+
+function normalizeWhatsapp(countryDial: string, local: string): string {
+  return `+${countryDial}${local.replace(/[^\d]/g, "")}`;
+}
+
+function toWhatsAppHref(value: string): string {
+  const { country, local } = splitWhatsapp(value);
+  return `https://wa.me/${country}${local}`;
+}
+
 type Provider = {
   id: string;
   tenant_id: string;
@@ -104,7 +149,6 @@ type ProviderForm = {
   company_name: string;
   trade: string;
   phone: string;
-  whatsapp: string;
   intervention_area: string;
   availability_status: AvailabilityStatus;
   internal_note: string;
@@ -116,7 +160,6 @@ const emptyForm = (): ProviderForm => ({
   company_name: "",
   trade: "",
   phone: "",
-  whatsapp: "",
   intervention_area: "",
   availability_status: "available",
   internal_note: "",
@@ -124,6 +167,21 @@ const emptyForm = (): ProviderForm => ({
 });
 
 export function HotelMaintenanceProvidersPage() {
+  // Radix Dialog/AlertDialog/Sheet/DropdownMenu portal their content to
+  // document.body by default, which sits outside HotelAppShell's
+  // `.hotel-theme` div — CSS custom properties (--primary, --ring) don't
+  // cross that boundary, so modals/menus fell back to the global blue
+  // instead of the SAOVIA Hôtel green. Mirroring the theme class onto
+  // <body> while this page is mounted fixes every portaled element at once
+  // without touching the shared HotelAppShell (used by every other Hotel
+  // page) or any global design token.
+  useEffect(() => {
+    document.body.classList.add("hotel-theme");
+    return () => {
+      document.body.classList.remove("hotel-theme");
+    };
+  }, []);
+
   const qc = useQueryClient();
   const { profile } = useTenant();
   const tenantId = profile?.tenant_id;
@@ -223,7 +281,8 @@ export function HotelMaintenanceProvidersPage() {
             </div>
             <h3 className="mt-4 font-semibold">Module non disponible</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Le module Prestataires n'est pas activé pour votre établissement. Contactez votre administrateur.
+              Le module Prestataires n'est pas activé pour votre établissement. Contactez votre
+              administrateur.
             </p>
           </div>
         </div>
@@ -310,7 +369,9 @@ export function HotelMaintenanceProvidersPage() {
             className="relative h-9 w-9 shrink-0 rounded-xl"
           >
             <SlidersHorizontal className="size-4" />
-            {hasActiveFilters && <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary" />}
+            {hasActiveFilters && (
+              <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary" />
+            )}
           </Button>
         </div>
 
@@ -327,7 +388,10 @@ export function HotelMaintenanceProvidersPage() {
           <FilterSelect
             value={availability}
             onChange={setAvailability}
-            options={[["all", "Toutes les disponibilités"], ...AVAILABILITY_OPTIONS.map((o) => [o.value, o.label])]}
+            options={[
+              ["all", "Toutes les disponibilités"],
+              ...AVAILABILITY_OPTIONS.map((o) => [o.value, o.label]),
+            ]}
           />
           {hasActiveFilters && (
             <Button
@@ -344,7 +408,10 @@ export function HotelMaintenanceProvidersPage() {
       </div>
 
       <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-[24px] sm:hidden">
+        <SheetContent
+          side="bottom"
+          className="max-h-[85vh] overflow-y-auto rounded-t-[24px] sm:hidden"
+        >
           <SheetHeader>
             <SheetTitle>Filtrer les prestataires</SheetTitle>
             <SheetDescription>Affinez la liste par disponibilité.</SheetDescription>
@@ -375,7 +442,12 @@ export function HotelMaintenanceProvidersPage() {
             </div>
           </div>
           <SheetFooter className="mt-6 flex-row gap-2">
-            <Button type="button" variant="ghost" onClick={resetFilters} className="flex-1 rounded-xl">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={resetFilters}
+              className="flex-1 rounded-xl"
+            >
               Réinitialiser
             </Button>
             <Button
@@ -396,7 +468,10 @@ export function HotelMaintenanceProvidersPage() {
           </div>
           <div className="mt-2.5 space-y-2 md:hidden">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+              <div
+                key={i}
+                className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm"
+              >
                 <Skeleton className="size-10 shrink-0 rounded-full" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-4 w-2/3 rounded" />
@@ -413,8 +488,14 @@ export function HotelMaintenanceProvidersPage() {
               <Wrench className="size-7" />
             </div>
             <h3 className="mt-4 font-semibold">Impossible de charger les prestataires</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Vérifiez votre connexion puis réessayez.</p>
-            <Button variant="outline" onClick={() => void providersQuery.refetch()} className="mt-5 rounded-xl">
+            <p className="mt-1 text-sm text-muted-foreground">
+              Vérifiez votre connexion puis réessayez.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => void providersQuery.refetch()}
+              className="mt-5 rounded-xl"
+            >
               Réessayer
             </Button>
           </div>
@@ -425,11 +506,16 @@ export function HotelMaintenanceProvidersPage() {
             <table className="w-full min-w-[900px] text-sm">
               <thead className="bg-muted/60 text-muted-foreground">
                 <tr>
-                  {["Prestataire", "Métier", "Contact", "Secteur", "Disponibilité", "Actions"].map((h) => (
-                    <th key={h} className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">
-                      {h}
-                    </th>
-                  ))}
+                  {["Prestataire", "Métier", "Contact", "Secteur", "Disponibilité", "Actions"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide"
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -484,7 +570,9 @@ export function HotelMaintenanceProvidersPage() {
         provider={editing}
         tenantId={tenantId}
         onOpenChange={setFormOpen}
-        onSaved={() => void qc.invalidateQueries({ queryKey: ["hotel-maintenance-providers", tenantId] })}
+        onSaved={() =>
+          void qc.invalidateQueries({ queryKey: ["hotel-maintenance-providers", tenantId] })
+        }
       />
 
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
@@ -493,8 +581,8 @@ export function HotelMaintenanceProvidersPage() {
             <AlertDialogTitle>Supprimer ce prestataire ?</AlertDialogTitle>
             <AlertDialogDescription>
               Voulez-vous vraiment supprimer{" "}
-              <span className="font-medium text-foreground">{deleting?.full_name}</span> ? Cette action est
-              irréversible.
+              <span className="font-medium text-foreground">{deleting?.full_name}</span> ? Cette
+              action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -503,7 +591,11 @@ export function HotelMaintenanceProvidersPage() {
               onClick={() => deleting && deleteProvider.mutate(deleting)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteProvider.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              {deleteProvider.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
               Supprimer définitivement
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -573,7 +665,9 @@ function ProviderRow({ provider, canUpdate, onEdit, onDelete }: RowProps) {
     <tr className="hover:bg-muted/30">
       <td className="px-3 py-3">
         <p className="font-medium">{provider.full_name}</p>
-        {provider.company_name && <p className="text-xs text-muted-foreground">{provider.company_name}</p>}
+        {provider.company_name && (
+          <p className="text-xs text-muted-foreground">{provider.company_name}</p>
+        )}
       </td>
       <td className="px-3 py-3">{provider.trade}</td>
       <td className="px-3 py-3">
@@ -614,10 +708,6 @@ function ProviderRow({ provider, canUpdate, onEdit, onDelete }: RowProps) {
   );
 }
 
-function toWhatsAppHref(value: string): string {
-  return `https://wa.me/${value.replace(/[^\d]/g, "")}`;
-}
-
 function ProviderMobileCard({ provider, canUpdate, onEdit, onDelete }: RowProps) {
   const hasWhatsapp = Boolean(provider.whatsapp?.trim());
   return (
@@ -654,7 +744,10 @@ function ProviderMobileCard({ provider, canUpdate, onEdit, onDelete }: RowProps)
               <MessageCircle className="size-3.5" /> WhatsApp
             </a>
           )}
-          <a href={`tel:${provider.phone}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+          <a
+            href={`tel:${provider.phone}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary"
+          >
             <Phone className="size-3.5" /> Appeler
           </a>
         </div>
@@ -663,7 +756,15 @@ function ProviderMobileCard({ provider, canUpdate, onEdit, onDelete }: RowProps)
   );
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div>
       <Label className="mb-1.5 block">
@@ -689,8 +790,10 @@ function ProviderFormDialog({
   onSaved: () => void;
 }) {
   const [form, setForm] = useState<ProviderForm>(emptyForm());
+  const [whatsappCountry, setWhatsappCountry] = useState<string>(DEFAULT_COUNTRY_DIAL);
+  const [whatsappLocal, setWhatsappLocal] = useState("");
   const isEdit = Boolean(provider);
-  const reset = () =>
+  const reset = () => {
     setForm(
       provider
         ? {
@@ -698,7 +801,6 @@ function ProviderFormDialog({
             company_name: provider.company_name ?? "",
             trade: provider.trade,
             phone: provider.phone,
-            whatsapp: provider.whatsapp ?? "",
             intervention_area: provider.intervention_area ?? "",
             availability_status: provider.availability_status,
             internal_note: provider.internal_note ?? "",
@@ -706,6 +808,10 @@ function ProviderFormDialog({
           }
         : emptyForm(),
     );
+    const { country, local } = splitWhatsapp(provider?.whatsapp);
+    setWhatsappCountry(country);
+    setWhatsappLocal(local);
+  };
 
   const save = useMutation({
     mutationFn: async () => {
@@ -721,14 +827,18 @@ function ProviderFormDialog({
         company_name: form.company_name.trim() || null,
         trade,
         phone,
-        whatsapp: form.whatsapp.trim() || null,
+        whatsapp: whatsappLocal.trim() ? normalizeWhatsapp(whatsappCountry, whatsappLocal) : null,
         intervention_area: form.intervention_area.trim() || null,
         availability_status: form.availability_status,
         internal_note: form.internal_note.trim() || null,
         is_active: form.is_active,
       };
       const result = provider
-        ? await db.from("hotel_maintenance_providers").update(payload).eq("tenant_id", tenantId).eq("id", provider.id)
+        ? await db
+            .from("hotel_maintenance_providers")
+            .update(payload)
+            .eq("tenant_id", tenantId)
+            .eq("id", provider.id)
         : await db.from("hotel_maintenance_providers").insert({ ...payload, tenant_id: tenantId });
       if (result.error) throw result.error;
     },
@@ -751,7 +861,9 @@ function ProviderFormDialog({
       <DialogContent className="flex w-[calc(100vw-24px)] max-h-[90dvh] flex-col gap-0 overflow-hidden rounded-[20px] p-0 sm:w-full sm:max-w-[560px]">
         <DialogHeader className="shrink-0 border-b px-4 py-4 sm:px-6">
           <DialogTitle>{isEdit ? "Modifier le prestataire" : "Nouveau prestataire"}</DialogTitle>
-          <DialogDescription>Renseignez les informations du prestataire de maintenance.</DialogDescription>
+          <DialogDescription>
+            Renseignez les informations du prestataire de maintenance.
+          </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(event) => {
@@ -761,7 +873,7 @@ function ProviderFormDialog({
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Nom complet" required>
                 <Input
                   value={form.full_name}
@@ -780,7 +892,7 @@ function ProviderFormDialog({
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Métier" required>
                 <Input
                   value={form.trade}
@@ -792,12 +904,14 @@ function ProviderFormDialog({
               <Field label="Disponibilité">
                 <FilterSelect
                   value={form.availability_status}
-                  onChange={(v) => setForm({ ...form, availability_status: v as AvailabilityStatus })}
+                  onChange={(v) =>
+                    setForm({ ...form, availability_status: v as AvailabilityStatus })
+                  }
                   options={AVAILABILITY_OPTIONS.map((o) => [o.value, o.label])}
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Téléphone" required>
                 <Input
                   type="tel"
@@ -808,13 +922,22 @@ function ProviderFormDialog({
                 />
               </Field>
               <Field label="WhatsApp">
-                <Input
-                  type="tel"
-                  value={form.whatsapp}
-                  onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-                  placeholder="Ex : 07 00 00 00 00"
-                  className="h-11"
-                />
+                <div className="flex gap-2">
+                  <div className="w-[118px] shrink-0">
+                    <FilterSelect
+                      value={whatsappCountry}
+                      onChange={setWhatsappCountry}
+                      options={COUNTRY_CODES.map((c) => [c.dial, `${c.flag} +${c.dial}`])}
+                    />
+                  </div>
+                  <Input
+                    type="tel"
+                    value={whatsappLocal}
+                    onChange={(e) => setWhatsappLocal(e.target.value)}
+                    placeholder="07 00 00 00 00"
+                    className="h-11 flex-1"
+                  />
+                </div>
               </Field>
             </div>
             <Field label="Secteur d'intervention">
@@ -849,10 +972,19 @@ function ProviderFormDialog({
             </div>
           </div>
           <DialogFooter className="shrink-0 border-t px-4 py-4 sm:flex-row sm:justify-end sm:gap-2 sm:px-6">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="h-11 w-full rounded-xl sm:w-auto">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              className="h-11 w-full rounded-xl sm:w-auto"
+            >
               Annuler
             </Button>
-            <Button type="submit" disabled={save.isPending} className="h-11 w-full rounded-xl sm:w-auto">
+            <Button
+              type="submit"
+              disabled={save.isPending}
+              className="h-11 w-full rounded-xl sm:w-auto"
+            >
               {save.isPending && <Loader2 className="size-4 animate-spin" />}
               {isEdit ? "Mettre à jour" : "Enregistrer le prestataire"}
             </Button>
