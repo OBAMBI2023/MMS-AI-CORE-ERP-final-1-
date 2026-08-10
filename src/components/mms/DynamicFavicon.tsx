@@ -13,7 +13,7 @@ export function DynamicFavicon({ platform = false }: { platform?: boolean }) {
       favicon.href = platform
         ? PLATFORM_BRANDING.assets.favicon
         : (logoUrl ?? PLATFORM_BRANDING.assets.favicon);
-      favicon.type = platform || !logoUrl ? "image/svg+xml" : "";
+      favicon.type = platform || !logoUrl ? "image/png" : "";
     }
 
     if (!platform && companyName) document.title = companyName;

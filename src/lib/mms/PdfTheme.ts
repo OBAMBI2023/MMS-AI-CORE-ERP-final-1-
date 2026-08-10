@@ -88,7 +88,7 @@ export function formatPdfDate(date: string | number | Date = new Date()) {
   }).format(new Date(date));
 }
 
-async function imageData(url: string) {
+export async function imageData(url: string) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Logo HTTP ${response.status}`);
   const blob = await response.blob();

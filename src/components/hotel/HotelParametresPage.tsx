@@ -12,6 +12,7 @@ import {
   Trash2,
   ShieldAlert,
   ImageIcon,
+  FileSignature,
 } from "lucide-react";
 import { toast } from "sonner";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
@@ -50,6 +51,7 @@ type ParametresRow = Tables<"parametres">;
 const BUCKET = "company-assets";
 const MAX_MB = 2;
 const ACCEPTED = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml"];
+const ACCEPTED_SIGNATURE = ["image/png", "image/jpeg", "image/jpg"];
 
 const CURRENCIES = ["XOF", "USD", "EUR", "MAD", "GBP"];
 
@@ -335,6 +337,19 @@ function GeneralTab({
           parametresId={parametresId}
           disabled={disabled}
           onChange={(path) => update("logo_url", path)}
+        />
+      </Section>
+
+      <Section
+        title="Signature et cachet"
+        description="Image affichée en bas des documents PDF (facture, reçu). PNG ou JPG — 2 Mo max."
+        icon={<FileSignature className="h-4 w-4" />}
+      >
+        <SignatureUploader
+          currentPath={form.signature_url ?? null}
+          parametresId={parametresId}
+          disabled={disabled}
+          onChange={(path) => update("signature_url", path)}
         />
       </Section>
 
@@ -733,6 +748,170 @@ function LogoUploader({
         ref={inputRef}
         type="file"
         accept={ACCEPTED.join(",")}
+        className="hidden"
+        disabled={disabled}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
+function SignatureUploader({
+  currentPath,
+  parametresId,
+  disabled,
+  onChange,
+}: {
+  currentPath: string | null;
+  parametresId?: string;
+  disabled: boolean;
+  onChange: (path: string | null) => void;
+}) {
+  const { profile } = useTenant();
+  const tenantId = profile?.tenant_id;
+  const qc = useQueryClient();
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const previewUrl = useSignedUrl(currentPath);
+
+  // Persiste immédiatement en base, comme LogoUploader : sinon la signature
+  // n'est visible sur les PDF qu'après un clic sur "Enregistrer".
+  const persistSignature = useCallback(
+    async (path: string | null) => {
+      if (!tenantId || !parametresId) return;
+      const { error } = await supabase
+        .from("parametres")
+        .update({ signature_url: path })
+        .eq("id", parametresId)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["parametres"] });
+    },
+    [tenantId, parametresId, qc],
+  );
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!ACCEPTED_SIGNATURE.includes(file.type))
+        return toast.error("Format non supporté (PNG, JPG, JPEG)");
+      if (file.size > MAX_MB * 1024 * 1024) return toast.error(`Taille max ${MAX_MB} Mo`);
+      if (!tenantId || !parametresId) return toast.error("Établissement introuvable");
+      setBusy(true);
+      try {
+        const ext = file.name.split(".").pop() || "png";
+        const path = `${tenantId}/signature/${parametresId}-${Date.now()}.${ext}`;
+        const { error } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, file, { upsert: false, contentType: file.type });
+        if (error) throw error;
+        await persistSignature(path);
+        onChange(path);
+        toast.success("Signature téléversée");
+      } catch (e) {
+        toast.error(formatSupabaseError(e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [tenantId, parametresId, onChange, persistSignature],
+  );
+
+  const remove = async () => {
+    if (!currentPath) return;
+    setBusy(true);
+    try {
+      await supabase.storage.from(BUCKET).remove([currentPath]);
+      await persistSignature(null);
+      onChange(null);
+      toast.success("Signature supprimée");
+    } catch (e) {
+      toast.error(formatSupabaseError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (!disabled) setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        if (disabled) return;
+        const file = e.dataTransfer.files?.[0];
+        if (file) handleFile(file);
+      }}
+      className={cn(
+        "relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 text-center transition-colors",
+        dragging ? "border-primary bg-primary/5" : "border-border bg-muted/20",
+      )}
+    >
+      {previewUrl ? (
+        <div className="flex w-full flex-col items-center gap-3">
+          <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-xl border border-border bg-background">
+            <img
+              src={previewUrl}
+              alt="Signature et cachet"
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+          {!disabled && (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => inputRef.current?.click()}
+                disabled={busy}
+                className="gap-2"
+              >
+                <Upload className="h-3.5 w-3.5" /> Remplacer
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={remove}
+                disabled={busy}
+                className="gap-2 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Supprimer
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+          </div>
+          <div>
+            <p className="text-sm font-medium">Glissez un fichier ici</p>
+            <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, JPEG — max {MAX_MB} Mo</p>
+          </div>
+          {!disabled && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => inputRef.current?.click()}
+              disabled={busy}
+            >
+              Importer un fichier
+            </Button>
+          )}
+        </>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPTED_SIGNATURE.join(",")}
         className="hidden"
         disabled={disabled}
         onChange={(e) => {

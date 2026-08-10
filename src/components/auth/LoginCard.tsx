@@ -53,7 +53,7 @@ export function LoginCard({
               transition={{ delay: 0.12, duration: 0.4 }}
               className="mb-4 flex justify-center"
             >
-              <BrandLogo context="login" src={logo} alt={logoAlt} className="size-24 bg-transparent p-0" />
+              <BrandLogo context="login" src={logo} alt={logoAlt} className="size-[118px] bg-transparent p-0" />
             </motion.div>
           )}
           <CardTitle className="text-[44px] font-bold leading-none tracking-[-0.035em] text-slate-950 dark:text-white">{title}</CardTitle>

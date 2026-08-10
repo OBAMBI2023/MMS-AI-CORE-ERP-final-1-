@@ -214,7 +214,7 @@ export function TrialSignupPage() {
           className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 lg:px-10"
         >
           <Link to="/" className="flex items-center">
-            <BrandLogo context="header" className="size-12 md:size-14" />
+            <BrandLogo context="trialHeader" />
           </Link>
 
           <div className="flex items-center gap-3">
@@ -237,7 +237,7 @@ export function TrialSignupPage() {
         </div>
 
         {/* Hero */}
-        <section className="relative px-5 py-14 sm:py-20 lg:px-8">
+        <section className="relative px-5 pb-20 pt-14 sm:py-20 lg:px-8">
           <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-14">
             {/* Colonne gauche : pitch + illustration + confiance */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -318,7 +318,7 @@ export function TrialSignupPage() {
                 ))}
               </div>
 
-              <p className="mt-4 text-center text-[11px] text-slate-400 sm:text-left">
+              <p className="mt-4 text-center text-[13px] text-slate-300 sm:text-left">
                 Compatible avec toutes les devises (FCFA, EUR, USD, GBP, etc.). SAOVIA adapte
                 automatiquement la devise selon la configuration de votre entreprise.
               </p>

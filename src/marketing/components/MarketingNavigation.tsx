@@ -22,7 +22,7 @@ export function MarketingNavigation() {
         className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8"
       >
         <Link to="/" className="flex items-center" onClick={() => setIsOpen(false)}>
-          <BrandLogo context="header" />
+          <BrandLogo context="marketingHeader" />
         </Link>
 
         <div className="hidden items-center gap-7 lg:flex">

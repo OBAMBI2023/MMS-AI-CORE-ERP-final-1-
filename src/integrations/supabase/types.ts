@@ -1615,6 +1615,8 @@ export type Database = {
       hotel_reservations: {
         Row: {
           accommodation_total: number | null
+          actual_check_in_at: string | null
+          actual_check_out_at: string | null
           check_in: string
           check_out: string
           created_at: string
@@ -1631,6 +1633,8 @@ export type Database = {
         }
         Insert: {
           accommodation_total?: number | null
+          actual_check_in_at?: string | null
+          actual_check_out_at?: string | null
           check_in: string
           check_out: string
           created_at?: string
@@ -1647,6 +1651,8 @@ export type Database = {
         }
         Update: {
           accommodation_total?: number | null
+          actual_check_in_at?: string | null
+          actual_check_out_at?: string | null
           check_in?: string
           check_out?: string
           created_at?: string
@@ -4113,6 +4119,8 @@ export type Database = {
       hotel_reservation_balances: {
         Row: {
           accommodation_total: number | null
+          actual_check_in_at: string | null
+          actual_check_out_at: string | null
           balance_due: number | null
           check_in: string | null
           check_out: string | null
@@ -4246,6 +4254,30 @@ export type Database = {
       can_manage_avatar_object: {
         Args: { object_name: string }
         Returns: boolean
+      }
+      check_client_duplicate: {
+        Args: {
+          p_email: string
+          p_exclude_id?: string
+          p_phone: string
+          p_tenant_id: string
+        }
+        Returns: {
+          duplicate_email: boolean
+          duplicate_phone: boolean
+        }[]
+      }
+      check_fournisseur_duplicate: {
+        Args: {
+          p_email: string
+          p_exclude_id?: string
+          p_phone: string
+          p_tenant_id: string
+        }
+        Returns: {
+          duplicate_email: boolean
+          duplicate_phone: boolean
+        }[]
       }
       collect_hotel_invoice_payment: {
         Args: {
@@ -4775,6 +4807,8 @@ export type Database = {
         Args: { p_full_name: string; p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
+      normalize_client_email: { Args: { p_email: string }; Returns: string }
+      normalize_client_phone: { Args: { p_phone: string }; Returns: string }
       normalize_tenant_slug: { Args: { p_name: string }; Returns: string }
       partner_can_read_module: {
         Args: { requested_module_id: string }

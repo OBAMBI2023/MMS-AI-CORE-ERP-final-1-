@@ -16,14 +16,14 @@ export const PLATFORM_BRANDING = {
     pay: "SAOVIA Pay",
     cloud: "SAOVIA Cloud",
   },
-  // A single official vector is currently available. Keep every surface on
+  // A single official asset is currently available. Keep every surface on
   // SAOVIA until dedicated, approved variants are supplied.
   assets: {
-    logo: "/branding/saovia-logo.svg",
-    logoDark: "/branding/saovia-logo.svg",
-    logoVertical: "/branding/saovia-logo.svg",
-    icon: "/branding/saovia-logo.svg",
-    favicon: "/branding/saovia-logo.svg",
+    logo: "/branding/saovia-logo-full.png",
+    logoDark: "/branding/saovia-logo-full.png",
+    logoVertical: "/branding/saovia-logo-full.png",
+    icon: "/branding/saovia-logo-full.png",
+    favicon: "/branding/saovia-icon.png",
   },
 } as const;
 

@@ -8,6 +8,7 @@ import {
   Check,
   ChevronsUpDown,
   FileDown,
+  FileCheck2,
   List,
   type LucideIcon,
   MoreVertical,
@@ -68,7 +69,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { useCompanySettings } from "@/hooks/use-company-settings";
-import { createHotelInvoicePdf } from "@/lib/mms/hotel-invoice-pdf";
+import { useHotelSettings } from "@/hooks/use-hotel-settings";
+import { createHotelReservationDetailPdf } from "@/lib/mms/hotel-reservation-detail-pdf";
+import { createHotelReservationConfirmationPdf } from "@/lib/mms/hotel-reservation-confirmation-pdf";
 import { downloadPdf } from "@/lib/mms/download-pdf";
 import { HotelSmsDialog } from "@/components/hotel/HotelSmsDialog";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
@@ -112,7 +115,8 @@ const emptyForm = {
 export function HotelReservationsPage() {
   const qc = useQueryClient();
   const { profile } = useTenant();
-  const { settings, logoUrl } = useCompanySettings(profile?.tenant_id);
+  const { settings, logoUrl, signatureUrl } = useCompanySettings(profile?.tenant_id);
+  const { data: hotelSettings } = useHotelSettings();
   const [form, setForm] = useState(emptyForm);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -442,7 +446,7 @@ export function HotelReservationsPage() {
     try {
       const guest: any = guests.get(reservation.guest_id);
       const room: any = rooms.get(reservation.room_id);
-      const pdf = await createHotelInvoicePdf(
+      const pdf = await createHotelReservationDetailPdf(
         {
           id: reservation.id,
           check_in: reservation.check_in,
@@ -453,9 +457,9 @@ export function HotelReservationsPage() {
           grand_total: Number(reservation.grand_total ?? 0),
           paid_total: Number(reservation.paid_total ?? 0),
           balance_due: Number(reservation.balance_due ?? 0),
-          status: reservation.status,
           guestName: guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL,
           guestPhone: guest?.phone,
+          guestEmail: guest?.email,
           companions: (data?.companions ?? [])
             .filter((companion: any) => companion.reservation_id === reservation.id)
             .map((companion: any) => companion.full_name),
@@ -467,12 +471,46 @@ export function HotelReservationsPage() {
         },
         settings,
         logoUrl,
+        signatureUrl,
       );
       await downloadPdf(pdf.doc, pdf.filename);
-      toast.success("Fiche de réservation téléchargée.");
+      toast.success("Détail de réservation téléchargé.");
     } catch (error) {
-      console.error("Échec de la génération de la fiche de réservation PDF", error);
-      toast.error("Impossible de générer la fiche PDF de cette réservation.");
+      console.error("Échec de la génération du détail de réservation PDF", error);
+      toast.error("Impossible de générer le détail PDF de cette réservation.");
+    }
+  };
+  const downloadConfirmationPdf = async (reservation: any) => {
+    try {
+      const guest: any = guests.get(reservation.guest_id);
+      const room: any = rooms.get(reservation.room_id);
+      const pdf = await createHotelReservationConfirmationPdf(
+        {
+          id: reservation.id,
+          check_in: reservation.check_in,
+          check_out: reservation.check_out,
+          nights: Number(reservation.nights ?? 0),
+          nightly_rate: Number(reservation.nightly_rate ?? 0),
+          grand_total: Number(reservation.grand_total ?? 0),
+          paid_total: Number(reservation.paid_total ?? 0),
+          guestName: guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL,
+          guestPhone: guest?.phone,
+          guestEmail: guest?.email,
+          roomNumber: room?.number ?? "—",
+          checkInTime: hotelSettings?.check_in_time,
+          checkOutTime: hotelSettings?.check_out_time,
+          bookingTerms: hotelSettings?.booking_terms,
+          cancellationPolicy: hotelSettings?.cancellation_policy,
+        },
+        settings,
+        logoUrl,
+        signatureUrl,
+      );
+      await downloadPdf(pdf.doc, pdf.filename);
+      toast.success("Confirmation de réservation téléchargée.");
+    } catch (error) {
+      console.error("Échec de la génération de la confirmation de réservation PDF", error);
+      toast.error("Impossible de générer la confirmation PDF de cette réservation.");
     }
   };
   return (
@@ -788,6 +826,7 @@ export function HotelReservationsPage() {
             canUpdate={canUpdate}
             canDelete={canDelete}
             downloadPdf={downloadReservationPdf}
+            downloadConfirmation={downloadConfirmationPdf}
             sendSms={setSmsReservation}
             canSendSms={canSendSms && smsModuleEnabled}
             changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
@@ -1052,6 +1091,7 @@ function ReservationTable({
   canUpdate,
   canDelete,
   downloadPdf,
+  downloadConfirmation,
   sendSms,
   canSendSms,
   changeStatus,
@@ -1119,7 +1159,10 @@ function ReservationTable({
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
-                          <FileDown /> Télécharger la fiche PDF
+                          <FileDown /> Détail de réservation
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => void downloadConfirmation(r)}>
+                          <FileCheck2 /> Confirmation de réservation
                         </DropdownMenuItem>
                         {canSendSms && (
                           <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!g?.phone}>

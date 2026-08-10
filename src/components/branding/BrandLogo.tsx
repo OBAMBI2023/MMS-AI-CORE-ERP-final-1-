@@ -10,7 +10,10 @@ export type BrandLogoContext =
   | "partner"
   | "dashboard"
   | "pdf"
-  | "mobile";
+  | "mobile"
+  | "marketingHeader"
+  | "marketingFooter"
+  | "trialHeader";
 
 const contextClasses: Record<BrandLogoContext, string> = {
   sidebar: "size-9 md:size-10",
@@ -21,6 +24,11 @@ const contextClasses: Record<BrandLogoContext, string> = {
   dashboard: "size-10 md:size-12",
   pdf: "size-8 md:size-10",
   mobile: "size-8 sm:size-10",
+  // Wide (non-square) boxes sized to the logo's own aspect ratio so mobile
+  // renders at a legible width without letterboxing or growing header height.
+  marketingHeader: "h-[62px] w-[84px] p-0 md:size-12 md:p-1",
+  marketingFooter: "h-[75px] w-[102px] p-0 md:size-12 md:p-1",
+  trialHeader: "h-[66px] w-[90px] p-0 md:size-14 md:p-1",
 };
 
 type BrandLogoProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {

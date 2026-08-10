@@ -188,7 +188,7 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
         logoAlt={tenant ? `Logo ${companyName}` : PLATFORM_BRANDING.alt}
         headerContent={
           tenantLoading ? (
-            <Skeleton className="mx-auto mb-4 h-24 w-24 rounded-2xl" />
+            <Skeleton className="mx-auto mb-4 h-[118px] w-[118px] rounded-2xl" />
           ) : undefined
         }
         premium

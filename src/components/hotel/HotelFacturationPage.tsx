@@ -39,7 +39,7 @@ const WALK_IN_LABEL = "Client de passage";
 
 export function HotelFacturationPage() {
   const { profile } = useTenant();
-  const { settings, logoUrl } = useCompanySettings(profile?.tenant_id);
+  const { settings, logoUrl, signatureUrl } = useCompanySettings(profile?.tenant_id);
   const { data, isLoading } = useHotelBillingData();
   const refresh = useHotelBillingRefresh();
   const modulesQuery = useTenantModules();
@@ -93,6 +93,32 @@ export function HotelFacturationPage() {
     try {
       const guest: any = guests.get(reservation.guest_id ?? "");
       const room: any = rooms.get(reservation.room_id);
+      const [extrasResult, paymentsResult] = await Promise.all([
+        db
+          .from("hotel_reservation_extras")
+          .select("label,quantity,unit_price")
+          .eq("tenant_id", profile?.tenant_id)
+          .eq("reservation_id", reservation.id),
+        db
+          .from("hotel_reservation_payments")
+          .select("amount,method,paid_at,reference")
+          .eq("tenant_id", profile?.tenant_id)
+          .eq("reservation_id", reservation.id)
+          .order("paid_at", { ascending: false }),
+      ]);
+      if (extrasResult.error) throw extrasResult.error;
+      if (paymentsResult.error) throw paymentsResult.error;
+      const extras = (extrasResult.data ?? []).map((extra: any) => ({
+        label: extra.label,
+        quantity: Number(extra.quantity ?? 0),
+        unitPrice: Number(extra.unit_price ?? 0),
+      }));
+      const payments = (paymentsResult.data ?? []).map((payment: any) => ({
+        date: payment.paid_at,
+        amount: Number(payment.amount ?? 0),
+        method: payment.method,
+        reference: payment.reference,
+      }));
       const pdf = await createHotelInvoicePdf(
         {
           id: reservation.id,
@@ -104,14 +130,16 @@ export function HotelFacturationPage() {
           grand_total: Number(reservation.grand_total ?? 0),
           paid_total: Number(reservation.paid_total ?? 0),
           balance_due: Number(reservation.balance_due ?? 0),
-          status: reservation.status,
           guestName: guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL,
           guestPhone: guest?.phone,
+          guestEmail: guest?.email,
           roomNumber: room?.number ?? "—",
-          notes: reservation.notes,
         },
         settings,
         logoUrl,
+        signatureUrl,
+        extras,
+        payments,
       );
       await downloadPdf(pdf.doc, pdf.filename);
       toast.success("Facture téléchargée.");

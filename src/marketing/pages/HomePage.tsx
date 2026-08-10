@@ -24,7 +24,7 @@ const capabilities = [
 export function HomePage() {
   return (
     <>
-      <section className="relative overflow-hidden px-5 py-24 sm:py-32 lg:px-8">
+      <section className="relative overflow-hidden px-5 pb-24 pt-16 sm:py-32 lg:px-8">
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.13),transparent_45%)]" />
         <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
           <div>

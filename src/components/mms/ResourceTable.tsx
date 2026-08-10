@@ -667,22 +667,52 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
   );
 }
 
-// Backstop for the "clients" table: if the pre-submit duplicate check (RPC
-// check_client_duplicate) is bypassed by a race condition, the per-tenant
-// unique index (when present — see clients_tenant_email_key /
-// clients_tenant_phone_key) still rejects the write with a 23505. Surface
-// that as the same friendly message instead of a raw Postgres error.
+// Per-table anti-duplicate config: which RPC does the pre-submit check,
+// and which partial unique index / message backs up each field in case
+// that check is bypassed by a race condition (see check_client_duplicate,
+// check_fournisseur_duplicate and their *_tenant_email_key / *_tenant_phone_key
+// indexes in supabase/migrations).
+const DUPLICATE_GUARDS: Record<
+  string,
+  {
+    rpc: "check_client_duplicate" | "check_fournisseur_duplicate";
+    emailIndex: string;
+    phoneIndex: string;
+    emailMessage: string;
+    phoneMessage: string;
+    /** Generic message for a 23505 on this table that matches neither index above. */
+    fallbackMessage?: string;
+  }
+> = {
+  clients: {
+    rpc: "check_client_duplicate",
+    emailIndex: "clients_tenant_email_key",
+    phoneIndex: "clients_tenant_phone_key",
+    emailMessage: "Un client avec cette adresse e-mail existe déjà.",
+    phoneMessage: "Un client avec ce numéro de téléphone existe déjà.",
+  },
+  fournisseurs: {
+    rpc: "check_fournisseur_duplicate",
+    emailIndex: "fournisseurs_tenant_email_key",
+    phoneIndex: "fournisseurs_tenant_phone_key",
+    emailMessage: "Un fournisseur avec cette adresse email existe déjà.",
+    phoneMessage: "Un fournisseur avec ce numéro de téléphone existe déjà.",
+    fallbackMessage: "Ce fournisseur existe déjà.",
+  },
+};
+
+// Backstop: if the pre-submit duplicate check (RPC) is bypassed by a race
+// condition, the per-tenant unique index (when present) still rejects the
+// write with a 23505. Surface that as the same friendly message instead of
+// a raw Postgres error.
 function toClientDuplicateError(table: string, error: Error): Error {
-  if (table !== "clients") return error;
+  const guard = DUPLICATE_GUARDS[table];
+  if (!guard) return error;
   if ((error as { code?: string }).code !== "23505") return error;
   const message = error.message ?? "";
-  if (message.includes("clients_tenant_email_key")) {
-    return new Error("Un client avec cette adresse e-mail existe déjà.");
-  }
-  if (message.includes("clients_tenant_phone_key")) {
-    return new Error("Un client avec ce numéro de téléphone existe déjà.");
-  }
-  return error;
+  if (message.includes(guard.emailIndex)) return new Error(guard.emailMessage);
+  if (message.includes(guard.phoneIndex)) return new Error(guard.phoneMessage);
+  return guard.fallbackMessage ? new Error(guard.fallbackMessage) : error;
 }
 
 function ResourceFormDialog<T extends { id: string }>({
@@ -724,11 +754,12 @@ function ResourceFormDialog<T extends { id: string }>({
         if (v === "") v = null;
         payload[f.name] = v;
       }
-      if (table === "clients" && profile?.tenant_id) {
+      const duplicateGuard = DUPLICATE_GUARDS[table];
+      if (duplicateGuard && profile?.tenant_id) {
         const email = typeof payload.email === "string" ? payload.email : "";
         const phone = typeof payload.phone === "string" ? payload.phone : "";
         if (email || phone) {
-          const { data: dup, error: dupError } = await supabase.rpc("check_client_duplicate", {
+          const { data: dup, error: dupError } = await supabase.rpc(duplicateGuard.rpc, {
             p_tenant_id: profile.tenant_id,
             p_email: email,
             p_phone: phone,
@@ -737,10 +768,10 @@ function ResourceFormDialog<T extends { id: string }>({
           if (dupError) throw dupError;
           const result = dup?.[0];
           if (result?.duplicate_email) {
-            throw new Error("Un client avec cette adresse e-mail existe déjà.");
+            throw new Error(duplicateGuard.emailMessage);
           }
           if (result?.duplicate_phone) {
-            throw new Error("Un client avec ce numéro de téléphone existe déjà.");
+            throw new Error(duplicateGuard.phoneMessage);
           }
         }
       }

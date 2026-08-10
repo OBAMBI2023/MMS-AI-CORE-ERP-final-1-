@@ -66,9 +66,17 @@ const emptyPaymentForm = {
   notes: "",
 };
 
+// Pure UI convenience — prefills the same `amount` field the user could type
+// into manually. Doesn't bypass or change the existing amount validation.
+const QUICK_AMOUNT_OPTIONS: { label: string; compute: (balanceDue: number) => number }[] = [
+  { label: "25 %", compute: (balanceDue) => Math.round(balanceDue * 0.25) },
+  { label: "50 %", compute: (balanceDue) => Math.round(balanceDue * 0.5) },
+  { label: "Solde complet", compute: (balanceDue) => Math.round(balanceDue) },
+];
+
 export function HotelCaissePage() {
   const { profile } = useTenant();
-  const { settings, logoUrl } = useCompanySettings(profile?.tenant_id);
+  const { settings, logoUrl, signatureUrl } = useCompanySettings(profile?.tenant_id);
   const { data, isLoading } = useHotelBillingData();
   const refresh = useHotelBillingRefresh();
   const modulesQuery = useTenantModules();
@@ -203,6 +211,7 @@ export function HotelCaissePage() {
           invoiceNumber: reservation.invoice_number,
           guestName: guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL,
           guestPhone: guest?.phone,
+          guestEmail: guest?.email,
           roomNumber: room?.number ?? "—",
           checkIn: reservation.check_in,
           checkOut: reservation.check_out,
@@ -212,6 +221,7 @@ export function HotelCaissePage() {
         },
         settings,
         logoUrl,
+        signatureUrl,
       );
       await downloadPdf(pdf.doc, pdf.filename);
     } catch (error) {
@@ -249,10 +259,10 @@ export function HotelCaissePage() {
 
   return (
     <HotelAppShell title="Caisse" subtitle="Encaissements des réservations et factures">
-      <section className="hotel-panel mb-5">
+      <section className="mb-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:mb-6 sm:rounded-[24px] sm:p-6 dark:border-white/5 dark:bg-[#151B2F]">
         <div className="mb-4">
-          <h2 className="font-semibold">Sélectionner une réservation ou une facture</h2>
-          <p className="text-xs text-slate-400">
+          <h2 className="text-base font-semibold sm:text-lg">Sélectionner une réservation ou une facture</h2>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             Recherchez par client, numéro de chambre ou numéro de facture.
           </p>
         </div>
@@ -268,116 +278,159 @@ export function HotelCaissePage() {
       {isLoading && <p className="text-sm text-muted-foreground">Chargement…</p>}
 
       {selected && (
-        <div className="grid gap-5 lg:grid-cols-3">
-          <section className="hotel-panel lg:col-span-1">
-            <h3 className="mb-3 font-semibold">Détails</h3>
-            <dl className="space-y-2 text-sm">
-              <Row label="Client" value={selectedGuest ? `${selectedGuest.first_name} ${selectedGuest.last_name}` : WALK_IN_LABEL} />
-              <Row label="Téléphone" value={selectedGuest?.phone ?? "—"} />
-              <Row label="Chambre" value={`N° ${selectedRoom?.number ?? "—"}`} />
-              <Row label="Séjour" value={`${formatDate(selected.check_in)} → ${formatDate(selected.check_out)}`} />
-              <Row label="Facture" value={selected.invoice_number ?? "Non émise"} />
-            </dl>
-            <div className="mt-4 space-y-2 rounded-lg border bg-muted/20 p-3 text-sm">
-              <Row label="Montant total" value={formatCurrency(Number(selected.grand_total))} bold />
-              <Row label="Déjà payé" value={formatCurrency(Number(selected.paid_total))} />
-              <Row label="Reste à payer" value={formatCurrency(Math.max(0, Number(selected.balance_due)))} bold />
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-muted-foreground">Statut</span>
-                {paymentStatus && (
+        <div className="space-y-5 sm:space-y-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+            <KpiTile label="Montant total" value={formatCurrency(Number(selected.grand_total))} />
+            <KpiTile
+              label="Déjà payé"
+              value={formatCurrency(Number(selected.paid_total))}
+              valueClassName="text-emerald-600 dark:text-emerald-400"
+            />
+            <KpiTile
+              label="Reste à payer"
+              value={formatCurrency(Math.max(0, Number(selected.balance_due)))}
+              valueClassName={
+                Number(selected.balance_due) > 0
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-emerald-600 dark:text-emerald-400"
+              }
+            />
+            <KpiTile
+              label="Statut"
+              value={
+                paymentStatus ? (
                   <span
                     className={cn(
-                      "rounded-full px-2 py-1 text-xs font-semibold",
+                      "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
                       HOTEL_PAYMENT_STATUS_BADGE[paymentStatus],
                     )}
                   >
                     {HOTEL_PAYMENT_STATUS_LABEL[paymentStatus]}
                   </span>
-                )}
-              </div>
-            </div>
-          </section>
+                ) : (
+                  "—"
+                )
+              }
+            />
+          </div>
 
-          <section className="hotel-panel lg:col-span-2">
-            <h3 className="mb-3 font-semibold">Encaisser un paiement</h3>
-            {!canCollect ? (
-              <p className="text-sm text-muted-foreground">
-                Vous n'avez pas la permission d'enregistrer un encaissement.
-              </p>
-            ) : Number(selected.balance_due) <= 0 ? (
-              <p className="text-sm font-medium text-emerald-600">
-                Cette réservation est intégralement soldée.
-              </p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Montant encaissé *">
-                  <Input
-                    type="number"
-                    min="0"
-                    max={selected.balance_due}
-                    step="1"
-                    value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  />
-                  {amountInvalid && form.amount !== "" && (
-                    <p className="mt-1 text-xs font-medium text-destructive">
-                      Le montant doit être positif et ne peut pas dépasser le solde restant.
-                    </p>
-                  )}
-                </Field>
-                <Field label="Mode de paiement *">
-                  <Select value={form.method} onValueChange={(v) => setForm({ ...form, method: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {HOTEL_PAYMENT_METHODS.map((method) => (
-                        <SelectItem key={method} value={method}>
-                          {method}
-                        </SelectItem>
+          <div className="grid gap-5 sm:gap-6 lg:grid-cols-2">
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:rounded-[24px] sm:p-6 dark:border-white/5 dark:bg-[#151B2F]">
+              <h3 className="mb-4 font-semibold">Détails de la réservation</h3>
+              <dl className="space-y-2.5 text-sm">
+                <Row label="Client" value={selectedGuest ? `${selectedGuest.first_name} ${selectedGuest.last_name}` : WALK_IN_LABEL} />
+                <Row label="Téléphone" value={selectedGuest?.phone ?? "—"} />
+                <Row label="Chambre" value={`N° ${selectedRoom?.number ?? "—"}`} />
+                <Row label="Séjour" value={`${formatDate(selected.check_in)} → ${formatDate(selected.check_out)}`} />
+                <Row label="Facture" value={selected.invoice_number ?? "Non émise"} />
+              </dl>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:rounded-[24px] sm:p-6 dark:border-white/5 dark:bg-[#151B2F]">
+              <h3 className="mb-4 font-semibold">Encaisser un paiement</h3>
+              {!canCollect ? (
+                <p className="text-sm text-muted-foreground">
+                  Vous n'avez pas la permission d'enregistrer un encaissement.
+                </p>
+              ) : Number(selected.balance_due) <= 0 ? (
+                <p className="text-sm font-medium text-emerald-600">
+                  Cette réservation est intégralement soldée.
+                </p>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Montant encaissé *">
+                    <Input
+                      type="number"
+                      min="0"
+                      max={selected.balance_due}
+                      step="1"
+                      value={form.amount}
+                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    />
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {QUICK_AMOUNT_OPTIONS.map((opt) => (
+                        <Button
+                          key={opt.label}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 rounded-full px-2.5 text-xs font-medium"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              amount: String(opt.compute(Number(selected.balance_due))),
+                            }))
+                          }
+                        >
+                          {opt.label}
+                        </Button>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Date de paiement *">
-                  <Input
-                    type="date"
-                    max={todayInputValue()}
-                    value={form.paidAt}
-                    onChange={(e) => setForm({ ...form, paidAt: e.target.value })}
-                  />
-                </Field>
-                <Field label="Référence (facultatif)">
-                  <Input
-                    value={form.reference}
-                    onChange={(e) => setForm({ ...form, reference: e.target.value })}
-                    placeholder="N° de transaction, chèque…"
-                  />
-                </Field>
-                <div className="sm:col-span-2">
-                  <Field label="Note (facultatif)">
-                    <Textarea
-                      value={form.notes}
-                      onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                      rows={2}
+                    </div>
+                    {amountInvalid && form.amount !== "" && (
+                      <p className="mt-1 text-xs font-medium text-destructive">
+                        Le montant doit être positif et ne peut pas dépasser le solde restant.
+                      </p>
+                    )}
+                  </Field>
+                  <Field label="Date de paiement *">
+                    <Input
+                      type="date"
+                      max={todayInputValue()}
+                      value={form.paidAt}
+                      onChange={(e) => setForm({ ...form, paidAt: e.target.value })}
                     />
                   </Field>
+                  <Field label="Mode de paiement *">
+                    <Select value={form.method} onValueChange={(v) => setForm({ ...form, method: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {HOTEL_PAYMENT_METHODS.map((method) => (
+                          <SelectItem key={method} value={method}>
+                            {method}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Référence (facultatif)">
+                    <Input
+                      value={form.reference}
+                      onChange={(e) => setForm({ ...form, reference: e.target.value })}
+                      placeholder="N° de transaction, chèque…"
+                    />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <Field label="Note (facultatif)">
+                      <Textarea
+                        value={form.notes}
+                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                        rows={2}
+                      />
+                    </Field>
+                  </div>
+                  <div className="flex justify-end sm:col-span-2">
+                    <Button
+                      className="w-full sm:w-auto"
+                      disabled={collect.isPending || amountInvalid || !form.method || !form.paidAt}
+                      onClick={() => collect.mutate()}
+                    >
+                      <Banknote className="mr-1.5 size-4" />
+                      {collect.isPending
+                        ? "Enregistrement…"
+                        : form.amount
+                          ? `Encaisser ${formatCurrency(amountValue)}`
+                          : "Encaisser"}
+                    </Button>
+                  </div>
                 </div>
-                <div className="sm:col-span-2 flex justify-end">
-                  <Button
-                    disabled={collect.isPending || amountInvalid || !form.method || !form.paidAt}
-                    onClick={() => collect.mutate()}
-                  >
-                    <Banknote className="mr-1.5 size-4" />
-                    {collect.isPending ? "Enregistrement…" : `Encaisser ${form.amount ? formatCurrency(amountValue) : ""}`}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </section>
+              )}
+            </section>
+          </div>
 
-          <section className="hotel-panel lg:col-span-3">
-            <h3 className="mb-3 font-semibold">Historique des paiements</h3>
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:rounded-[24px] sm:p-6 dark:border-white/5 dark:bg-[#151B2F]">
+            <h3 className="mb-4 font-semibold">Historique des paiements</h3>
             <PaymentHistoryTable
               payments={history.data ?? []}
               loading={history.isLoading}
@@ -400,6 +453,27 @@ export function HotelCaissePage() {
         </Card>
       )}
     </HotelAppShell>
+  );
+}
+
+function KpiTile({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:rounded-[20px] sm:p-5 dark:border-white/5 dark:bg-[#151B2F]">
+      <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+        {label}
+      </p>
+      <div className={cn("mt-2 text-lg font-bold leading-none tracking-tight sm:text-xl", valueClassName)}>
+        {value}
+      </div>
+    </div>
   );
 }
 

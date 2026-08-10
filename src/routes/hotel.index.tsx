@@ -208,7 +208,7 @@ function HotelDashboard() {
   );
 
   return (
-    <HotelAppShell title="Tableau de bord" subtitle="SAOVIA HOTEL" contentClassName="bg-[#F4FAF8] dark:bg-[#07211C]">
+    <HotelAppShell title="Tableau de bord" contentClassName="bg-[#F4FAF8] dark:bg-[#07211C]">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
