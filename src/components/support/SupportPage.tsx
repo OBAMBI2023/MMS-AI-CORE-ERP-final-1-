@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/mms/AppShell";
+import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { ImageField } from "@/components/hotel/HotelImageField";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,7 +37,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { useSignedUrl } from "@/hooks/use-signed-url";
+import { useTenant } from "@/providers/TenantProvider";
 import { formatDateTime } from "@/lib/mms/format";
 import { cn } from "@/lib/utils";
 import {
@@ -395,8 +398,19 @@ function NewTicketDialog({
 }
 
 export function SupportPage() {
+  // Support is one route shared by both platform types — it must render
+  // inside whichever shell/sidebar the tenant's own pages use (HotelAppShell
+  // for platform_type='HOTEL', the ERP AppShell otherwise), never a shell of
+  // its own. Hardcoding AppShell here previously made a HOTEL tenant lose
+  // its entire Hotel sidebar (and fall back to the ERP SidebarCompanyHeader,
+  // which shows "Secteur non renseigné" since Hotel tenants don't populate
+  // the ERP-only business_sector field) whenever they opened /support.
+  const { tenant, loading: tenantLoading } = useTenant();
+  const Shell = tenant?.platform_type === "HOTEL" ? HotelAppShell : AppShell;
   const canView = useActionPermission("support.view");
   const canCreate = useActionPermission("support.create");
+  const modulesQuery = useTenantModules();
+  const moduleEnabled = modulesQuery.data?.has("support") ?? false;
   const ticketsQuery = useSupportTickets();
   const unreadQuery = useSupportUnreadByTicket();
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -419,9 +433,46 @@ export function SupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTicketId]);
 
+  if (tenantLoading) {
+    // Platform type isn't known yet — rendering either shell now would risk
+    // flashing the wrong sidebar for a hotel tenant on a hard refresh.
+    return (
+      <div className="grid min-h-screen place-items-center bg-background">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (modulesQuery.isLoading) {
+    return (
+      <Shell title="Support" subtitle="Échangez avec l'équipe SAOVIA">
+        <Skeleton className="h-72 rounded-[24px]" />
+      </Shell>
+    );
+  }
+
+  if (!moduleEnabled) {
+    return (
+      <Shell title="Support" subtitle="Échangez avec l'équipe SAOVIA">
+        <div className="mt-4 grid min-h-72 place-items-center rounded-[24px] border border-dashed bg-muted/20 p-8 text-center">
+          <div>
+            <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-muted text-muted-foreground">
+              <LifeBuoy className="size-7" />
+            </div>
+            <h3 className="mt-4 font-semibold">Module non disponible</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Le module Support n'est pas activé pour votre établissement. Contactez votre
+              administrateur.
+            </p>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
   if (!canView) {
     return (
-      <AppShell title="Support" subtitle="Échangez avec l'équipe SAOVIA">
+      <Shell title="Support" subtitle="Échangez avec l'équipe SAOVIA">
         <div className="mt-4 grid min-h-72 place-items-center rounded-[24px] border border-dashed bg-muted/20 p-8 text-center">
           <div>
             <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-destructive/10 text-destructive">
@@ -433,12 +484,12 @@ export function SupportPage() {
             </p>
           </div>
         </div>
-      </AppShell>
+      </Shell>
     );
   }
 
   return (
-    <AppShell
+    <Shell
       title="Support"
       subtitle="Échangez avec l'équipe SAOVIA"
       actions={
@@ -606,6 +657,6 @@ export function SupportPage() {
       )}
 
       <NewTicketDialog open={newTicketOpen} onOpenChange={setNewTicketOpen} />
-    </AppShell>
+    </Shell>
   );
 }

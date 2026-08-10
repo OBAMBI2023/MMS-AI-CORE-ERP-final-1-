@@ -14,6 +14,7 @@ const accentMap: Record<SecondaryAccent, string> = {
 export function DashboardSecondaryCard({
   title,
   value,
+  compactValue,
   icon: Icon,
   route,
   accent = "primary",
@@ -21,6 +22,8 @@ export function DashboardSecondaryCard({
 }: {
   title: string;
   value: string;
+  /** Shorter form of `value` (e.g. "1,87 M FCFA") shown below the `sm` breakpoint instead of `value`, to avoid truncating large amounts on mobile. */
+  compactValue?: string;
   icon: LucideIcon;
   route: string;
   accent?: SecondaryAccent;
@@ -42,7 +45,16 @@ export function DashboardSecondaryCard({
         </div>
         <div className="min-w-0">
           <p className="truncate text-[11px] font-medium text-muted-foreground">{title}</p>
-          <p className="text-[1.15rem] font-bold leading-tight tracking-tight">{value}</p>
+          <p className="truncate text-[1.15rem] font-bold leading-tight tracking-tight tabular-nums">
+            {compactValue ? (
+              <>
+                <span className="sm:hidden">{compactValue}</span>
+                <span className="hidden sm:inline">{value}</span>
+              </>
+            ) : (
+              value
+            )}
+          </p>
         </div>
       </a>
     </motion.div>

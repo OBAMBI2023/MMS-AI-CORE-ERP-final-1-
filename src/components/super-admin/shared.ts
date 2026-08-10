@@ -10,6 +10,7 @@ import {
   Handshake,
   Home,
   LayoutDashboard,
+  LifeBuoy,
   MessageSquareText,
   Package,
   Receipt,
@@ -84,6 +85,7 @@ const MODULE_ICON_MAP: Record<string, LucideIcon> = {
   ContactRound,
   ChartNoAxesCombined,
   Wrench,
+  LifeBuoy,
 };
 
 export function iconForModule(iconName: string | null | undefined): LucideIcon {

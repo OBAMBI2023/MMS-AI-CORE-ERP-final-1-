@@ -45,7 +45,7 @@ import { fr } from "date-fns/locale";
 import { AppShell } from "@/components/mms/AppShell";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency } from "@/lib/mms/format";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/mms/format";
 import { useTenant } from "@/providers/TenantProvider";
 import {
   Select,
@@ -1169,6 +1169,7 @@ function RapportsPage() {
                 <KpiTile
                   title="CA total"
                   value={formatCurrency(report.target.totalRevenue)}
+                  compactValue={formatCurrencyCompact(report.target.totalRevenue)}
                   icon={Wallet}
                   trend={report.trends.totalRevenue}
                   spark={trends?.total}
@@ -1180,6 +1181,7 @@ function RapportsPage() {
                 <KpiTile
                   title="CA produits"
                   value={formatCurrency(report.target.productRevenue)}
+                  compactValue={formatCurrencyCompact(report.target.productRevenue)}
                   icon={Package}
                   trend={report.trends.productRevenue}
                   spark={trends?.product}
@@ -1191,6 +1193,7 @@ function RapportsPage() {
                 <KpiTile
                   title="CA services"
                   value={formatCurrency(report.target.serviceRevenue)}
+                  compactValue={formatCurrencyCompact(report.target.serviceRevenue)}
                   icon={Wrench}
                   trend={report.trends.serviceRevenue}
                   spark={trends?.service}
@@ -1202,6 +1205,7 @@ function RapportsPage() {
                 <KpiTile
                   title="Achats"
                   value={formatCurrency(report.target.purchases)}
+                  compactValue={formatCurrencyCompact(report.target.purchases)}
                   icon={ShoppingCart}
                   trend={report.trends.purchases}
                   spark={trends?.purchases}
@@ -1212,6 +1216,7 @@ function RapportsPage() {
               <KpiTile
                 title="Dépenses"
                 value={formatCurrency(report.target.expenses)}
+                compactValue={formatCurrencyCompact(report.target.expenses)}
                 icon={Receipt}
                 trend={report.trends.expenses}
                 spark={trends?.expenses}
@@ -1222,6 +1227,7 @@ function RapportsPage() {
                 <KpiTile
                   title="Marge brute produits"
                   value={formatCurrency(report.target.grossMargin)}
+                  compactValue={formatCurrencyCompact(report.target.grossMargin)}
                   icon={BarChart3}
                   trend={report.trends.grossMargin}
                   accent="indigo"
@@ -1231,6 +1237,7 @@ function RapportsPage() {
               <KpiTile
                 title="Résultat net"
                 value={formatCurrency(report.target.netResult)}
+                compactValue={formatCurrencyCompact(report.target.netResult)}
                 icon={TrendingUp}
                 trend={report.trends.netResult}
                 accent="emerald"
@@ -1466,6 +1473,7 @@ function RapportsPage() {
 function KpiTile({
   title,
   value,
+  compactValue,
   icon,
   trend,
   spark,
@@ -1474,6 +1482,7 @@ function KpiTile({
 }: {
   title: string;
   value: string;
+  compactValue?: string;
   icon: LucideIcon;
   trend: number | null;
   spark?: SparkPoint[];
@@ -1484,6 +1493,7 @@ function KpiTile({
     <DashboardKpiCard
       title={title}
       value={value}
+      compactValue={compactValue}
       icon={icon}
       trend={trend}
       spark={spark}

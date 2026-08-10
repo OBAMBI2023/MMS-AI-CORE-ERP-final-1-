@@ -9,6 +9,8 @@ import {
   Wallet,
   BarChart3,
   Settings,
+  Wrench,
+  LifeBuoy,
 } from "lucide-react";
 
 export type HotelNavItem = {
@@ -27,6 +29,8 @@ export const HOTEL_NAV_ITEMS: HotelNavItem[] = [
   { icon: Wallet, label: "Caisse", to: "/hotel/caisse" },
   { icon: Wallet, label: "Dépenses", to: "/hotel/depenses" },
   { icon: BarChart3, label: "Rapports", to: "/hotel/rapports" },
+  { icon: Wrench, label: "Prestataires", to: "/hotel/maintenance" },
+  { icon: LifeBuoy, label: "Support", to: "/support" },
   { icon: Settings, label: "Paramètres", to: "/hotel/parametres" },
 ];
 

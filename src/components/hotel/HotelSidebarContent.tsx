@@ -2,7 +2,9 @@ import { motion } from "framer-motion";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { HOTEL_NAV_ITEMS } from "./hotel-nav-items";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { isHotelSettingsRoute } from "@/lib/route-permissions";
+import { hotelRouteModules } from "@/lib/route-modules";
 import { cn } from "@/lib/utils";
 
 export function HotelSidebarContent({
@@ -18,10 +20,16 @@ export function HotelSidebarContent({
   // rôle secondaire (ex: "Gérant") peut s'être vu attribuer cette
   // permission pour le tenant (cf. isHotelSettingsRoute).
   const canViewHotelSettings = useActionPermission("hotel.settings.view");
+  const modulesQuery = useTenantModules();
 
   const visibleItems = HOTEL_NAV_ITEMS.filter((it) => {
-    if (!isHotelSettingsRoute(it.to)) return true;
-    return canViewHotelSettings;
+    if (isHotelSettingsRoute(it.to) && !canViewHotelSettings) return false;
+    const requiredModule = hotelRouteModules[it.to];
+    if (requiredModule) {
+      if (modulesQuery.isLoading) return false;
+      if (!modulesQuery.data?.has(requiredModule)) return false;
+    }
+    return true;
   });
 
   return (

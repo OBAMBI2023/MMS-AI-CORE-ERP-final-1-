@@ -56,7 +56,7 @@ import { DashboardEmptyState } from "@/components/mms/dashboard/DashboardEmptySt
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import type { ActivityItem } from "@/hooks/use-dashboard-data";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/mms/format";
+import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from "@/lib/mms/format";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { cn } from "@/lib/utils";
@@ -353,6 +353,7 @@ function Dashboard() {
               index={0}
               title={catalogMode === "products" ? "CA produits" : catalogMode === "services" ? "CA services" : "CA total"}
               value={formatCurrency(catalogMode === "products" ? data.catalogSummary.productRevenue : catalogMode === "services" ? data.catalogSummary.serviceRevenue : data.kpis.revenue.value)}
+              compactValue={formatCurrencyCompact(catalogMode === "products" ? data.catalogSummary.productRevenue : catalogMode === "services" ? data.catalogSummary.serviceRevenue : data.kpis.revenue.value)}
               icon={Wallet}
               route="/ventes"
               trend={data.kpis.revenue.trend}
@@ -363,6 +364,7 @@ function Dashboard() {
               index={1}
               title="Dépenses"
               value={formatCurrency(data.kpis.depenses.value)}
+              compactValue={formatCurrencyCompact(data.kpis.depenses.value)}
               icon={Receipt}
               route="/depenses"
               trend={data.kpis.depenses.trend}
@@ -373,6 +375,7 @@ function Dashboard() {
               index={2}
               title="Achats"
               value={formatCurrency(data.kpis.achats.value)}
+              compactValue={formatCurrencyCompact(data.kpis.achats.value)}
               icon={Package}
               route="/achats"
               trend={data.kpis.achats.trend}
@@ -383,6 +386,7 @@ function Dashboard() {
               index={3}
               title="Bénéfice"
               value={formatCurrency(data.kpis.benefice.value)}
+              compactValue={formatCurrencyCompact(data.kpis.benefice.value)}
               icon={TrendingUp}
               route="/rapports"
               trend={data.kpis.benefice.trend}
@@ -435,6 +439,7 @@ function Dashboard() {
                   index={3}
                   title="Factures impayées"
                   value={formatCurrency(data.secondary.facturesImpayeesTotal)}
+                  compactValue={formatCurrencyCompact(data.secondary.facturesImpayeesTotal)}
                   icon={AlertTriangle}
                   route="/devis"
                   accent="amber"

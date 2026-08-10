@@ -96,7 +96,7 @@ export function DashboardKpiCard({
           <div className="relative flex items-start justify-between gap-2 sm:gap-3">
             <div className="min-w-0">
               <p className="truncate text-[10px] font-medium tracking-wide text-muted-foreground uppercase sm:text-xs">{title}</p>
-              <p className="mt-2 break-words text-lg font-bold leading-tight tracking-tight sm:mt-2.5 sm:text-[1.7rem] sm:leading-none">
+              <p className="mt-2 break-words text-lg font-bold leading-tight tracking-tight tabular-nums sm:mt-2.5 sm:text-[1.7rem] sm:leading-none">
                 {compactValue ? (
                   <>
                     <span className="sm:hidden">{compactValue}</span>

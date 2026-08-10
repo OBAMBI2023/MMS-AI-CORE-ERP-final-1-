@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { logAction } from "@/lib/audit.server";
+import { isModuleEligibleForTenant } from "@/lib/module-eligibility";
 
 type TenantRow = {
   id: string;
@@ -15,6 +16,7 @@ type TenantRow = {
   deleted_at: string | null;
   deletion_reason: string | null;
   suspended_at: string | null;
+  platform_type: string | null;
 };
 type PartnerTenantRow = { partner_id: string; tenant_id: string; assigned_at: string };
 type TenantMetricRow = {
@@ -211,6 +213,7 @@ export type SuperAdminTenant = {
   id: string;
   name: string;
   slug: string;
+  platformType: string | null;
   loginUrl: string;
   status: string;
   createdAt: string | null;
@@ -424,7 +427,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
       fetchRows<TenantRow>(
         supabaseAdmin,
         "tenants",
-        "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at",
+        "id, name, slug, is_active, created_at, deleted_at, deletion_reason, suspended_at, platform_type",
       ),
       fetchRows<TenantMetricRow>(supabaseAdmin, "profiles", "tenant_id, created_at, updated_at"),
       fetchRows<SaleRow>(supabaseAdmin, "ventes", "tenant_id, total, created_at, updated_at"),
@@ -619,6 +622,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug,
+          platformType: tenant.platform_type,
           loginUrl: `/login/${tenant.slug}`,
           status: tenant.deleted_at
             ? "deleted"
@@ -650,7 +654,7 @@ export const getSuperAdminDashboard = createServerFn({ method: "GET" })
           daysRemaining: remainingDays(subscriptionEnd),
           lastActivityAt: latestDate(tenantMetrics.lastActivityAt, tenant.created_at),
           modules: moduleRows
-            .filter((module) => module.is_active)
+            .filter((module) => module.is_active && isModuleEligibleForTenant(module.code, tenant.platform_type))
             .map((module) => ({
               ...module,
               enabled: tenantModuleState.get(`${tenant.id}:${module.id}`) ?? false,
@@ -1026,6 +1030,21 @@ export const manageTenantModule = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: tenantRow }, { data: moduleRow }] = await Promise.all([
+      supabaseAdmin.from("tenants").select("name, platform_type").eq("id", data.tenantId).maybeSingle(),
+      supabaseAdmin.from("erp_modules").select("code, name").eq("id", data.moduleId).maybeSingle(),
+    ]);
+    // Defense-in-depth: the console never offers an ineligible module for a
+    // tenant, but a direct call to this endpoint (or a stale client) must
+    // still be rejected server-side rather than relying on the UI to filter.
+    const moduleCode = (moduleRow as { code?: string } | null)?.code ?? null;
+    if (
+      data.enabled &&
+      moduleCode &&
+      !isModuleEligibleForTenant(moduleCode, (tenantRow as { platform_type?: string | null } | null)?.platform_type)
+    ) {
+      throw new Error(`Le module "${moduleCode}" n'est pas éligible pour ce type de tenant.`);
+    }
     const { error } = await supabaseAdmin.from("tenant_modules").upsert(
       {
         tenant_id: data.tenantId,
@@ -1035,10 +1054,6 @@ export const manageTenantModule = createServerFn({ method: "POST" })
       { onConflict: "tenant_id,module_id" },
     );
     if (error) throw new Error(formatSupabaseError(error));
-    const [{ data: tenantRow }, { data: moduleRow }] = await Promise.all([
-      supabaseAdmin.from("tenants").select("name").eq("id", data.tenantId).maybeSingle(),
-      supabaseAdmin.from("erp_modules").select("code, name").eq("id", data.moduleId).maybeSingle(),
-    ]);
     await logAction(
       context.userId,
       null,
@@ -1048,7 +1063,7 @@ export const manageTenantModule = createServerFn({ method: "POST" })
         tenantId: data.tenantId,
         tenantName: tenantRow?.name ?? null,
         moduleId: data.moduleId,
-        moduleCode: (moduleRow as { code?: string } | null)?.code ?? null,
+        moduleCode,
         moduleName: (moduleRow as { name?: string } | null)?.name ?? null,
         enabled: data.enabled,
         actorEmail: (context.claims as { email?: string } | undefined)?.email ?? null,

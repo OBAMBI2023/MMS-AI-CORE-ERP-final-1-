@@ -53,6 +53,7 @@ import { Route as HotelReservationsRouteImport } from './routes/hotel.reservatio
 import { Route as HotelRapportsRouteImport } from './routes/hotel.rapports'
 import { Route as HotelPersonnelRouteImport } from './routes/hotel.personnel'
 import { Route as HotelParametresRouteImport } from './routes/hotel.parametres'
+import { Route as HotelMaintenanceRouteImport } from './routes/hotel.maintenance'
 import { Route as HotelHousekeepingRouteImport } from './routes/hotel.housekeeping'
 import { Route as HotelFacturationRouteImport } from './routes/hotel.facturation'
 import { Route as HotelDepensesRouteImport } from './routes/hotel.depenses'
@@ -284,6 +285,11 @@ const HotelParametresRoute = HotelParametresRouteImport.update({
   path: '/hotel/parametres',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HotelMaintenanceRoute = HotelMaintenanceRouteImport.update({
+  id: '/hotel/maintenance',
+  path: '/hotel/maintenance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HotelHousekeepingRoute = HotelHousekeepingRouteImport.update({
   id: '/hotel/housekeeping',
   path: '/hotel/housekeeping',
@@ -375,6 +381,7 @@ export interface FileRoutesByFullPath {
   '/hotel/depenses': typeof HotelDepensesRoute
   '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/housekeeping': typeof HotelHousekeepingRoute
+  '/hotel/maintenance': typeof HotelMaintenanceRoute
   '/hotel/parametres': typeof HotelParametresRoute
   '/hotel/personnel': typeof HotelPersonnelRoute
   '/hotel/rapports': typeof HotelRapportsRoute
@@ -431,6 +438,7 @@ export interface FileRoutesByTo {
   '/hotel/depenses': typeof HotelDepensesRoute
   '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/housekeeping': typeof HotelHousekeepingRoute
+  '/hotel/maintenance': typeof HotelMaintenanceRoute
   '/hotel/parametres': typeof HotelParametresRoute
   '/hotel/personnel': typeof HotelPersonnelRoute
   '/hotel/rapports': typeof HotelRapportsRoute
@@ -488,6 +496,7 @@ export interface FileRoutesById {
   '/hotel/depenses': typeof HotelDepensesRoute
   '/hotel/facturation': typeof HotelFacturationRoute
   '/hotel/housekeeping': typeof HotelHousekeepingRoute
+  '/hotel/maintenance': typeof HotelMaintenanceRoute
   '/hotel/parametres': typeof HotelParametresRoute
   '/hotel/personnel': typeof HotelPersonnelRoute
   '/hotel/rapports': typeof HotelRapportsRoute
@@ -546,6 +555,7 @@ export interface FileRouteTypes {
     | '/hotel/depenses'
     | '/hotel/facturation'
     | '/hotel/housekeeping'
+    | '/hotel/maintenance'
     | '/hotel/parametres'
     | '/hotel/personnel'
     | '/hotel/rapports'
@@ -602,6 +612,7 @@ export interface FileRouteTypes {
     | '/hotel/depenses'
     | '/hotel/facturation'
     | '/hotel/housekeeping'
+    | '/hotel/maintenance'
     | '/hotel/parametres'
     | '/hotel/personnel'
     | '/hotel/rapports'
@@ -658,6 +669,7 @@ export interface FileRouteTypes {
     | '/hotel/depenses'
     | '/hotel/facturation'
     | '/hotel/housekeeping'
+    | '/hotel/maintenance'
     | '/hotel/parametres'
     | '/hotel/personnel'
     | '/hotel/rapports'
@@ -715,6 +727,7 @@ export interface RootRouteChildren {
   HotelDepensesRoute: typeof HotelDepensesRoute
   HotelFacturationRoute: typeof HotelFacturationRoute
   HotelHousekeepingRoute: typeof HotelHousekeepingRoute
+  HotelMaintenanceRoute: typeof HotelMaintenanceRoute
   HotelParametresRoute: typeof HotelParametresRoute
   HotelPersonnelRoute: typeof HotelPersonnelRoute
   HotelRapportsRoute: typeof HotelRapportsRoute
@@ -1038,6 +1051,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelParametresRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hotel/maintenance': {
+      id: '/hotel/maintenance'
+      path: '/hotel/maintenance'
+      fullPath: '/hotel/maintenance'
+      preLoaderRoute: typeof HotelMaintenanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hotel/housekeeping': {
       id: '/hotel/housekeeping'
       path: '/hotel/housekeeping'
@@ -1169,6 +1189,7 @@ const rootRouteChildren: RootRouteChildren = {
   HotelDepensesRoute: HotelDepensesRoute,
   HotelFacturationRoute: HotelFacturationRoute,
   HotelHousekeepingRoute: HotelHousekeepingRoute,
+  HotelMaintenanceRoute: HotelMaintenanceRoute,
   HotelParametresRoute: HotelParametresRoute,
   HotelPersonnelRoute: HotelPersonnelRoute,
   HotelRapportsRoute: HotelRapportsRoute,
