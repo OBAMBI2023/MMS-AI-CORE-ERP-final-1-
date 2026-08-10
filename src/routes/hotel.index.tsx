@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { startOfDay, startOfMonth, subDays, subMonths, addDays } from "date-fns";
 import {
@@ -10,10 +10,11 @@ import {
   CalendarPlus,
   ArrowLeftRight,
   Wallet,
-  Sparkles,
   Building2,
   CalendarDays,
   ArrowRight,
+  Ban,
+  History,
 } from "lucide-react";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { Card } from "@/components/ui/card";
@@ -61,6 +62,27 @@ const RESERVATION_STATUS_LABEL: Record<string, string> = {
   no_show: "Non présenté",
 };
 
+type HistoryFilter = "all" | "reservations" | "payments" | "checkin_checkout";
+
+const HISTORY_FILTERS: { key: HistoryFilter; label: string }[] = [
+  { key: "all", label: "Tous" },
+  { key: "reservations", label: "Réservations" },
+  { key: "payments", label: "Encaissements" },
+  { key: "checkin_checkout", label: "Arrivées / Départs" },
+];
+
+type ActivityEvent = {
+  id: string;
+  category: Exclude<HistoryFilter, "all">;
+  icon: typeof LogIn;
+  iconClass: string;
+  title: string;
+  guestName: string;
+  roomNumber: string | null;
+  amount: number | null;
+  at: string;
+};
+
 const RESERVATION_STATUS_CLASSES: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   confirmed: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
@@ -70,13 +92,6 @@ const RESERVATION_STATUS_CLASSES: Record<string, string> = {
   cancelled: "bg-red-500/10 text-red-600 dark:text-red-400",
   no_show: "bg-red-500/10 text-red-600 dark:text-red-400",
 };
-
-const HOUSEKEEPING_TASKS = [
-  { id: 1, room: "Chambre 205", task: "Nettoyage complet", progress: 100 },
-  { id: 2, room: "Chambre 111", task: "Maintenance plomberie", progress: 40 },
-  { id: 3, room: "Chambre 103", task: "Nettoyage complet", progress: 65 },
-  { id: 4, room: "Suite 302", task: "Préparation check-in", progress: 20 },
-];
 
 const CARD_CLASS = "rounded-[24px] dark:bg-[#0F2E28] dark:border-white/5";
 const MAX_TODAY_LIST_ITEMS = 5;
@@ -98,7 +113,9 @@ function formatFrTime(isoStr: string | null | undefined): string | null {
 function HotelDashboard() {
   const { profile } = useTenant();
   const tenantId = profile?.tenant_id;
+  const qc = useQueryClient();
   const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("today");
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
 
   const roomsQuery = useQuery({
     queryKey: ["hotel_rooms", tenantId],
@@ -120,12 +137,33 @@ function HotelDashboard() {
     queryFn: async () => {
       const { data, error } = await db
         .from("hotel_reservation_payments")
-        .select("amount,paid_at")
+        .select("id,amount,paid_at,reservation_id,reference")
         .eq("tenant_id", tenantId);
       if (error) throw error;
-      return (data ?? []) as { amount: number; paid_at: string }[];
+      return (data ?? []) as {
+        id: string;
+        amount: number;
+        paid_at: string;
+        reservation_id: string;
+        reference: string | null;
+      }[];
     },
   });
+
+  useEffect(() => {
+    if (!tenantId) return;
+    const channel = supabase
+      .channel(`hotel-payments-dashboard-${tenantId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "hotel_reservation_payments", filter: `tenant_id=eq.${tenantId}` },
+        () => qc.invalidateQueries({ queryKey: ["hotel-payments-dashboard", tenantId] }),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [tenantId, qc]);
 
   const totalRooms = roomsQuery.data?.length ?? 0;
   const occupiedRooms = (roomsQuery.data ?? []).filter((r) => r.status === "occupied").length;
@@ -217,6 +255,89 @@ function HotelDashboard() {
     [reservations, todayIso],
   );
 
+  const historyEvents = useMemo(() => {
+    const events: ActivityEvent[] = [];
+    for (const r of reservations) {
+      const guest = guestLabel(r.guest_id);
+      const room = roomLabel(r.room_id);
+      if (r.status === "cancelled") {
+        events.push({
+          id: `${r.id}-cancelled`,
+          category: "reservations",
+          icon: Ban,
+          iconClass: "bg-red-500/10 text-red-600 dark:text-red-400",
+          title: "Réservation annulée",
+          guestName: guest,
+          roomNumber: room,
+          amount: null,
+          at: r.updated_at,
+        });
+      } else if (r.actual_check_out_at) {
+        events.push({
+          id: `${r.id}-checkout`,
+          category: "checkin_checkout",
+          icon: LogOut,
+          iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+          title: "Check-out effectué",
+          guestName: guest,
+          roomNumber: room,
+          amount: null,
+          at: r.actual_check_out_at,
+        });
+      } else if (r.actual_check_in_at) {
+        events.push({
+          id: `${r.id}-checkin`,
+          category: "checkin_checkout",
+          icon: LogIn,
+          iconClass: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+          title: "Check-in effectué",
+          guestName: guest,
+          roomNumber: room,
+          amount: null,
+          at: r.actual_check_in_at,
+        });
+      } else {
+        events.push({
+          id: `${r.id}-created`,
+          category: "reservations",
+          icon: CalendarPlus,
+          iconClass: "bg-primary/10 text-primary",
+          title: "Nouvelle réservation créée",
+          guestName: guest,
+          roomNumber: room,
+          amount: null,
+          at: r.updated_at,
+        });
+      }
+    }
+    for (const p of paymentsQuery.data ?? []) {
+      const reservation = reservations.find((r) => r.id === p.reservation_id);
+      const guest = reservation ? guestLabel(reservation.guest_id) : "—";
+      const room = reservation ? roomLabel(reservation.room_id) : null;
+      const amount = Number(p.amount);
+      events.push({
+        id: `${p.id}-payment`,
+        category: "payments",
+        icon: Wallet,
+        iconClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+        title: "Paiement encaissé",
+        guestName: guest,
+        roomNumber: room,
+        amount,
+        at: p.paid_at,
+      });
+    }
+    return events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  }, [reservations, paymentsQuery.data, guestsById, roomsById]);
+
+  const filteredHistory = useMemo(
+    () =>
+      historyEvents
+        .filter((event) => historyFilter === "all" || event.category === historyFilter)
+        .slice(0, MAX_TODAY_LIST_ITEMS),
+    [historyEvents, historyFilter],
+  );
+
   const today = useMemo(
     () =>
       new Date().toLocaleDateString("fr-FR", {
@@ -227,6 +348,15 @@ function HotelDashboard() {
       }),
     [],
   );
+
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const userName = profile?.full_name?.trim() || profile?.email?.split("@")[0]?.trim() || "utilisateur";
+  const greeting = now.getHours() < 18 ? "Bonjour" : "Bonsoir";
 
   return (
     <HotelAppShell title="Tableau de bord" contentClassName="bg-[#F4FAF8] dark:bg-[#07211C]">
@@ -243,15 +373,15 @@ function HotelDashboard() {
           <Building2 className="pointer-events-none absolute right-6 top-6 h-9 w-9 text-white/25 sm:h-10 sm:w-10" />
           <div className="relative">
             <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
-              Bienvenue sur SAOVIA HOTEL 👋
+              {greeting} {userName} 👋
             </h1>
             <p className="mt-1.5 text-sm text-white/80 capitalize">{today}</p>
 
             <div className="mt-5 flex divide-x divide-white/15 overflow-hidden rounded-2xl bg-white/10">
               {[
-                { key: "occupation", icon: Percent, label: "Occupation", value: `${occupancyRate}%` },
-                { key: "arrivees", icon: LogIn, label: "Arrivées", value: arrivalsToday },
-                { key: "departs", icon: LogOut, label: "Départs", value: departuresToday },
+                { key: "revenue", icon: Wallet, label: "Chiffre d'affaires du mois", value: formatCurrency(revenueByPeriod.month.value) },
+                { key: "arrivees", icon: LogIn, label: "Arrivées du jour", value: arrivalsToday },
+                { key: "departs", icon: LogOut, label: "Départs du jour", value: departuresToday },
               ].map((stat) => (
                 <div key={stat.key} className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 sm:px-3">
                   <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
@@ -545,39 +675,97 @@ function HotelDashboard() {
                     to="/hotel/reservations"
                     className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold text-primary hover:underline"
                   >
-                    Voir toutes <ArrowRight className="h-3.5 w-3.5" />
+                    Voir tout <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 )}
               </>
             )}
           </Card>
 
-          {/* Housekeeping */}
+          {/* Historique récent */}
           <Card className={cn("p-4 sm:p-6 lg:col-span-3", CARD_CLASS)}>
-            <h3 className="font-bold mb-4 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" /> Housekeeping
-            </h3>
-            <ul className="divide-y divide-border">
-              {HOUSEKEEPING_TASKS.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 py-2.5 text-sm">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{t.room}</p>
-                    <p className="text-xs text-muted-foreground">{t.task}</p>
-                  </div>
-                  <div className="hidden w-32 shrink-0 sm:block">
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-primary to-primary-glow"
-                        style={{ width: `${t.progress}%` }}
-                      />
+            <div className="mb-1 flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              <h3 className="font-bold">Historique récent</h3>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Dernières activités liées à l'exploitation hôtelière
+            </p>
+
+            <div className="-mx-1 mb-4 overflow-x-auto px-1 pb-1">
+              <div className="flex w-max min-w-full gap-1 rounded-full bg-muted/60 p-1">
+                {HISTORY_FILTERS.map((filter) => (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    onClick={() => setHistoryFilter(filter.key)}
+                    className={cn(
+                      "shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                      historyFilter === filter.key
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {billing.isLoading ? (
+              <ul className="space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Skeleton className="h-4 w-1/2 rounded" />
+                      <Skeleton className="h-3 w-1/3 rounded" />
                     </div>
-                  </div>
-                  <span className="w-10 shrink-0 text-right text-xs font-semibold text-muted-foreground">
-                    {t.progress}%
-                  </span>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            ) : billing.isError ? (
+              <p className="text-xs text-muted-foreground">
+                Impossible de charger l'historique récent pour le moment.
+              </p>
+            ) : filteredHistory.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Aucune activité récente.</p>
+            ) : (
+              <ol>
+                {filteredHistory.map((event, index) => (
+                  <li key={event.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full", event.iconClass)}>
+                        <event.icon className="h-4 w-4" />
+                      </span>
+                      {index < filteredHistory.length - 1 && <span className="w-px flex-1 bg-border" />}
+                    </div>
+                    <div className="min-w-0 flex-1 pb-4">
+                      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-0.5">
+                        <p className="text-sm font-semibold">{event.title}</p>
+                        <p className="shrink-0 text-[11px] text-muted-foreground">
+                          {new Date(event.at).toLocaleString("fr-FR", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {event.guestName}
+                        {event.roomNumber ? ` · Chambre ${event.roomNumber}` : ""}
+                      </p>
+                      {event.amount !== null && (
+                        <p className="mt-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(event.amount)}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
           </Card>
         </div>
       </motion.div>

@@ -144,7 +144,6 @@ export function HotelCaissePage() {
       if (!profile?.tenant_id) throw new Error("Tenant introuvable");
       if (!selected) throw new Error("Sélectionnez une réservation ou une facture.");
       if (amountInvalid) throw new Error("Le montant encaissé est invalide.");
-      if (!form.method) throw new Error("Sélectionnez un mode de paiement.");
       if (!form.paidAt) throw new Error("La date de paiement est obligatoire.");
 
       let invoiceId = selected.invoice_id;
@@ -164,10 +163,11 @@ export function HotelCaissePage() {
       }
 
       const paidAtIso = new Date(`${form.paidAt}T12:00:00`).toISOString();
+      const method = form.method.trim() || null;
       const { data: paymentId, error } = await db.rpc("collect_hotel_invoice_payment", {
         requested_invoice_id: invoiceId,
         requested_amount: amountValue,
-        requested_method: form.method,
+        requested_method: method,
         requested_reference: form.reference.trim() || null,
         requested_notes: form.notes.trim() || null,
         requested_paid_at: paidAtIso,
@@ -176,7 +176,7 @@ export function HotelCaissePage() {
       return {
         paymentId: paymentId as string,
         amount: amountValue,
-        method: form.method,
+        method,
         paidAt: paidAtIso,
         reference: form.reference.trim() || null,
         notes: form.notes.trim() || null,
@@ -197,7 +197,7 @@ export function HotelCaissePage() {
     payment: {
       paymentId: string;
       amount: number;
-      method: string;
+      method: string | null;
       paidAt: string;
       reference: string | null;
       notes: string | null;
@@ -389,10 +389,10 @@ export function HotelCaissePage() {
                       onChange={(e) => setForm({ ...form, paidAt: e.target.value })}
                     />
                   </Field>
-                  <Field label="Mode de paiement *">
+                  <Field label="Mode de paiement">
                     <Select value={form.method} onValueChange={(v) => setForm({ ...form, method: v })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner" />
+                        <SelectValue placeholder="Sélectionner (facultatif)" />
                       </SelectTrigger>
                       <SelectContent>
                         {HOTEL_PAYMENT_METHODS.map((method) => (
@@ -422,7 +422,7 @@ export function HotelCaissePage() {
                   <div className="flex justify-end sm:col-span-2">
                     <Button
                       className="w-full sm:w-auto"
-                      disabled={collect.isPending || amountInvalid || !form.method || !form.paidAt}
+                      disabled={collect.isPending || amountInvalid || !form.paidAt}
                       onClick={() => collect.mutate()}
                     >
                       <Banknote className="mr-1.5 size-4" />
@@ -634,7 +634,7 @@ function PaymentHistoryTable({
             <tr key={p.id} className="border-b">
               <td className="p-2">{formatDateTime(p.paid_at)}</td>
               <td className="font-medium">{formatCurrency(Number(p.amount))}</td>
-              <td>{p.method}</td>
+              <td>{p.method ?? "—"}</td>
               <td className="truncate">{p.reference ?? "—"}</td>
               <td className="max-w-[200px] truncate">{p.notes ?? "—"}</td>
               <td className="text-right">

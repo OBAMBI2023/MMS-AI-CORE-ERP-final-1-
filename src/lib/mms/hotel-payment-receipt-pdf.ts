@@ -21,7 +21,7 @@ import { formatMoney, reservationPaymentStatus } from "./hotel-reservation-pdf-v
 export type HotelPaymentReceiptData = {
   paymentId: string;
   amount: number;
-  method: string;
+  method: string | null;
   paidAt: string;
   reference?: string | null;
   notes?: string | null;

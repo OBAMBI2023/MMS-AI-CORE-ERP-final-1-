@@ -123,13 +123,14 @@ export function useHotelBillingRefresh() {
     qc.invalidateQueries({ queryKey: ["hotel-reservations", tenantId] });
     qc.invalidateQueries({ queryKey: ["hotel-overview"] });
     qc.invalidateQueries({ queryKey: ["hotel-reports", tenantId] });
+    qc.invalidateQueries({ queryKey: ["hotel-payments-dashboard", tenantId] });
   };
 }
 
 export type HotelPaymentRecord = {
   id: string;
   amount: number;
-  method: string;
+  method: string | null;
   paid_at: string;
   reference: string | null;
   notes: string | null;

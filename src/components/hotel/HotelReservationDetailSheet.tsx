@@ -564,7 +564,7 @@ export function HotelReservationDetailSheet({
                     key={payment.id}
                     icon={Receipt}
                     title="Reçu de paiement"
-                    subtitle={`${formatCurrency(Number(payment.amount))} · ${formatDate(payment.paid_at)} · ${payment.method}`}
+                    subtitle={`${formatCurrency(Number(payment.amount))} · ${formatDate(payment.paid_at)} · ${payment.method ?? "—"}`}
                     busyKey={busyKey}
                     onBusyChange={setBusyKey}
                     action={{

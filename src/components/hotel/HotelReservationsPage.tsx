@@ -585,13 +585,20 @@ export function HotelReservationsPage() {
               </p>
             )}
             {selectedRoomUnavailable && (
-              <p className="mt-1.5 text-xs font-medium text-destructive">
-                {conflictingReservation
-                  ? `Cette chambre est déjà réservée du ${formatDate(conflictingReservation.check_in)} au ${formatDate(conflictingReservation.check_out)}.`
-                  : "Ce logement est indisponible ou placé en maintenance."}
-              </p>
+              <>
+                <p className="mt-1.5 text-xs font-medium text-destructive">
+                  {conflictingReservation
+                    ? `Cette chambre est déjà réservée du ${formatDate(conflictingReservation.check_in)} au ${formatDate(conflictingReservation.check_out)}.`
+                    : "Ce logement est indisponible ou placé en maintenance."}
+                </p>
+                {conflictingReservation && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Veuillez sélectionner un autre logement disponible pour ces dates.
+                  </p>
+                )}
+              </>
             )}
-            {form.check_in && form.check_out && (
+            {form.check_in && form.check_out && !selectedRoomUnavailable && (
               <p className="mt-1.5 text-xs text-muted-foreground">
                 {availableRooms.length
                   ? `Logements disponibles aux mêmes dates : ${availableRooms.map((room: any) => `N° ${room.number}`).join(", ")}.`

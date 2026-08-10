@@ -38,7 +38,7 @@ export type HotelInvoiceExtraItem = { label: string; quantity: number; unitPrice
 export type HotelInvoicePaymentHistoryItem = {
   date: string;
   amount: number;
-  method: string;
+  method: string | null;
   reference?: string | null;
 };
 
