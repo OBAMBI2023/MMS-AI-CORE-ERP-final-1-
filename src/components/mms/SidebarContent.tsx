@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Home,
@@ -13,6 +14,7 @@ import {
   Boxes,
   Tags,
   Bot,
+  LifeBuoy,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -21,6 +23,7 @@ import { isAdminOnlyRoute, isAdministratorRole } from "@/lib/route-permissions";
 import { routeModules } from "@/lib/route-modules";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { catalogRouteEnabled } from "@/lib/catalog-settings";
+import { useSupportUnreadByTicket } from "@/hooks/use-support";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -36,6 +39,7 @@ const items = [
   { icon: Handshake, label: "Fournisseurs", to: "/fournisseurs" },
   { icon: Receipt, label: "Dépenses", to: "/depenses" },
   { icon: TrendingUp, label: "Rapports", to: "/rapports" },
+  { icon: LifeBuoy, label: "Support", to: "/support" },
   { icon: Settings, label: "Paramètres", to: "/parametres" },
 ] as const;
 
@@ -50,7 +54,16 @@ export function SidebarContent({
   const { data, isLoading } = usePermissions();
   const modulesQuery = useTenantModules();
   const catalogSettingsQuery = useCatalogSettings();
+  const supportUnreadQuery = useSupportUnreadByTicket();
   const role = data?.role;
+
+  const supportUnreadTotal = useMemo(() => {
+    let total = 0;
+    supportUnreadQuery.data?.forEach((count) => {
+      total += count;
+    });
+    return total;
+  }, [supportUnreadQuery.data]);
 
   const filteredItems = items.filter((it) => {
     if (isLoading || modulesQuery.isLoading || catalogSettingsQuery.isLoading) return false;
@@ -97,6 +110,11 @@ export function SidebarContent({
                     : it.label
                 : it.label}
             </span>
+            {it.to === "/support" && supportUnreadTotal > 0 && (
+              <span className="relative ml-auto grid size-5 shrink-0 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {supportUnreadTotal > 9 ? "9+" : supportUnreadTotal}
+              </span>
+            )}
           </Link>
         );
       })}

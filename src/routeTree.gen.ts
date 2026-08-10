@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VentesRouteImport } from './routes/ventes'
 import { Route as UtilisateursRouteImport } from './routes/utilisateurs'
 import { Route as TarifsRouteImport } from './routes/tarifs'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as ServicesRouteImport } from './routes/services'
@@ -40,6 +41,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as HotelIndexRouteImport } from './routes/hotel.index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as SuperAdminUsersRouteImport } from './routes/super-admin.users'
+import { Route as SuperAdminSupportRouteImport } from './routes/super-admin.support'
 import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
 import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.ia-platform'
 import { Route as SettingsUsersRouteImport } from './routes/settings.users'
@@ -75,6 +77,11 @@ const UtilisateursRoute = UtilisateursRouteImport.update({
 const TarifsRoute = TarifsRouteImport.update({
   id: '/tarifs',
   path: '/tarifs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuperAdminRoute = SuperAdminRouteImport.update({
@@ -217,6 +224,11 @@ const SuperAdminUsersRoute = SuperAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => SuperAdminRoute,
 } as any)
+const SuperAdminSupportRoute = SuperAdminSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => SuperAdminRoute,
+} as any)
 const SuperAdminPartnersRoute = SuperAdminPartnersRouteImport.update({
   id: '/partners',
   path: '/partners',
@@ -349,6 +361,7 @@ export interface FileRoutesByFullPath {
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
+  '/support': typeof SupportRoute
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
@@ -373,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
+  '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app/': typeof AppIndexRoute
   '/hotel/': typeof HotelIndexRoute
@@ -403,6 +417,7 @@ export interface FileRoutesByTo {
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
+  '/support': typeof SupportRoute
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
@@ -427,6 +442,7 @@ export interface FileRoutesByTo {
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
+  '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app': typeof AppIndexRoute
   '/hotel': typeof HotelIndexRoute
@@ -458,6 +474,7 @@ export interface FileRoutesById {
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
+  '/support': typeof SupportRoute
   '/tarifs': typeof TarifsRoute
   '/utilisateurs': typeof UtilisateursRoute
   '/ventes': typeof VentesRoute
@@ -482,6 +499,7 @@ export interface FileRoutesById {
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
+  '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app/': typeof AppIndexRoute
   '/hotel/': typeof HotelIndexRoute
@@ -514,6 +532,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/stock'
     | '/super-admin'
+    | '/support'
     | '/tarifs'
     | '/utilisateurs'
     | '/ventes'
@@ -538,6 +557,7 @@ export interface FileRouteTypes {
     | '/settings/users'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
+    | '/super-admin/support'
     | '/super-admin/users'
     | '/app/'
     | '/hotel/'
@@ -568,6 +588,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/stock'
     | '/super-admin'
+    | '/support'
     | '/tarifs'
     | '/utilisateurs'
     | '/ventes'
@@ -592,6 +613,7 @@ export interface FileRouteTypes {
     | '/settings/users'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
+    | '/super-admin/support'
     | '/super-admin/users'
     | '/app'
     | '/hotel'
@@ -622,6 +644,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/stock'
     | '/super-admin'
+    | '/support'
     | '/tarifs'
     | '/utilisateurs'
     | '/ventes'
@@ -646,6 +669,7 @@ export interface FileRouteTypes {
     | '/settings/users'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
+    | '/super-admin/support'
     | '/super-admin/users'
     | '/app/'
     | '/hotel/'
@@ -677,6 +701,7 @@ export interface RootRouteChildren {
   ServicesRoute: typeof ServicesRoute
   StockRoute: typeof StockRoute
   SuperAdminRoute: typeof SuperAdminRouteWithChildren
+  SupportRoute: typeof SupportRoute
   TarifsRoute: typeof TarifsRoute
   UtilisateursRoute: typeof UtilisateursRoute
   VentesRoute: typeof VentesRoute
@@ -724,6 +749,13 @@ declare module '@tanstack/react-router' {
       path: '/tarifs'
       fullPath: '/tarifs'
       preLoaderRoute: typeof TarifsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/super-admin': {
@@ -922,6 +954,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperAdminUsersRouteImport
       parentRoute: typeof SuperAdminRoute
     }
+    '/super-admin/support': {
+      id: '/super-admin/support'
+      path: '/support'
+      fullPath: '/super-admin/support'
+      preLoaderRoute: typeof SuperAdminSupportRouteImport
+      parentRoute: typeof SuperAdminRoute
+    }
     '/super-admin/partners': {
       id: '/super-admin/partners'
       path: '/partners'
@@ -1075,12 +1114,14 @@ declare module '@tanstack/react-router' {
 interface SuperAdminRouteChildren {
   SuperAdminIaPlatformRoute: typeof SuperAdminIaPlatformRoute
   SuperAdminPartnersRoute: typeof SuperAdminPartnersRoute
+  SuperAdminSupportRoute: typeof SuperAdminSupportRoute
   SuperAdminUsersRoute: typeof SuperAdminUsersRoute
 }
 
 const SuperAdminRouteChildren: SuperAdminRouteChildren = {
   SuperAdminIaPlatformRoute: SuperAdminIaPlatformRoute,
   SuperAdminPartnersRoute: SuperAdminPartnersRoute,
+  SuperAdminSupportRoute: SuperAdminSupportRoute,
   SuperAdminUsersRoute: SuperAdminUsersRoute,
 }
 
@@ -1114,6 +1155,7 @@ const rootRouteChildren: RootRouteChildren = {
   ServicesRoute: ServicesRoute,
   StockRoute: StockRoute,
   SuperAdminRoute: SuperAdminRouteWithChildren,
+  SupportRoute: SupportRoute,
   TarifsRoute: TarifsRoute,
   UtilisateursRoute: UtilisateursRoute,
   VentesRoute: VentesRoute,
