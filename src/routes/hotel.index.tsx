@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { startOfDay, startOfMonth, subDays, subMonths, addDays } from "date-fns";
+import { startOfDay, startOfMonth, endOfMonth, subDays, subMonths, addDays } from "date-fns";
 import {
   Percent,
   LogIn,
@@ -11,10 +11,11 @@ import {
   ArrowLeftRight,
   Wallet,
   Building2,
-  CalendarDays,
   ArrowRight,
   Ban,
   History,
+  AlertCircle,
+  CalendarClock,
 } from "lucide-react";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { Card } from "@/components/ui/card";
@@ -22,7 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardKpiCard } from "@/components/mms/dashboard/DashboardKpiCard";
 import { HotelAvailabilityCalendar } from "@/components/hotel/HotelAvailabilityCalendar";
-import { formatCurrency } from "@/lib/mms/format";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/mms/format";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/providers/TenantProvider";
@@ -96,19 +97,19 @@ const RESERVATION_STATUS_CLASSES: Record<string, string> = {
 const CARD_CLASS = "rounded-[24px] dark:bg-[#0F2E28] dark:border-white/5";
 const MAX_TODAY_LIST_ITEMS = 5;
 
-function formatFrShortDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return "—";
-  const [y, m, d] = dateStr.split("-").map(Number);
-  if (!y || !m || !d) return "—";
-  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long" });
-}
-
 function formatFrTime(isoStr: string | null | undefined): string | null {
   if (!isoStr) return null;
   const date = new Date(isoStr);
   if (isNaN(date.getTime())) return null;
   return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
+
+function parseIsoDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y || 0, (m || 1) - 1, d || 1);
+}
+
+const OCCUPANCY_STATUSES = new Set(["confirmed", "checked_in", "checked_out", "completed"]);
 
 function HotelDashboard() {
   const { profile } = useTenant();
@@ -212,6 +213,39 @@ function HotelDashboard() {
     (r) => r.status === "checked_in" && r.check_out === todayIso,
   ).length;
 
+  const monthlyOccupancyRate = useMemo(() => {
+    if (!totalRooms) return 0;
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEndExclusive = addDays(endOfMonth(now), 1);
+    let occupiedNights = 0;
+    for (const r of reservations) {
+      if (!OCCUPANCY_STATUSES.has(r.status)) continue;
+      const checkIn = parseIsoDate(r.check_in);
+      const checkOut = parseIsoDate(r.check_out);
+      const start = checkIn < monthStart ? monthStart : checkIn;
+      const end = checkOut > monthEndExclusive ? monthEndExclusive : checkOut;
+      const nights = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+      if (nights > 0) occupiedNights += nights;
+    }
+    const daysInMonth = Math.round((monthEndExclusive.getTime() - monthStart.getTime()) / 86_400_000);
+    const availableRoomNights = totalRooms * daysInMonth;
+    return availableRoomNights > 0 ? Math.round((occupiedNights / availableRoomNights) * 100) : 0;
+  }, [reservations, totalRooms]);
+
+  const totalUnpaid = useMemo(
+    () =>
+      reservations
+        .filter((r) => !["cancelled", "no_show"].includes(r.status))
+        .reduce((sum, r) => sum + Math.max(0, Number(r.balance_due ?? 0)), 0),
+    [reservations],
+  );
+
+  const upcomingReservationsCount = useMemo(
+    () => reservations.filter((r) => r.status === "confirmed" && r.check_in > todayIso).length,
+    [reservations, todayIso],
+  );
+
   const guestsById = useMemo(
     () => new Map((billing.data?.guests ?? []).map((g) => [g.id, g])),
     [billing.data?.guests],
@@ -236,13 +270,6 @@ function HotelDashboard() {
     const guest = guestId ? guestsById.get(guestId) : null;
     return guest ? `${guest.first_name} ${guest.last_name}`.trim() : "Client de passage";
   };
-  const arrivalsTodayList = reservations.filter(
-    (r) => ["pending", "confirmed"].includes(r.status) && r.check_in === todayIso,
-  );
-  const departuresTodayList = reservations.filter(
-    (r) => r.status === "checked_in" && r.check_out === todayIso,
-  );
-
   const todayReservationsList = useMemo(
     () =>
       reservations
@@ -379,16 +406,43 @@ function HotelDashboard() {
 
             <div className="mt-5 flex divide-x divide-white/15 overflow-hidden rounded-2xl bg-white/10">
               {[
-                { key: "revenue", icon: Wallet, label: "Chiffre d'affaires du mois", value: formatCurrency(revenueByPeriod.month.value) },
-                { key: "arrivees", icon: LogIn, label: "Arrivées du jour", value: arrivalsToday },
-                { key: "departs", icon: LogOut, label: "Départs du jour", value: departuresToday },
+                {
+                  key: "revenue",
+                  icon: Wallet,
+                  label: "Chiffre d'affaires du mois",
+                  value: formatCurrency(revenueByPeriod.month.value) as string | number,
+                  compactValue: formatCurrencyCompact(revenueByPeriod.month.value),
+                },
+                {
+                  key: "occupancy",
+                  icon: Percent,
+                  label: "Taux d'occupation du mois",
+                  value: `${monthlyOccupancyRate}%` as string | number,
+                  compactValue: undefined as string | undefined,
+                },
+                {
+                  key: "impayes",
+                  icon: AlertCircle,
+                  label: "Impayés",
+                  value: formatCurrency(totalUnpaid) as string | number,
+                  compactValue: formatCurrencyCompact(totalUnpaid),
+                },
               ].map((stat) => (
                 <div key={stat.key} className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 sm:px-3">
                   <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
                     <stat.icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 leading-tight">
-                    <p className="truncate text-sm font-bold text-white">{stat.value}</p>
+                    <p className="break-words text-sm font-bold leading-tight text-white sm:truncate">
+                      {stat.compactValue ? (
+                        <>
+                          <span className="sm:hidden">{stat.compactValue}</span>
+                          <span className="hidden sm:inline">{stat.value}</span>
+                        </>
+                      ) : (
+                        stat.value
+                      )}
+                    </p>
                     <p className="truncate text-[10px] text-white/75">{stat.label}</p>
                   </div>
                 </div>
@@ -431,15 +485,6 @@ function HotelDashboard() {
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <DashboardKpiCard
             index={0}
-            title="Taux d'occupation"
-            value={`${occupancyRate}%`}
-            icon={Percent}
-            route="/hotel/chambres"
-            trend={null}
-            accent="primary"
-          />
-          <DashboardKpiCard
-            index={1}
             title="Arrivées du jour"
             value={String(arrivalsToday)}
             icon={LogIn}
@@ -448,7 +493,7 @@ function HotelDashboard() {
             accent="sky"
           />
           <DashboardKpiCard
-            index={2}
+            index={1}
             title="Départs du jour"
             value={String(departuresToday)}
             icon={LogOut}
@@ -456,117 +501,25 @@ function HotelDashboard() {
             trend={null}
             accent="amber"
           />
+          <DashboardKpiCard
+            index={2}
+            title="Réservations à venir"
+            value={String(upcomingReservationsCount)}
+            icon={CalendarClock}
+            route="/hotel/reservations"
+            trend={null}
+            accent="violet"
+          />
         </div>
 
         {/* Disponibilité des logements */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-4">
-          <Card className={cn("p-4 sm:p-6 lg:col-span-3", CARD_CLASS)}>
-            <HotelAvailabilityCalendar
-              rooms={calendarRooms}
-              reservations={reservations as any}
-              guestsById={guestsById as any}
-            />
-          </Card>
-
-          <div className="flex flex-col gap-4 sm:gap-6 lg:col-span-1">
-            <Card className={cn("p-4 sm:p-6", CARD_CLASS)}>
-              <h3 className="font-bold mb-2 flex items-center gap-2">
-                <LogIn className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                Arrivées du jour{arrivalsTodayList.length > 0 ? ` · ${arrivalsTodayList.length}` : ""}
-              </h3>
-              {arrivalsTodayList.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Aucune arrivée prévue aujourd'hui.</p>
-              ) : (
-                <>
-                  <ul className="divide-y divide-border">
-                    {arrivalsTodayList.slice(0, MAX_TODAY_LIST_ITEMS).map((r) => {
-                      const arrivalTime = formatFrTime(r.actual_check_in_at);
-                      return (
-                        <li key={r.id}>
-                          <Link
-                            to="/hotel/checkin-checkout"
-                            className="-mx-1 flex flex-col gap-1 rounded-lg px-1 py-2.5 text-sm transition-colors hover:bg-muted/60"
-                          >
-                            <p className="truncate font-semibold">{guestLabel(r.guest_id)}</p>
-                            <p className="truncate text-xs text-muted-foreground">Chambre {roomLabel(r.room_id)}</p>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
-                              <span className="text-xs font-medium">{formatFrShortDate(r.check_in)}</span>
-                              {arrivalTime && <span className="text-xs text-muted-foreground">à {arrivalTime}</span>}
-                              <span className="rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400">
-                                Aujourd'hui
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground">
-                              Départ le {formatFrShortDate(r.check_out)}
-                            </p>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {arrivalsTodayList.length > MAX_TODAY_LIST_ITEMS && (
-                    <Link
-                      to="/hotel/checkin-checkout"
-                      className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
-                    >
-                      Voir les {arrivalsTodayList.length} arrivées <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  )}
-                </>
-              )}
-            </Card>
-
-            <Card className={cn("p-4 sm:p-6", CARD_CLASS)}>
-              <h3 className="font-bold mb-2 flex items-center gap-2">
-                <LogOut className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                Départs du jour{departuresTodayList.length > 0 ? ` · ${departuresTodayList.length}` : ""}
-              </h3>
-              {departuresTodayList.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Aucun départ prévu aujourd'hui.</p>
-              ) : (
-                <>
-                  <ul className="divide-y divide-border">
-                    {departuresTodayList.slice(0, MAX_TODAY_LIST_ITEMS).map((r) => {
-                      const departureTime = formatFrTime(r.actual_check_out_at);
-                      return (
-                        <li key={r.id}>
-                          <Link
-                            to="/hotel/checkin-checkout"
-                            className="-mx-1 flex flex-col gap-1 rounded-lg px-1 py-2.5 text-sm transition-colors hover:bg-muted/60"
-                          >
-                            <p className="truncate font-semibold">{guestLabel(r.guest_id)}</p>
-                            <p className="truncate text-xs text-muted-foreground">Chambre {roomLabel(r.room_id)}</p>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                              <span className="text-xs font-medium">{formatFrShortDate(r.check_out)}</span>
-                              {departureTime && <span className="text-xs text-muted-foreground">à {departureTime}</span>}
-                              <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                                Aujourd'hui
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground">
-                              Arrivé le {formatFrShortDate(r.check_in)}
-                            </p>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {departuresTodayList.length > MAX_TODAY_LIST_ITEMS && (
-                    <Link
-                      to="/hotel/checkin-checkout"
-                      search={{ tab: "departures" } as never}
-                      className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold text-amber-600 hover:underline dark:text-amber-400"
-                    >
-                      Voir les {departuresTodayList.length} départs <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  )}
-                </>
-              )}
-            </Card>
-          </div>
-        </div>
+        <Card className={cn("p-4 sm:p-6", CARD_CLASS)}>
+          <HotelAvailabilityCalendar
+            rooms={calendarRooms}
+            reservations={reservations as any}
+            guestsById={guestsById as any}
+          />
+        </Card>
 
         {/* Widgets */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -608,7 +561,10 @@ function HotelDashboard() {
                 </TabsList>
               </Tabs>
             </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(activeRevenue.value)}</p>
+            <p className="break-words text-3xl font-bold leading-tight tracking-tight">
+              <span className="sm:hidden">{formatCurrencyCompact(activeRevenue.value)}</span>
+              <span className="hidden sm:inline">{formatCurrency(activeRevenue.value)}</span>
+            </p>
             {revenueTrend !== null && (
               <p
                 className={cn(

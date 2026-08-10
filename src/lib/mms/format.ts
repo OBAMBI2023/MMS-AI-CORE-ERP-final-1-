@@ -34,6 +34,22 @@ export function formatCurrency(
     .replace(/\u202F|\u00A0/g, " ");
 }
 
+export function formatCurrencyCompact(amount: number, currency = activeCurrency): string {
+  const n = Number.isFinite(Number(amount)) ? Number(amount) : 0;
+  const suffix = normalizeCurrency(currency) === "XOF" ? "FCFA" : normalizeCurrency(currency);
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1_000_000) {
+    const value = (abs / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+    return `${sign}${value} M ${suffix}`;
+  }
+  if (abs >= 1_000) {
+    const value = (abs / 1_000).toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+    return `${sign}${value} k ${suffix}`;
+  }
+  return `${sign}${abs.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${suffix}`;
+}
+
 export function formatNumber(n: number): string {
   return n.toLocaleString("fr-FR");
 }

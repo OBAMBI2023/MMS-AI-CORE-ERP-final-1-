@@ -53,6 +53,7 @@ const accentMap: Record<KpiAccent, { icon: string; glow: string; stroke: string 
 export function DashboardKpiCard({
   title,
   value,
+  compactValue,
   icon: Icon,
   route,
   trend,
@@ -62,6 +63,8 @@ export function DashboardKpiCard({
 }: {
   title: string;
   value: string;
+  /** Shorter form of `value` (e.g. "1,87 M FCFA") shown below the `sm` breakpoint instead of `value`, to avoid truncating large amounts on mobile. */
+  compactValue?: string;
   icon: LucideIcon;
   route?: string;
   trend: number | null;
@@ -93,7 +96,16 @@ export function DashboardKpiCard({
           <div className="relative flex items-start justify-between gap-2 sm:gap-3">
             <div className="min-w-0">
               <p className="truncate text-[10px] font-medium tracking-wide text-muted-foreground uppercase sm:text-xs">{title}</p>
-              <p className="mt-2 text-lg font-bold leading-none tracking-tight sm:mt-2.5 sm:text-[1.7rem]">{value}</p>
+              <p className="mt-2 break-words text-lg font-bold leading-tight tracking-tight sm:mt-2.5 sm:text-[1.7rem] sm:leading-none">
+                {compactValue ? (
+                  <>
+                    <span className="sm:hidden">{compactValue}</span>
+                    <span className="hidden sm:inline">{value}</span>
+                  </>
+                ) : (
+                  value
+                )}
+              </p>
             </div>
             <div
               className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 sm:rounded-2xl", colors.icon)}

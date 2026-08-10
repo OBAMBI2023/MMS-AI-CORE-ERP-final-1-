@@ -42,7 +42,7 @@ export function HotelAppShell({
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="h-[100dvh] w-[82vw] max-w-[300px] overflow-hidden bg-sidebar p-0 text-sidebar-foreground [&>button]:right-3 [&>button]:top-3 [&>button]:flex [&>button]:h-11 [&>button]:w-11 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full"
+                className="hotel-theme h-[100dvh] w-[82vw] max-w-[300px] overflow-hidden bg-sidebar p-0 text-sidebar-foreground [&>button]:right-3 [&>button]:top-3 [&>button]:flex [&>button]:h-11 [&>button]:w-11 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full"
               >
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <div className="flex h-full flex-col overflow-hidden">

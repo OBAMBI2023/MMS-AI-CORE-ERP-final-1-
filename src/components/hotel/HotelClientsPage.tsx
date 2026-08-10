@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarPlus,
   ChevronDown,
+  Download,
   Eye,
   FileText,
   Loader2,
@@ -66,11 +67,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTenant } from "@/providers/TenantProvider";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { formatCurrency, formatDate } from "@/lib/mms/format";
 import { createHotelListPdf } from "@/lib/mms/hotel-pdf-engine";
-import { downloadPdf } from "@/lib/mms/download-pdf";
+import { downloadFile, downloadPdf } from "@/lib/mms/download-pdf";
 
 // The generated Supabase types do not include the recently provisioned hotel tables yet.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -190,6 +192,26 @@ function splitFullName(fullName: string): { first_name: string; last_name: strin
 function guestName(g: Guest) {
   return `${g.first_name} ${g.last_name}`.trim();
 }
+
+const IDENTITY_DOCUMENTS_BUCKET = "hotel-identity-documents";
+
+function slugifyForFilename(value: string): string {
+  const slug = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "client";
+}
+
+function extensionFromMimeType(mimeType: string): string {
+  if (mimeType.includes("pdf")) return "pdf";
+  if (mimeType.includes("png")) return "png";
+  if (mimeType.includes("webp")) return "webp";
+  return "jpg";
+}
+
 function initials(g: Guest) {
   const name = guestName(g);
   const parts = name.split(/\s+/).filter(Boolean);
@@ -1105,9 +1127,36 @@ function ClientDetails({
   onEdit?: () => void;
   onReserve?: () => void;
 }) {
+  const isIdentityDataUri = guest?.identity_document_path?.startsWith("data:") ?? false;
+  const identityStoragePath = guest && !isIdentityDataUri ? guest.identity_document_path : null;
+  const identitySignedUrl = useSignedUrl(identityStoragePath, IDENTITY_DOCUMENTS_BUCKET);
+  const [downloadingIdentity, setDownloadingIdentity] = useState(false);
+
   if (!guest) return null;
   const totalSpent = stays.reduce((sum, s) => sum + Number(s.paid_total ?? 0), 0);
   const sortedStays = [...stays].sort((a, b) => b.check_in.localeCompare(a.check_in));
+
+  const handleDownloadIdentityDocument = async () => {
+    if (!guest.identity_document_path) return;
+    const sourceUrl = isIdentityDataUri ? guest.identity_document_path : identitySignedUrl;
+    if (!sourceUrl) return;
+    setDownloadingIdentity(true);
+    try {
+      const response = await fetch(sourceUrl);
+      if (!response.ok) throw new Error("download_failed");
+      const blob = await response.blob();
+      const pathExtension = identityStoragePath?.split(".").pop()?.toLowerCase();
+      const extension = pathExtension && /^[a-z0-9]{2,4}$/.test(pathExtension)
+        ? pathExtension
+        : extensionFromMimeType(blob.type);
+      const filename = `piece-identite-${slugifyForFilename(guestName(guest))}.${extension}`;
+      downloadFile(new File([blob], filename, { type: blob.type || "application/octet-stream" }));
+    } catch {
+      toast.error("Impossible de télécharger le document d’identité. Veuillez réessayer.");
+    } finally {
+      setDownloadingIdentity(false);
+    }
+  };
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[24px] p-0 sm:max-w-3xl">
@@ -1139,7 +1188,26 @@ function ClientDetails({
         </div>
         {guest.identity_document_path && (
           <div className="px-6 pb-2">
-            <DetailSection title="Document d’identité">
+            <DetailSection
+              title="Document d’identité"
+              actions={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadIdentityDocument}
+                  disabled={downloadingIdentity || (!isIdentityDataUri && !identitySignedUrl)}
+                  className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
+                >
+                  {downloadingIdentity ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Download className="size-3.5" />
+                  )}
+                  Télécharger
+                </Button>
+              }
+            >
               {guest.identity_document_path.startsWith("data:image/") ? (
                 <img src={guest.identity_document_path} alt="Pièce d’identité" className="max-h-56 rounded-xl border object-contain" />
               ) : (
@@ -1201,10 +1269,21 @@ function ClientDetails({
   );
 }
 
-function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+function DetailSection({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section>
-      <h3 className="mb-2 text-sm font-semibold text-[#102A43] dark:text-white">{title}</h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-[#102A43] dark:text-white">{title}</h3>
+        {actions}
+      </div>
       {children}
     </section>
   );
