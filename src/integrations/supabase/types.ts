@@ -2430,6 +2430,10 @@ export type Database = {
       parametres: {
         Row: {
           address: string | null
+          backup_auto_enabled: boolean
+          backup_auto_frequency: string | null
+          backup_auto_last_run_at: string | null
+          backup_last_success_at: string | null
           business_sector: string | null
           city: string | null
           company_name: string
@@ -2460,6 +2464,10 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          backup_auto_enabled?: boolean
+          backup_auto_frequency?: string | null
+          backup_auto_last_run_at?: string | null
+          backup_last_success_at?: string | null
           business_sector?: string | null
           city?: string | null
           company_name?: string
@@ -2490,6 +2498,10 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          backup_auto_enabled?: boolean
+          backup_auto_frequency?: string | null
+          backup_auto_last_run_at?: string | null
+          backup_last_success_at?: string | null
           business_sector?: string | null
           city?: string | null
           company_name?: string
@@ -3669,6 +3681,59 @@ export type Database = {
             foreignKeyName: "tenant_ai_subscriptions_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_backups: {
+        Row: {
+          backup_type: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          expires_at: string | null
+          id: string
+          modules: Json
+          record_count: number | null
+          status: string
+          storage_path: string | null
+          tenant_id: string
+        }
+        Insert: {
+          backup_type: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          modules?: Json
+          record_count?: number | null
+          status?: string
+          storage_path?: string | null
+          tenant_id: string
+        }
+        Update: {
+          backup_type?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          modules?: Json
+          record_count?: number | null
+          status?: string
+          storage_path?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_backups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
