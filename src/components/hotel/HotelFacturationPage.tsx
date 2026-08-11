@@ -52,6 +52,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { useHotelSettings } from "@/hooks/use-hotel-settings";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import {
   type HotelBillingReservation,
@@ -72,7 +73,12 @@ const WALK_IN_LABEL = "Client de passage";
 
 export function HotelFacturationPage() {
   const { profile } = useTenant();
-  const { settings, logoUrl, signatureUrl } = useCompanySettings(profile?.tenant_id);
+  const { settings, logoUrl, signatureUrl, stampUrl } = useCompanySettings(profile?.tenant_id);
+  const { data: hotelSettings } = useHotelSettings();
+  const showSignatureOnDocuments = hotelSettings?.show_signature_on_documents ?? true;
+  const showStampOnDocuments = hotelSettings?.show_stamp_on_documents ?? true;
+  const visibleSignatureUrl = showSignatureOnDocuments ? signatureUrl : null;
+  const visibleStampUrl = showStampOnDocuments ? stampUrl : null;
   const { data, isLoading } = useHotelBillingData();
   const refresh = useHotelBillingRefresh();
   const modulesQuery = useTenantModules();
@@ -244,9 +250,10 @@ export function HotelFacturationPage() {
         },
         settings,
         logoUrl,
-        signatureUrl,
+        visibleSignatureUrl,
         extras,
         payments,
+        visibleStampUrl,
       );
       return { doc: pdf.doc, filename: pdf.filename };
     } catch (error) {

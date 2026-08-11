@@ -65,6 +65,7 @@ export async function createHotelReservationConfirmationPdf(
   settings?: Record<string, unknown> | null,
   logoUrl?: string | null,
   signatureUrl?: string | null,
+  stampUrl?: string | null,
 ) {
   const reference = `CONF-${hotelDocText(data.id, "RESERVATION")
     .replace(/[^a-z0-9]/gi, "")
@@ -156,6 +157,7 @@ export async function createHotelReservationConfirmationPdf(
   await renderHotelDocumentFooter(doc, {
     tenant,
     signatureUrl,
+    stampUrl,
     thankYouMessage: "Nous avons hâte de vous accueillir.",
     contentBottom: contentBottom + 14,
     legalInfo: {

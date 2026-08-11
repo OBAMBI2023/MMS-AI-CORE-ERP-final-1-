@@ -23,7 +23,7 @@ export function useCompanySettings(tenantId?: string | null) {
     settings?.logo_url ?? null,
   );
   const signatureUrl = useSignedUrl(settings?.signature_url ?? null);
-  const cachetUrl = useSignedUrl(settings?.cachet_url ?? null);
+  const stampUrl = useSignedUrl(settings?.stamp_url ?? null);
   const brandingLoading =
     (tenantId === undefined && tenantLoading) ||
     (resolvedTenantId !== null && (isLoading || logoLoading));
@@ -32,7 +32,7 @@ export function useCompanySettings(tenantId?: string | null) {
     settings,
     logoUrl,
     signatureUrl,
-    cachetUrl,
+    stampUrl,
     isLoading: brandingLoading,
     companyName:
       settings?.company_name?.trim() ||

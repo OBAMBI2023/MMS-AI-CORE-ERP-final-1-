@@ -60,6 +60,7 @@ export async function createHotelPaymentReceiptPdf(
   settings?: Record<string, unknown> | null,
   logoUrl?: string | null,
   signatureUrl?: string | null,
+  stampUrl?: string | null,
 ) {
   const reference = `REC-${hotelDocText(data.paymentId, "PAIEMENT")
     .replace(/[^a-z0-9]/gi, "")
@@ -164,6 +165,7 @@ export async function createHotelPaymentReceiptPdf(
   await renderHotelDocumentFooter(doc, {
     tenant,
     signatureUrl,
+    stampUrl,
     contentBottom: Math.max(detailsBottom, situationBottom) + 16,
     legalInfo: {
       rccm: (rawSettings?.rccm as string | null) ?? null,

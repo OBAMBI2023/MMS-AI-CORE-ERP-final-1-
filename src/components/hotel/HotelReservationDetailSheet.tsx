@@ -206,8 +206,12 @@ export function HotelReservationDetailSheet({
 }) {
   const { profile } = useTenant();
   const tenantId = profile?.tenant_id;
-  const { settings, logoUrl, signatureUrl } = useCompanySettings(tenantId);
+  const { settings, logoUrl, signatureUrl, stampUrl } = useCompanySettings(tenantId);
   const { data: hotelSettings } = useHotelSettings();
+  const showSignatureOnDocuments = hotelSettings?.show_signature_on_documents ?? true;
+  const showStampOnDocuments = hotelSettings?.show_stamp_on_documents ?? true;
+  const visibleSignatureUrl = showSignatureOnDocuments ? signatureUrl : null;
+  const visibleStampUrl = showStampOnDocuments ? stampUrl : null;
   const billing = useHotelBillingData();
   const payments = useHotelPaymentHistory(reservationId);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -311,7 +315,8 @@ export function HotelReservationDetailSheet({
       },
       settings,
       logoUrl,
-      signatureUrl,
+      visibleSignatureUrl,
+      visibleStampUrl,
     );
 
   const buildCertificatePdf = async () => {
@@ -332,7 +337,8 @@ export function HotelReservationDetailSheet({
       },
       settings,
       logoUrl,
-      signatureUrl,
+      visibleSignatureUrl,
+      visibleStampUrl,
     );
   };
 
@@ -406,9 +412,10 @@ export function HotelReservationDetailSheet({
       },
       settings,
       logoUrl,
-      signatureUrl,
+      visibleSignatureUrl,
       extras,
       paymentRows,
+      visibleStampUrl,
     );
   };
 
@@ -434,7 +441,8 @@ export function HotelReservationDetailSheet({
       },
       settings,
       logoUrl,
-      signatureUrl,
+      visibleSignatureUrl,
+      visibleStampUrl,
     );
 
   const hasInvoice = Boolean(reservation?.invoice_number);

@@ -2,10 +2,17 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
-  Clock,
+  CalendarCheck,
   ClipboardList,
+  Eye,
+  FileCheck2,
+  FileText,
+  Lock,
+  PenLine,
+  Pencil,
+  Percent,
   Receipt,
-  Wallet,
+  Stamp,
   Users,
   Save,
   Loader2,
@@ -14,7 +21,6 @@ import {
   Shield,
   ShieldAlert,
   ImageIcon,
-  FileSignature,
 } from "lucide-react";
 import { toast } from "sonner";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
@@ -22,11 +28,20 @@ import { HotelUsersAccessTab } from "@/components/hotel/HotelUsersAccessTab";
 import { HotelSecurityTab } from "@/components/hotel/HotelSecurityTab";
 import { HotelAuditLogTab } from "@/components/hotel/HotelAuditLogTab";
 import { Section } from "@/components/hotel/HotelSettingsUi";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -45,7 +60,6 @@ import {
   useHotelSettingsRefresh,
   type HotelSettingsRow,
 } from "@/hooks/use-hotel-settings";
-import { HOTEL_PAYMENT_METHODS } from "@/lib/hotel-payments";
 import { configureCurrency } from "@/lib/mms/format";
 import type { Tables } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
@@ -67,8 +81,6 @@ const TIMEZONES = [
   { value: "Europe/Paris", label: "Paris (GMT+1/+2)" },
   { value: "UTC", label: "UTC" },
 ];
-
-const PAYMENT_METHOD_OPTIONS = HOTEL_PAYMENT_METHODS.filter((m) => m !== "Autre");
 
 function formatSupabaseError(error: unknown): string {
   const e = error as { code?: string; message?: string; details?: string; hint?: string };
@@ -93,6 +105,7 @@ export function HotelParametresPage() {
   const refreshHotelSettings = useHotelSettingsRefresh();
   const { settings: paramSettings, isLoading: paramsLoading } = useCompanySettings(tenantId);
 
+  const [activeTab, setActiveTab] = useState("general");
   const [hotelForm, setHotelForm] = useState<Partial<HotelSettingsRow>>({});
   const hotelInitialized = useRef(false);
   useEffect(() => {
@@ -115,16 +128,6 @@ export function HotelParametresPage() {
     setHotelForm((s) => ({ ...s, [key]: value }));
   const updateParam = <K extends keyof ParametresRow>(key: K, value: ParametresRow[K] | null) =>
     setParamForm((s) => ({ ...s, [key]: value as ParametresRow[K] }));
-
-  const togglePaymentMethod = (method: string, checked: boolean) => {
-    setHotelForm((s) => {
-      const current = s.payment_methods ?? [];
-      const next = checked
-        ? [...new Set([...current, method])]
-        : current.filter((m) => m !== method);
-      return { ...s, payment_methods: next };
-    });
-  };
 
   const save = useMutation({
     mutationFn: async () => {
@@ -220,19 +223,16 @@ export function HotelParametresPage() {
       ) : hotelSettingsQuery.isError ? (
         <p className="text-sm text-destructive">{formatSupabaseError(hotelSettingsQuery.error)}</p>
       ) : (
-        <Tabs defaultValue="general" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-6 flex h-auto flex-wrap gap-1 rounded-xl bg-muted/60 p-1">
             <TabTrig value="general" icon={<Building2 className="h-4 w-4" />}>
               Général
             </TabTrig>
-            <TabTrig value="reservations" icon={<Clock className="h-4 w-4" />}>
-              Réservations
-            </TabTrig>
             <TabTrig value="facturation" icon={<Receipt className="h-4 w-4" />}>
               Facturation
             </TabTrig>
-            <TabTrig value="paiements" icon={<Wallet className="h-4 w-4" />}>
-              Paiements
+            <TabTrig value="documents" icon={<FileText className="h-4 w-4" />}>
+              Documents
             </TabTrig>
             {canViewUsers && (
               <TabTrig value="users" icon={<Users className="h-4 w-4" />}>
@@ -258,23 +258,21 @@ export function HotelParametresPage() {
             />
           </TabsContent>
 
-          <TabsContent value="reservations">
-            <ReservationsTab form={hotelForm} update={updateHotel} disabled={!canEdit} />
-          </TabsContent>
-
           <TabsContent value="facturation">
             <FacturationTab
               paramForm={paramForm}
               hotelForm={hotelForm}
               update={updateHotel}
               disabled={!canEdit}
+              onEditGeneral={() => setActiveTab("general")}
             />
           </TabsContent>
 
-          <TabsContent value="paiements">
-            <PaiementsTab
-              methods={hotelForm.payment_methods ?? []}
-              onToggle={togglePaymentMethod}
+          <TabsContent value="documents">
+            <DocumentsTab
+              hotelForm={hotelForm}
+              paramForm={paramForm}
+              update={updateHotel}
               disabled={!canEdit}
             />
           </TabsContent>
@@ -358,18 +356,63 @@ function GeneralTab({
         />
       </Section>
 
-      <Section
-        title="Signature et cachet"
-        description="Image affichée en bas des documents PDF (facture, reçu). PNG ou JPG — 2 Mo max."
-        icon={<FileSignature className="h-4 w-4" />}
-      >
-        <SignatureUploader
-          currentPath={form.signature_url ?? null}
-          parametresId={parametresId}
-          disabled={disabled}
-          onChange={(path) => update("signature_url", path)}
-        />
-      </Section>
+      <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="flex h-full flex-col rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+              <PenLine className="size-4" />
+            </div>
+            <div>
+              <h4 className="font-semibold">Signature</h4>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Signature affichée en bas des documents PDF.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex-1">
+            <DocumentImageUploader
+              currentPath={form.signature_url ?? null}
+              parametresId={parametresId}
+              disabled={disabled}
+              field="signature_url"
+              folder="signature"
+              altText="Signature"
+              successUploadMessage="Signature téléversée"
+              successRemoveMessage="Signature supprimée"
+              onChange={(path) => update("signature_url", path)}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">PNG ou JPG — 2 Mo max.</p>
+        </div>
+
+        <div className="flex h-full flex-col rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+              <Stamp className="size-4" />
+            </div>
+            <div>
+              <h4 className="font-semibold">Cachet de l'établissement</h4>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Cachet affiché en bas des documents PDF.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex-1">
+            <DocumentImageUploader
+              currentPath={form.stamp_url ?? null}
+              parametresId={parametresId}
+              disabled={disabled}
+              field="stamp_url"
+              folder="stamp"
+              altText="Cachet de l'établissement"
+              successUploadMessage="Cachet téléversé"
+              successRemoveMessage="Cachet supprimé"
+              onChange={(path) => update("stamp_url", path)}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">PNG ou JPG — 2 Mo max.</p>
+        </div>
+      </div>
 
       <Section title="Coordonnées" icon={<Building2 className="h-4 w-4" />}>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -447,63 +490,40 @@ function GeneralTab({
   );
 }
 
-function ReservationsTab({
-  form,
-  update,
-  disabled,
-}: {
-  form: Partial<HotelSettingsRow>;
-  update: <K extends keyof HotelSettingsRow>(k: K, v: HotelSettingsRow[K]) => void;
-  disabled: boolean;
-}) {
+function LegalField({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <Section title="Horaires" icon={<Clock className="h-4 w-4" />}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Heure de check-in par défaut">
-            <Input
-              type="time"
-              value={(form.check_in_time ?? "14:00:00").slice(0, 5)}
-              disabled={disabled}
-              onChange={(e) => update("check_in_time", `${e.target.value}:00`)}
-            />
-          </Field>
-          <Field label="Heure de check-out par défaut">
-            <Input
-              type="time"
-              value={(form.check_out_time ?? "12:00:00").slice(0, 5)}
-              disabled={disabled}
-              onChange={(e) => update("check_out_time", `${e.target.value}:00`)}
-            />
-          </Field>
-        </div>
-      </Section>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn("mt-1 font-medium", !value && "font-normal italic text-muted-foreground")}>
+        {value || "Non renseigné"}
+      </dd>
+    </div>
+  );
+}
 
-      <Section
-        title="Conditions & annulation"
-        description="Affichées aux voyageurs lors de la réservation."
-      >
-        <div className="grid grid-cols-1 gap-4">
-          <Field label="Conditions de réservation">
-            <Textarea
-              rows={3}
-              value={form.booking_terms ?? ""}
-              disabled={disabled}
-              placeholder="Ex. Pièce d'identité obligatoire à l'arrivée, caution demandée…"
-              onChange={(e) => update("booking_terms", e.target.value || null)}
-            />
-          </Field>
-          <Field label="Politique d'annulation">
-            <Textarea
-              rows={3}
-              value={form.cancellation_policy ?? ""}
-              disabled={disabled}
-              placeholder="Ex. Annulation gratuite jusqu'à 24h avant l'arrivée…"
-              onChange={(e) => update("cancellation_policy", e.target.value || null)}
-            />
-          </Field>
+function CardHeader({
+  icon,
+  title,
+  description,
+  badge,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  badge?: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          {icon}
         </div>
-      </Section>
+        <div>
+          <h3 className="font-semibold">{title}</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {badge}
     </div>
   );
 }
@@ -513,107 +533,417 @@ function FacturationTab({
   hotelForm,
   update,
   disabled,
+  onEditGeneral,
 }: {
   paramForm: Partial<ParametresRow>;
   hotelForm: Partial<HotelSettingsRow>;
   update: <K extends keyof HotelSettingsRow>(k: K, v: HotelSettingsRow[K]) => void;
   disabled: boolean;
+  onEditGeneral: () => void;
 }) {
   return (
-    <div>
-      <section className="hotel-panel mb-5">
-        <header className="mb-4 flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
-              <Receipt className="h-4 w-4" />
-            </div>
-            <div>
-              <h3 className="font-semibold">Informations sur les factures & reçus</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Identité affichée sur les documents (RCCM, NIF, régime fiscal) — lecture seule ici.
-              </p>
-            </div>
-          </div>
-        </header>
-        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-muted-foreground">Raison sociale</dt>
-            <dd className="font-medium">{paramForm.company_name || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Adresse</dt>
-            <dd className="font-medium">{paramForm.address || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">RCCM</dt>
-            <dd className="font-medium">{paramForm.rccm || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">NIF</dt>
-            <dd className="font-medium">{paramForm.tax_number || "—"}</dd>
-          </div>
-        </dl>
-      </section>
-
-      <Section
-        title="Taxe hôtel"
-        description="Taux de référence conservé avec l'établissement. Il n'est pas encore appliqué automatiquement au calcul des factures."
-      >
-        <div className="max-w-xs">
-          <Field label="Taux de taxe (%)">
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={hotelForm.tax_rate ?? 0}
-              disabled={disabled}
-              onChange={(e) => update("tax_rate", Number(e.target.value))}
-            />
-          </Field>
+    <div className="mx-auto w-full max-w-[1100px]">
+      <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium">
+            Les informations légales proviennent des paramètres généraux de l'établissement.
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pour modifier ces informations, rendez-vous dans l'onglet Général.
+          </p>
         </div>
-      </Section>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onEditGeneral}
+          className="shrink-0 gap-1.5 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+        >
+          <Pencil className="h-3.5 w-3.5" /> Aller dans Général
+        </Button>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="flex h-full flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
+          <CardHeader
+            icon={<Building2 className="size-5" />}
+            title="Identité de facturation"
+            description="Informations utilisées automatiquement sur les factures, reçus et documents."
+            badge={
+              <Badge variant="secondary" className="shrink-0 gap-1 font-medium">
+                <Lock className="h-3 w-3" /> Lecture seule
+              </Badge>
+            }
+          />
+
+          <div className="mt-5 flex-1 divide-y divide-border">
+            <dl className="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2">
+              <LegalField label="Raison sociale" value={paramForm.company_name} />
+              <LegalField label="Adresse" value={paramForm.address} />
+            </dl>
+            <dl className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2">
+              <LegalField label="RCCM" value={paramForm.rccm} />
+              <LegalField label="NIF / Numéro contribuable" value={paramForm.tax_number} />
+            </dl>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-3 rounded-lg bg-primary/5 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Ces informations proviennent des paramètres généraux de l'établissement.
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onEditGeneral}
+              className="shrink-0 gap-1.5 text-primary hover:bg-primary/10 hover:text-primary"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Modifier dans Général
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex h-full flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
+          <CardHeader
+            icon={<Percent className="size-5" />}
+            title="Configuration fiscale"
+            description="Paramètres fiscaux utilisés pour la facturation de l'établissement."
+          />
+
+          <div className="mt-5 flex-1">
+            <Field label="Taux de taxe (%)">
+              <div className="relative w-full">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={hotelForm.tax_rate ?? 0}
+                  disabled={disabled}
+                  onChange={(e) => update("tax_rate", Number(e.target.value))}
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  %
+                </span>
+              </div>
+            </Field>
+          </div>
+
+          <div className="mt-5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3.5">
+            <p className="text-xs text-muted-foreground">
+              Taux de référence conservé avec l'établissement. Il n'est pas encore appliqué
+              automatiquement au calcul des factures.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function PaiementsTab({
-  methods,
-  onToggle,
+const FOOTER_MAX_LENGTH = 300;
+
+type DocumentKind = "invoice" | "receipt" | "confirmation" | "certificate";
+
+const DOCUMENT_KINDS: {
+  kind: DocumentKind;
+  label: string;
+  description: string;
+  icon: ReactNode;
+  prefixField: "invoice_prefix" | "receipt_prefix" | "confirmation_prefix" | "certificate_prefix";
+  prefixLabel: string;
+}[] = [
+  {
+    kind: "invoice",
+    label: "Facture",
+    description: "Émise depuis Facturation.",
+    icon: <Receipt className="size-4" />,
+    prefixField: "invoice_prefix",
+    prefixLabel: "Préfixe Facture",
+  },
+  {
+    kind: "receipt",
+    label: "Reçu",
+    description: "Émis depuis la Caisse.",
+    icon: <FileText className="size-4" />,
+    prefixField: "receipt_prefix",
+    prefixLabel: "Préfixe Reçu",
+  },
+  {
+    kind: "confirmation",
+    label: "Confirmation de réservation",
+    description: "Émise depuis Réservations.",
+    icon: <CalendarCheck className="size-4" />,
+    prefixField: "confirmation_prefix",
+    prefixLabel: "Préfixe Confirmation",
+  },
+  {
+    kind: "certificate",
+    label: "Certificat d'hébergement",
+    description: "Émis depuis la fiche réservation.",
+    icon: <FileCheck2 className="size-4" />,
+    prefixField: "certificate_prefix",
+    prefixLabel: "Préfixe Certificat",
+  },
+];
+
+function DocumentPreviewDialog({
+  open,
+  onOpenChange,
+  documentKind,
+  companyName,
+  prefix,
+  footerText,
+  showLogo,
+  showSignature,
+  showStamp,
+  logoUrl,
+  signatureUrl,
+  stampUrl,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  documentKind: (typeof DOCUMENT_KINDS)[number] | null;
+  companyName: string;
+  prefix: string;
+  footerText: string;
+  showLogo: boolean;
+  showSignature: boolean;
+  showStamp: boolean;
+  logoUrl: string | null;
+  signatureUrl: string | null;
+  stampUrl: string | null;
+}) {
+  if (!documentKind) return null;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[540px]">
+        <DialogHeader>
+          <DialogTitle>Aperçu — {documentKind.label}</DialogTitle>
+          <DialogDescription>
+            Aperçu indicatif avec des données fictives. Aucun document ni numéro définitif n'est
+            créé.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-xl border border-border bg-white p-5 text-neutral-800 shadow-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-dashed border-border pb-3">
+            {showLogo && logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="h-10 max-w-[120px] object-contain" />
+            ) : (
+              <div className="grid h-10 w-24 place-items-center rounded bg-muted text-[10px] text-muted-foreground">
+                {showLogo ? "Logo" : "Logo masqué"}
+              </div>
+            )}
+            <div className="text-right">
+              <p className="text-sm font-semibold">{companyName || "Votre établissement"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{documentKind.label}</p>
+              <p className="text-xs text-muted-foreground">
+                N° {(prefix || "PREFIXE").toUpperCase()}-APERCU
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-1 text-xs text-muted-foreground">
+            <p>Client : Jean Dupont (exemple)</p>
+            <p>Date : 01/01/2026</p>
+            <p>Détail de la prestation à titre d'exemple…</p>
+          </div>
+
+          <div className="mt-6 flex items-end justify-between gap-3 border-t border-dashed border-border pt-3">
+            <p className="max-w-[55%] text-[11px] text-muted-foreground">
+              {footerText || "Merci de votre confiance."}
+            </p>
+            <div className="flex gap-2">
+              {showSignature && (
+                <div className="grid h-14 w-20 place-items-center rounded border border-dashed border-border p-1 text-center text-[9px] text-muted-foreground">
+                  {signatureUrl ? (
+                    <img
+                      src={signatureUrl}
+                      alt="Signature"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    "Signature"
+                  )}
+                </div>
+              )}
+              {showStamp && (
+                <div className="grid h-14 w-20 place-items-center rounded border border-dashed border-border p-1 text-center text-[9px] text-muted-foreground">
+                  {stampUrl ? (
+                    <img
+                      src={stampUrl}
+                      alt="Cachet"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    "Cachet"
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Fermer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DocumentsTab({
+  hotelForm,
+  paramForm,
+  update,
   disabled,
 }: {
-  methods: string[];
-  onToggle: (method: string, checked: boolean) => void;
+  hotelForm: Partial<HotelSettingsRow>;
+  paramForm: Partial<ParametresRow>;
+  update: <K extends keyof HotelSettingsRow>(k: K, v: HotelSettingsRow[K]) => void;
   disabled: boolean;
 }) {
+  const logoUrl = useSignedUrl(paramForm.logo_url ?? null);
+  const signatureUrl = useSignedUrl(paramForm.signature_url ?? null);
+  const stampUrl = useSignedUrl(paramForm.stamp_url ?? null);
+  const [previewKind, setPreviewKind] = useState<(typeof DOCUMENT_KINDS)[number] | null>(null);
+
+  const showLogo = hotelForm.show_logo_on_documents ?? true;
+  const showSignature = hotelForm.show_signature_on_documents ?? true;
+  const showStamp = hotelForm.show_stamp_on_documents ?? true;
+  const footerText = hotelForm.document_footer_text ?? "";
+
   return (
-    <Section
-      title="Moyens de paiement acceptés"
-      description="Sélectionnez les modes de paiement proposés aux clients à la caisse et sur les réservations."
-      icon={<Wallet className="h-4 w-4" />}
-    >
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {PAYMENT_METHOD_OPTIONS.map((method) => {
-          const checked = methods.includes(method);
-          return (
-            <label
-              key={method}
-              className={cn(
-                "flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm font-medium transition-colors",
-                !disabled && "cursor-pointer hover:bg-muted/40",
-              )}
+    <div className="max-w-[1000px] space-y-5">
+      <Section
+        title="Documents disponibles"
+        description="Documents actuellement générés par votre établissement."
+        icon={<FileText className="h-4 w-4" />}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {DOCUMENT_KINDS.map((doc) => (
+            <div
+              key={doc.kind}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3"
             >
-              <Checkbox
-                checked={checked}
+              <div className="flex items-center gap-3">
+                <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                  {doc.icon}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{doc.label}</p>
+                  <p className="text-xs text-muted-foreground">{doc.description}</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setPreviewKind(doc)}
+                className="h-9 shrink-0 gap-1.5"
+              >
+                <Eye className="h-3.5 w-3.5" /> Aperçu
+              </Button>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section
+        title="Éléments affichés"
+        description="Contrôlez ce qui apparaît sur les documents générés. Réutilise les fichiers déjà configurés dans Général."
+        icon={<ImageIcon className="h-4 w-4" />}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
+            <span className="text-sm font-medium">Afficher le logo</span>
+            <Switch
+              checked={showLogo}
+              disabled={disabled}
+              onCheckedChange={(v) => update("show_logo_on_documents", v)}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
+            <span className="text-sm font-medium">Afficher la signature</span>
+            <Switch
+              checked={showSignature}
+              disabled={disabled}
+              onCheckedChange={(v) => update("show_signature_on_documents", v)}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
+            <span className="text-sm font-medium">Afficher le cachet</span>
+            <Switch
+              checked={showStamp}
+              disabled={disabled}
+              onCheckedChange={(v) => update("show_stamp_on_documents", v)}
+            />
+          </label>
+        </div>
+      </Section>
+
+      <Section
+        title="Numérotation"
+        description="Préfixe affiché devant le numéro de chaque type de document."
+        icon={<Receipt className="h-4 w-4" />}
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {DOCUMENT_KINDS.map((doc) => (
+            <Field key={doc.kind} label={doc.prefixLabel}>
+              <Input
+                value={hotelForm[doc.prefixField] ?? ""}
                 disabled={disabled}
-                onCheckedChange={(v) => onToggle(method, Boolean(v))}
+                maxLength={10}
+                onChange={(e) => update(doc.prefixField, e.target.value.toUpperCase())}
               />
-              {method}
-            </label>
-          );
-        })}
-      </div>
-    </Section>
+            </Field>
+          ))}
+        </div>
+      </Section>
+
+      <Section
+        title="Pied de page"
+        description="Texte affiché en bas des documents générés."
+        icon={<PenLine className="h-4 w-4" />}
+      >
+        <Field label="Texte de pied de page">
+          <Textarea
+            rows={3}
+            value={footerText}
+            disabled={disabled}
+            maxLength={FOOTER_MAX_LENGTH}
+            placeholder="Ex : Merci pour votre confiance."
+            onChange={(e) =>
+              update("document_footer_text", e.target.value.slice(0, FOOTER_MAX_LENGTH))
+            }
+          />
+        </Field>
+        <p className="mt-1.5 text-right text-[11px] text-muted-foreground">
+          {footerText.length}/{FOOTER_MAX_LENGTH}
+        </p>
+      </Section>
+
+      <DocumentPreviewDialog
+        open={previewKind !== null}
+        onOpenChange={(next) => {
+          if (!next) setPreviewKind(null);
+        }}
+        documentKind={previewKind}
+        companyName={paramForm.company_name ?? ""}
+        prefix={previewKind ? (hotelForm[previewKind.prefixField] ?? "") : ""}
+        footerText={footerText}
+        showLogo={showLogo}
+        showSignature={showSignature}
+        showStamp={showStamp}
+        logoUrl={showLogo ? logoUrl : null}
+        signatureUrl={showSignature ? signatureUrl : null}
+        stampUrl={showStamp ? stampUrl : null}
+      />
+    </div>
   );
 }
 
@@ -778,15 +1108,25 @@ function LogoUploader({
   );
 }
 
-function SignatureUploader({
+function DocumentImageUploader({
   currentPath,
   parametresId,
   disabled,
+  field,
+  folder,
+  altText,
+  successUploadMessage,
+  successRemoveMessage,
   onChange,
 }: {
   currentPath: string | null;
   parametresId?: string;
   disabled: boolean;
+  field: "signature_url" | "stamp_url";
+  folder: "signature" | "stamp";
+  altText: string;
+  successUploadMessage: string;
+  successRemoveMessage: string;
   onChange: (path: string | null) => void;
 }) {
   const { profile } = useTenant();
@@ -797,20 +1137,23 @@ function SignatureUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const previewUrl = useSignedUrl(currentPath);
 
-  // Persiste immédiatement en base, comme LogoUploader : sinon la signature
-  // n'est visible sur les PDF qu'après un clic sur "Enregistrer".
-  const persistSignature = useCallback(
+  // Persiste immédiatement en base, comme LogoUploader : sinon l'image n'est
+  // visible sur les PDF qu'après un clic sur "Enregistrer".
+  const persist = useCallback(
     async (path: string | null) => {
       if (!tenantId || !parametresId) return;
+      const patch: Partial<Pick<ParametresRow, "signature_url" | "stamp_url">> = {
+        [field]: path,
+      };
       const { error } = await supabase
         .from("parametres")
-        .update({ signature_url: path })
+        .update(patch)
         .eq("id", parametresId)
         .eq("tenant_id", tenantId);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["parametres"] });
     },
-    [tenantId, parametresId, qc],
+    [tenantId, parametresId, qc, field],
   );
 
   const handleFile = useCallback(
@@ -822,21 +1165,21 @@ function SignatureUploader({
       setBusy(true);
       try {
         const ext = file.name.split(".").pop() || "png";
-        const path = `${tenantId}/signature/${parametresId}-${Date.now()}.${ext}`;
+        const path = `${tenantId}/${folder}/${parametresId}-${Date.now()}.${ext}`;
         const { error } = await supabase.storage
           .from(BUCKET)
           .upload(path, file, { upsert: false, contentType: file.type });
         if (error) throw error;
-        await persistSignature(path);
+        await persist(path);
         onChange(path);
-        toast.success("Signature téléversée");
+        toast.success(successUploadMessage);
       } catch (e) {
         toast.error(formatSupabaseError(e));
       } finally {
         setBusy(false);
       }
     },
-    [tenantId, parametresId, onChange, persistSignature],
+    [tenantId, parametresId, onChange, persist, folder, successUploadMessage],
   );
 
   const remove = async () => {
@@ -844,9 +1187,9 @@ function SignatureUploader({
     setBusy(true);
     try {
       await supabase.storage.from(BUCKET).remove([currentPath]);
-      await persistSignature(null);
+      await persist(null);
       onChange(null);
-      toast.success("Signature supprimée");
+      toast.success(successRemoveMessage);
     } catch (e) {
       toast.error(formatSupabaseError(e));
     } finally {
@@ -855,41 +1198,47 @@ function SignatureUploader({
   };
 
   return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        if (!disabled) setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragging(false);
-        if (disabled) return;
-        const file = e.dataTransfer.files?.[0];
-        if (file) handleFile(file);
-      }}
-      className={cn(
-        "relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 text-center transition-colors",
-        dragging ? "border-primary bg-primary/5" : "border-border bg-muted/20",
-      )}
-    >
-      {previewUrl ? (
-        <div className="flex w-full flex-col items-center gap-3">
-          <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-xl border border-border bg-background">
-            <img
-              src={previewUrl}
-              alt="Signature et cachet"
-              className="max-h-full max-w-full object-contain"
-            />
+    <div className="flex flex-col gap-2.5">
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          if (disabled) return;
+          const file = e.dataTransfer.files?.[0];
+          if (file) handleFile(file);
+        }}
+        className={cn(
+          "flex h-[130px] w-full items-center justify-center rounded-xl border-2 border-dashed p-2 transition-colors",
+          dragging ? "border-primary bg-primary/5" : "border-border bg-muted/20",
+        )}
+      >
+        {previewUrl ? (
+          <img src={previewUrl} alt={altText} className="max-h-full max-w-full object-contain" />
+        ) : busy ? (
+          <Loader2 className="size-5 animate-spin text-primary" />
+        ) : (
+          <div className="flex flex-col items-center gap-1.5 text-center">
+            <Upload className="size-5 text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">Glissez un fichier ici</p>
           </div>
-          {!disabled && (
-            <div className="flex gap-2">
+        )}
+      </div>
+
+      {!disabled && (
+        <div className="flex gap-2">
+          {previewUrl ? (
+            <>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => inputRef.current?.click()}
                 disabled={busy}
-                className="gap-2"
+                className="h-10 flex-1 gap-1.5 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
               >
                 <Upload className="h-3.5 w-3.5" /> Remplacer
               </Button>
@@ -898,34 +1247,25 @@ function SignatureUploader({
                 variant="outline"
                 onClick={remove}
                 disabled={busy}
-                className="gap-2 text-destructive hover:text-destructive"
+                className="h-10 flex-1 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
               >
                 <Trash2 className="h-3.5 w-3.5" /> Supprimer
               </Button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-          </div>
-          <div>
-            <p className="text-sm font-medium">Glissez un fichier ici</p>
-            <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, JPEG — max {MAX_MB} Mo</p>
-          </div>
-          {!disabled && (
+            </>
+          ) : (
             <Button
               size="sm"
               variant="outline"
               onClick={() => inputRef.current?.click()}
               disabled={busy}
+              className="h-10 w-full gap-1.5"
             >
-              Importer un fichier
+              <Upload className="h-3.5 w-3.5" /> Importer un fichier
             </Button>
           )}
-        </>
+        </div>
       )}
+
       <input
         ref={inputRef}
         type="file"

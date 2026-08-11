@@ -117,8 +117,12 @@ const emptyForm = {
 export function HotelReservationsPage() {
   const qc = useQueryClient();
   const { profile } = useTenant();
-  const { settings, logoUrl, signatureUrl } = useCompanySettings(profile?.tenant_id);
+  const { settings, logoUrl, signatureUrl, stampUrl } = useCompanySettings(profile?.tenant_id);
   const { data: hotelSettings } = useHotelSettings();
+  const showSignatureOnDocuments = hotelSettings?.show_signature_on_documents ?? true;
+  const showStampOnDocuments = hotelSettings?.show_stamp_on_documents ?? true;
+  const visibleSignatureUrl = showSignatureOnDocuments ? signatureUrl : null;
+  const visibleStampUrl = showStampOnDocuments ? stampUrl : null;
   const [form, setForm] = useState(emptyForm);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -507,7 +511,8 @@ export function HotelReservationsPage() {
         },
         settings,
         logoUrl,
-        signatureUrl,
+        visibleSignatureUrl,
+        visibleStampUrl,
       );
       await downloadPdf(pdf.doc, pdf.filename);
       toast.success("Confirmation de réservation téléchargée.");

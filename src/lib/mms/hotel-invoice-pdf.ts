@@ -58,6 +58,7 @@ export async function createHotelInvoicePdf(
   signatureUrl?: string | null,
   extras: HotelInvoiceExtraItem[] = [],
   payments: HotelInvoicePaymentHistoryItem[] = [],
+  stampUrl?: string | null,
 ) {
   const reference = `FACT-${hotelDocText(invoice.id, "RESERVATION")
     .replace(/[^a-z0-9]/gi, "")
@@ -149,7 +150,7 @@ export async function createHotelInvoicePdf(
   );
   ensureHotelFooterSpace(doc, y);
 
-  await renderHotelDocumentFooter(doc, { tenant, signatureUrl });
+  await renderHotelDocumentFooter(doc, { tenant, signatureUrl, stampUrl });
 
   return { doc, number: reference, filename: `facture-${reference}.pdf` };
 }

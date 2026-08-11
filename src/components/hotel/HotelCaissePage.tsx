@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { useHotelSettings } from "@/hooks/use-hotel-settings";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import {
   type HotelBillingReservation,
@@ -85,7 +86,12 @@ const QUICK_AMOUNT_OPTIONS: { label: string; compute: (balanceDue: number) => nu
 
 export function HotelCaissePage() {
   const { profile } = useTenant();
-  const { settings, logoUrl, signatureUrl } = useCompanySettings(profile?.tenant_id);
+  const { settings, logoUrl, signatureUrl, stampUrl } = useCompanySettings(profile?.tenant_id);
+  const { data: hotelSettings } = useHotelSettings();
+  const showSignatureOnDocuments = hotelSettings?.show_signature_on_documents ?? true;
+  const showStampOnDocuments = hotelSettings?.show_stamp_on_documents ?? true;
+  const visibleSignatureUrl = showSignatureOnDocuments ? signatureUrl : null;
+  const visibleStampUrl = showStampOnDocuments ? stampUrl : null;
   const { data, isLoading } = useHotelBillingData();
   const refresh = useHotelBillingRefresh();
   const modulesQuery = useTenantModules();
@@ -230,7 +236,8 @@ export function HotelCaissePage() {
         },
         settings,
         logoUrl,
-        signatureUrl,
+        visibleSignatureUrl,
+        visibleStampUrl,
       );
       await downloadPdf(pdf.doc, pdf.filename);
     } catch (error) {

@@ -144,6 +144,7 @@ export async function createHotelAccommodationCertificatePdf(
   settings?: Record<string, unknown> | null,
   logoUrl?: string | null,
   signatureUrl?: string | null,
+  stampUrl?: string | null,
 ) {
   if (!isHotelCertificateIssueDateValid(data.check_in)) {
     throw new Error(HOTEL_CERTIFICATE_DATE_ERROR);
@@ -237,6 +238,7 @@ export async function createHotelAccommodationCertificatePdf(
   await renderHotelDocumentFooter(doc, {
     tenant,
     signatureUrl,
+    stampUrl,
     thankYouMessage: "Merci de votre confiance.",
     legalInfo: {
       rccm: (rawSettings?.rccm as string | null) ?? null,

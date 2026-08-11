@@ -738,6 +738,7 @@ export function renderHotelFinancialSummary(
 export type HotelFooterOptions = {
   tenant: PdfTenant;
   signatureUrl?: string | null;
+  stampUrl?: string | null;
   thankYouMessage?: string;
   /**
    * Y position right after the document's own content (e.g. last info
@@ -763,8 +764,56 @@ export type HotelFooterOptions = {
  * mention informative générique et un discret repère décoratif — sans QR
  * code et sans mention "Document généré par ...".
  */
+/**
+ * Draws one bordered, titled box (signature OR cachet) at the given position
+ * and, if `imageUrl` resolves, fits the image inside preserving its ratio.
+ */
+async function renderHotelSignatureBox(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  titleSpace: number,
+  title: string,
+  imageUrl: string,
+): Promise<void> {
+  doc.setDrawColor(...PDF_COLORS.secondary);
+  doc.setLineWidth(0.35);
+  doc.roundedRect(x, y, width, height, 2, 2, "D");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...PDF_COLORS.primary);
+  doc.text(title, x + width / 2, y + 5, { align: "center" });
+
+  try {
+    const data = await imageData(imageUrl);
+    const properties = doc.getImageProperties(data);
+    const ratio = properties.width / properties.height;
+    const padding = 2;
+    const maxW = width - padding * 2;
+    const maxH = height - titleSpace - padding * 2;
+    let w = maxW;
+    let h = w / ratio;
+    if (h > maxH) {
+      h = maxH;
+      w = h * ratio;
+    }
+    doc.addImage(
+      data,
+      properties.fileType || "PNG",
+      x + (width - w) / 2,
+      y + titleSpace + (height - titleSpace - h) / 2,
+      w,
+      h,
+    );
+  } catch (error) {
+    console.warn("Signature/cachet PDF indisponible.", error);
+  }
+}
+
 export async function renderHotelDocumentFooter(doc: jsPDF, options: HotelFooterOptions): Promise<void> {
-  const { tenant, signatureUrl } = options;
+  const { tenant, signatureUrl, stampUrl } = options;
   const thankYouMessage = options.thankYouMessage ?? "Merci de votre confiance.";
   const width = HOTEL_PAGE_WIDTH;
   const height = doc.internal.pageSize.getHeight();
@@ -793,48 +842,67 @@ export async function renderHotelDocumentFooter(doc: jsPDF, options: HotelFooter
   });
   const leftBottom = contactLines.length ? contactY - 4.4 : contentY;
 
+  const hasSignature = Boolean(signatureUrl);
+  const hasStamp = Boolean(stampUrl);
   const boxWidth = 52;
   const boxHeight = 23;
   const boxX = width - margin - boxWidth;
   const boxY = contentY - 4;
   const titleSpace = 6.5;
-  doc.setDrawColor(...PDF_COLORS.secondary);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2, 2, "D");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...PDF_COLORS.primary);
-  doc.text("SIGNATURE ET CACHET", boxX + boxWidth / 2, boxY + 5, { align: "center" });
 
-  if (signatureUrl) {
-    try {
-      const data = await imageData(signatureUrl);
-      const properties = doc.getImageProperties(data);
-      const ratio = properties.width / properties.height;
-      const padding = 2;
-      const maxW = boxWidth - padding * 2;
-      const maxH = boxHeight - titleSpace - padding * 2;
-      let w = maxW;
-      let h = w / ratio;
-      if (h > maxH) {
-        h = maxH;
-        w = h * ratio;
-      }
-      doc.addImage(
-        data,
-        properties.fileType || "PNG",
-        boxX + (boxWidth - w) / 2,
-        boxY + titleSpace + (boxHeight - titleSpace - h) / 2,
-        w,
-        h,
-      );
-    } catch (error) {
-      console.warn("Signature/cachet PDF indisponible.", error);
-    }
+  let boxBottom = leftBottom;
+  if (hasSignature && hasStamp) {
+    const gap = 2;
+    const halfWidth = (boxWidth - gap) / 2;
+    await renderHotelSignatureBox(
+      doc,
+      boxX,
+      boxY,
+      halfWidth,
+      boxHeight,
+      titleSpace,
+      "SIGNATURE",
+      signatureUrl!,
+    );
+    await renderHotelSignatureBox(
+      doc,
+      boxX + halfWidth + gap,
+      boxY,
+      halfWidth,
+      boxHeight,
+      titleSpace,
+      "CACHET",
+      stampUrl!,
+    );
+    boxBottom = boxY + boxHeight;
+  } else if (hasSignature) {
+    await renderHotelSignatureBox(
+      doc,
+      boxX,
+      boxY,
+      boxWidth,
+      boxHeight,
+      titleSpace,
+      "SIGNATURE",
+      signatureUrl!,
+    );
+    boxBottom = boxY + boxHeight;
+  } else if (hasStamp) {
+    await renderHotelSignatureBox(
+      doc,
+      boxX,
+      boxY,
+      boxWidth,
+      boxHeight,
+      titleSpace,
+      "CACHET",
+      stampUrl!,
+    );
+    boxBottom = boxY + boxHeight;
   }
 
   if (options.legalNotice ?? true) {
-    const blockBottom = Math.max(leftBottom, boxY + boxHeight);
+    const blockBottom = Math.max(leftBottom, boxBottom);
     const defaultLineY = height - 15;
     const lineY = Math.min(defaultLineY, blockBottom + 7);
     const bottomLineY = lineY + 5;
