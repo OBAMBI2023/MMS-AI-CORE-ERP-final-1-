@@ -663,6 +663,7 @@ export function renderHotelFinancialSummary(
   totals: HotelFinancialTotals,
   y: number,
   payments?: HotelPaymentHistoryRow[],
+  options?: { highlightGold?: boolean },
 ): number {
   const gap = 6;
   const hasHistory = payments !== undefined;
@@ -696,18 +697,26 @@ export function renderHotelFinancialSummary(
   doc.text("RÉSUMÉ", leftX + 8, y + 8.5);
 
   let rowY = y + 14;
+  const highlightGold = options?.highlightGold ?? false;
   const highlightColor = hotelStatusColor(totals.status);
   rows.forEach((row) => {
     if (row.kind === "highlight") {
-      doc.setFillColor(
-        highlightColor[0] + (255 - highlightColor[0]) * 0.85,
-        highlightColor[1] + (255 - highlightColor[1]) * 0.85,
-        highlightColor[2] + (255 - highlightColor[2]) * 0.85,
-      );
+      if (highlightGold) {
+        doc.setFillColor(...PDF_COLORS.secondary);
+      } else {
+        doc.setFillColor(
+          highlightColor[0] + (255 - highlightColor[0]) * 0.85,
+          highlightColor[1] + (255 - highlightColor[1]) * 0.85,
+          highlightColor[2] + (255 - highlightColor[2]) * 0.85,
+        );
+      }
       doc.roundedRect(leftX + 5, rowY - 5.5, leftWidth - 10, rowHeight + highlightExtra, 2, 2, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10.5);
-      doc.setTextColor(...highlightColor);
+      const highlightTextColor: [number, number, number] = highlightGold
+        ? [255, 255, 255]
+        : highlightColor;
+      doc.setTextColor(...highlightTextColor);
       doc.text(row.label, leftX + 8, rowY + 1.2);
       doc.text(row.value, leftX + leftWidth - 8, rowY + 1.2, { align: "right" });
       rowY += rowHeight + highlightExtra;
@@ -756,6 +765,14 @@ export type HotelFooterOptions = {
    * gold divider instead of the generic "document informatisé" disclaimer.
    */
   legalInfo?: { rccm?: string | null; taxNumber?: string | null; website?: string | null } | null;
+  /**
+   * Overrides the two lines shown by the generic disclaimer (only used when
+   * `legalInfo` isn't provided). Defaults to the "document informatisé"
+   * wording used by every document except the invoice.
+   */
+  disclaimerLines?: [string, string];
+  /** Set to false to omit the decorative badge next to the disclaimer text. Defaults to true. */
+  disclaimerBadge?: boolean;
 };
 
 /**
@@ -902,16 +919,22 @@ export async function renderHotelDocumentFooter(doc: jsPDF, options: HotelFooter
   }
 
   if (options.legalNotice ?? true) {
-    const blockBottom = Math.max(leftBottom, boxBottom);
-    const defaultLineY = height - 15;
-    const lineY = Math.min(defaultLineY, blockBottom + 7);
-    const bottomLineY = lineY + 5;
     const legalInfo = options.legalInfo;
     const legalInfoProvided = options.legalInfo !== undefined;
     const legalItems: Array<[HotelIconType, string]> = [];
     if (legalInfo?.rccm) legalItems.push(["shield", `RCCM : ${legalInfo.rccm}`]);
     if (legalInfo?.taxNumber) legalItems.push(["building", `N° Contribuable : ${legalInfo.taxNumber}`]);
     if (legalInfo?.website) legalItems.push(["globe", legalInfo.website]);
+    // The two-line disclaimer needs more clearance below the gold rule than
+    // the single-line legalItems row, or its first line's ascent collides
+    // with the rule. Reserve 4mm more at the bottom for it specifically so
+    // the block still ends at its usual distance from the page edge instead
+    // of just pushing everything down.
+    const showsDisclaimer = !legalInfoProvided;
+    const blockBottom = Math.max(leftBottom, boxBottom);
+    const defaultLineY = height - (showsDisclaimer ? 19 : 15);
+    const lineY = Math.min(defaultLineY, blockBottom + 7);
+    const bottomLineY = lineY + 5;
 
     doc.setDrawColor(...PDF_COLORS.secondary);
     doc.setLineWidth(0.4);
@@ -938,14 +961,35 @@ export async function renderHotelDocumentFooter(doc: jsPDF, options: HotelFooter
           cursorX += sepGap;
         }
       });
-    } else if (!legalInfoProvided) {
-      drawHotelIcon(doc, "shield", margin + 3, bottomLineY - 2.5, 5.5, PDF_COLORS.primary);
+    } else if (showsDisclaimer) {
+      const [line1, line2] = options.disclaimerLines ?? [
+        "Ce document est informatisé et ne nécessite",
+        "aucune signature manuscrite.",
+      ];
+      const showBadge = options.disclaimerBadge ?? true;
+      // Clear, un-ambiguous gap under the rule: the first baseline sits 6mm
+      // below it (comfortably clearing the ~2mm font ascent, unlike the old
+      // 1mm gap that let the rule cut through the glyphs), then 4mm between
+      // the two lines, same as before.
+      const line1Y = lineY + 6;
+      const line2Y = line1Y + 4;
+      drawHotelIcon(doc, "shield", margin + 3, (line1Y + line2Y) / 2, 5.5, PDF_COLORS.primary);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(6.2);
       doc.setTextColor(...PDF_COLORS.muted);
-      doc.text("Ce document est informatisé et ne nécessite", margin + 8, bottomLineY - 4, { maxWidth: 78 });
-      doc.text("aucune signature manuscrite.", margin + 8, bottomLineY, { maxWidth: 78 });
-      drawHotelIcon(doc, "medal", width / 2, bottomLineY - 2, 6.5, [255, 255, 255], PDF_COLORS.secondary);
+      doc.text(line1, margin + 8, line1Y, { maxWidth: 78 });
+      doc.text(line2, margin + 8, line2Y, { maxWidth: 78 });
+      if (showBadge) {
+        drawHotelIcon(
+          doc,
+          "medal",
+          width / 2,
+          (line1Y + line2Y) / 2,
+          6.5,
+          [255, 255, 255],
+          PDF_COLORS.secondary,
+        );
+      }
     }
   }
 }

@@ -12,7 +12,6 @@ import {
   HOTEL_CONTENT_WIDTH,
   HOTEL_MARGIN,
   type HotelInvoiceItem,
-  type HotelPaymentHistoryRow,
 } from "./hotel-pdf-template";
 import { safeHotelPdfNumber } from "./hotel-pdf-values";
 import { formatMoney, reservationPaymentStatus } from "./hotel-reservation-pdf-values";
@@ -136,21 +135,34 @@ export async function createHotelInvoicePdf(
 
   const { subtotal, discount, grandTotal, paidTotal, balanceDue } = reservationFinancialSummary(invoice);
   const lastPaymentMethod = payments[0]?.method;
-  const historyRows: HotelPaymentHistoryRow[] = payments.map((payment) => ({
-    date: formatHotelPdfDate(payment.date),
-    amount: formatMoney(payment.amount),
-    method: hotelDocText(payment.method),
-    reference: hotelDocText(payment.reference, "—"),
-  }));
+  // Pas d'historique des paiements sur la facture (contrairement au détail de
+  // réservation interne) : en omettant `payments`, le RÉSUMÉ prend toute la
+  // largeur au lieu de partager la ligne avec une carte "Historique".
   y = renderHotelFinancialSummary(
     doc,
     { subtotal, discount, grandTotal, paidTotal, balanceDue, status, paymentMethod: lastPaymentMethod },
     y,
-    historyRows,
+    undefined,
+    { highlightGold: true },
   );
   ensureHotelFooterSpace(doc, y);
 
-  await renderHotelDocumentFooter(doc, { tenant, signatureUrl, stampUrl });
+  await renderHotelDocumentFooter(doc, {
+    tenant,
+    signatureUrl,
+    stampUrl,
+    // Sans indication explicite, le footer reste toujours épinglé en bas de
+    // page — laissant un grand vide au-dessus sur une facture courte (peu de
+    // prestations, pas d'historique). En passant la position réelle du
+    // contenu, le footer remonte automatiquement pour rester proche du
+    // résumé, sans jamais descendre plus bas que la position par défaut.
+    contentBottom: y + 10,
+    disclaimerLines: [
+      "Document généré électroniquement par l'établissement.",
+      "Ce document a une valeur administrative et comptable.",
+    ],
+    disclaimerBadge: false,
+  });
 
   return { doc, number: reference, filename: `facture-${reference}.pdf` };
 }

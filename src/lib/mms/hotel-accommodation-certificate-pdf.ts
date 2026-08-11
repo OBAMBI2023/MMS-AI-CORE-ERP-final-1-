@@ -88,53 +88,93 @@ function slugifyForFilename(value: string): string {
 
 /**
  * The accommodation certificate is always delivered before the guest's arrival (for visa/travel
- * formalities), so the wording is a single fixed future-tense attestation — it must never be
- * derived from today's date or the reservation's current status.
+ * formalities), so the wording is a fixed future-tense attestation — it must never be derived
+ * from today's date or the reservation's current status. Returned as separate paragraphs (rather
+ * than one fused sentence) so the closing "Fait pour servir..." line can get its own spacing.
  */
-function hotelCertificateStatementText(
+function hotelCertificateStatementParagraphs(
   data: HotelAccommodationCertificateData,
   tenant: PdfTenant,
   reservationRef: string,
-): string {
+): [string, string, string] {
   const hotelName = hotelDocText(tenant.companyName, "l’établissement");
   const guestName = hotelDocPersonName(data.guestName);
   const arrivalDate = formatHotelPdfDate(data.check_in);
   const departureDate = formatHotelPdfDate(data.check_out);
   const roomName = hotelDocText(data.roomNumber);
 
-  return (
+  return [
     `Nous soussignés, la Direction de ${hotelName}, certifions par la présente que ${guestName} ` +
-    `sera hébergé(e) dans notre établissement du ${arrivalDate} au ${departureDate}, dans le logement ` +
-    `${roomName}, conformément à la réservation ${reservationRef}. Le présent certificat d’hébergement ` +
-    `est délivré à l’intéressé(e) avant son arrivée afin de lui permettre d’accomplir les formalités ` +
-    `administratives nécessaires à son voyage et à son séjour, et pour servir et valoir ce que de droit.`
-  );
+      `sera hébergé(e) dans notre établissement, au ${roomName}, du ${arrivalDate} au ${departureDate}, ` +
+      `conformément à la réservation ${reservationRef}.`,
+    `Le présent certificat d’hébergement est délivré à l’intéressé(e), à sa demande, afin de lui ` +
+      `permettre d’accomplir les formalités administratives nécessaires à son voyage et à son séjour.`,
+    `Fait pour servir et valoir ce que de droit.`,
+  ];
 }
 
-/** Formal attestation paragraph, styled like the confirmation PDF's "Conditions de réservation" block. */
+const CERTIFICATE_STATEMENT_LINE_HEIGHT = 4.6;
+const CERTIFICATE_STATEMENT_PARAGRAPH_GAP = 3;
+const CERTIFICATE_STATEMENT_FINAL_GAP = 6;
+const CERTIFICATE_STATEMENT_PADDING_TOP = 8;
+const CERTIFICATE_STATEMENT_PADDING_BOTTOM = 7;
+
+function certificateStatementGapBefore(index: number, count: number): number {
+  if (index === 0) return 0;
+  return index === count - 1
+    ? CERTIFICATE_STATEMENT_FINAL_GAP
+    : CERTIFICATE_STATEMENT_PARAGRAPH_GAP;
+}
+
+/** Total card height for a given set of wrapped paragraphs — shared by the page-break check and the renderer so they can never drift apart. */
+function measureCertificateStatementHeight(
+  doc: jsPDF,
+  paragraphs: string[],
+  width: number,
+): number {
+  const innerWidth = width - 12;
+  const wrapped = paragraphs.map((paragraph) => doc.splitTextToSize(paragraph, innerWidth));
+  const bodyHeight = wrapped.reduce(
+    (sum, lines, index) =>
+      sum +
+      certificateStatementGapBefore(index, wrapped.length) +
+      lines.length * CERTIFICATE_STATEMENT_LINE_HEIGHT,
+    0,
+  );
+  return CERTIFICATE_STATEMENT_PADDING_TOP + bodyHeight + CERTIFICATE_STATEMENT_PADDING_BOTTOM;
+}
+
+/**
+ * Formal attestation paragraphs, shown directly under the Voyageur/Séjour cards with no
+ * intermediate title — just the administrative text itself, styled like the confirmation PDF's
+ * "Conditions de réservation" block (light card, gold left accent).
+ */
 function renderCertificateStatement(
   doc: jsPDF,
-  title: string,
-  text: string,
+  paragraphs: string[],
   x: number,
   y: number,
   width: number,
 ): number {
-  const lines = doc.splitTextToSize(text, width - 10);
-  const height = 12 + lines.length * 4.6;
+  const innerWidth = width - 12;
+  const height = measureCertificateStatementHeight(doc, paragraphs, width);
   doc.setDrawColor(...PDF_COLORS.line);
   doc.setFillColor(...PDF_COLORS.surface);
   doc.roundedRect(x, y, width, height, 2.5, 2.5, "FD");
   doc.setFillColor(...PDF_COLORS.secondary);
   doc.rect(x, y, 2, height, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(...PDF_COLORS.primary);
-  doc.text(title.toUpperCase(), x + 6, y + 7);
   doc.setFont("times", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...PDF_COLORS.text);
-  doc.text(lines, x + 6, y + 14, { lineHeightFactor: 1.5 });
+
+  const wrapped = paragraphs.map((paragraph) => doc.splitTextToSize(paragraph, innerWidth));
+  let cursorY = y + CERTIFICATE_STATEMENT_PADDING_TOP;
+  wrapped.forEach((lines, index) => {
+    cursorY += certificateStatementGapBefore(index, wrapped.length);
+    doc.text(lines, x + 6, cursorY, { lineHeightFactor: 1.5, maxWidth: innerWidth });
+    cursorY += lines.length * CERTIFICATE_STATEMENT_LINE_HEIGHT;
+  });
+
   return y + height;
 }
 
@@ -175,9 +215,12 @@ export async function createHotelAccommodationCertificatePdf(
   );
   const infoToStatementGap = 9;
 
-  const statementText = hotelCertificateStatementText(data, tenant, reservationRef);
-  const statementLines = doc.splitTextToSize(statementText, HOTEL_CONTENT_WIDTH - 10).length;
-  const statementHeight = 12 + statementLines * 4.6;
+  const statementParagraphs = hotelCertificateStatementParagraphs(data, tenant, reservationRef);
+  const statementHeight = measureCertificateStatementHeight(
+    doc,
+    statementParagraphs,
+    HOTEL_CONTENT_WIDTH,
+  );
 
   let y = headerBottom;
   const guestBottom = renderHotelInfoBlock(
@@ -223,14 +266,7 @@ export async function createHotelAccommodationCertificatePdf(
   y = Math.max(guestBottom, stayBottom) + infoToStatementGap;
   y = ensureHotelFooterSpace(doc, y, 46 + statementHeight);
 
-  renderCertificateStatement(
-    doc,
-    "Formule officielle",
-    statementText,
-    HOTEL_MARGIN,
-    y,
-    HOTEL_CONTENT_WIDTH,
-  );
+  renderCertificateStatement(doc, statementParagraphs, HOTEL_MARGIN, y, HOTEL_CONTENT_WIDTH);
 
   // No contentBottom override: the signature/cachet block, the "Merci de votre confiance" contact
   // block, and the discreet RCCM line stay anchored to their default near-bottom position (like the

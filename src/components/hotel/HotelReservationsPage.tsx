@@ -210,6 +210,16 @@ export function HotelReservationsPage() {
         },
         refresh,
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "hotel_reservation_payments",
+          filter: `tenant_id=eq.${profile.tenant_id}`,
+        },
+        refresh,
+      )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
