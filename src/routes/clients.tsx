@@ -10,6 +10,7 @@ import {
   type MobileCardActions,
 } from "@/components/mms/ResourceTable";
 import { ResourceCard, type ResourceCardDetail, type ResourceCardMenuAction } from "@/components/mms/ResourceCard";
+import { ResourceSummaryBar } from "@/components/mms/ResourceSummaryBar";
 import {
   DataExportMenu,
   exportRowsToPdf,
@@ -190,10 +191,18 @@ export const Route = createFileRoute("/clients")({
 function ClientsPage() {
   const canExport = useActionPermission("clients.export");
   const { settings, logoUrl, companyName } = useCompanySettings();
+  const [summary, setSummary] = useState({ search: "", count: 0, page: 1, pageSize: 20 });
 
   return (
     <AppShell title="Clients" subtitle="Répertoire de vos clients">
       <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
+        <ResourceSummaryBar
+          count={summary.count}
+          page={summary.page}
+          pageSize={summary.pageSize}
+          itemLabelSingular="client"
+          itemLabelPlural="clients"
+        />
         <ResourceTable<Client>
           table="clients"
           singular="Client"
@@ -201,6 +210,7 @@ function ClientsPage() {
           fields={fields}
           columns={columns}
           searchFields={["name", "phone", "email"]}
+          onServerSummaryChange={setSummary}
           orderBy={{ column: "created_at", ascending: false }}
           deletePermission="clients.delete"
           entityName="clients"

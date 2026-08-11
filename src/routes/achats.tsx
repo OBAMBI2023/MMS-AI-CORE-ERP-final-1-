@@ -23,6 +23,7 @@ import {
 import { AppShell } from "@/components/mms/AppShell";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { PremiumResourceList, type MobileSort } from "@/components/mms/PremiumResourceList";
+import { ResourceSummaryBar } from "@/components/mms/ResourceSummaryBar";
 import { usePaginatedTable, useDebouncedValue, fetchAllMatching } from "@/hooks/use-paginated-table";
 import { ResourceCard, type ResourceCardDetail, type ResourceCardMenuAction } from "@/components/mms/ResourceCard";
 import {
@@ -225,6 +226,29 @@ function AchatCard({
   );
 }
 
+/**
+ * Total amount matching the current search, computed entirely in Postgres
+ * via the `achats_summary` RPC (COUNT + SUM in one aggregate query) — never
+ * loads a single achat row just to render this total. Tenant scoping comes
+ * from current_tenant_id() inside the function itself, the same as this
+ * page's own RLS, not from a client param.
+ */
+function useAchatsTotalAmount(search: string) {
+  const { profile } = useTenant();
+  const tenantId = profile?.tenant_id;
+  return useQuery({
+    queryKey: ["achats", "summary-total", tenantId, search],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("achats_summary", {
+        p_search: search || undefined,
+      });
+      if (error) throw error;
+      return Number(data?.[0]?.total ?? 0);
+    },
+    enabled: Boolean(tenantId),
+  });
+}
+
 function AchatsPage() {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
@@ -269,6 +293,7 @@ function AchatsPage() {
   const data = listQuery.data?.rows ?? [];
   const totalCount = listQuery.data?.count ?? 0;
   const isLoading = listQuery.isLoading;
+  const totalAmountQuery = useAchatsTotalAmount(debouncedQ);
 
   const { data: lineCounts = {} } = useQuery({
     queryKey: ["achat_items_counts", tenantId],
@@ -329,6 +354,15 @@ function AchatsPage() {
   return (
     <AppShell title="Achats" subtitle="Approvisionnements et commandes fournisseurs">
       <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
+        <ResourceSummaryBar
+          count={totalCount}
+          page={page}
+          pageSize={pageSize}
+          itemLabelSingular="achat"
+          itemLabelPlural="achats"
+          total={totalAmountQuery.data ?? 0}
+          totalLoading={totalAmountQuery.isLoading}
+        />
         <PremiumResourceList<Achat>
           items={data}
           isLoading={isLoading}

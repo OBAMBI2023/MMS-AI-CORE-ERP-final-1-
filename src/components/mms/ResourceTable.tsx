@@ -151,6 +151,19 @@ export interface ResourceTableProps<T extends { id: string }> {
   /** Columns fetched server-side when `serverPaginated` is on. Defaults to
    * "*" (unchanged from the full-fetch behavior). */
   serverSelectColumns?: string;
+  /**
+   * Opt-in: called whenever the server-paginated result changes (only when
+   * `serverPaginated` is on) with the exact debounced search term and total
+   * row count the table itself is using, so a parent page can build a
+   * "N results" summary without duplicating the search/filter state or
+   * re-querying for a count that already exists here.
+   */
+  onServerSummaryChange?: (info: {
+    search: string;
+    count: number;
+    page: number;
+    pageSize: number;
+  }) => void;
 }
 
 type MobileSort = "default" | "name-asc" | "name-desc" | "recent" | "oldest";
@@ -197,6 +210,7 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
     serverPageSize = 20,
     serverFilters = [],
     serverSelectColumns = "*",
+    onServerSummaryChange,
   } = props;
   const hasMobileCards = Boolean(renderMobileCard);
   const useUnifiedCards = hasMobileCards && premiumLayout;
@@ -262,6 +276,24 @@ export function ResourceTable<T extends { id: string; [k: string]: unknown }>(
   const data = serverPaginated ? (serverQuery.data?.rows ?? []) : fullData;
   const isLoading = serverPaginated ? serverQuery.isLoading : fullLoading;
   const serverTotalCount = serverQuery.data?.count ?? 0;
+
+  useEffect(() => {
+    if (!serverPaginated || !onServerSummaryChange || serverQuery.data === undefined) return;
+    onServerSummaryChange({
+      search: debouncedQ,
+      count: serverTotalCount,
+      page: serverPage,
+      pageSize: serverPageSize,
+    });
+  }, [
+    serverPaginated,
+    onServerSummaryChange,
+    serverQuery.data,
+    debouncedQ,
+    serverTotalCount,
+    serverPage,
+    serverPageSize,
+  ]);
 
   const filtered = useMemo(() => {
     if (serverPaginated) return data;

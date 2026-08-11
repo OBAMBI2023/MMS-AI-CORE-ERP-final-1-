@@ -18,6 +18,7 @@ import {
 import { AppShell } from "@/components/mms/AppShell";
 import { LineItemsDialog } from "@/components/mms/LineItemsDialog";
 import { PremiumResourceList, type MobileSort } from "@/components/mms/PremiumResourceList";
+import { ResourceSummaryBar } from "@/components/mms/ResourceSummaryBar";
 import { usePaginatedTable, useDebouncedValue } from "@/hooks/use-paginated-table";
 import { ResourceCard, type ResourceCardDetail, type ResourceCardFooterAction } from "@/components/mms/ResourceCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -240,6 +241,29 @@ function DevisCard({
   );
 }
 
+/**
+ * Total amount matching the current search, computed entirely in Postgres
+ * via the `devis_summary` RPC (COUNT + SUM in one aggregate query) — never
+ * loads a single devis row just to render this total. Tenant scoping comes
+ * from current_tenant_id() inside the function itself, the same as this
+ * page's own RLS, not from a client param.
+ */
+function useDevisTotalAmount(search: string) {
+  const { profile } = useTenant();
+  const tenantId = profile?.tenant_id;
+  return useQuery({
+    queryKey: ["devis", "summary-total", tenantId, search],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("devis_summary", {
+        p_search: search || undefined,
+      });
+      if (error) throw error;
+      return Number(data?.[0]?.total ?? 0);
+    },
+    enabled: Boolean(tenantId),
+  });
+}
+
 function DevisPage() {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
@@ -342,6 +366,7 @@ function DevisPage() {
   const data = listQuery.data?.rows ?? [];
   const totalCount = listQuery.data?.count ?? 0;
   const isLoading = listQuery.isLoading;
+  const totalAmountQuery = useDevisTotalAmount(debouncedQ);
 
   const del = useMutation({
     mutationFn: async (devis: Devis) => {
@@ -369,6 +394,16 @@ function DevisPage() {
   return (
     <AppShell title="Devis" subtitle="Propositions commerciales et suivi">
       <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
+        <ResourceSummaryBar
+          count={totalCount}
+          page={page}
+          pageSize={pageSize}
+          itemLabelSingular="devis"
+          itemLabelPlural="devis"
+          totalLabel="Montant total"
+          total={totalAmountQuery.data ?? 0}
+          totalLoading={totalAmountQuery.isLoading}
+        />
         <PremiumResourceList<Devis>
           items={data}
           isLoading={isLoading}

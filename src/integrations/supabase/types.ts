@@ -4403,6 +4403,13 @@ export type Database = {
       }
     }
     Functions: {
+      achats_summary: {
+        Args: { p_search?: string }
+        Returns: {
+          count: number
+          total: number
+        }[]
+      }
       activate_invited_tenant_after_password: { Args: never; Returns: Json }
       activate_partner_tenant: {
         Args: { requested_actor_id: string; requested_tenant_id: string }
@@ -4718,6 +4725,20 @@ export type Database = {
       delete_tenant_postgres_data_core: {
         Args: { requested_actor_id: string; requested_job_id: string }
         Returns: undefined
+      }
+      depenses_summary: {
+        Args: { p_search?: string }
+        Returns: {
+          count: number
+          total: number
+        }[]
+      }
+      devis_summary: {
+        Args: { p_search?: string }
+        Returns: {
+          count: number
+          total: number
+        }[]
       }
       expire_due_module_subscriptions: {
         Args: { p_module_code?: string }
