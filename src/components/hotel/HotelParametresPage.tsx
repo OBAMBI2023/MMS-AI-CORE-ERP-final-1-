@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   Clock,
+  ClipboardList,
   Receipt,
   Wallet,
   Users,
@@ -10,6 +11,7 @@ import {
   Loader2,
   Upload,
   Trash2,
+  Shield,
   ShieldAlert,
   ImageIcon,
   FileSignature,
@@ -17,6 +19,8 @@ import {
 import { toast } from "sonner";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { HotelUsersAccessTab } from "@/components/hotel/HotelUsersAccessTab";
+import { HotelSecurityTab } from "@/components/hotel/HotelSecurityTab";
+import { HotelAuditLogTab } from "@/components/hotel/HotelAuditLogTab";
 import { Section } from "@/components/hotel/HotelSettingsUi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -235,6 +239,12 @@ export function HotelParametresPage() {
                 Utilisateurs & accès
               </TabTrig>
             )}
+            <TabTrig value="security" icon={<Shield className="h-4 w-4" />}>
+              Sécurité
+            </TabTrig>
+            <TabTrig value="audit" icon={<ClipboardList className="h-4 w-4" />}>
+              Journal d'audit
+            </TabTrig>
           </TabsList>
 
           <TabsContent value="general">
@@ -274,6 +284,14 @@ export function HotelParametresPage() {
               <HotelUsersAccessTab />
             </TabsContent>
           )}
+
+          <TabsContent value="security">
+            <HotelSecurityTab />
+          </TabsContent>
+
+          <TabsContent value="audit">
+            <HotelAuditLogTab />
+          </TabsContent>
         </Tabs>
       )}
     </HotelAppShell>
