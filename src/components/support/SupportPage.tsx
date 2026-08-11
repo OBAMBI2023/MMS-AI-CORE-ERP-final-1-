@@ -1,19 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
   ExternalLink,
+  Flag,
   LifeBuoy,
   Loader2,
   Paperclip,
   Plus,
   RotateCcw,
   Send,
+  Tag,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/mms/AppShell";
 import { HotelAppShell } from "@/components/hotel/HotelAppShell";
 import { ImageField } from "@/components/hotel/HotelImageField";
+import { supabase } from "@/integrations/supabase/client";
+import { generateSafeId } from "@/lib/uuid";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -263,6 +268,132 @@ function MessageComposer({ ticketId }: { ticketId: string }) {
   );
 }
 
+const MESSAGE_MAX_LENGTH = 1000;
+const ATTACHMENT_MAX_SIZE = 10 * 1024 * 1024;
+const ATTACHMENT_ACCEPT =
+  "image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,text/plain";
+const ATTACHMENT_ALLOWED_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.oasis.opendocument.text",
+  "text/plain",
+];
+
+function isAllowedAttachment(file: File) {
+  return file.type.startsWith("image/") || ATTACHMENT_ALLOWED_TYPES.includes(file.type);
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+type Attachment = { path: string; name: string | null; size: number | null };
+const EMPTY_ATTACHMENT: Attachment = { path: "", name: null, size: null };
+
+function TicketAttachmentField({
+  attachment,
+  onChange,
+}: {
+  attachment: Attachment;
+  onChange: (next: Attachment) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { profile } = useTenant();
+  const [uploading, setUploading] = useState(false);
+
+  const select = async (file?: File) => {
+    if (!file) return;
+    if (!isAllowedAttachment(file)) {
+      toast.error("Formats acceptés : images, PDF ou documents (Word, texte).");
+      return;
+    }
+    if (file.size > ATTACHMENT_MAX_SIZE) {
+      toast.error("Le fichier ne doit pas dépasser 10 Mo.");
+      return;
+    }
+    if (!profile?.tenant_id) {
+      toast.error("Établissement introuvable.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const extension = file.name.split(".").pop()?.toLowerCase() || "bin";
+      const path = `${profile.tenant_id}/attachments/${generateSafeId()}.${extension}`;
+      const { error } = await supabase.storage
+        .from("support-attachments")
+        .upload(path, file, { contentType: file.type });
+      if (error) throw error;
+      onChange({ path, name: file.name, size: file.size });
+    } catch {
+      toast.error("Impossible de joindre ce fichier. Veuillez réessayer.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (attachment.path) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 px-3 py-2.5 text-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <Paperclip className="size-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0">
+            <p className="truncate font-medium">
+              {attachment.name ?? attachment.path.split("/").pop()}
+            </p>
+            {attachment.size != null && (
+              <p className="text-[11px] text-muted-foreground">{formatFileSize(attachment.size)}</p>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(EMPTY_ATTACHMENT)}
+          className="shrink-0 rounded-lg p-1.5 text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
+          aria-label="Supprimer la pièce jointe"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        disabled={uploading}
+        onClick={() => fileRef.current?.click()}
+        className="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-primary/40 bg-primary/[0.03] px-3 py-5 text-center transition-colors hover:border-primary/60 hover:bg-primary/5 disabled:opacity-50"
+      >
+        {uploading ? (
+          <Loader2 className="size-5 animate-spin text-primary" />
+        ) : (
+          <Paperclip className="size-5 text-primary" />
+        )}
+        <span className="text-sm font-medium text-foreground">
+          {uploading ? "Envoi…" : "Joindre un fichier"}
+        </span>
+        <span className="text-[11px] text-muted-foreground">
+          Images, PDF, Word, texte • Max. 10 Mo
+        </span>
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept={ATTACHMENT_ACCEPT}
+        className="sr-only"
+        onChange={(e) => {
+          void select(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
 function NewTicketDialog({
   open,
   onOpenChange,
@@ -270,11 +401,14 @@ function NewTicketDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { tenant } = useTenant();
+  const isHotel = tenant?.platform_type === "HOTEL";
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<SupportCategory>(SUPPORT_CATEGORIES[0]);
   const [priority, setPriority] = useState<SupportPriority>("normal");
   const [message, setMessage] = useState("");
-  const [attachmentPath, setAttachmentPath] = useState("");
+  const [attachment, setAttachment] = useState<Attachment>(EMPTY_ATTACHMENT);
+  const [errors, setErrors] = useState<{ subject?: string; message?: string }>({});
   const create = useCreateSupportTicket();
 
   const reset = () => {
@@ -282,22 +416,25 @@ function NewTicketDialog({
     setCategory(SUPPORT_CATEGORIES[0]);
     setPriority("normal");
     setMessage("");
-    setAttachmentPath("");
+    setAttachment(EMPTY_ATTACHMENT);
+    setErrors({});
   };
 
   const submit = async () => {
-    if (!subject.trim() || !message.trim()) {
-      toast.error("Le sujet et le message sont obligatoires.");
-      return;
-    }
+    const nextErrors: { subject?: string; message?: string } = {};
+    if (!subject.trim()) nextErrors.subject = "Le sujet est obligatoire.";
+    if (!message.trim()) nextErrors.message = "Le message est obligatoire.";
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     try {
       await create.mutateAsync({
         subject: subject.trim(),
         category,
         priority,
         message: message.trim(),
-        attachmentPath: attachmentPath || null,
-        attachmentName: attachmentPath ? attachmentPath.split("/").pop() : null,
+        attachmentPath: attachment.path || null,
+        attachmentName: attachment.name,
       });
       toast.success("Ticket créé. Notre équipe vous répondra rapidement.");
       reset();
@@ -315,30 +452,50 @@ function NewTicketDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle>Nouveau ticket</DialogTitle>
-          <DialogDescription>
+      <DialogContent
+        className={cn(
+          "flex w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:w-full sm:max-w-[760px]",
+          "max-h-[92dvh] sm:max-h-[90dvh]",
+          isHotel && "hotel-theme",
+        )}
+      >
+        <DialogHeader className="items-center gap-1.5 border-b px-6 py-5 text-center sm:text-center">
+          <div className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <LifeBuoy className="size-6" />
+          </div>
+          <DialogTitle className="text-center text-xl font-bold">Nouveau ticket</DialogTitle>
+          <DialogDescription className="text-center">
             Décrivez votre demande, l'équipe SAOVIA vous répondra directement ici.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+
+        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
           <div>
             <Label className="mb-1.5 block">Sujet</Label>
             <Input
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) => {
+                setSubject(e.target.value);
+                if (errors.subject) setErrors((prev) => ({ ...prev, subject: undefined }));
+              }}
               placeholder="Ex : Impossible d'exporter mes rapports"
               className="h-11"
+              aria-invalid={Boolean(errors.subject)}
               autoFocus
             />
+            {errors.subject && (
+              <p className="mt-1.5 text-xs text-destructive">{errors.subject}</p>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label className="mb-1.5 block">Catégorie</Label>
               <Select value={category} onValueChange={(v) => setCategory(v as SupportCategory)}>
                 <SelectTrigger className="h-11">
-                  <SelectValue />
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <Tag className="size-4 shrink-0 text-muted-foreground" />
+                    <SelectValue />
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   {SUPPORT_CATEGORIES.map((c) => (
@@ -353,7 +510,10 @@ function NewTicketDialog({
               <Label className="mb-1.5 block">Priorité</Label>
               <Select value={priority} onValueChange={(v) => setPriority(v as SupportPriority)}>
                 <SelectTrigger className="h-11">
-                  <SelectValue />
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <Flag className="size-4 shrink-0 text-muted-foreground" />
+                    <SelectValue />
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   {PRIORITY_OPTIONS.map((p) => (
@@ -369,26 +529,47 @@ function NewTicketDialog({
             <Label className="mb-1.5 block">Message</Label>
             <Textarea
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value.slice(0, MESSAGE_MAX_LENGTH));
+                if (errors.message) setErrors((prev) => ({ ...prev, message: undefined }));
+              }}
               rows={5}
+              maxLength={MESSAGE_MAX_LENGTH}
               placeholder="Décrivez votre demande en détail…"
+              aria-invalid={Boolean(errors.message)}
             />
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              {errors.message ? (
+                <p className="text-xs text-destructive">{errors.message}</p>
+              ) : (
+                <span />
+              )}
+              <span className="shrink-0 text-[11px] text-muted-foreground">
+                {message.length}/{MESSAGE_MAX_LENGTH}
+              </span>
+            </div>
           </div>
           <div>
             <Label className="mb-1.5 block">Pièce jointe (optionnel)</Label>
-            <ImageField
-              value={attachmentPath}
-              onChange={setAttachmentPath}
-              storage={{ bucket: "support-attachments", folder: "attachments" }}
-            />
+            <TicketAttachmentField attachment={attachment} onChange={setAttachment} />
           </div>
         </div>
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+
+        <DialogFooter className="border-t px-6 py-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="border-primary text-primary hover:bg-primary/5 hover:text-primary"
+            onClick={() => onOpenChange(false)}
+          >
             Annuler
           </Button>
           <Button type="button" onClick={() => void submit()} disabled={create.isPending}>
-            {create.isPending && <Loader2 className="size-4 animate-spin" />}
+            {create.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
             Créer le ticket
           </Button>
         </DialogFooter>
