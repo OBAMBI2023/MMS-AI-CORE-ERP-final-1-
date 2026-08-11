@@ -11,7 +11,7 @@ import {
   BarChart3,
   Settings,
   Wrench,
-  LifeBuoy,
+  MessageCircle,
 } from "lucide-react";
 
 export type HotelNavItem = {
@@ -31,7 +31,7 @@ export const HOTEL_NAV_ITEMS: HotelNavItem[] = [
   { icon: ReceiptText, label: "Dépenses", to: "/hotel/depenses" },
   { icon: BarChart3, label: "Rapports", to: "/hotel/rapports" },
   { icon: Wrench, label: "Prestataires", to: "/hotel/maintenance" },
-  { icon: LifeBuoy, label: "Support", to: "/support" },
+  { icon: MessageCircle, label: "Support", to: "/support" },
   { icon: Settings, label: "Paramètres", to: "/hotel/parametres" },
 ];
 

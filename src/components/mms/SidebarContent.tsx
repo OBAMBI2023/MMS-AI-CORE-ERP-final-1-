@@ -14,7 +14,7 @@ import {
   Boxes,
   Tags,
   Bot,
-  LifeBuoy,
+  MessageCircle,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -39,7 +39,7 @@ const items = [
   { icon: Handshake, label: "Fournisseurs", to: "/fournisseurs" },
   { icon: Receipt, label: "Dépenses", to: "/depenses" },
   { icon: TrendingUp, label: "Rapports", to: "/rapports" },
-  { icon: LifeBuoy, label: "Support", to: "/support" },
+  { icon: MessageCircle, label: "Support", to: "/support" },
   { icon: Settings, label: "Paramètres", to: "/parametres" },
 ] as const;
 
