@@ -6,11 +6,12 @@ import {
   hotelDocPersonName,
   hotelDocText,
   hotelInfoBlockHeight,
-  renderHotelDocumentFooter,
   renderHotelDocumentHeader,
   renderHotelInfoBlock,
+  renderHotelSignatureBox,
   HOTEL_CONTENT_WIDTH,
   HOTEL_MARGIN,
+  HOTEL_PAGE_WIDTH,
 } from "./hotel-pdf-template";
 import { safeHotelPdfNumber } from "./hotel-pdf-values";
 
@@ -178,6 +179,124 @@ function renderCertificateStatement(
   return y + height;
 }
 
+/**
+ * Certificate-only footer: "Fait à {ville}, le {date}." + "Pour la Direction de {hôtel}." on
+ * the left, Signature/Cachet side by side on the right, a thin gold rule, then a compact
+ * administrative strip (reception contact, "document établi électroniquement"). Deliberately
+ * not the shared `renderHotelDocumentFooter` — this wording/structure ("Fait à/le", an
+ * authority line, no "Merci de votre confiance") is specific to the certificate and would only
+ * complicate the shared helper's options for no benefit to the other three documents, which
+ * keep using it unchanged.
+ */
+async function renderCertificateFooter(
+  doc: jsPDF,
+  params: {
+    tenant: PdfTenant;
+    city: string | null;
+    issueDate: string;
+    signatureUrl?: string | null;
+    stampUrl?: string | null;
+  },
+): Promise<void> {
+  const { tenant, city, issueDate, signatureUrl, stampUrl } = params;
+  const width = HOTEL_PAGE_WIDTH;
+  const height = doc.internal.pageSize.getHeight();
+  const margin = HOTEL_MARGIN;
+
+  const hasSignature = Boolean(signatureUrl);
+  const hasStamp = Boolean(stampUrl);
+  const boxWidth = 52;
+  const boxHeight = 23;
+  const boxX = width - margin - boxWidth;
+  const titleSpace = 6.5;
+
+  // Fixed 58mm bottom reserve: comfortably fits the two-tier layout (identity band + gold
+  // rule + contact/legal strip) with a clear margin from the page edge — every gap below is
+  // deliberately generous after the earlier "gold rule cuts through the text" bug.
+  const topY = height - 58;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...PDF_COLORS.text);
+  const madeAtLabel = city ? `Fait à ${city}, le ${issueDate}.` : `Fait le ${issueDate}.`;
+  doc.text(madeAtLabel, margin, topY + 5, { maxWidth: boxX - margin - 8 });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.6);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.text(
+    `Pour la Direction de ${hotelDocText(tenant.companyName, "l’établissement")}.`,
+    margin,
+    topY + 11,
+    { maxWidth: boxX - margin - 8 },
+  );
+
+  let boxBottom = topY + 14;
+  if (hasSignature && hasStamp) {
+    const boxGap = 2;
+    const halfWidth = (boxWidth - boxGap) / 2;
+    await renderHotelSignatureBox(
+      doc,
+      boxX,
+      topY,
+      halfWidth,
+      boxHeight,
+      titleSpace,
+      "SIGNATURE",
+      signatureUrl!,
+    );
+    await renderHotelSignatureBox(
+      doc,
+      boxX + halfWidth + boxGap,
+      topY,
+      halfWidth,
+      boxHeight,
+      titleSpace,
+      "CACHET",
+      stampUrl!,
+    );
+    boxBottom = topY + boxHeight;
+  } else if (hasSignature) {
+    await renderHotelSignatureBox(
+      doc,
+      boxX,
+      topY,
+      boxWidth,
+      boxHeight,
+      titleSpace,
+      "SIGNATURE",
+      signatureUrl!,
+    );
+    boxBottom = topY + boxHeight;
+  } else if (hasStamp) {
+    await renderHotelSignatureBox(doc, boxX, topY, boxWidth, boxHeight, titleSpace, "CACHET", stampUrl!);
+    boxBottom = topY + boxHeight;
+  }
+
+  const lineY = Math.max(topY + 14, boxBottom) + 6;
+  doc.setDrawColor(...PDF_COLORS.secondary);
+  doc.setLineWidth(0.4);
+  doc.line(margin, lineY, width - margin, lineY);
+
+  const contactValues = [tenant.phone, tenant.email].filter(
+    (value): value is string => Boolean(value && value.trim()),
+  );
+  const contactLine = contactValues.length ? `Réception : ${contactValues.join(" · ")}` : null;
+
+  let textY = lineY + 6;
+  doc.setFont("helvetica", "normal");
+  if (contactLine) {
+    doc.setFontSize(7);
+    doc.setTextColor(...PDF_COLORS.muted);
+    doc.text(contactLine, width / 2, textY, { align: "center" });
+    textY += 4.4;
+  }
+  doc.setFontSize(6.4);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.text("Document établi électroniquement par l’établissement.", width / 2, textY, {
+    align: "center",
+  });
+}
+
 /** "Certificat d'hébergement" — attestation officielle pré-arrivée remise au voyageur. */
 export async function createHotelAccommodationCertificatePdf(
   data: HotelAccommodationCertificateData,
@@ -264,23 +383,18 @@ export async function createHotelAccommodationCertificatePdf(
   );
 
   y = Math.max(guestBottom, stayBottom) + infoToStatementGap;
-  y = ensureHotelFooterSpace(doc, y, 46 + statementHeight);
+  // 58mm reserve matches renderCertificateFooter's own fixed bottom band, so a long statement
+  // never gets pinned so low it collides with the footer instead of flowing to a new page.
+  y = ensureHotelFooterSpace(doc, y, 58 + statementHeight);
 
   renderCertificateStatement(doc, statementParagraphs, HOTEL_MARGIN, y, HOTEL_CONTENT_WIDTH);
 
-  // No contentBottom override: the signature/cachet block, the "Merci de votre confiance" contact
-  // block, and the discreet RCCM line stay anchored to their default near-bottom position (like the
-  // invoice's footer) instead of trailing tightly behind the statement text.
-  await renderHotelDocumentFooter(doc, {
+  await renderCertificateFooter(doc, {
     tenant,
+    city: (rawSettings?.city as string | null) ?? null,
+    issueDate,
     signatureUrl,
     stampUrl,
-    thankYouMessage: "Merci de votre confiance.",
-    legalInfo: {
-      rccm: (rawSettings?.rccm as string | null) ?? null,
-      taxNumber: (rawSettings?.tax_number as string | null) ?? null,
-      website: tenant.website ?? null,
-    },
   });
 
   const filename = `certificat-hebergement-${slugifyForFilename(data.guestName)}-${reservationRef}.pdf`;

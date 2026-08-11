@@ -31,6 +31,7 @@ import {
   AtSign,
   Mail,
   Lock,
+  type LucideIcon,
 } from "lucide-react";
 import { createUser, updateUser } from "@/lib/user-management.server";
 import { useTenant } from "@/providers/TenantProvider";
@@ -51,15 +52,27 @@ const fieldIconClass = "pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -t
 export function UserFormDialog({
   user,
   triggerClassName,
+  triggerLabel = "Nouvel utilisateur",
+  triggerIcon: TriggerIcon = Plus,
+  accent = "blue",
+  createTitle = "Nouvel utilisateur",
 }: {
   user?: any;
   triggerClassName?: string;
+  triggerLabel?: string;
+  triggerIcon?: LucideIcon;
+  /** "hotel" swaps the submit button's blue for the Hotel module's green/petrol accent. Defaults to the ERP blue everywhere else. */
+  accent?: "blue" | "hotel";
+  /** Dialog title shown when creating a user (not shown in edit mode, which always reads "Modifier l'utilisateur"). */
+  createTitle?: string;
 }) {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
   const [open, setOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const isEdit = !!user;
+  const submitButtonAccentClass =
+    accent === "hotel" ? "bg-primary hover:bg-primary/90" : "bg-[#2563EB] hover:bg-[#1D4ED8]";
 
   const [formData, setFormData] = useState({
     email: user?.username || "", // Assuming username is email based on current implementation
@@ -183,7 +196,7 @@ export function UserFormDialog({
           </button>
         ) : (
           <Button className={cn("bg-[#2563EB] hover:bg-[#1D4ED8]", triggerClassName)}>
-            <Plus className="mr-2 h-4 w-4" /> Nouvel utilisateur
+            <TriggerIcon className="mr-2 h-4 w-4" /> {triggerLabel}
           </Button>
         )}
       </DialogTrigger>
@@ -205,7 +218,7 @@ export function UserFormDialog({
             </div>
             <div className="min-w-0 text-left">
               <DialogTitle className="text-lg font-semibold text-gray-900">
-                {isEdit ? "Modifier l'utilisateur" : "Nouvel utilisateur"}
+                {isEdit ? "Modifier l'utilisateur" : createTitle}
               </DialogTitle>
               <p className="mt-0.5 text-sm text-gray-500">
                 {isEdit ? "Modifiez les informations du collaborateur." : "Ajoutez un collaborateur."}
@@ -399,7 +412,8 @@ export function UserFormDialog({
             <Button
               type="submit"
               className={cn(
-                "h-12 rounded-[12px] bg-[#2563EB] px-5 font-medium hover:bg-[#1D4ED8]",
+                "h-12 rounded-[12px] px-5 font-medium",
+                submitButtonAccentClass,
                 !isEdit && "w-full sm:w-auto",
               )}
               disabled={mutation.isPending}

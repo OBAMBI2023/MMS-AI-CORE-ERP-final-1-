@@ -52,26 +52,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { RecentConnections } from "@/components/mms/RecentConnections";
 // import { PermissionsTab } from "@/components/mms/PermissionsTab";
+import { BackupsPanel } from "@/components/mms/BackupsPanel";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTenant } from "@/providers/TenantProvider";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
-import { useTenantBackups, type TenantBackup } from "@/hooks/use-tenant-backups";
 import { useActionPermission } from "@/hooks/use-action-permission";
-import { BACKUP_MODULE_OPTIONS, BACKUP_MODULE_LABELS } from "@/lib/backup-modules";
+import { BACKUP_MODULE_OPTIONS } from "@/lib/backup-modules";
 import type { CatalogSettings } from "@/lib/catalog-settings";
 import { configureCurrency } from "@/lib/mms/format";
 
@@ -137,6 +127,11 @@ function ParametresPage() {
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
   const canViewBackups = useActionPermission("backup.view");
+  const backupModulesQuery = useTenantModules();
+  const enabledBackupModules = backupModulesQuery.data ?? new Set<string>();
+  const availableBackupModules = BACKUP_MODULE_OPTIONS.filter((m) =>
+    enabledBackupModules.has(m.code),
+  );
   const catalogSettingsQuery = useCatalogSettings();
   const AI_FIELD_NAMES = [
     "openai_key",
@@ -346,7 +341,15 @@ function ParametresPage() {
               </TabsContent>
               {canViewBackups && (
                 <TabsContent value="backups">
-                  <BackupsTab form={form} update={update} onSave={save.mutate} />
+                  <BackupsPanel
+                    permissionView="backup.view"
+                    permissionCreate="backup.create"
+                    form={form}
+                    update={(key, value) => update(key, value as never)}
+                    onSave={save.mutate}
+                    moduleOptions={availableBackupModules}
+                    moduleOptionsLoading={backupModulesQuery.isLoading}
+                  />
                 </TabsContent>
               )}
               <TabsContent value="integrations">
@@ -818,277 +821,6 @@ function DocumentsTab({
             onSave({ stamp_url: path });
           }}
         />
-      </Card>
-    </div>
-  );
-}
-
-const BACKUP_STATUS_LABELS: Record<string, string> = {
-  en_attente: "En attente",
-  en_cours: "En cours",
-  terminee: "Terminée",
-  echec: "Échec",
-};
-
-function BackupStatusBadge({ status }: { status: string }) {
-  if (status === "terminee") {
-    return (
-      <Badge variant="outline" className="gap-1.5 border-emerald-200 text-emerald-700">
-        <CheckCircle2 className="h-3.5 w-3.5" /> {BACKUP_STATUS_LABELS[status]}
-      </Badge>
-    );
-  }
-  if (status === "echec") {
-    return (
-      <Badge variant="destructive" className="gap-1.5">
-        <AlertCircle className="h-3.5 w-3.5" /> {BACKUP_STATUS_LABELS[status]}
-      </Badge>
-    );
-  }
-  if (status === "en_cours") {
-    return (
-      <Badge variant="secondary" className="gap-1.5">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" /> {BACKUP_STATUS_LABELS[status]}
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="outline" className="gap-1.5 text-amber-600">
-      <AlertCircle className="h-3.5 w-3.5" /> {BACKUP_STATUS_LABELS[status] ?? status}
-    </Badge>
-  );
-}
-
-function BackupDownloadButton({ backup }: { backup: TenantBackup }) {
-  const url = useSignedUrl(backup.storage_path, "backup-archives");
-  if (backup.status !== "terminee" || !backup.storage_path) return null;
-  return (
-    <Button variant="outline" size="sm" className="gap-1.5" disabled={!url} asChild={Boolean(url)}>
-      {url ? (
-        <a href={url} download>
-          <Download className="h-3.5 w-3.5" /> Télécharger
-        </a>
-      ) : (
-        <span>
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        </span>
-      )}
-    </Button>
-  );
-}
-
-function BackupsTab({
-  form,
-  update,
-  onSave,
-}: {
-  form: Partial<Parametres>;
-  update: <K extends keyof Parametres>(k: K, v: Parametres[K] | null) => void;
-  onSave: (patch: Partial<Parametres>) => void;
-}) {
-  const modulesQuery = useTenantModules();
-  const {
-    data: backups,
-    isLoading: backupsLoading,
-    createBackup,
-    retryBackup,
-  } = useTenantBackups();
-  const enabledModules = modulesQuery.data ?? new Set<string>();
-  const availableOptions = BACKUP_MODULE_OPTIONS.filter((m) => enabledModules.has(m.code));
-  const [selectedModules, setSelectedModules] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (availableOptions.length > 0 && selectedModules.length === 0) {
-      setSelectedModules(availableOptions.map((m) => m.code));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableOptions.length]);
-
-  const isRunning = (backups ?? []).some(
-    (b) => b.status === "en_attente" || b.status === "en_cours",
-  );
-
-  const toggleModule = (code: string) => {
-    setSelectedModules((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
-    );
-  };
-
-  const lastSuccess = form.backup_last_success_at
-    ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" }).format(
-        new Date(form.backup_last_success_at),
-      )
-    : null;
-
-  return (
-    <div className="space-y-6">
-      <Card
-        title="Sauvegarde des données"
-        description="Protégez et exportez les données de votre entreprise."
-        icon={<DatabaseBackup className="h-4 w-4" />}
-      >
-        <p className="text-sm mb-4">
-          {lastSuccess ? (
-            <>
-              Dernière sauvegarde réussie :{" "}
-              <span className="font-medium text-foreground">{lastSuccess}</span>
-            </>
-          ) : (
-            <span className="text-muted-foreground">
-              Aucune sauvegarde effectuée pour le moment.
-            </span>
-          )}
-        </p>
-
-        <p className="text-xs font-medium text-muted-foreground mb-2">Modules à sauvegarder</p>
-        {modulesQuery.isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Chargement des modules…
-          </div>
-        ) : availableOptions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucun module activé pour ce compte.</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-            {availableOptions.map((m) => (
-              <label key={m.code} className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox
-                  checked={selectedModules.includes(m.code)}
-                  onCheckedChange={() => toggleModule(m.code)}
-                />
-                <m.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                {m.label}
-              </label>
-            ))}
-          </div>
-        )}
-
-        <Button
-          className="gap-2"
-          disabled={selectedModules.length === 0 || isRunning || createBackup.isPending}
-          onClick={() => createBackup.mutate(selectedModules)}
-        >
-          {isRunning || createBackup.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <DatabaseBackup className="h-4 w-4" />
-          )}
-          {isRunning ? "Sauvegarde en cours…" : "Créer une sauvegarde"}
-        </Button>
-      </Card>
-
-      <Card
-        title="Sauvegarde automatique"
-        description="Planifiez des sauvegardes régulières et automatiques."
-        icon={<RotateCcw className="h-4 w-4" />}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm font-medium">Activer la sauvegarde automatique</p>
-            <p className="text-xs text-muted-foreground">
-              Le lien de téléchargement sera envoyé à l'email de réception ci-dessous.
-            </p>
-          </div>
-          <Switch
-            checked={form.backup_auto_enabled ?? false}
-            onCheckedChange={(checked) => {
-              update("backup_auto_enabled", checked);
-              onSave({ backup_auto_enabled: checked });
-            }}
-          />
-        </div>
-        {form.backup_auto_enabled && (
-          <Field label="Fréquence">
-            <Select
-              value={form.backup_auto_frequency ?? undefined}
-              onValueChange={(v) => {
-                update("backup_auto_frequency", v as Parametres["backup_auto_frequency"]);
-                onSave({ backup_auto_frequency: v as Parametres["backup_auto_frequency"] });
-              }}
-            >
-              <SelectTrigger className="max-w-xs">
-                <SelectValue placeholder="Choisir une fréquence" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="quotidienne">Quotidienne</SelectItem>
-                <SelectItem value="hebdomadaire">Hebdomadaire</SelectItem>
-                <SelectItem value="mensuelle">Mensuelle</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        )}
-        <Separator className="my-4" />
-        <Field label="Email de réception" hint="Modifiable dans l'onglet Général.">
-          <Input value={form.email ?? ""} disabled />
-        </Field>
-      </Card>
-
-      <Card
-        title="Historique"
-        description="Les 10 dernières sauvegardes."
-        icon={<ClipboardList className="h-4 w-4" />}
-      >
-        {backupsLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
-          </div>
-        ) : !backups || backups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucune sauvegarde pour le moment.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Modules</TableHead>
-                <TableHead>Enregistrements</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {backups.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell className="whitespace-nowrap">
-                    {new Intl.DateTimeFormat("fr-FR", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    }).format(new Date(b.created_at))}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {b.backup_type === "manuel" ? "Manuel" : "Automatique"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
-                    {(Array.isArray(b.modules) ? (b.modules as string[]) : [])
-                      .map((m) => BACKUP_MODULE_LABELS[m] ?? m)
-                      .join(", ")}
-                  </TableCell>
-                  <TableCell>{b.record_count ?? "—"}</TableCell>
-                  <TableCell>
-                    <BackupStatusBadge status={b.status} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <BackupDownloadButton backup={b} />
-                      {b.status === "echec" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5"
-                          disabled={retryBackup.isPending}
-                          onClick={() => retryBackup.mutate(b)}
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" /> Réessayer
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
       </Card>
     </div>
   );

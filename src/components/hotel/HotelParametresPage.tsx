@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarCheck,
   ClipboardList,
+  DatabaseBackup,
   Eye,
   FileCheck2,
   FileText,
@@ -28,6 +29,8 @@ import { HotelUsersAccessTab } from "@/components/hotel/HotelUsersAccessTab";
 import { HotelSecurityTab } from "@/components/hotel/HotelSecurityTab";
 import { HotelAuditLogTab } from "@/components/hotel/HotelAuditLogTab";
 import { Section } from "@/components/hotel/HotelSettingsUi";
+import { BackupsPanel } from "@/components/mms/BackupsPanel";
+import { useHotelBackupModules } from "@/hooks/use-hotel-backup-modules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,10 +103,12 @@ export function HotelParametresPage() {
   const canView = useActionPermission("hotel.settings.view");
   const canEdit = useActionPermission("hotel.settings.update");
   const canViewUsers = useActionPermission("hotel.users.view");
+  const canViewBackups = useActionPermission("hotel.backups.view");
 
   const hotelSettingsQuery = useHotelSettings();
   const refreshHotelSettings = useHotelSettingsRefresh();
   const { settings: paramSettings, isLoading: paramsLoading } = useCompanySettings(tenantId);
+  const backupModulesQuery = useHotelBackupModules();
 
   const [activeTab, setActiveTab] = useState("general");
   const [hotelForm, setHotelForm] = useState<Partial<HotelSettingsRow>>({});
@@ -156,6 +161,8 @@ export function HotelParametresPage() {
           address: paramForm.address,
           logo_url: paramForm.logo_url,
           currency: paramForm.currency,
+          backup_auto_enabled: paramForm.backup_auto_enabled,
+          backup_auto_frequency: paramForm.backup_auto_frequency,
         };
         tasks.push(
           (async () => {
@@ -190,7 +197,11 @@ export function HotelParametresPage() {
       title="Paramètres"
       subtitle="Configuration de l'établissement"
       actions={
-        canEdit ? (
+        // Utilisateurs & accès persiste chaque action immédiatement via ses propres
+        // mutations (création/édition/suppression/statut) — ce bouton ne touche que
+        // hotelForm/paramForm et n'a aucun effet sur cet onglet, où il ne ferait que
+        // prêter à confusion.
+        canEdit && activeTab !== "users" ? (
           <Button
             onClick={() => save.mutate()}
             disabled={save.isPending || isLoading}
@@ -234,6 +245,11 @@ export function HotelParametresPage() {
             <TabTrig value="documents" icon={<FileText className="h-4 w-4" />}>
               Documents
             </TabTrig>
+            {canViewBackups && (
+              <TabTrig value="backups" icon={<DatabaseBackup className="h-4 w-4" />}>
+                Sauvegardes
+              </TabTrig>
+            )}
             {canViewUsers && (
               <TabTrig value="users" icon={<Users className="h-4 w-4" />}>
                 Utilisateurs & accès
@@ -276,6 +292,19 @@ export function HotelParametresPage() {
               disabled={!canEdit}
             />
           </TabsContent>
+
+          {canViewBackups && (
+            <TabsContent value="backups">
+              <BackupsPanel
+                permissionView="hotel.backups.view"
+                permissionCreate="hotel.backups.create"
+                form={paramForm}
+                update={(key, value) => updateParam(key, value as never)}
+                moduleOptions={backupModulesQuery.data ?? []}
+                moduleOptionsLoading={backupModulesQuery.isLoading}
+              />
+            </TabsContent>
+          )}
 
           {canViewUsers && (
             <TabsContent value="users">

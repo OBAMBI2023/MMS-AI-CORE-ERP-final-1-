@@ -9,6 +9,7 @@ import {
   ToggleLeft,
   ToggleRight,
   ShieldAlert,
+  UserPlus,
   Users as UsersIcon,
 } from "lucide-react";
 import { Section } from "@/components/hotel/HotelSettingsUi";
@@ -78,7 +79,9 @@ export function HotelUsersAccessTab() {
       if (!tenantId) return [];
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, username, full_name, email, phone, status, last_login_at, avatar_url, roles(id, name)")
+        .select(
+          "id, username, full_name, email, phone, status, last_login_at, avatar_url, roles(id, name)",
+        )
         .eq("tenant_id", tenantId)
         .order("full_name");
       if (error) throw error;
@@ -112,7 +115,8 @@ export function HotelUsersAccessTab() {
     onError: (error: unknown) => toast.error(formatSupabaseError(error)),
   });
 
-  const rowPending = toggleMutation.isPending || passwordMutation.isPending || deleteMutation.isPending;
+  const rowPending =
+    toggleMutation.isPending || passwordMutation.isPending || deleteMutation.isPending;
 
   if (!canView) {
     return (
@@ -185,15 +189,20 @@ export function HotelUsersAccessTab() {
   return (
     <Section
       title="Utilisateurs & accès"
-      description="Utilisateurs de cet établissement, leur rôle et leur statut."
+      description="Gérez les membres de l'établissement, leurs rôles et leurs autorisations."
       icon={<UsersIcon className="h-4 w-4" />}
+      action={
+        canManage ? (
+          <UserFormDialog
+            triggerClassName="h-11 w-full gap-2 rounded-xl bg-primary hover:bg-primary/90 sm:h-9 sm:w-auto"
+            triggerLabel="Ajouter un utilisateur"
+            triggerIcon={UserPlus}
+            accent="hotel"
+            createTitle="Ajouter un utilisateur"
+          />
+        ) : undefined
+      }
     >
-      {canManage && (
-        <div className="mb-4 flex justify-end">
-          <UserFormDialog triggerClassName="h-11 w-full sm:h-9 sm:w-auto" />
-        </div>
-      )}
-
       {usersQuery.isLoading ? (
         <div className="flex items-center gap-2 py-8 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
@@ -203,116 +212,129 @@ export function HotelUsersAccessTab() {
       ) : (
         <>
           <div className="space-y-3 sm:hidden">
-          {users.map((user) => (
-            <div key={user.id} className="min-w-0 rounded-xl border border-border p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-3">
-                  <ProfileAvatar
-                    path={user.avatar_url}
-                    name={user.full_name}
-                    email={user.email}
-                    className="h-10 w-10 shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{user.full_name}</p>
-                    <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+            {users.map((user) => (
+              <div key={user.id} className="min-w-0 rounded-xl border border-border p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ProfileAvatar
+                      path={user.avatar_url}
+                      name={user.full_name}
+                      email={user.email}
+                      className="h-10 w-10 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{user.full_name}</p>
+                      <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                    </div>
                   </div>
+                  {canManage && <div className="shrink-0">{renderActionsMenu(user)}</div>}
                 </div>
-                {canManage && <div className="shrink-0">{renderActionsMenu(user)}</div>}
-              </div>
 
-              <div className="mt-3 min-w-0">
-                <p className="text-xs font-medium text-muted-foreground">Rôle</p>
-                <Badge variant="outline" className="mt-1">
-                  {(user.roles as any)?.name ?? "—"}
-                </Badge>
-              </div>
-
-              <div className="mt-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Statut</p>
-                  <Badge
-                    variant="outline"
-                    className={cn("mt-1 font-medium", STATUS_BADGE_CLASSES[user.status ?? ""] ?? "")}
-                  >
-                    {(user.status && STATUS_LABELS[user.status]) ?? user.status}
+                <div className="mt-3 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">Rôle</p>
+                  <Badge variant="outline" className="mt-1">
+                    {(user.roles as any)?.name ?? "—"}
                   </Badge>
                 </div>
-                <div className="min-w-0 text-right">
-                  <p className="text-xs font-medium text-muted-foreground">Dernière activité</p>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">
-                    {user.last_login_at ? formatDateTime(user.last_login_at) : "Jamais"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-          {users.length === 0 && (
-            <div className="rounded-xl border border-border p-10 text-center text-sm text-muted-foreground">
-              Aucun utilisateur pour cet établissement.
-            </div>
-          )}
-        </div>
 
-        <div className="hidden overflow-x-auto rounded-xl border border-border sm:block">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Nom</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Rôle</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Dernière activité</TableHead>
-                {canManage && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <ProfileAvatar
-                        path={user.avatar_url}
-                        name={user.full_name}
-                        email={user.email}
-                        className="h-8 w-8 shrink-0"
-                      />
-                      <span className="truncate font-medium">{user.full_name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{(user.roles as any)?.name ?? "—"}</Badge>
-                  </TableCell>
-                  <TableCell>
+                <div className="mt-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">Statut</p>
                     <Badge
                       variant="outline"
-                      className={cn("font-medium", STATUS_BADGE_CLASSES[user.status ?? ""] ?? "")}
+                      className={cn(
+                        "mt-1 font-medium",
+                        STATUS_BADGE_CLASSES[user.status ?? ""] ?? "",
+                      )}
                     >
                       {(user.status && STATUS_LABELS[user.status]) ?? user.status}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.last_login_at ? formatDateTime(user.last_login_at) : "Jamais"}
-                  </TableCell>
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <p className="text-xs font-medium text-muted-foreground">Dernière activité</p>
+                    <p className="mt-1 truncate text-sm text-muted-foreground">
+                      {user.last_login_at ? formatDateTime(user.last_login_at) : "Jamais"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {users.length === 0 && (
+              <div className="rounded-xl border border-border p-10 text-center text-sm text-muted-foreground">
+                Aucun utilisateur pour cet établissement.
+              </div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-xl border border-border sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="py-3 text-xs uppercase tracking-wide">Nom</TableHead>
+                  <TableHead className="py-3 text-xs uppercase tracking-wide">Email</TableHead>
+                  <TableHead className="py-3 text-xs uppercase tracking-wide">Rôle</TableHead>
+                  <TableHead className="py-3 text-xs uppercase tracking-wide">Statut</TableHead>
+                  <TableHead className="py-3 text-xs uppercase tracking-wide">
+                    Dernière activité
+                  </TableHead>
                   {canManage && (
-                    <TableCell className="text-right">{renderActionsMenu(user)}</TableCell>
+                    <TableHead className="py-3 text-right text-xs uppercase tracking-wide">
+                      Actions
+                    </TableHead>
                   )}
                 </TableRow>
-              ))}
-              {users.length === 0 && (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={canManage ? 6 : 5}
-                    className="p-10 text-center text-sm text-muted-foreground"
-                  >
-                    Aucun utilisateur pour cet établissement.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="py-3.5">
+                      <div className="flex items-center gap-3">
+                        <ProfileAvatar
+                          path={user.avatar_url}
+                          name={user.full_name}
+                          email={user.email}
+                          className="h-8 w-8 shrink-0"
+                        />
+                        <span className="truncate font-medium">{user.full_name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3.5 text-muted-foreground">{user.email}</TableCell>
+                    <TableCell className="py-3.5">
+                      <Badge variant="outline">{(user.roles as any)?.name ?? "—"}</Badge>
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <Badge
+                        variant="outline"
+                        className={cn("font-medium", STATUS_BADGE_CLASSES[user.status ?? ""] ?? "")}
+                      >
+                        {(user.status && STATUS_LABELS[user.status]) ?? user.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3.5 text-muted-foreground">
+                      {user.last_login_at ? formatDateTime(user.last_login_at) : "Jamais"}
+                    </TableCell>
+                    {canManage && (
+                      <TableCell className="py-3.5 text-right">
+                        <div className="flex justify-end opacity-70 transition-opacity hover:opacity-100">
+                          {renderActionsMenu(user)}
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+                {users.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell
+                      colSpan={canManage ? 6 : 5}
+                      className="p-10 text-center text-sm text-muted-foreground"
+                    >
+                      Aucun utilisateur pour cet établissement.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </>
       )}
 
@@ -330,7 +352,9 @@ export function HotelUsersAccessTab() {
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
-              onClick={() => userToDelete && deleteMutation.mutate({ data: { id: userToDelete.id } })}
+              onClick={() =>
+                userToDelete && deleteMutation.mutate({ data: { id: userToDelete.id } })
+              }
             >
               Supprimer
             </AlertDialogAction>

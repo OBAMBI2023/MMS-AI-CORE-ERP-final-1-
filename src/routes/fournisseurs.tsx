@@ -25,6 +25,7 @@ import {
   type MobileCardActions,
 } from "@/components/mms/ResourceTable";
 import { ResourceCard, type ResourceCardDetail, type ResourceCardMenuAction } from "@/components/mms/ResourceCard";
+import { ResourceSummaryBar } from "@/components/mms/ResourceSummaryBar";
 import {
   DataExportMenu,
   exportRowsToPdf,
@@ -257,10 +258,18 @@ function FournisseursPage() {
   const { settings, logoUrl, companyName } = useCompanySettings();
   const { data: achatsStats = {} } = useFournisseursAchatsStats();
   const exportColumns = buildExportColumns(achatsStats);
+  const [summary, setSummary] = useState({ search: "", count: 0, page: 1, pageSize: 20 });
 
   return (
     <AppShell title="Fournisseurs" subtitle="Gérez vos fournisseurs">
       <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
+        <ResourceSummaryBar
+          count={summary.count}
+          page={summary.page}
+          pageSize={summary.pageSize}
+          itemLabelSingular="fournisseur"
+          itemLabelPlural="fournisseurs"
+        />
         <ResourceTable<Fournisseur>
           table="fournisseurs"
           singular="Fournisseur"
@@ -268,6 +277,7 @@ function FournisseursPage() {
           fields={fields}
           columns={columns}
           searchFields={["name", "phone", "email"]}
+          onServerSummaryChange={setSummary}
           orderBy={{ column: "created_at", ascending: false }}
           deletePermission="fournisseurs.delete"
           entityName="fournisseurs"

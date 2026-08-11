@@ -44,9 +44,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { useExpenseCategories } from "@/hooks/use-expense-categories";
+import { useTenant } from "@/providers/TenantProvider";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -362,6 +365,81 @@ function DepenseMobileCard({ row, actions }: { row: Depense; actions: MobileCard
   );
 }
 
+const DEPENSE_SEARCH_FIELDS = ["category", "description"];
+
+type DepensesServerSummary = { search: string; count: number; page: number; pageSize: number };
+const EMPTY_SERVER_SUMMARY: DepensesServerSummary = { search: "", count: 0, page: 1, pageSize: 20 };
+
+function formatThousands(value: number): string {
+  return new Intl.NumberFormat("fr-FR").format(value);
+}
+
+/**
+ * Total amount matching the same tenant + search filter the table itself
+ * uses, computed entirely in Postgres via the `depenses_summary` RPC (COUNT
+ * + SUM in one aggregate query) — a tenant with tens of thousands of
+ * expenses never has the browser fetch a single expense row just to render
+ * this total. Tenant scoping comes from current_tenant_id() inside the
+ * function itself, the same as the table's own RLS, not from a client param.
+ */
+function useDepensesTotalAmount(search: string) {
+  const { profile } = useTenant();
+  const tenantId = profile?.tenant_id;
+  return useQuery({
+    queryKey: ["depenses", "summary-total", tenantId, search],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("depenses_summary", {
+        p_search: search || undefined,
+      });
+      if (error) throw error;
+      return Number(data?.[0]?.total ?? 0);
+    },
+    enabled: Boolean(tenantId),
+  });
+}
+
+function DepensesSummaryBar({
+  count,
+  page,
+  pageSize,
+  total,
+  totalLoading,
+}: {
+  count: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalLoading: boolean;
+}) {
+  const rangeStart = count === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, count);
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 rounded-lg border border-border bg-muted/40 px-3.5 py-2 text-sm">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-medium text-foreground">
+          {formatThousands(count)} dépense{count !== 1 ? "s" : ""}
+        </span>
+        <span className="text-muted-foreground" aria-hidden="true">
+          •
+        </span>
+        <span className="text-muted-foreground">
+          Total :{" "}
+          <span className="font-semibold text-foreground">
+            {totalLoading ? "…" : `${formatThousands(total)} FCFA`}
+          </span>
+        </span>
+      </div>
+      {count > 0 && (
+        <span className="text-xs text-muted-foreground">
+          {formatThousands(rangeStart)}–{formatThousands(rangeEnd)} sur {formatThousands(count)}{" "}
+          dépense{count !== 1 ? "s" : ""}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/depenses")({
   component: DepensesPage,
   head: () => ({
@@ -376,17 +454,27 @@ function DepensesPage() {
   const today = new Date().toISOString().slice(0, 10);
   const { settings, logoUrl, companyName } = useCompanySettings();
   const canExport = useActionPermission("depenses.export");
+  const [summary, setSummary] = useState<DepensesServerSummary>(EMPTY_SERVER_SUMMARY);
+  const totalQuery = useDepensesTotalAmount(summary.search);
 
   return (
     <AppShell title="Dépenses" subtitle="Gérez vos dépenses">
       <div className="-m-4 bg-muted/40 p-4 md:-m-8 md:p-8">
+        <DepensesSummaryBar
+          count={summary.count}
+          page={summary.page}
+          pageSize={summary.pageSize}
+          total={totalQuery.data ?? 0}
+          totalLoading={totalQuery.isLoading}
+        />
         <ResourceTable<Depense>
           table="depenses"
           singular="Dépense"
           plural="Dépenses"
           fields={fields}
           columns={columns}
-          searchFields={["category", "description"]}
+          searchFields={DEPENSE_SEARCH_FIELDS}
+          onServerSummaryChange={setSummary}
           orderBy={{ column: "paid_at", ascending: false }}
           defaultValues={
             { category: "Général", paid_at: today, payment_method: "Espèces" } as Partial<Depense>

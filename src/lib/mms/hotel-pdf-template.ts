@@ -785,7 +785,7 @@ export type HotelFooterOptions = {
  * Draws one bordered, titled box (signature OR cachet) at the given position
  * and, if `imageUrl` resolves, fits the image inside preserving its ratio.
  */
-async function renderHotelSignatureBox(
+export async function renderHotelSignatureBox(
   doc: jsPDF,
   x: number,
   y: number,

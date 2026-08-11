@@ -1,11 +1,16 @@
 // Sauvegardes: core export engine shared by create-backup (manual trigger)
-// and run-scheduled-backups (pg_cron trigger). Kept as one module so both
-// paths use the exact same tenant-filtering/CSV/ZIP/email logic — the one
-// piece of code that needs to be reviewed carefully for cross-tenant leakage.
+// and run-scheduled-backups (pg_cron trigger), and shared across the ERP and
+// HOTEL platforms. Kept as one module so every path uses the exact same
+// tenant-filtering/CSV/ZIP/email logic — the one piece of code that needs to
+// be reviewed carefully for cross-tenant and cross-platform leakage.
 
 import { zipSync, strToU8 } from "npm:fflate@0.8.3";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.110.5";
-import { BACKUP_MODULES, isBackupModuleCode } from "./backup-modules.ts";
+import {
+  getBackupModuleRegistry,
+  isBackupModuleCode,
+  type PlatformType,
+} from "./backup-modules.ts";
 
 const BATCH_SIZE = 1000;
 
@@ -63,11 +68,12 @@ export async function buildModuleExport(
   client: SupabaseClient,
   tenantId: string,
   moduleCode: string,
+  platformType: PlatformType,
 ): Promise<ModuleExportResult> {
-  if (!isBackupModuleCode(moduleCode)) {
+  if (!isBackupModuleCode(moduleCode, platformType)) {
     return { files: {}, recordCount: 0 };
   }
-  const def = BACKUP_MODULES[moduleCode];
+  const def = getBackupModuleRegistry(platformType)[moduleCode];
   const files: Record<string, Uint8Array> = {};
   let recordCount = 0;
 
@@ -83,21 +89,30 @@ export async function buildModuleExport(
 
 export interface BuildManifestParams {
   tenantId: string;
+  tenantName: string;
+  platformType: PlatformType;
   backupType: "manuel" | "automatique";
   modules: string[];
   moduleRecordCounts: Record<string, number>;
+  totalRecordCount: number;
 }
 
 // formatVersion is a plain integer bumped whenever the JSON export shape
-// changes, so a future Restore feature can branch on it safely.
+// changes, so a future Restore feature can branch on it safely. platformType
+// is a new, purely additive field (existing ERP manifests before this change
+// simply didn't have it) — no existing reader depends on its absence, so
+// this doesn't break previously generated ERP backups.
 export function buildManifest(params: BuildManifestParams) {
   return {
     formatVersion: 1,
+    platformType: params.platformType,
     tenantId: params.tenantId,
+    tenantName: params.tenantName,
     generatedAt: new Date().toISOString(),
     backupType: params.backupType,
     modules: params.modules,
     recordCounts: params.moduleRecordCounts,
+    totalRecordCount: params.totalRecordCount,
   };
 }
 
@@ -111,6 +126,7 @@ export interface SendBackupEmailParams {
   signedUrl: string;
   backupDate: string;
   modules: string[];
+  platformType: PlatformType;
   recordCount: number;
   expiresAt: string;
 }
@@ -127,9 +143,10 @@ export async function sendBackupEmail(params: SendBackupEmailParams): Promise<vo
     return;
   }
 
+  const registry = getBackupModuleRegistry(params.platformType);
   const formattedDate = new Date(params.backupDate).toLocaleString("fr-FR");
   const formattedExpiry = new Date(params.expiresAt).toLocaleString("fr-FR");
-  const modulesList = params.modules.map((m) => BACKUP_MODULES[m]?.label ?? m).join(", ");
+  const modulesList = params.modules.map((m) => registry[m]?.label ?? m).join(", ");
 
   const html = `
     <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto;">
@@ -170,7 +187,11 @@ export async function sendBackupEmail(params: SendBackupEmailParams): Promise<vo
 // Keeps only the 10 most recent backups per tenant and drops anything past
 // its expiry, removing both the DB row and the storage object so nothing is
 // orphaned. Run at the end of every backup attempt (success or failure).
-export async function enforceRetention(adminClient: SupabaseClient, tenantId: string): Promise<void> {
+// Platform-agnostic: it only ever operates on the caller's own tenantId.
+export async function enforceRetention(
+  adminClient: SupabaseClient,
+  tenantId: string,
+): Promise<void> {
   const { data: rows, error } = await adminClient
     .from("tenant_backups")
     .select("id, storage_path, expires_at")
@@ -208,29 +229,49 @@ export interface RunBackupParams {
   adminClient: SupabaseClient;
   readClient: SupabaseClient;
   tenantId: string;
+  platformType: PlatformType;
   backupId: string;
   modules: string[];
   backupType: "manuel" | "automatique";
 }
 
 export async function runBackup(params: RunBackupParams): Promise<void> {
-  const { adminClient, readClient, tenantId, backupId, modules, backupType } = params;
+  const { adminClient, readClient, tenantId, platformType, backupId, modules, backupType } = params;
 
   try {
     await adminClient.from("tenant_backups").update({ status: "en_cours" }).eq("id", backupId);
+
+    // Fetched once, up front, from parametres — the same shared per-tenant
+    // settings singleton ERP already uses, tenant_id-filtered explicitly.
+    // Used only as metadata (tenant name for the manifest/email, email
+    // recipient) — parametres.email itself is never written into the ZIP.
+    const { data: parametresRow } = await adminClient
+      .from("parametres")
+      .select("email, company_name")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    const tenantName = parametresRow?.company_name ?? "Votre entreprise";
 
     const files: Record<string, Uint8Array> = {};
     const moduleRecordCounts: Record<string, number> = {};
     let totalRecordCount = 0;
 
     for (const moduleCode of modules) {
-      const result = await buildModuleExport(readClient, tenantId, moduleCode);
+      const result = await buildModuleExport(readClient, tenantId, moduleCode, platformType);
       Object.assign(files, result.files);
       moduleRecordCounts[moduleCode] = result.recordCount;
       totalRecordCount += result.recordCount;
     }
 
-    const manifest = buildManifest({ tenantId, backupType, modules, moduleRecordCounts });
+    const manifest = buildManifest({
+      tenantId,
+      tenantName,
+      platformType,
+      backupType,
+      modules,
+      moduleRecordCounts,
+      totalRecordCount,
+    });
     files["manifest.json"] = strToU8(JSON.stringify(manifest, null, 2));
 
     const zipped = zipArchive(files);
@@ -239,7 +280,8 @@ export async function runBackup(params: RunBackupParams): Promise<void> {
     const { error: uploadError } = await adminClient.storage
       .from("backup-archives")
       .upload(storagePath, zipped, { contentType: "application/zip", upsert: true });
-    if (uploadError) throw new Error(`Téléversement de l'archive impossible: ${uploadError.message}`);
+    if (uploadError)
+      throw new Error(`Téléversement de l'archive impossible: ${uploadError.message}`);
 
     const nowIso = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
@@ -260,20 +302,15 @@ export async function runBackup(params: RunBackupParams): Promise<void> {
       })
       .eq("id", backupId);
 
-    const { data: parametresRow } = await adminClient
-      .from("parametres")
-      .select("email, company_name")
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-
     if (parametresRow?.email && signedUrlData?.signedUrl) {
       try {
         await sendBackupEmail({
           to: parametresRow.email,
-          tenantName: parametresRow.company_name ?? "Votre entreprise",
+          tenantName,
           signedUrl: signedUrlData.signedUrl,
           backupDate: nowIso,
           modules,
+          platformType,
           recordCount: totalRecordCount,
           expiresAt,
         });
@@ -283,7 +320,10 @@ export async function runBackup(params: RunBackupParams): Promise<void> {
       }
     }
 
-    await adminClient.from("parametres").update({ backup_last_success_at: nowIso }).eq("tenant_id", tenantId);
+    await adminClient
+      .from("parametres")
+      .update({ backup_last_success_at: nowIso })
+      .eq("tenant_id", tenantId);
   } catch (err) {
     console.error("backup run failed", err);
     await adminClient

@@ -1,16 +1,19 @@
 // Sauvegardes: scheduled backup runner, invoked hourly by pg_cron/pg_net
-// (see 20260811164000_enable_pg_cron_backup_scheduler.sql), never by the
+// (see 20260811164000_enable_pg_cron_backup_scheduler.sql — NOT applied yet,
+// this function is not currently reachable by any scheduler), never by the
 // browser. There is no interactive user JWT in this path, so it necessarily
 // uses the service_role client (bypasses RLS) for both reads and writes —
-// every query inside buildModuleExport() still carries an explicit
-// tenant_id filter (see _shared/backup-engine.ts), which is the only thing
-// preventing cross-tenant leakage here. This function shares that exact
-// module with create-backup rather than re-implementing its own queries, to
-// keep the tenant-isolation-critical code in one reviewed place.
+// every query here (module data, platform_type, enabled modules) carries an
+// explicit tenant_id filter, which is the only thing preventing cross-tenant
+// leakage in this path. Shares the exact buildModuleExport/runBackup core
+// with create-backup rather than re-implementing its own queries, so the
+// tenant-isolation-critical code stays in one reviewed place. Platform-aware
+// like create-backup: each due tenant's own platform_type (read explicitly
+// per-tenant, never assumed) selects the ERP or HOTEL module registry.
 
 import { createClient } from "npm:@supabase/supabase-js@2.110.5";
 import { runBackup } from "../_shared/backup-engine.ts";
-import { BACKUP_MODULE_CODES } from "../_shared/backup-modules.ts";
+import { getBackupModuleRegistry, normalizePlatformType } from "../_shared/backup-modules.ts";
 
 const MAX_TENANTS_PER_RUN = 50;
 
@@ -49,12 +52,23 @@ Deno.serve(async (req: Request) => {
     if (error) throw error;
 
     const due = (candidates ?? [])
-      .filter((row) => row.tenant_id && isDue(row.backup_auto_frequency, row.backup_auto_last_run_at))
+      .filter(
+        (row) => row.tenant_id && isDue(row.backup_auto_frequency, row.backup_auto_last_run_at),
+      )
       .slice(0, MAX_TENANTS_PER_RUN);
 
     let processed = 0;
     for (const tenant of due) {
       const tenantId = tenant.tenant_id as string;
+
+      // Explicit per-tenant filter, service_role bypasses RLS.
+      const { data: tenantRow } = await adminClient
+        .from("tenants")
+        .select("platform_type")
+        .eq("id", tenantId)
+        .single();
+      const platformType = normalizePlatformType(tenantRow?.platform_type);
+      const registry = getBackupModuleRegistry(platformType);
 
       const { data: enabledRows } = await adminClient
         .from("tenant_modules")
@@ -68,7 +82,7 @@ Deno.serve(async (req: Request) => {
           return rel ? [rel.code] : [];
         }),
       );
-      const modules = BACKUP_MODULE_CODES.filter((m) => enabledCodes.has(m));
+      const modules = Object.keys(registry).filter((m) => enabledCodes.has(m));
       if (modules.length === 0) continue;
 
       const { data: inserted, error: insertError } = await adminClient
@@ -85,6 +99,7 @@ Deno.serve(async (req: Request) => {
         adminClient,
         readClient: adminClient,
         tenantId,
+        platformType,
         backupId: inserted.id,
         modules,
         backupType: "automatique",
