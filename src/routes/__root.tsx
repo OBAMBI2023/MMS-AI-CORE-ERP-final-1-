@@ -347,14 +347,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: PLATFORM_BRANDING.name },
       {
         name: "description",
-        content:
-          PLATFORM_BRANDING.description,
+        content: PLATFORM_BRANDING.description,
       },
       { property: "og:title", content: PLATFORM_BRANDING.name },
       {
         property: "og:description",
-        content:
-          PLATFORM_BRANDING.description,
+        content: PLATFORM_BRANDING.description,
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -364,8 +362,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         name: "twitter:description",
-        content:
-          PLATFORM_BRANDING.description,
+        content: PLATFORM_BRANDING.description,
       },
       {
         property: "og:image",
@@ -375,10 +372,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "twitter:image",
         content: socialLogoUrl,
       },
+      { name: "theme-color", content: PLATFORM_BRANDING.primaryColor },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: PLATFORM_BRANDING.assets.favicon, type: "image/png", sizes: "32x32" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -408,13 +407,13 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 import { DynamicFavicon } from "@/components/mms/DynamicFavicon";
+import { PwaUpdatePrompt } from "@/components/pwa/PwaUpdatePrompt";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const isPlatformArea = useLocation({
-    select: (location) =>
-      isPlatformRoute(location.pathname) || isPartnerRoute(location.pathname),
+    select: (location) => isPlatformRoute(location.pathname) || isPartnerRoute(location.pathname),
   });
   const isPublicArea = useLocation({
     select: (location) => isPublicRoute(location.pathname),
@@ -434,6 +433,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <PwaUpdatePrompt />
       <ThemeProvider>
         {isPlatformArea || isPublicArea ? (
           <>
