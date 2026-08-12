@@ -6,6 +6,7 @@ import type { TablesUpdate } from "@/integrations/supabase/types";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { logAction } from "@/lib/audit.server";
 import { isModuleEligibleForTenant } from "@/lib/module-eligibility";
+import { getInvitationRedirectUrl } from "@/lib/partner-admin.server";
 
 type TenantRow = {
   id: string;
@@ -1284,4 +1285,88 @@ export const getSuperAdminActivity = createServerFn({ method: "GET" })
         actorEmail: (metadata.actorEmail as string | undefined) ?? null,
       };
     });
+  });
+
+const createTenantBySuperAdminSchema = z.object({
+  companyName: z.string().trim().min(2).max(120),
+  adminName: z.string().trim().min(2).max(120),
+  adminEmail: z.string().trim().email().max(254),
+  phone: z.string().trim().min(6).max(30),
+  platformType: z.enum(["ERP", "HOTEL"]),
+  billingCycle: z.enum(["monthly", "quarterly", "yearly"]),
+  days: z.number().int().min(1).max(3650).optional(),
+  moduleIds: z.array(z.string().uuid()).max(100).default([]),
+});
+
+export const createTenantBySuperAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(createTenantBySuperAdminSchema)
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const redirectTo = getInvitationRedirectUrl();
+    const authResult = await supabaseAdmin.auth.admin.inviteUserByEmail(data.adminEmail, {
+      data: { full_name: data.adminName, phone: data.phone },
+      redirectTo,
+    });
+    if (authResult.error || !authResult.data.user) {
+      throw new Error(
+        formatSupabaseError(authResult.error ?? new Error("Compte administrateur non créé")),
+      );
+    }
+
+    let tenantCommitted = false;
+    try {
+      const { data: rpcResult, error } = await (supabaseAdmin as any).rpc(
+        "create_invited_tenant_atomic",
+        {
+          requested_company_name: data.companyName,
+          requested_admin_name: data.adminName,
+          requested_admin_email: data.adminEmail,
+          requested_admin_user_id: authResult.data.user.id,
+          requested_actor_id: context.userId,
+          requested_platform_type: data.platformType,
+          requested_billing_cycle: data.billingCycle,
+          requested_duration_days: data.days ?? cycleDays(data.billingCycle),
+          requested_module_ids: data.platformType === "HOTEL" ? [] : data.moduleIds,
+        },
+      );
+      if (error) throw new Error(formatSupabaseError(error));
+      tenantCommitted = true;
+      const created = rpcResult as { tenantId: string; slug: string };
+
+      const { error: phoneError } = await supabaseAdmin
+        .from("profiles")
+        .update({ phone: data.phone })
+        .eq("id", authResult.data.user.id);
+      if (phoneError) {
+        console.warn("[SuperAdminInvitation] téléphone non enregistré", {
+          userId: authResult.data.user.id,
+        });
+      }
+
+      const { error: metadataError } = await supabaseAdmin.auth.admin.updateUserById(
+        authResult.data.user.id,
+        { user_metadata: { tenant_slug: created.slug } },
+      );
+      if (metadataError) {
+        console.warn("[SuperAdminInvitation] tenant_slug non ajouté aux métadonnées", {
+          userId: authResult.data.user.id,
+          tenantId: created.tenantId,
+        });
+      }
+
+      return { tenantId: created.tenantId, loginUrl: `/login/${created.slug}` };
+    } catch (error) {
+      if (!tenantCommitted) {
+        const { error: rollbackError } = await supabaseAdmin.auth.admin.deleteUser(
+          authResult.data.user.id,
+        );
+        if (rollbackError) {
+          console.error("[SuperAdminInvitation] Échec du rollback Auth", rollbackError);
+        }
+      }
+      throw error;
+    }
   });

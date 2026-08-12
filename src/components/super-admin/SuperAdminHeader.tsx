@@ -12,15 +12,18 @@ import {
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { BrandLogo } from "@/components/branding/BrandLogo";
 import { SuperAdminSidebar } from "@/components/super-admin/SuperAdminSidebar";
+import type { SuperAdminModulePack } from "@/lib/super-admin.server";
 
 export function SuperAdminHeader({
   query,
   onQueryChange,
   onSignOut,
+  modulePacks = [],
 }: {
   query: string;
   onQueryChange: (value: string) => void;
   onSignOut: () => Promise<void>;
+  modulePacks?: SuperAdminModulePack[];
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur-xl">
@@ -35,7 +38,7 @@ export function SuperAdminHeader({
             </SheetTrigger>
             <SheetContent side="left" className="w-[280px] border-0 p-0 [&>button]:text-white">
               <SheetTitle className="sr-only">Navigation Super Admin</SheetTitle>
-              <SuperAdminSidebar mobile />
+              <SuperAdminSidebar mobile modulePacks={modulePacks} />
             </SheetContent>
           </Sheet>
           <BrandLogo context="mobile" className="sm:hidden" />

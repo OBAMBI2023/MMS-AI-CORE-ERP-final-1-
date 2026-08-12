@@ -119,7 +119,7 @@ export function SuperAdminDashboardView({
   return (
     <div className="min-h-screen bg-muted/30 text-foreground dark:bg-background">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[228px] lg:block">
-        <SuperAdminSidebar />
+        <SuperAdminSidebar modulePacks={dashboard.modulePacks} />
       </aside>
 
       <div className="lg:pl-[228px]">
@@ -127,6 +127,7 @@ export function SuperAdminDashboardView({
           query={tenantQuery}
           onQueryChange={setTenantQuery}
           onSignOut={onSignOut}
+          modulePacks={dashboard.modulePacks}
         />
 
         <main id="dashboard" className="space-y-7 p-4 sm:p-6 xl:p-8">

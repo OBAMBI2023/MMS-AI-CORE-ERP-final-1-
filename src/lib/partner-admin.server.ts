@@ -12,7 +12,7 @@ import { z } from "zod";
 
 export type { AuthenticatedDestination } from "@/lib/tenant-landing-route.server";
 
-function getInvitationRedirectUrl(): string {
+export function getInvitationRedirectUrl(): string {
   const appUrl = readEnvVar("APP_URL");
   if (!appUrl) {
     throw new Error("APP_URL est requis pour construire l'URL de redirection de l'invitation.");
