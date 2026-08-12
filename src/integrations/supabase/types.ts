@@ -1185,6 +1185,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "devis_items_devis_id_fkey"
+            columns: ["devis_id"]
+            isOneToOne: false
+            referencedRelation: "devis_balances"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "devis_items_service_id_fkey"
             columns: ["service_id"]
             isOneToOne: false
@@ -1193,6 +1200,67 @@ export type Database = {
           },
           {
             foreignKeyName: "devis_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devis_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          devis_id: string
+          id: string
+          method: string | null
+          notes: string | null
+          paid_at: string
+          reference: string | null
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          devis_id: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_at?: string
+          reference?: string | null
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          devis_id?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_at?: string
+          reference?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devis_payments_devis_id_tenant_id_fkey"
+            columns: ["devis_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "devis"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "devis_payments_devis_id_tenant_id_fkey"
+            columns: ["devis_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "devis_balances"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "devis_payments_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -4362,6 +4430,42 @@ export type Database = {
       }
     }
     Views: {
+      devis_balances: {
+        Row: {
+          balance_due: number | null
+          client_id: string | null
+          client_name: string | null
+          created_at: string | null
+          discount: number | null
+          due_date: string | null
+          id: string | null
+          notes: string | null
+          number: string | null
+          paid_total: number | null
+          settlement_status: string | null
+          status: string | null
+          subtotal: number | null
+          tenant_id: string | null
+          total: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devis_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devis_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_invoice_balances: {
         Row: {
           accommodation_total: number | null
@@ -4595,6 +4699,17 @@ export type Database = {
         Args: { requested_ticket_id: string }
         Returns: undefined
       }
+      collect_devis_payment: {
+        Args: {
+          requested_amount: number
+          requested_devis_id: string
+          requested_method?: string
+          requested_notes?: string
+          requested_paid_at?: string
+          requested_reference?: string
+        }
+        Returns: string
+      }
       collect_hotel_invoice_payment: {
         Args: {
           requested_amount: number
@@ -4798,13 +4913,25 @@ export type Database = {
           total: number
         }[]
       }
-      devis_summary: {
-        Args: { p_search?: string }
-        Returns: {
-          count: number
-          total: number
-        }[]
-      }
+      devis_summary:
+        | {
+            Args: { p_search?: string }
+            Returns: {
+              count: number
+              total: number
+            }[]
+          }
+        | {
+            Args: {
+              p_search?: string
+              p_settlement_status?: string
+              p_status?: string
+            }
+            Returns: {
+              count: number
+              total: number
+            }[]
+          }
       expire_due_module_subscriptions: {
         Args: { p_module_code?: string }
         Returns: number

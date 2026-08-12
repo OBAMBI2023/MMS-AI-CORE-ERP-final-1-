@@ -351,7 +351,7 @@ function Dashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <DashboardKpiCard
               index={0}
-              title={catalogMode === "products" ? "CA produits" : catalogMode === "services" ? "CA services" : "CA total"}
+              title={catalogMode === "products" ? "CA produits" : catalogMode === "services" ? "CA services" : "CA encaissé"}
               value={formatCurrency(catalogMode === "products" ? data.catalogSummary.productRevenue : catalogMode === "services" ? data.catalogSummary.serviceRevenue : data.kpis.revenue.value)}
               compactValue={formatCurrencyCompact(catalogMode === "products" ? data.catalogSummary.productRevenue : catalogMode === "services" ? data.catalogSummary.serviceRevenue : data.kpis.revenue.value)}
               icon={Wallet}
