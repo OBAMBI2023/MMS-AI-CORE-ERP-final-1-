@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -103,7 +103,7 @@ const clientTypeMeta: Record<ClientType, { label: string; className: string }> =
 type SortBy = "recent" | "name" | "stays";
 const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: "recent", label: "Plus récents" },
-  { key: "name", label: "Nom (A→Z)" },
+  { key: "name", label: "Nom (Aâ†’Z)" },
   { key: "stays", label: "Nombre de séjours" },
 ];
 const CLIENTS_PAGE_SIZE = 10;
@@ -113,18 +113,24 @@ type Guest = {
   tenant_id: string;
   first_name: string;
   last_name: string;
+  client_type: ClientType | null;
+  company: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
   notes: string | null;
+  identity_type?: string | null;
+  identity_number?: string | null;
+  identity_document_path?: string | null;
+  nationality: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type HotelGuestInsertResult = Guest;
+type GuestIdentity = Guest & {
   identity_type: string | null;
   identity_number: string | null;
   identity_document_path: string | null;
-  nationality: string | null;
-  client_type: ClientType | null;
-  company: string | null;
-  created_at: string;
-  updated_at: string;
 };
 type Stay = {
   id: string;
@@ -229,6 +235,7 @@ export function HotelClientsPage() {
   const canCreate = useActionPermission("hotel.guests.create");
   const canUpdate = useActionPermission("hotel.guests.update");
   const canDelete = useActionPermission("hotel.guests.delete");
+  const canViewIdentity = useActionPermission("hotel.guests.identity_view");
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"all" | ClientType>("all");
   const [sortBy, setSortBy] = useState<SortBy>("recent");
@@ -243,13 +250,19 @@ export function HotelClientsPage() {
     queryKey: ["hotel-clients", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("hotel_guests")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false });
+      const { data, error } = await db.rpc("hotel_guest_list_for_ui");
       if (error) throw error;
       return (data ?? []) as Guest[];
+    },
+  });
+
+  const guestIdentityQuery = useQuery({
+    queryKey: ["hotel-client-identity", tenantId, viewing?.id],
+    enabled: Boolean(tenantId && viewing?.id && canViewIdentity),
+    queryFn: async () => {
+      const { data, error } = await db.rpc("hotel_guest_identity_for_ui", { p_guest_id: viewing?.id });
+      if (error) throw error;
+      return (data?.[0] ?? null) as GuestIdentity | null;
     },
   });
 
@@ -965,8 +978,8 @@ function ClientFormDialog({
         : emptyForm,
     );
 
-  const save = useMutation({
-    mutationFn: async () => {
+    const save = useMutation({
+    mutationFn: async (): Promise<void> => {
       if (!tenantId) throw new Error("Aucun établissement actif.");
       const { first_name, last_name } = splitFullName(form.full_name);
       if (!first_name || !last_name) {
@@ -984,12 +997,8 @@ function ClientFormDialog({
         });
         if (dupError) throw dupError;
         const result = dup?.[0];
-        if (result?.duplicate_phone) {
-          throw new Error("Un client avec ce numéro de téléphone existe déjà.");
-        }
-        if (result?.duplicate_email) {
-          throw new Error("Un client avec cette adresse email existe déjà.");
-        }
+        if (result?.duplicate_phone) throw new Error("Un client avec ce numéro de téléphone existe déjà.");
+        if (result?.duplicate_email) throw new Error("Un client avec cette adresse email existe déjà.");
       }
       const payload = {
         first_name,
@@ -1005,19 +1014,31 @@ function ClientFormDialog({
         identity_document_path: form.identity_document_path || null,
         notes: form.notes.trim() || null,
       };
-      const result = guest
-        ? await db.from("hotel_guests").update(payload).eq("tenant_id", tenantId).eq("id", guest.id)
-        : await db.from("hotel_guests").insert({ ...payload, tenant_id: tenantId });
-      if (result.error) throw toHotelGuestDuplicateError(result.error);
+      if (guest) {
+        const { error } = await db
+          .from("hotel_guests")
+          .update(payload)
+          .eq("tenant_id", tenantId)
+          .eq("id", guest.id);
+        if (error) throw toHotelGuestDuplicateError(error);
+        return;
+      }
+      const { error } = await db.from("hotel_guests").insert(payload);
+      if (error) throw toHotelGuestDuplicateError(error);
+      return;
     },
     onSuccess: () => {
       toast.success(isEdit ? "Client mis à jour" : "Client ajouté");
       onSaved();
       onOpenChange(false);
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => {
+      if (import.meta.env.DEV) {
+        console.error("[hotel.clients] save failed", error);
+      }
+      toast.error(`Impossible d'enregistrer le client : ${error.message}`);
+    },
   });
-
   return (
     <Dialog
       open={open}
@@ -1128,7 +1149,7 @@ function ClientDetails({
   onReserve?: () => void;
 }) {
   const isIdentityDataUri = guest?.identity_document_path?.startsWith("data:") ?? false;
-  const identityStoragePath = guest && !isIdentityDataUri ? guest.identity_document_path : null;
+  const identityStoragePath = guest && !isIdentityDataUri ? guest.identity_document_path ?? null : null;
   const identitySignedUrl = useSignedUrl(identityStoragePath, IDENTITY_DOCUMENTS_BUCKET);
   const [downloadingIdentity, setDownloadingIdentity] = useState(false);
 

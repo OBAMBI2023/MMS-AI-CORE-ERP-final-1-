@@ -68,7 +68,7 @@ export function useHotelReportsData() {
           .from("hotel_rooms")
           .select("id,number,status,rate,room_type_id,hotel_room_types(name)")
           .eq("tenant_id", tenantId),
-        db.from("hotel_guests").select("id,first_name,last_name").eq("tenant_id", tenantId),
+        db.rpc("hotel_guest_list_for_ui"),
       ]);
       for (const result of [reservations, payments, expenses, rooms, guests]) if (result.error) throw result.error;
       return {
