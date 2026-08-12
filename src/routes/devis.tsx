@@ -41,6 +41,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -381,6 +391,8 @@ function DevisCard({
   const title = row.client_name?.trim() || "Client inconnu";
   const isAccepted = row.status === "accepté";
   const canRegler = canCollect && isAccepted && row.balance_due > 0;
+  const hasPayment = row.paid_total > 0;
+  const isFullyPaid = row.settlement_status === "reglé";
 
   const details: ResourceCardDetail[] = [
     { icon: Calendar, label: "Échéance", value: formatDate(row.due_date) },
@@ -448,23 +460,34 @@ function DevisCard({
           },
         ]
       : []),
-    {
-      key: "edit",
-      icon: Pencil,
-      label: "Modifier",
-      onClick: onEdit,
-      colorClass:
-        "text-violet-600 hover:bg-violet-50 active:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-500/10",
-    },
-    {
-      key: "delete",
-      icon: Trash2,
-      label: "Supprimer",
-      onClick: onDelete,
-      colorClass:
-        "text-red-600 hover:bg-red-50 active:bg-red-100 dark:text-red-400 dark:hover:bg-red-500/10",
-      disabled: !canDelete,
-    },
+    ...(isFullyPaid
+      ? []
+      : [
+          {
+            key: "edit",
+            icon: Pencil,
+            label: "Modifier",
+            onClick: onEdit,
+            colorClass:
+              "text-violet-600 hover:bg-violet-50 active:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-500/10",
+          },
+        ]),
+    // Masqué (pas seulement désactivé) dès qu'un règlement existe : un devis
+    // avec paid_total > 0 ne doit jamais pouvoir être supprimé, cf. la FK
+    // devis_payments_devis_id_tenant_id_fkey qui protège déjà ces lignes.
+    ...(hasPayment
+      ? []
+      : [
+          {
+            key: "delete",
+            icon: Trash2,
+            label: "Supprimer",
+            onClick: onDelete,
+            colorClass:
+              "text-red-600 hover:bg-red-50 active:bg-red-100 dark:text-red-400 dark:hover:bg-red-500/10",
+            disabled: !canDelete,
+          },
+        ]),
   ];
 
   return (
@@ -614,6 +637,7 @@ function DevisPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [payingDevis, setPayingDevis] = useState<Devis | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Devis | null>(null);
   const { data: userData } = useQuery({
     queryKey: ["user"],
     queryFn: () => supabase.auth.getUser(),
@@ -736,13 +760,33 @@ function DevisPage() {
     settlementFilterValue,
   );
 
+  const PAYMENT_BLOCKS_DELETE_MESSAGE =
+    "Ce devis possède déjà un règlement et ne peut pas être supprimé. Vous pouvez l’archiver ou l’annuler.";
+
   const del = useMutation({
     mutationFn: async (devis: Devis) => {
       if (!tenantId) throw new Error("Locataire introuvable");
+      // Court-circuite avant même d'appeler la base : un devis réglé (même
+      // partiellement) ne doit jamais être envoyé en suppression — la FK
+      // devis_payments_devis_id_tenant_id_fkey (ON DELETE RESTRICT, jamais
+      // CASCADE) protège déjà les paiements côté serveur, ceci n'est qu'un
+      // message clair côté client au lieu de laisser échouer la requête.
+      if (devis.paid_total > 0) {
+        throw new Error(PAYMENT_BLOCKS_DELETE_MESSAGE);
+      }
       const { error } = await (supabase.from("devis").delete() as any)
         .eq("id", devis.id)
         .eq("tenant_id", tenantId);
-      if (error) throw error;
+      if (error) {
+        // Filet de sécurité si un règlement a été enregistré entre le
+        // chargement de la liste et le clic sur Supprimer : ne jamais laisser
+        // remonter le message Postgres brut (nom de contrainte, code SQL...).
+        if (error.code === "23503" || /devis_payments/i.test(error.message ?? "")) {
+          throw new Error(PAYMENT_BLOCKS_DELETE_MESSAGE);
+        }
+        console.error("Échec de la suppression du devis", error);
+        throw new Error("La suppression a échoué. Réessayez ou contactez le support.");
+      }
       return devis;
     },
     onSuccess: async (devis) => {
@@ -755,6 +799,7 @@ function DevisPage() {
       qc.invalidateQueries({ queryKey: ["devis"] });
     },
     onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setDeleteTarget(null),
   });
 
   return (
@@ -824,9 +869,7 @@ function DevisPage() {
               canDelete={canDeleteDevis}
               canCollect={canEditDevis}
               onEdit={() => setEditId(row.id)}
-              onDelete={() => {
-                if (confirm("Supprimer ce devis ?")) del.mutate(row);
-              }}
+              onDelete={() => setDeleteTarget(row)}
               onDownloadPdf={() => downloadPDF(row)}
               onCollect={() => setPayingDevis(row)}
             />
@@ -869,6 +912,35 @@ function DevisPage() {
           qc.invalidateQueries({ queryKey: ["devis"] });
         }}
       />
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !del.isPending) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le devis ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est définitive et supprimera ce devis.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={del.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={del.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteTarget && !del.isPending) del.mutate(deleteTarget);
+              }}
+            >
+              {del.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }

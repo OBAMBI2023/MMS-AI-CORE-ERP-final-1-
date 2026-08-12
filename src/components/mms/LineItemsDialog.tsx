@@ -126,22 +126,31 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       query = query.eq("active", true);
       const settings = catalogSettingsQuery.data;
       const allowedTypes: ("product" | "service")[] = [];
-      if (settings?.catalog_mode !== "services" && (headerTable === "achats" || settings?.products_in_sales_enabled)) allowedTypes.push("product");
-      if (headerTable !== "achats" && settings?.catalog_mode !== "products" && settings?.services_in_sales_enabled) allowedTypes.push("service");
+      if (
+        settings?.catalog_mode !== "services" &&
+        (headerTable === "achats" || settings?.products_in_sales_enabled)
+      )
+        allowedTypes.push("product");
+      if (
+        headerTable !== "achats" &&
+        settings?.catalog_mode !== "products" &&
+        settings?.services_in_sales_enabled
+      )
+        allowedTypes.push("service");
       if (allowedTypes.length === 0) return [];
       if (allowedTypes.length === 1) query = query.eq("type", allowedTypes[0]);
       const { data, error } = await query.order("name", { ascending: true });
       if (error) throw error;
       return (
-        data as {
+        (data as {
           id: string;
           name: string;
           unit: string;
           price: number;
           type: "service" | "product";
           cost_price: number;
-        }[]
-      ) ?? [];
+        }[]) ?? []
+      );
     },
     enabled: catalogSettingsQuery.isSuccess,
   });
@@ -152,7 +161,11 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       let headQuery = db.from(headerTable).select("*").eq("id", initialId);
       if (tenantId) headQuery = headQuery.eq("tenant_id", tenantId);
       const { data: head, error: e1 } = await headQuery.maybeSingle();
-      if (e1 || !head) return;
+      if (e1 || !head) {
+        if (e1) console.error("Échec du chargement du document à éditer", e1);
+        toast.error("Impossible de charger ce document pour modification.");
+        return;
+      }
       const h = head as Record<string, unknown>;
       setPartnerId(
         (h[fkColumn.replace("_id", partnerTable === "clients" ? "_id" : "_id")] as string) ?? "",
@@ -168,10 +181,20 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       const ex: Record<string, string> = {};
       for (const f of extraFields) ex[f.name] = (h[f.name] as string) ?? "";
       setExtra(ex);
-      const { data: rows } = await db
+      // "*" (not a hardcoded column list) so this works across ventes/achats/
+      // devis even though their *_items tables don't share the same columns
+      // (e.g. selling_price/item_type/service_id/cost_price only exist on
+      // vente_items) — a mismatched column previously made this query error
+      // silently, leaving the form on its single default blank line.
+      const { data: rows, error: e2 } = await db
         .from(itemsTable)
-        .select("id, service_id, item_type, cost_price, selling_price, name, unit, qty, price")
+        .select("*")
         .eq(fkColumn, initialId);
+      if (e2) {
+        console.error("Échec du chargement des lignes à éditer", e2);
+        toast.error("Impossible de charger les lignes de ce document.");
+        return;
+      }
       const list = (rows as LineItem[]) ?? [];
       if (list.length) setItems(list);
     })();
@@ -351,7 +374,13 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
           });
         else updateItem(idx, { name: v });
       }}
-      placeholder={isAchats ? "Produit..." : isDevis ? "Service/produit du catalogue ou texte libre..." : "Service..."}
+      placeholder={
+        isAchats
+          ? "Produit..."
+          : isDevis
+            ? "Service/produit du catalogue ou texte libre..."
+            : "Service..."
+      }
       className={className}
     />
   );
@@ -371,9 +400,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
       step="0.01"
       value={it.qty === 0 || it.qty === undefined || it.qty === null ? "" : it.qty}
       placeholder="0"
-      onChange={(e) =>
-        updateItem(idx, { qty: e.target.value === "" ? 0 : Number(e.target.value) })
-      }
+      onChange={(e) => updateItem(idx, { qty: e.target.value === "" ? 0 : Number(e.target.value) })}
       className={className}
     />
   );
@@ -660,9 +687,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1">
-                          <span className="text-[10px] uppercase text-muted-foreground">
-                            Unité
-                          </span>
+                          <span className="text-[10px] uppercase text-muted-foreground">Unité</span>
                           {unitInput(
                             idx,
                             it,
@@ -692,9 +717,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                           )}
                         </label>
                         <div className="flex flex-col gap-1 min-w-0">
-                          <span className="text-[10px] uppercase text-muted-foreground">
-                            Total
-                          </span>
+                          <span className="text-[10px] uppercase text-muted-foreground">Total</span>
                           <div className="rounded-lg bg-muted/50 px-2 py-1.5 text-sm text-right font-semibold truncate">
                             {formatCurrency(Number(it.qty || 0) * Number(it.price || 0))}
                           </div>
@@ -834,9 +857,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1">
-                          <span className="text-[10px] uppercase text-muted-foreground">
-                            Unité
-                          </span>
+                          <span className="text-[10px] uppercase text-muted-foreground">Unité</span>
                           {unitInput(
                             idx,
                             it,
@@ -865,9 +886,7 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
                         )}
                       </label>
                       <div className="flex items-center justify-between pt-1">
-                        <span className="text-[10px] uppercase text-muted-foreground">
-                          Total
-                        </span>
+                        <span className="text-[10px] uppercase text-muted-foreground">Total</span>
                         <span className="text-sm font-bold text-foreground whitespace-nowrap">
                           {formatCurrency(Number(it.qty || 0) * Number(it.price || 0))}
                         </span>
@@ -919,7 +938,9 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-semibold">Lignes</h4>
-                {addLineButton("inline-flex items-center gap-1 text-xs text-primary hover:underline")}
+                {addLineButton(
+                  "inline-flex items-center gap-1 text-xs text-primary hover:underline",
+                )}
               </div>
               <div className="rounded-xl border border-border overflow-hidden">
                 <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
