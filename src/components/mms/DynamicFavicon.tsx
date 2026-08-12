@@ -3,7 +3,7 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { PLATFORM_BRANDING } from "@/config/branding";
 
 export function DynamicFavicon({ platform = false }: { platform?: boolean }) {
-  const { logoUrl, companyName, isLoading } = useCompanySettings();
+  const { logoUrl, isLoading } = useCompanySettings();
 
   useEffect(() => {
     if (!platform && isLoading) return;
@@ -15,9 +15,12 @@ export function DynamicFavicon({ platform = false }: { platform?: boolean }) {
         : (logoUrl ?? PLATFORM_BRANDING.assets.favicon);
       favicon.type = platform || !logoUrl ? "image/png" : "";
     }
-
-    if (!platform && companyName) document.title = companyName;
-  }, [logoUrl, companyName, isLoading, platform]);
+    // document.title is centrally managed by useDocumentTitle() (see
+    // DocumentTitleManager in __root.tsx) — this component only owns the
+    // favicon now. It used to also set document.title = companyName here,
+    // which raced with route-based titles and could leave a tab showing
+    // just the tenant's raw company name with no page name or brand.
+  }, [logoUrl, isLoading, platform]);
 
   return null;
 }

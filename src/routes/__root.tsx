@@ -408,6 +408,17 @@ function RootShell({ children }: { children: ReactNode }) {
 
 import { DynamicFavicon } from "@/components/mms/DynamicFavicon";
 import { PwaUpdatePrompt } from "@/components/pwa/PwaUpdatePrompt";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+
+// Renderless: must be rendered inside <TenantProvider> to see the real
+// tenant (mirrors DynamicFavicon's placement below). Outside TenantProvider
+// (platform/public branch) useTenant() resolves to its null default, which
+// is correct there since only the login/super-admin title scopes apply and
+// neither needs a tenant name.
+function DocumentTitleManager() {
+  useDocumentTitle();
+  return null;
+}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -438,12 +449,14 @@ function RootComponent() {
         {isPlatformArea || isPublicArea ? (
           <>
             <DynamicFavicon platform />
+            <DocumentTitleManager />
             <Outlet />
             <Toaster richColors position="top-right" />
           </>
         ) : (
           <TenantProvider>
             <DynamicFavicon />
+            <DocumentTitleManager />
             <Outlet />
             <Toaster richColors position="top-right" />
           </TenantProvider>
