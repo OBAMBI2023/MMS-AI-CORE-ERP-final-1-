@@ -34,6 +34,9 @@ CROSS JOIN public.erp_modules module
 WHERE module.code = 'fiscalite'
   AND COALESCE(tenant.deleted_at IS NULL, true)
   AND COALESCE(tenant.platform_type, 'ERP') = 'ERP'
-ON CONFLICT (tenant_id, module_id) DO NOTHING;
+ON CONFLICT (tenant_id, module_id) DO UPDATE
+SET enabled = true,
+    assignment_source = 'system',
+    updated_at = now();
 
 NOTIFY pgrst, 'reload schema';
