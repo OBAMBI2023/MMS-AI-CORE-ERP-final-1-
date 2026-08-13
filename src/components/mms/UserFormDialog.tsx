@@ -4,11 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +34,7 @@ import { useTenant } from "@/providers/TenantProvider";
 import { formatSupabaseError } from "@/lib/supabase-error";
 import { AvatarManager } from "@/components/mms/AvatarManager";
 import { cn } from "@/lib/utils";
+import { HotelDialogBody, HotelDialogContent, HotelDialogFooter, HotelDialogHeader } from "@/components/hotel/HotelDialog";
 
 const fieldInputClass =
   "h-12 rounded-[12px] border-gray-200 bg-white pl-11 text-[15px] text-gray-900 shadow-none placeholder:text-gray-400 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0";
@@ -179,7 +176,7 @@ export function UserFormDialog({
         email: formData.email,
         password: formData.password,
         role_id: formData.role_id,
-        full_name: formData.username,
+        full_name: formData.full_name,
         username: formData.username,
         status: "actif" as const,
       };
@@ -200,41 +197,16 @@ export function UserFormDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent
-        className={cn(
-          "flex w-[calc(100vw-24px)] flex-col gap-0 overflow-hidden rounded-2xl border-none p-0 shadow-2xl sm:w-[calc(100vw-48px)] max-h-[calc(100dvh-24px)]",
-          isEdit ? "max-w-[960px]" : "max-w-[440px]",
-        )}
-      >
-        <DialogHeader
-          className={cn(
-            "shrink-0 border-b border-gray-100 bg-white pr-12",
-            isEdit ? "px-[18px] py-5 sm:px-8 sm:py-6" : "px-5 py-4 sm:px-6",
-          )}
-        >
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              <UserRound className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 text-left">
-              <DialogTitle className="text-lg font-semibold text-gray-900">
-                {isEdit ? "Modifier l'utilisateur" : createTitle}
-              </DialogTitle>
-              <p className="mt-0.5 text-sm text-gray-500">
-                {isEdit ? "Modifiez les informations du collaborateur." : "Ajoutez un collaborateur."}
-              </p>
-            </div>
-          </div>
-        </DialogHeader>
+      <HotelDialogContent size="lg">
+        <HotelDialogHeader
+          title={isEdit ? "Modifier l'utilisateur" : createTitle}
+          description={isEdit ? "Modifiez les informations du collaborateur." : "Ajoutez un collaborateur."}
+          icon={UserRound}
+        />
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div
-            className={cn(
-              "flex-1 overflow-y-auto overflow-x-hidden",
-              isEdit ? "px-[18px] py-5 sm:px-8 sm:py-7" : "px-5 py-4 sm:px-6",
-            )}
-          >
+          <HotelDialogBody className="overflow-x-hidden">
             {isEdit && tenantId && (
-              <div className="mb-6 border-b border-gray-100 pb-6">
+              <div className="mb-6 border-b border-border pb-6">
                 <AvatarManager
                   userId={user.id}
                   tenantId={tenantId}
@@ -390,32 +362,20 @@ export function UserFormDialog({
                 </div>
               )}
             </div>
-          </div>
-          <DialogFooter
-            className={cn(
-              "shrink-0 gap-2 border-t border-gray-100 bg-white",
-              isEdit ? "px-[18px] py-4 sm:px-8 sm:py-5" : "px-5 py-4 sm:px-6",
-            )}
-          >
+          </HotelDialogBody>
+          <HotelDialogFooter className="gap-2 sm:justify-end">
             <Button
               type="button"
               variant="ghost"
               onClick={() => setOpen(false)}
               disabled={mutation.isPending}
-              className={cn(
-                "h-12 rounded-[12px] text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-                !isEdit && "w-full sm:w-auto",
-              )}
+              className="h-12 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               Annuler
             </Button>
             <Button
               type="submit"
-              className={cn(
-                "h-12 rounded-[12px] px-5 font-medium",
-                submitButtonAccentClass,
-                !isEdit && "w-full sm:w-auto",
-              )}
+              className={cn("h-12 rounded-xl px-5 font-medium", submitButtonAccentClass)}
               disabled={mutation.isPending}
             >
               {mutation.isPending ? (
@@ -432,9 +392,9 @@ export function UserFormDialog({
                 </>
               )}
             </Button>
-          </DialogFooter>
+          </HotelDialogFooter>
         </form>
-      </DialogContent>
+      </HotelDialogContent>
     </Dialog>
   );
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { BrandLogo } from "@/components/branding/BrandLogo";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -50,7 +50,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Tables } from "@/integrations/supabase/types";
 import { RecentConnections } from "@/components/mms/RecentConnections";
@@ -61,9 +60,21 @@ import { useTenant } from "@/providers/TenantProvider";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { useTenantSubscription } from "@/hooks/use-tenant-subscription";
 import { BACKUP_MODULE_OPTIONS } from "@/lib/backup-modules";
 import type { CatalogSettings } from "@/lib/catalog-settings";
 import { configureCurrency } from "@/lib/mms/format";
+import {
+  formatBillingCycle,
+  formatSubscriptionStatus,
+  subscriptionDaysRemaining,
+  subscriptionDurationLabel,
+  subscriptionEndDate,
+  subscriptionStartDate,
+} from "@/lib/subscription";
+import { CreditCard } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 // Assuming AiSettings is available in the scope or imported.
 // Since the original file didn't import it, I'll assume it's part of the type definition context
@@ -122,11 +133,32 @@ function cleanBusinessSector(value: string | null | undefined): string | null {
   return cleaned || null;
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return "Non définie";
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(value));
+}
+
 function ParametresPage() {
   const qc = useQueryClient();
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
+  const [activeTab, setActiveTab] = useState("general");
+  const allowedTabs = useMemo(
+    () =>
+      new Set([
+        "general",
+        "catalogue",
+        "subscription",
+        "finances",
+        "documents",
+        "backups",
+        "security",
+        "audit",
+      ]),
+    [],
+  );
   const canViewBackups = useActionPermission("backup.view");
+  const subscriptionQuery = useTenantSubscription();
   const backupModulesQuery = useTenantModules();
   const enabledBackupModules = backupModulesQuery.data ?? new Set<string>();
   const availableBackupModules = BACKUP_MODULE_OPTIONS.filter((m) =>
@@ -204,6 +236,16 @@ function ParametresPage() {
       initialized.current = true;
     }
   }, [data]);
+  useEffect(() => {
+    if (!allowedTabs.has(activeTab)) {
+      setActiveTab("general");
+    }
+  }, [activeTab, allowedTabs]);
+  useEffect(() => {
+    if (activeTab === "organization") {
+      setActiveTab("general");
+    }
+  }, [activeTab]);
 
   const update = <K extends keyof Parametres>(key: K, value: Parametres[K] | null) =>
     setForm((s) => ({ ...s, [key]: value as Parametres[K] }));
@@ -252,14 +294,16 @@ function ParametresPage() {
       title="Paramètres"
       subtitle="Centre de configuration de l'entreprise"
       actions={
-        <Button onClick={saveAll} disabled={save.isPending || isLoading} className="gap-2">
-          {save.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          Enregistrer
-        </Button>
+        activeTab === "subscription" ? undefined : (
+          <Button onClick={saveAll} disabled={save.isPending || isLoading} className="gap-2">
+            {save.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Enregistrer
+          </Button>
+        )
       }
     >
       {tenantLoading || isLoading ? (
@@ -275,16 +319,16 @@ function ParametresPage() {
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
           <div className="min-w-0">
-            <Tabs defaultValue="general">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="mb-6 flex flex-wrap h-auto p-1 bg-muted/60 rounded-xl">
                 <TabTrig value="general" icon={<Building2 className="h-4 w-4" />}>
                   Général
                 </TabTrig>
-                <TabTrig value="organization" icon={<FileText className="h-4 w-4" />}>
-                  Organisation
-                </TabTrig>
                 <TabTrig value="catalogue" icon={<Boxes className="h-4 w-4" />}>
                   Catalogue
+                </TabTrig>
+                <TabTrig value="subscription" icon={<CreditCard className="h-4 w-4" />}>
+                  Abonnement
                 </TabTrig>
                 <Link
                   to="/settings/users"
@@ -304,9 +348,11 @@ function ParametresPage() {
                     Sauvegardes
                   </TabTrig>
                 )}
-                <TabTrig value="integrations" icon={<Plug className="h-4 w-4" />}>
+                {false && <>
+                  <TabTrig value="integrations" icon={<Plug className="h-4 w-4" />}>
                   Intégrations
                 </TabTrig>
+                </>}
                 <TabTrig value="security" icon={<Shield className="h-4 w-4" />}>
                   Sécurité
                 </TabTrig>
@@ -318,15 +364,15 @@ function ParametresPage() {
               <TabsContent value="general">
                 <GeneralTab form={form} update={update} settingsId={data.id} onSave={save.mutate} />
               </TabsContent>
-              <TabsContent value="organization">
-                <LegalTab form={form} update={update} />
-              </TabsContent>
               <TabsContent value="catalogue">
                 <CatalogueSummaryCard
                   settings={catalogSettingsQuery.data}
                   isLoading={catalogSettingsQuery.isLoading}
                   hasError={catalogSettingsQuery.isError}
                 />
+              </TabsContent>
+              <TabsContent value="subscription">
+                <SubscriptionTab subscription={subscriptionQuery.data ?? null} loading={subscriptionQuery.isLoading} />
               </TabsContent>
               <TabsContent value="finances">
                 <BillingTab form={form} update={update} />
@@ -352,7 +398,8 @@ function ParametresPage() {
                   />
                 </TabsContent>
               )}
-              <TabsContent value="integrations">
+              {false && <>
+                <TabsContent value="integrations">
                 <Card
                   title="Intégrations"
                   description="Connectez et configurez les services externes de votre organisation."
@@ -362,7 +409,8 @@ function ParametresPage() {
                     Les intégrations disponibles apparaîtront ici lorsqu’elles seront activées.
                   </p>
                 </Card>
-              </TabsContent>
+                </TabsContent>
+              </>}
               <TabsContent value="security">
                 <SecurityTab />
               </TabsContent>
@@ -483,6 +531,124 @@ function CatalogueSummaryCard({
   );
 }
 
+function SubscriptionTab({
+  subscription,
+  loading,
+}: {
+  subscription: import("@/lib/subscription").SubscriptionRow | null;
+  loading: boolean;
+}) {
+  const planLabel = subscription?.status === "trial" ? "Essai gratuit" : formatBillingCycle(subscription?.billing_cycle);
+  const statusLabel = formatSubscriptionStatus(subscription?.status);
+  const statusClassName =
+    subscription?.status === "trial"
+      ? "border-sky-200 bg-sky-500/10 text-sky-700 dark:border-sky-900 dark:text-sky-300"
+      : subscription?.status === "active"
+        ? "border-emerald-200 bg-emerald-500/10 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300"
+        : subscription?.status === "expired"
+          ? "border-red-200 bg-red-500/10 text-red-700 dark:border-red-900 dark:text-red-300"
+          : subscription?.status === "suspended"
+            ? "border-orange-200 bg-orange-500/10 text-orange-700 dark:border-orange-900 dark:text-orange-300"
+            : "border-border bg-muted text-muted-foreground";
+  const amountLabel =
+    subscription?.amount != null ? `${new Intl.NumberFormat("fr-FR").format(Number(subscription.amount))} FCFA` : "Non défini";
+  const endDate = subscriptionEndDate(subscription);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Chargement...
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <CreditCard className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-foreground">Abonnement en cours</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Consultez votre formule, votre statut et la prochaine échéance.
+            </p>
+          </div>
+        </div>
+
+        {!subscription ? (
+          <p className="text-sm text-muted-foreground">Aucune information d’abonnement disponible.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SubscriptionField label="Formule actuelle" value={planLabel} emphasized />
+            <SubscriptionField
+              label="Statut"
+              value={<Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", statusClassName)}>{statusLabel}</Badge>}
+            />
+            <SubscriptionField label="Date de début" value={formatDate(subscriptionStartDate(subscription))} />
+            <SubscriptionField label="Date d’expiration" value={formatDate(endDate)} />
+            <SubscriptionField label="Durée" value={subscriptionDurationLabel(subscription)} />
+            <SubscriptionField
+              label="Jours restants"
+              value={endDate ? subscriptionDaysRemaining(endDate) : "Non définie"}
+              emphasized
+            />
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Receipt className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-foreground">Votre formule</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Informations de facturation disponibles pour le tenant ERP.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SubscriptionField label="Périodicité" value={subscription?.billing_cycle ? formatBillingCycle(subscription.billing_cycle) : "Non définie"} />
+          <SubscriptionField label="Montant de l’abonnement" value={amountLabel} emphasized />
+        </div>
+
+        <div className="mt-4">
+          <Button type="button" variant="outline" disabled className="w-full sm:w-auto">
+            Renouvellement bientôt disponible
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SubscriptionField({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string;
+  value: ReactNode;
+  emphasized?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/20 p-4">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className={cn("mt-1.5 min-h-6", emphasized && "text-lg font-semibold text-foreground")}>
+        {typeof value === "string" ? (
+          <p className={cn("leading-6", emphasized ? "text-lg font-semibold text-foreground" : "text-sm font-medium text-foreground")}>{value}</p>
+        ) : (
+          value
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TabTrig({
   value,
   icon,
@@ -565,7 +731,7 @@ function GeneralTab({
   return (
     <div className="space-y-6">
       <Card
-        title="Logo de l'entreprise"
+        title="Informations de l'entreprise"
         description="PNG, JPG ou SVG — 2 Mo max."
         icon={<ImageIcon className="h-4 w-4" />}
       >
@@ -580,7 +746,7 @@ function GeneralTab({
         />
       </Card>
 
-      <Card title="Coordonnées" icon={<Building2 className="h-4 w-4" />}>
+      <Card title="Coordonnées et identité" icon={<Building2 className="h-4 w-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Raison sociale" required>
             <Input
@@ -644,6 +810,51 @@ function GeneralTab({
               />
             </Field>
           </div>
+        </div>
+      </Card>
+
+      <Card title="Informations légales" icon={<Receipt className="h-4 w-4" />}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="RCCM">
+            <Input value={form.rccm ?? ""} onChange={(e) => update("rccm", e.target.value || null)} />
+          </Field>
+          <Field label="Numéro fiscal (NIF)">
+            <Input
+              value={form.tax_number ?? ""}
+              onChange={(e) => update("tax_number", e.target.value || null)}
+            />
+          </Field>
+          <Field label="Régime fiscal">
+            <Select
+              value={form.tax_regime ?? undefined}
+              onValueChange={(v) => update("tax_regime", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Réel">Régime du réel</SelectItem>
+                <SelectItem value="Simplifié">Régime simplifié</SelectItem>
+                <SelectItem value="Micro-entreprise">Micro-entreprise</SelectItem>
+                <SelectItem value="Non assujetti">Non assujetti</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Taux TVA (%)" hint="Laisser vide si non applicable">
+            <div className="relative">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={form.vat_rate ?? ""}
+                onChange={(e) =>
+                  update("vat_rate", e.target.value === "" ? null : Number(e.target.value))
+                }
+              />
+              <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          </Field>
         </div>
       </Card>
     </div>

@@ -47,7 +47,6 @@ import { useTenant } from "@/providers/TenantProvider";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { deleteUser, resetUserPassword, toggleStatus } from "@/lib/user-management.server";
 import { formatSupabaseError } from "@/lib/supabase-error";
-import { formatDateTime } from "@/lib/mms/format";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -135,6 +134,8 @@ export function HotelUsersAccessTab() {
   }
 
   const users = usersQuery.data ?? [];
+  const getUserDisplayName = (user: (typeof users)[number]) =>
+    user.full_name?.trim() || user.username?.trim() || user.email?.trim() || "—";
 
   const renderActionsMenu = (user: (typeof users)[number]) => (
     <DropdownMenu>
@@ -154,7 +155,7 @@ export function HotelUsersAccessTab() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <UserFormDialog user={user} />
+        <UserFormDialog user={user} accent="hotel" />
         <DropdownMenuItem onClick={() => passwordMutation.mutate({ data: { id: user.id } })}>
           <Key className="mr-2 h-4 w-4" /> Réinitialiser le mot de passe
         </DropdownMenuItem>
@@ -218,12 +219,12 @@ export function HotelUsersAccessTab() {
                   <div className="flex min-w-0 items-center gap-3">
                     <ProfileAvatar
                       path={user.avatar_url}
-                      name={user.full_name}
+                      name={getUserDisplayName(user)}
                       email={user.email}
                       className="h-10 w-10 shrink-0"
                     />
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{user.full_name}</p>
+                      <p className="truncate font-medium">{getUserDisplayName(user)}</p>
                       <p className="truncate text-sm text-muted-foreground">{user.email}</p>
                     </div>
                   </div>
@@ -250,12 +251,6 @@ export function HotelUsersAccessTab() {
                       {(user.status && STATUS_LABELS[user.status]) ?? user.status}
                     </Badge>
                   </div>
-                  <div className="min-w-0 text-right">
-                    <p className="text-xs font-medium text-muted-foreground">Dernière activité</p>
-                    <p className="mt-1 truncate text-sm text-muted-foreground">
-                      {user.last_login_at ? formatDateTime(user.last_login_at) : "Jamais"}
-                    </p>
-                  </div>
                 </div>
               </div>
             ))}
@@ -274,9 +269,6 @@ export function HotelUsersAccessTab() {
                   <TableHead className="py-3 text-xs uppercase tracking-wide">Email</TableHead>
                   <TableHead className="py-3 text-xs uppercase tracking-wide">Rôle</TableHead>
                   <TableHead className="py-3 text-xs uppercase tracking-wide">Statut</TableHead>
-                  <TableHead className="py-3 text-xs uppercase tracking-wide">
-                    Dernière activité
-                  </TableHead>
                   {canManage && (
                     <TableHead className="py-3 text-right text-xs uppercase tracking-wide">
                       Actions
@@ -291,11 +283,11 @@ export function HotelUsersAccessTab() {
                       <div className="flex items-center gap-3">
                         <ProfileAvatar
                           path={user.avatar_url}
-                          name={user.full_name}
+                          name={getUserDisplayName(user)}
                           email={user.email}
                           className="h-8 w-8 shrink-0"
                         />
-                        <span className="truncate font-medium">{user.full_name}</span>
+                        <span className="truncate font-medium">{getUserDisplayName(user)}</span>
                       </div>
                     </TableCell>
                     <TableCell className="py-3.5 text-muted-foreground">{user.email}</TableCell>
@@ -310,9 +302,6 @@ export function HotelUsersAccessTab() {
                         {(user.status && STATUS_LABELS[user.status]) ?? user.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-3.5 text-muted-foreground">
-                      {user.last_login_at ? formatDateTime(user.last_login_at) : "Jamais"}
-                    </TableCell>
                     {canManage && (
                       <TableCell className="py-3.5 text-right">
                         <div className="flex justify-end opacity-70 transition-opacity hover:opacity-100">
@@ -325,7 +314,7 @@ export function HotelUsersAccessTab() {
                 {users.length === 0 && (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={canManage ? 6 : 5}
+                      colSpan={canManage ? 5 : 4}
                       className="p-10 text-center text-sm text-muted-foreground"
                     >
                       Aucun utilisateur pour cet établissement.

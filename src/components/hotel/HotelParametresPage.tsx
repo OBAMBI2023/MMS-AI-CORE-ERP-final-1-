@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   CalendarCheck,
+  CalendarClock,
   ClipboardList,
   DatabaseBackup,
   Eye,
@@ -57,7 +58,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/providers/TenantProvider";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { useHotelSubscription } from "@/hooks/use-hotel-subscription";
 import { useSignedUrl } from "@/hooks/use-signed-url";
+import type { HotelSubscriptionRow } from "@/hooks/use-hotel-subscription";
 import {
   useHotelSettings,
   useHotelSettingsRefresh,
@@ -85,6 +88,23 @@ const TIMEZONES = [
   { value: "UTC", label: "UTC" },
 ];
 
+const SUBSCRIPTION_FALLBACK_RATES: Record<"monthly" | "quarterly" | "yearly", { label: string; amount: number }> = {
+  monthly: { label: "Mensuel", amount: 0 },
+  quarterly: { label: "Trimestriel", amount: 50000 },
+  yearly: { label: "Annuel", amount: 100000 },
+};
+
+const STATUS_META: Record<
+  "trial" | "active" | "expired" | "suspended" | "missing",
+  { label: string; className: string }
+> = {
+  trial: { label: "Essai gratuit", className: "border-sky-200 bg-sky-500/10 text-sky-700 dark:border-sky-900 dark:text-sky-300" },
+  active: { label: "Actif", className: "border-emerald-200 bg-emerald-500/10 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300" },
+  expired: { label: "Expiré", className: "border-red-200 bg-red-500/10 text-red-700 dark:border-red-900 dark:text-red-300" },
+  suspended: { label: "Suspendu", className: "border-orange-200 bg-orange-500/10 text-orange-700 dark:border-orange-900 dark:text-orange-300" },
+  missing: { label: "Non défini", className: "border-border bg-muted text-muted-foreground" },
+};
+
 function formatSupabaseError(error: unknown): string {
   const e = error as { code?: string; message?: string; details?: string; hint?: string };
   const parts = [
@@ -106,6 +126,7 @@ export function HotelParametresPage() {
   const canViewBackups = useActionPermission("hotel.backups.view");
 
   const hotelSettingsQuery = useHotelSettings();
+  const hotelSubscriptionQuery = useHotelSubscription();
   const refreshHotelSettings = useHotelSettingsRefresh();
   const { settings: paramSettings, isLoading: paramsLoading } = useCompanySettings(tenantId);
   const backupModulesQuery = useHotelBackupModules();
@@ -201,7 +222,7 @@ export function HotelParametresPage() {
         // mutations (création/édition/suppression/statut) — ce bouton ne touche que
         // hotelForm/paramForm et n'a aucun effet sur cet onglet, où il ne ferait que
         // prêter à confusion.
-        canEdit && activeTab !== "users" ? (
+        canEdit && activeTab !== "users" && activeTab !== "subscription" ? (
           <Button
             onClick={() => save.mutate()}
             disabled={save.isPending || isLoading}
@@ -244,6 +265,9 @@ export function HotelParametresPage() {
             </TabTrig>
             <TabTrig value="documents" icon={<FileText className="h-4 w-4" />}>
               Documents
+            </TabTrig>
+            <TabTrig value="subscription" icon={<CalendarClock className="h-4 w-4" />}>
+              Abonnement
             </TabTrig>
             {canViewBackups && (
               <TabTrig value="backups" icon={<DatabaseBackup className="h-4 w-4" />}>
@@ -290,6 +314,13 @@ export function HotelParametresPage() {
               paramForm={paramForm}
               update={updateHotel}
               disabled={!canEdit}
+            />
+          </TabsContent>
+
+          <TabsContent value="subscription">
+            <SubscriptionTab
+              subscription={hotelSubscriptionQuery.data ?? null}
+              loading={hotelSubscriptionQuery.isLoading}
             />
           </TabsContent>
 
@@ -351,6 +382,182 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
       <Label className="mb-1.5 block">{label}</Label>
       {children}
       {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Non définie";
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function daysRemaining(endsAt?: string | null) {
+  if (!endsAt) return "Non définie";
+  const end = new Date(endsAt);
+  const diff = end.getTime() - new Date().getTime();
+  if (Number.isNaN(end.getTime()) || diff <= 0) return "0 jour";
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return `${days} jour${days > 1 ? "s" : ""}`;
+}
+
+function durationLabel(subscription: HotelSubscriptionRow | null) {
+  if (!subscription) return "Non définie";
+  if (subscription.status === "trial" && subscription.trial_started_at && subscription.trial_ends_at) {
+    const days = Math.max(
+      0,
+      Math.ceil(
+        (new Date(subscription.trial_ends_at).getTime() - new Date(subscription.trial_started_at).getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
+    );
+    return `${days} jours`;
+  }
+  if (subscription.starts_at && subscription.ends_at) {
+    const days = Math.max(
+      0,
+      Math.ceil((new Date(subscription.ends_at).getTime() - new Date(subscription.starts_at).getTime()) / (1000 * 60 * 60 * 24)),
+    );
+    return `${days} jours`;
+  }
+  return "Non définie";
+}
+
+function SubscriptionTab({
+  subscription,
+  loading,
+}: {
+  subscription: HotelSubscriptionRow | null;
+  loading: boolean;
+}) {
+  const billingCycle: "monthly" | "quarterly" | "yearly" =
+    subscription?.billing_cycle === "quarterly" || subscription?.billing_cycle === "yearly"
+      ? subscription.billing_cycle
+      : "monthly";
+  const fallbackRate = SUBSCRIPTION_FALLBACK_RATES[billingCycle];
+  const planLabel = subscription?.status === "trial" ? "Essai gratuit" : subscription?.billing_cycle ? fallbackRate.label : "Non définie";
+  const statusKey: "trial" | "active" | "expired" | "suspended" | "missing" =
+    subscription?.status === "trial" ||
+    subscription?.status === "active" ||
+    subscription?.status === "expired" ||
+    subscription?.status === "suspended"
+      ? subscription.status
+      : "missing";
+  const status = STATUS_META[statusKey];
+  const amountLabel =
+    subscription?.amount != null
+      ? `${new Intl.NumberFormat("fr-FR").format(Number(subscription.amount))} FCFA`
+      : "Non définie";
+  const canRenew = false;
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <header className="max-w-3xl space-y-2">
+        <h3 className="text-xl font-semibold">Abonnement</h3>
+        <p className="text-sm text-muted-foreground">
+          Consultez votre formule, votre période d’abonnement et son échéance.
+        </p>
+      </header>
+
+      {!subscription ? (
+        <section className="hotel-panel">
+          <p className="text-sm text-muted-foreground">Aucune information d’abonnement disponible.</p>
+        </section>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <section className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 sm:p-6">
+            <div className="mb-5 flex items-start gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <CalendarCheck className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-base font-semibold text-foreground">Abonnement en cours</h4>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Vue récapitulative de l’abonnement actif de l’établissement.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SubscriptionMeta label="Formule actuelle" value={planLabel} emphasized />
+              <SubscriptionMeta
+                label="Statut"
+                value={<Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", status.className)}>{status.label}</Badge>}
+              />
+              <SubscriptionMeta label="Date de début" value={formatDate(subscription.starts_at ?? subscription.trial_started_at)} />
+              <SubscriptionMeta label="Date d’expiration" value={formatDate(subscription.ends_at ?? subscription.trial_ends_at)} />
+              <SubscriptionMeta label="Durée" value={durationLabel(subscription)} />
+              <SubscriptionMeta
+                label="Jours restants"
+                value={subscription.ends_at || subscription.trial_ends_at ? daysRemaining(subscription.ends_at ?? subscription.trial_ends_at) : "Non définie"}
+                emphasized
+              />
+            </div>
+          </section>
+
+          <section className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 sm:p-6">
+            <div className="mb-5 flex items-start gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Receipt className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-base font-semibold text-foreground">Votre formule</h4>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Paramètres de facturation liés à l’abonnement actuel.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SubscriptionMeta label="Périodicité" value={subscription?.billing_cycle ? fallbackRate.label : "Non définie"} />
+              <SubscriptionMeta label="Montant de l’abonnement" value={amountLabel} emphasized />
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button
+                type="button"
+                className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400 sm:w-auto"
+                disabled={!canRenew}
+              >
+                Renouveler l’abonnement
+              </Button>
+              {!canRenew && (
+                <p className="text-xs text-muted-foreground">Renouvellement bientôt disponible</p>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubscriptionMeta({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string;
+  value: ReactNode;
+  emphasized?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/20 p-4">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className={cn("mt-1.5 min-h-6", emphasized && "text-lg font-semibold text-foreground")}>
+        {typeof value === "string" ? (
+          <p className={cn("leading-6", emphasized ? "text-lg font-semibold text-foreground" : "text-sm font-medium text-foreground")}>{value}</p>
+        ) : (
+          value
+        )}
+      </div>
     </div>
   );
 }
