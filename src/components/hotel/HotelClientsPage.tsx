@@ -160,6 +160,11 @@ type GuestForm = {
   identity_document_path: string;
   notes: string;
 };
+type IdentityDocumentSource = {
+  first_name: string;
+  last_name: string;
+  identity_document_path: string | null;
+};
 const emptyForm: GuestForm = {
   full_name: "",
   client_type: "individuel",
@@ -827,7 +832,7 @@ function ClientActions({
   onDelete,
 }: Omit<ManageClientProps, "stays">) {
   const { downloadIdentityDocument, downloadingIdentity, canDownloadIdentityDocument } =
-    useIdentityDocumentDownload(guest);
+    useIdentityDocumentDownload(guest, true);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -997,6 +1002,12 @@ function ClientFormDialog({
   const [form, setForm] = useState<GuestForm>(emptyForm);
   const [identityLoadedForGuestId, setIdentityLoadedForGuestId] = useState<string | null>(null);
   const isEdit = Boolean(guest);
+  const formIdentitySource: IdentityDocumentSource = {
+    ...splitFullName(form.full_name),
+    identity_document_path: form.identity_document_path || null,
+  };
+  const { downloadIdentityDocument, downloadingIdentity, canDownloadIdentityDocument } =
+    useIdentityDocumentDownload(formIdentitySource, canViewIdentity);
   const formFromGuest = (currentGuest: Guest): GuestForm => ({
     full_name: guestName(currentGuest),
     client_type: currentGuest.client_type ?? "individuel",
@@ -1190,6 +1201,24 @@ function ClientFormDialog({
                     value={form.identity_document_path}
                     onChange={(v) => setForm({ ...form, identity_document_path: v })}
                   />
+                  {canViewIdentity && canDownloadIdentityDocument ? (
+                    <div className="mt-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void downloadIdentityDocument()}
+                        disabled={downloadingIdentity}
+                        className="gap-2 rounded-xl"
+                      >
+                        {downloadingIdentity ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Download className="size-4" />
+                        )}
+                        Télécharger la pièce d’identité
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : canViewIdentity && (guest || identityLoadedForGuestId) ? (
@@ -1430,19 +1459,24 @@ function Detail({ icon: Icon, label, value }: { icon?: typeof Phone; label: stri
   );
 }
 
-function useIdentityDocumentDownload(guest: Guest | null, canViewIdentity = true) {
-  const isIdentityDataUri = guest?.identity_document_path?.startsWith("data:") ?? false;
-  const identityStoragePath = guest && canViewIdentity && !isIdentityDataUri ? guest.identity_document_path ?? null : null;
+function useIdentityDocumentDownload(
+  source: Pick<IdentityDocumentSource, "first_name" | "last_name" | "identity_document_path"> | Guest | null,
+  canViewIdentity = true,
+) {
+  const identityDocumentPath = source?.identity_document_path ?? null;
+  const isIdentityDataUri = identityDocumentPath?.startsWith("data:") ?? false;
+  const identityStoragePath =
+    source && canViewIdentity && !isIdentityDataUri ? identityDocumentPath : null;
   const identitySignedUrl = useSignedUrl(identityStoragePath, IDENTITY_DOCUMENTS_BUCKET);
   const [downloadingIdentity, setDownloadingIdentity] = useState(false);
 
   const canDownloadIdentityDocument = Boolean(
-    guest && canViewIdentity && guest.identity_document_path && (isIdentityDataUri || identitySignedUrl),
+    source && canViewIdentity && identityDocumentPath && (isIdentityDataUri || identitySignedUrl),
   );
 
   const downloadIdentityDocument = async () => {
-    if (!guest?.identity_document_path || !canViewIdentity) return;
-    const sourceUrl = isIdentityDataUri ? guest.identity_document_path : identitySignedUrl;
+    if (!identityDocumentPath || !canViewIdentity) return;
+    const sourceUrl = isIdentityDataUri ? identityDocumentPath : identitySignedUrl;
     if (!sourceUrl) return;
     setDownloadingIdentity(true);
     try {
@@ -1453,7 +1487,9 @@ function useIdentityDocumentDownload(guest: Guest | null, canViewIdentity = true
       const extension = pathExtension && /^[a-z0-9]{2,4}$/.test(pathExtension)
         ? pathExtension
         : extensionFromMimeType(blob.type);
-      const filename = `piece-identite-${slugifyForFilename(guestName(guest))}.${extension}`;
+      const firstName = source && "first_name" in source ? source.first_name : "";
+      const lastName = source && "last_name" in source ? source.last_name : "";
+      const filename = `piece-identite-${slugifyForFilename(`${firstName} ${lastName}`.trim() || "client")}.${extension}`;
       downloadFile(new File([blob], filename, { type: blob.type || "application/octet-stream" }));
     } catch {
       toast.error("Impossible de télécharger la pièce d’identité.");
