@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   FileText,
+  History,
   Loader2,
   Mail,
   MapPin,
@@ -103,7 +104,7 @@ const clientTypeMeta: Record<ClientType, { label: string; className: string }> =
 type SortBy = "recent" | "name" | "stays";
 const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: "recent", label: "Plus récents" },
-  { key: "name", label: "Nom (Aâ†’Z)" },
+  { key: "name", label: "Nom (A→Z)" },
   { key: "stays", label: "Nombre de séjours" },
 ];
 const CLIENTS_PAGE_SIZE = 10;
@@ -236,6 +237,7 @@ export function HotelClientsPage() {
   const canUpdate = useActionPermission("hotel.guests.update");
   const canDelete = useActionPermission("hotel.guests.delete");
   const canViewIdentity = useActionPermission("hotel.guests.identity_view");
+  const canManageIdentity = useActionPermission("hotel.guests.identity_manage");
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"all" | ClientType>("all");
   const [sortBy, setSortBy] = useState<SortBy>("recent");
@@ -317,7 +319,9 @@ export function HotelClientsPage() {
         (a, b) => (staysByGuest.get(b.id)?.length ?? 0) - (staysByGuest.get(a.id)?.length ?? 0),
       );
     }
-    return filtered;
+    return [...filtered].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime() || b.id.localeCompare(a.id),
+    );
   }, [guestsQuery.data, query, type, sortBy, staysByGuest]);
 
   useEffect(() => {
@@ -345,12 +349,9 @@ export function HotelClientsPage() {
   const deleteGuest = useMutation({
     mutationFn: async (guest: Guest) => {
       if (!tenantId) throw new Error("Établissement introuvable.");
-      const { error } = await db
-        .from("hotel_guests")
-        .delete()
-        .eq("tenant_id", tenantId)
-        .eq("id", guest.id);
+      const { data, error } = await db.rpc("hotel_guest_delete_for_ui", { p_guest_id: guest.id });
       if (error) throw error;
+      if (!data) throw new Error("Aucune ligne n’a été supprimée.");
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["hotel-clients", tenantId] });
@@ -656,6 +657,7 @@ export function HotelClientsPage() {
                     canUpdate={canUpdate}
                     canDelete={canDelete}
                     onView={() => setViewing(guest)}
+                    onHistory={() => setViewing(guest)}
                     onEdit={() => openEdit(guest)}
                     onReserve={() => startReservation()}
                     onDelete={() => setDeleting(guest)}
@@ -673,6 +675,7 @@ export function HotelClientsPage() {
                 canUpdate={canUpdate}
                 canDelete={canDelete}
                 onView={() => setViewing(guest)}
+                onHistory={() => setViewing(guest)}
                 onEdit={() => openEdit(guest)}
                 onReserve={() => startReservation()}
                 onDelete={() => setDeleting(guest)}
@@ -700,6 +703,8 @@ export function HotelClientsPage() {
         open={formOpen}
         guest={editing}
         tenantId={tenantId}
+        canViewIdentity={canViewIdentity}
+        canManageIdentity={canManageIdentity}
         onOpenChange={setFormOpen}
         onSaved={() => void qc.invalidateQueries({ queryKey: ["hotel-clients", tenantId] })}
       />
@@ -707,6 +712,7 @@ export function HotelClientsPage() {
         guest={viewing}
         stays={viewing ? (staysByGuest.get(viewing.id) ?? []) : []}
         roomsById={roomsById}
+        canViewIdentity={canViewIdentity}
         onClose={() => setViewing(null)}
         onEdit={
           canUpdate && viewing
@@ -804,12 +810,24 @@ type ManageClientProps = {
   canUpdate: boolean;
   canDelete: boolean;
   onView: () => void;
+  onHistory: () => void;
   onEdit: () => void;
   onReserve: () => void;
   onDelete: () => void;
 };
 
-function ClientActions({ guest, canUpdate, canDelete, onView, onEdit, onReserve, onDelete }: Omit<ManageClientProps, "stays">) {
+function ClientActions({
+  guest,
+  canUpdate,
+  canDelete,
+  onView,
+  onHistory,
+  onEdit,
+  onReserve,
+  onDelete,
+}: Omit<ManageClientProps, "stays">) {
+  const { downloadIdentityDocument, downloadingIdentity, canDownloadIdentityDocument } =
+    useIdentityDocumentDownload(guest);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -821,6 +839,21 @@ function ClientActions({ guest, canUpdate, canDelete, onView, onEdit, onReserve,
         <DropdownMenuItem onSelect={onView}>
           <Eye className="size-4" /> Voir la fiche
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onHistory}>
+          <History className="size-4" /> Historique du client
+        </DropdownMenuItem>
+        {canDownloadIdentityDocument && (
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              void downloadIdentityDocument();
+            }}
+            disabled={downloadingIdentity}
+          >
+            {downloadingIdentity ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            Télécharger la pièce d’identité
+          </DropdownMenuItem>
+        )}
         {canUpdate && (
           <DropdownMenuItem onSelect={onEdit}>
             <Pencil className="size-4" /> Modifier
@@ -866,10 +899,10 @@ function ClientRow(props: ManageClientProps) {
         <TypeBadge type={guest.client_type} />
       </td>
       <td className="px-3 py-2 text-muted-foreground">
-        <p>{guest.phone ?? "—"}</p>
+        <p>{guest.phone ?? "?"}</p>
         {guest.email && <p className="text-xs">{guest.email}</p>}
       </td>
-      <td className="px-3 py-2 text-muted-foreground">{guest.nationality ?? "—"}</td>
+      <td className="px-3 py-2 text-muted-foreground">{guest.nationality?.trim() ? guest.nationality : "—"}</td>
       <td className="px-3 py-2 font-medium">{stays.length}</td>
       <td className="px-3 py-2">
         <ClientActions {...props} />
@@ -903,8 +936,8 @@ function ClientMobileCard(props: ManageClientProps) {
           <TypeBadge type={guest.client_type} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-          <span className="truncate">{guest.phone ?? "Sans téléphone"}</span>
-          <span>·</span>
+            <span className="truncate">{guest.phone ?? "Sans téléphone"}</span>
+          <span>•</span>
           <span className="shrink-0">
             {stays.length} séjour{stays.length > 1 ? "s" : ""}
           </span>
@@ -948,37 +981,74 @@ function ClientFormDialog({
   open,
   guest,
   tenantId,
+  canViewIdentity,
+  canManageIdentity,
   onOpenChange,
   onSaved,
 }: {
   open: boolean;
   guest: Guest | null;
   tenantId?: string;
+  canViewIdentity: boolean;
+  canManageIdentity: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
   const [form, setForm] = useState<GuestForm>(emptyForm);
+  const [identityLoadedForGuestId, setIdentityLoadedForGuestId] = useState<string | null>(null);
   const isEdit = Boolean(guest);
-  const reset = () =>
-    setForm(
-      guest
-        ? {
-            full_name: guestName(guest),
-            client_type: guest.client_type ?? "individuel",
-            company: guest.company ?? "",
-            phone: guest.phone ?? "",
-            email: guest.email ?? "",
-            nationality: guest.nationality ?? "",
-            address: guest.address ?? "",
-            identity_type: guest.identity_type ?? "",
-            identity_number: guest.identity_number ?? "",
-            identity_document_path: guest.identity_document_path ?? "",
-            notes: guest.notes ?? "",
-          }
-        : emptyForm,
-    );
+  const formFromGuest = (currentGuest: Guest): GuestForm => ({
+    full_name: guestName(currentGuest),
+    client_type: currentGuest.client_type ?? "individuel",
+    company: currentGuest.company ?? "",
+    phone: currentGuest.phone ?? "",
+    email: currentGuest.email ?? "",
+    nationality: currentGuest.nationality ?? "",
+    address: currentGuest.address ?? "",
+    identity_type: currentGuest.identity_type ?? "",
+    identity_number: currentGuest.identity_number ?? "",
+    identity_document_path: currentGuest.identity_document_path ?? "",
+    notes: currentGuest.notes ?? "",
+  });
 
-    const save = useMutation({
+  useEffect(() => {
+    if (!open) return;
+    if (!guest) {
+      setForm(emptyForm);
+      setIdentityLoadedForGuestId(null);
+      return;
+    }
+    setForm(formFromGuest(guest));
+    setIdentityLoadedForGuestId(null);
+  }, [open, guest?.id]);
+
+  useEffect(() => {
+    if (!open || !guest || !canViewIdentity) return;
+    let cancelled = false;
+    const loadIdentity = async () => {
+      const { data, error } = await db.rpc("hotel_guest_identity_for_ui", { p_guest_id: guest.id });
+      if (cancelled) return;
+      if (error) {
+        toast.error("Impossible de charger les informations d’identité du client.");
+        return;
+      }
+      const identityGuest = (data?.[0] ?? null) as GuestIdentity | null;
+      if (!identityGuest) return;
+      setForm((current) => ({
+        ...current,
+        identity_type: identityGuest.identity_type ?? "",
+        identity_number: identityGuest.identity_number ?? "",
+        identity_document_path: identityGuest.identity_document_path ?? "",
+      }));
+      setIdentityLoadedForGuestId(guest.id);
+    };
+    void loadIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, guest?.id, canViewIdentity]);
+
+  const save = useMutation({
     mutationFn: async (): Promise<void> => {
       if (!tenantId) throw new Error("Aucun établissement actif.");
       const { first_name, last_name } = splitFullName(form.full_name);
@@ -1000,7 +1070,7 @@ function ClientFormDialog({
         if (result?.duplicate_phone) throw new Error("Un client avec ce numéro de téléphone existe déjà.");
         if (result?.duplicate_email) throw new Error("Un client avec cette adresse email existe déjà.");
       }
-      const payload = {
+      const commonPayload = {
         first_name,
         last_name,
         client_type: form.client_type,
@@ -1009,18 +1079,39 @@ function ClientFormDialog({
         email: email || null,
         nationality: form.nationality.trim() || null,
         address: form.address.trim() || null,
-        identity_type: form.identity_type || null,
-        identity_number: form.identity_number.trim() || null,
-        identity_document_path: form.identity_document_path || null,
         notes: form.notes.trim() || null,
       };
+      const identityPayload =
+        canManageIdentity && (identityLoadedForGuestId === guest?.id || !guest)
+          ? {
+              identity_type: form.identity_type.trim() || null,
+              identity_number: form.identity_number.trim() || null,
+              identity_document_path: form.identity_document_path || null,
+            }
+          : {};
+      const payload = { ...commonPayload, ...identityPayload };
       if (guest) {
-        const { error } = await db
-          .from("hotel_guests")
-          .update(payload)
-          .eq("tenant_id", tenantId)
-          .eq("id", guest.id);
+        const { data, error } = await db.rpc("hotel_guest_update_for_ui", {
+          p_guest_id: guest.id,
+          p_first_name: payload.first_name,
+          p_last_name: payload.last_name,
+          p_client_type: payload.client_type,
+          p_company: payload.company,
+          p_phone: payload.phone,
+          p_email: payload.email,
+          p_nationality: payload.nationality,
+          p_address: payload.address,
+          p_notes: payload.notes,
+          ...(canManageIdentity
+            ? {
+                p_identity_type: payload.identity_type,
+                p_identity_number: payload.identity_number,
+                p_identity_document_path: payload.identity_document_path,
+              }
+            : {}),
+        });
         if (error) throw toHotelGuestDuplicateError(error);
+        if (!data) throw new Error("Aucune ligne n’a été modifiée.");
         return;
       }
       const { error } = await db.from("hotel_guests").insert(payload);
@@ -1042,10 +1133,7 @@ function ClientFormDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => {
-        if (next) reset();
-        onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
     >
       <DialogContent className="flex w-[calc(100vw-24px)] max-h-[90dvh] flex-col gap-0 overflow-hidden rounded-[20px] p-0 sm:w-full sm:max-w-[520px]">
         <DialogHeader className="shrink-0 border-b px-4 py-4 sm:px-6">
@@ -1078,10 +1166,42 @@ function ClientFormDialog({
                 className="h-11"
               />
             </Field>
-            <div>
-              <Label className="mb-1.5 block">Pièce d’identité</Label>
-              <ImageField value={form.identity_document_path} onChange={(v) => setForm({ ...form, identity_document_path: v })} />
-            </div>
+            {canManageIdentity ? (
+              <>
+                <Field label="Type de pièce d’identité">
+                  <Input
+                    value={form.identity_type}
+                    onChange={(e) => setForm({ ...form, identity_type: e.target.value })}
+                    placeholder="CNI, passeport, permis..."
+                    className="h-11"
+                  />
+                </Field>
+                <Field label="Numéro de pièce d’identité">
+                  <Input
+                    value={form.identity_number}
+                    onChange={(e) => setForm({ ...form, identity_number: e.target.value })}
+                    placeholder="Numéro du document"
+                    className="h-11"
+                  />
+                </Field>
+                <div>
+                  <Label className="mb-1.5 block">Pièce d’identité</Label>
+                  <ImageField
+                    value={form.identity_document_path}
+                    onChange={(v) => setForm({ ...form, identity_document_path: v })}
+                  />
+                </div>
+              </>
+            ) : canViewIdentity && (guest || identityLoadedForGuestId) ? (
+              <div className="rounded-2xl border bg-muted/30 p-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">Pièce d’identité consultable</p>
+                <p className="mt-1">
+                  {form.identity_type || form.identity_number
+                    ? `${form.identity_type || "Type non renseigné"}${form.identity_number ? ` · ${form.identity_number}` : ""}`
+                    : "Aucune donnée sensible disponible."}
+                </p>
+              </div>
+            ) : null}
             <div>
               <Label className="mb-1.5 block">Notes</Label>
               <Textarea
@@ -1137,6 +1257,7 @@ function ClientDetails({
   guest,
   stays,
   roomsById,
+  canViewIdentity,
   onClose,
   onEdit,
   onReserve,
@@ -1144,40 +1265,18 @@ function ClientDetails({
   guest: Guest | null;
   stays: Stay[];
   roomsById: Map<string, Room>;
+  canViewIdentity: boolean;
   onClose: () => void;
   onEdit?: () => void;
   onReserve?: () => void;
 }) {
-  const isIdentityDataUri = guest?.identity_document_path?.startsWith("data:") ?? false;
-  const identityStoragePath = guest && !isIdentityDataUri ? guest.identity_document_path ?? null : null;
-  const identitySignedUrl = useSignedUrl(identityStoragePath, IDENTITY_DOCUMENTS_BUCKET);
-  const [downloadingIdentity, setDownloadingIdentity] = useState(false);
+  const { downloadIdentityDocument, downloadingIdentity, canDownloadIdentityDocument } =
+    useIdentityDocumentDownload(guest, canViewIdentity);
 
   if (!guest) return null;
   const totalSpent = stays.reduce((sum, s) => sum + Number(s.paid_total ?? 0), 0);
   const sortedStays = [...stays].sort((a, b) => b.check_in.localeCompare(a.check_in));
 
-  const handleDownloadIdentityDocument = async () => {
-    if (!guest.identity_document_path) return;
-    const sourceUrl = isIdentityDataUri ? guest.identity_document_path : identitySignedUrl;
-    if (!sourceUrl) return;
-    setDownloadingIdentity(true);
-    try {
-      const response = await fetch(sourceUrl);
-      if (!response.ok) throw new Error("download_failed");
-      const blob = await response.blob();
-      const pathExtension = identityStoragePath?.split(".").pop()?.toLowerCase();
-      const extension = pathExtension && /^[a-z0-9]{2,4}$/.test(pathExtension)
-        ? pathExtension
-        : extensionFromMimeType(blob.type);
-      const filename = `piece-identite-${slugifyForFilename(guestName(guest))}.${extension}`;
-      downloadFile(new File([blob], filename, { type: blob.type || "application/octet-stream" }));
-    } catch {
-      toast.error("Impossible de télécharger le document d’identité. Veuillez réessayer.");
-    } finally {
-      setDownloadingIdentity(false);
-    }
-  };
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[24px] p-0 sm:max-w-3xl">
@@ -1201,13 +1300,15 @@ function ClientDetails({
           <Detail icon={Mail} label="Email" value={guest.email ?? "—"} />
           <Detail icon={MapPin} label="Adresse" value={guest.address ?? "—"} />
           <Detail icon={UserCheck} label="Nationalité" value={guest.nationality ?? "—"} />
-          <Detail
-            label="Pièce d’identité"
-            value={guest.identity_type ? `${guest.identity_type}${guest.identity_number ? ` · ${guest.identity_number}` : ""}` : "—"}
-          />
+          {canViewIdentity && (guest.identity_type || guest.identity_number) ? (
+            <Detail
+              label="Pièce d’identité"
+              value={guest.identity_type ? `${guest.identity_type}${guest.identity_number ? ` · ${guest.identity_number}` : ""}` : "—"}
+            />
+          ) : null}
           <Detail label="Client depuis" value={formatDate(guest.created_at)} />
         </div>
-        {guest.identity_document_path && (
+        {canViewIdentity && canDownloadIdentityDocument && (
           <div className="px-6 pb-2">
             <DetailSection
               title="Document d’identité"
@@ -1216,8 +1317,8 @@ function ClientDetails({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={handleDownloadIdentityDocument}
-                  disabled={downloadingIdentity || (!isIdentityDataUri && !identitySignedUrl)}
+                  onClick={() => void downloadIdentityDocument()}
+                  disabled={downloadingIdentity}
                   className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
                 >
                   {downloadingIdentity ? (
@@ -1229,7 +1330,7 @@ function ClientDetails({
                 </Button>
               }
             >
-              {guest.identity_document_path.startsWith("data:image/") ? (
+              {guest.identity_document_path?.startsWith("data:image/") ? (
                 <img src={guest.identity_document_path} alt="Pièce d’identité" className="max-h-56 rounded-xl border object-contain" />
               ) : (
                 <p className="text-sm text-muted-foreground">{guest.identity_document_path}</p>
@@ -1320,4 +1421,39 @@ function Detail({ icon: Icon, label, value }: { icon?: typeof Phone; label: stri
       <p className="mt-1 truncate font-semibold">{value}</p>
     </div>
   );
+}
+
+function useIdentityDocumentDownload(guest: Guest | null, canViewIdentity = true) {
+  const isIdentityDataUri = guest?.identity_document_path?.startsWith("data:") ?? false;
+  const identityStoragePath = guest && canViewIdentity && !isIdentityDataUri ? guest.identity_document_path ?? null : null;
+  const identitySignedUrl = useSignedUrl(identityStoragePath, IDENTITY_DOCUMENTS_BUCKET);
+  const [downloadingIdentity, setDownloadingIdentity] = useState(false);
+
+  const canDownloadIdentityDocument = Boolean(
+    guest && canViewIdentity && guest.identity_document_path && (isIdentityDataUri || identitySignedUrl),
+  );
+
+  const downloadIdentityDocument = async () => {
+    if (!guest?.identity_document_path || !canViewIdentity) return;
+    const sourceUrl = isIdentityDataUri ? guest.identity_document_path : identitySignedUrl;
+    if (!sourceUrl) return;
+    setDownloadingIdentity(true);
+    try {
+      const response = await fetch(sourceUrl);
+      if (!response.ok) throw new Error("download_failed");
+      const blob = await response.blob();
+      const pathExtension = identityStoragePath?.split(".").pop()?.toLowerCase();
+      const extension = pathExtension && /^[a-z0-9]{2,4}$/.test(pathExtension)
+        ? pathExtension
+        : extensionFromMimeType(blob.type);
+      const filename = `piece-identite-${slugifyForFilename(guestName(guest))}.${extension}`;
+      downloadFile(new File([blob], filename, { type: blob.type || "application/octet-stream" }));
+    } catch {
+      toast.error("Impossible de télécharger le document d’identité.");
+    } finally {
+      setDownloadingIdentity(false);
+    }
+  };
+
+  return { downloadIdentityDocument, downloadingIdentity, canDownloadIdentityDocument };
 }
