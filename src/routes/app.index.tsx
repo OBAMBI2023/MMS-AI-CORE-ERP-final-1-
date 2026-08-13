@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
@@ -19,8 +19,6 @@ import {
   BarChart3,
   Settings,
   Bot,
-  Search,
-  Command,
   ShoppingBag,
   Receipt,
   Clock,
@@ -53,7 +51,6 @@ import { Button } from "@/components/ui/button";
 import { DashboardKpiCard } from "@/components/mms/dashboard/DashboardKpiCard";
 import { DashboardSecondaryCard } from "@/components/mms/dashboard/DashboardSecondaryCard";
 import { DashboardEmptyState } from "@/components/mms/dashboard/DashboardEmptyState";
-import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import type { ActivityItem } from "@/hooks/use-dashboard-data";
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from "@/lib/mms/format";
@@ -131,19 +128,7 @@ function Dashboard() {
   const canViewClients = modulesQuery.data?.has("customers") ?? false;
   const canViewFournisseurs = modulesQuery.data?.has("suppliers") ?? false;
   const canViewDevis = modulesQuery.data?.has("quotes") ?? false;
-  const [searchOpen, setSearchOpen] = useState(false);
   const [showAllActions, setShowAllActions] = useState(false);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setSearchOpen((o) => !o);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -210,8 +195,6 @@ function Dashboard() {
 
   return (
     <AppShell title="Dashboard" contentClassName="bg-[#F8FAFC] dark:bg-[#0B1020]">
-      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
-
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -268,19 +251,6 @@ function Dashboard() {
             )}
           </div>
         </div>
-
-        {/* Recherche */}
-        <button
-          type="button"
-          onClick={() => setSearchOpen(true)}
-          className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm transition-colors hover:border-primary/50 dark:bg-[#151B2F] dark:border-white/5"
-        >
-          <Search className="h-4 w-4 shrink-0" />
-          <span className="flex-1 truncate text-left">Rechercher un client, un produit, une facture...</span>
-          <span className="hidden shrink-0 items-center gap-0.5 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex dark:border-white/10 dark:bg-white/5">
-            <Command className="h-3 w-3" /> K
-          </span>
-        </button>
 
         {/* Actions Rapides */}
         <div className="space-y-3">
