@@ -1,6 +1,7 @@
 import { supabase } from "./client";
 
 const RECOVERY_STORAGE_KEY = "mms:password-recovery";
+const AUTH_CALLBACK_STORAGE_KEY = "mms:supabase-auth-callback";
 
 type RecoveryCallback = {
   code: string | null;
@@ -10,7 +11,9 @@ type RecoveryCallback = {
   refreshToken: string | null;
 };
 
-let recoveryPromise: Promise<boolean> | null = null;
+type SupabaseCallbackKind = "recovery" | "generic";
+
+let recoveryPromise: Promise<SupabaseCallbackKind | null> | null = null;
 
 function readRecoveryCallback(): RecoveryCallback | null {
   if (typeof window === "undefined") return null;
@@ -39,7 +42,11 @@ function readRecoveryCallback(): RecoveryCallback | null {
 
 export function hasPasswordRecoveryContext(): boolean {
   if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(RECOVERY_STORAGE_KEY) !== null || readRecoveryCallback() !== null;
+  return (
+    sessionStorage.getItem(RECOVERY_STORAGE_KEY) !== null ||
+    sessionStorage.getItem(AUTH_CALLBACK_STORAGE_KEY) !== null ||
+    readRecoveryCallback() !== null
+  );
 }
 
 export function hasValidPasswordRecoverySession(): boolean {
@@ -49,18 +56,31 @@ export function hasValidPasswordRecoverySession(): boolean {
 }
 
 export async function handlePasswordRecoveryCallback(): Promise<boolean> {
+  const handled = await handleSupabaseAuthCallback();
+  return handled === "recovery";
+}
+
+export async function handleSupabaseAuthCallback(): Promise<SupabaseCallbackKind | null> {
   const callback = readRecoveryCallback();
-  if (!callback) return false;
+  if (!callback) return null;
   if (recoveryPromise) return recoveryPromise;
 
-  sessionStorage.setItem(RECOVERY_STORAGE_KEY, "pending");
+  const callbackKind: SupabaseCallbackKind =
+    ["recovery", "invite"].includes(callback.type ?? "") ? "recovery" : "generic";
+  sessionStorage.setItem(
+    callbackKind === "recovery" ? RECOVERY_STORAGE_KEY : AUTH_CALLBACK_STORAGE_KEY,
+    "pending",
+  );
 
   recoveryPromise = (async () => {
     if (callback.code) {
       const { data, error } = await supabase.auth.exchangeCodeForSession(callback.code);
       if (error) console.error("Impossible d’échanger le code de récupération Supabase :", error);
-      sessionStorage.setItem(RECOVERY_STORAGE_KEY, data.session && !error ? "valid" : "invalid");
-      return true;
+      sessionStorage.setItem(
+        callbackKind === "recovery" ? RECOVERY_STORAGE_KEY : AUTH_CALLBACK_STORAGE_KEY,
+        data.session && !error ? "valid" : "invalid",
+      );
+      return callbackKind;
     }
 
     if (callback.tokenHash) {
@@ -69,8 +89,11 @@ export async function handlePasswordRecoveryCallback(): Promise<boolean> {
         type: callback.type === "invite" ? "invite" : "recovery",
       });
       if (error) console.error("Impossible de vérifier le jeton de récupération Supabase :", error);
-      sessionStorage.setItem(RECOVERY_STORAGE_KEY, data.session && !error ? "valid" : "invalid");
-      return true;
+      sessionStorage.setItem(
+        callbackKind === "recovery" ? RECOVERY_STORAGE_KEY : AUTH_CALLBACK_STORAGE_KEY,
+        data.session && !error ? "valid" : "invalid",
+      );
+      return callbackKind;
     }
 
     if (callback.accessToken && callback.refreshToken) {
@@ -79,12 +102,18 @@ export async function handlePasswordRecoveryCallback(): Promise<boolean> {
         refresh_token: callback.refreshToken,
       });
       if (error) console.error("Impossible d’établir la session de récupération Supabase :", error);
-      sessionStorage.setItem(RECOVERY_STORAGE_KEY, data.session && !error ? "valid" : "invalid");
+      sessionStorage.setItem(
+        callbackKind === "recovery" ? RECOVERY_STORAGE_KEY : AUTH_CALLBACK_STORAGE_KEY,
+        data.session && !error ? "valid" : "invalid",
+      );
     } else {
-      sessionStorage.setItem(RECOVERY_STORAGE_KEY, "invalid");
+      sessionStorage.setItem(
+        callbackKind === "recovery" ? RECOVERY_STORAGE_KEY : AUTH_CALLBACK_STORAGE_KEY,
+        "invalid",
+      );
     }
 
-    return true;
+    return callbackKind;
   })();
 
   return recoveryPromise;
@@ -93,6 +122,7 @@ export async function handlePasswordRecoveryCallback(): Promise<boolean> {
 export function clearPasswordRecoveryContext(): void {
   if (typeof window !== "undefined") {
     sessionStorage.removeItem(RECOVERY_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_CALLBACK_STORAGE_KEY);
   }
 }
 

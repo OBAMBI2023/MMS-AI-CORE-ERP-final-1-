@@ -28,7 +28,7 @@ import { getPlatformAdminAccess } from "@/lib/super-admin.server";
 import { getPartnerAdminAccess } from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { readEnvVar } from "@/integrations/supabase/env";
-import { handlePasswordRecoveryCallback } from "@/integrations/supabase/password-recovery";
+import { handleSupabaseAuthCallback } from "@/integrations/supabase/password-recovery";
 
 function getSiteOrigin() {
   const browserOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
@@ -154,10 +154,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     // Supabase may return recovery credentials on the configured Site URL
     // (including in the hash). Normalize every recovery callback before the
     // regular public/authenticated route guards can redirect elsewhere.
-    if (await handlePasswordRecoveryCallback()) {
-      if (location.pathname !== "/reset-password") {
+    const callbackKind = await handleSupabaseAuthCallback();
+    if (callbackKind === "recovery" && location.pathname !== "/reset-password") {
         throw redirect({ to: "/reset-password" });
-      }
+    }
+
+    if (callbackKind) {
       return;
     }
 

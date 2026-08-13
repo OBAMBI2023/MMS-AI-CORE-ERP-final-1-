@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   addMonths,
@@ -17,15 +17,7 @@ import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { BLOCKING_RESERVATION_STATUSES, periodsOverlap } from "@/lib/hotel-availability";
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "En attente",
-  confirmed: "Confirmée",
-  checked_in: "En séjour",
-  checked_out: "Terminée",
-  cancelled: "Annulée",
-  no_show: "Non présenté",
-};
+import { getHotelReservationStatusLabel } from "@/lib/hotel-reservation-status";
 
 const DAY_CELL_WIDTH = 36;
 const ROOM_COL_WIDTH = 168;
@@ -233,7 +225,7 @@ function FragmentRow({
                   <p>Logement : {room.number}{room.typeName ? ` · ${room.typeName}` : ""}</p>
                   <p>Arrivée : {format(parseISO(segment.reservation.check_in), "dd MMM yyyy", { locale: fr })}</p>
                   <p>Départ : {format(parseISO(segment.reservation.check_out), "dd MMM yyyy", { locale: fr })}</p>
-                  <p>Statut : {STATUS_LABEL[segment.reservation.status] ?? segment.reservation.status}</p>
+                  <p>Statut : {getHotelReservationStatusLabel(segment.reservation.status)}</p>
                 </div>
               </HoverCardContent>
             </HoverCard>
@@ -243,3 +235,6 @@ function FragmentRow({
     </>
   );
 }
+
+
+

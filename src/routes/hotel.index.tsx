@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -27,6 +27,10 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/providers/TenantProvider";
 import { useHotelBillingData } from "@/hooks/use-hotel-billing";
+import {
+  getHotelReservationStatusBadgeClass,
+  getHotelReservationStatusLabel,
+} from "@/lib/hotel-reservation-status";
 
 const db = supabase as any;
 
@@ -41,7 +45,7 @@ const ACTION_COLOR_CLASSES: Record<ActionColor, string> = {
 
 const QUICK_ACTIONS = [
   { title: "Nouvelle réservation", subtitle: null as string | null, icon: CalendarPlus, route: "/hotel/reservations", color: "primary" as ActionColor },
-  { title: "Arrivées / Départs", subtitle: "Check-in & Check-out", icon: ArrowLeftRight, route: "/hotel/checkin-checkout", color: "sky" as ActionColor },
+  { title: "Arrivées / Départs", subtitle: "Arrivées et départs", icon: ArrowLeftRight, route: "/hotel/checkin-checkout", color: "sky" as ActionColor },
 ];
 
 type RevenuePeriod = "today" | "week" | "month";
@@ -51,16 +55,6 @@ const REVENUE_PERIODS: { key: RevenuePeriod; label: string }[] = [
   { key: "week", label: "7 jours" },
   { key: "month", label: "Ce mois" },
 ];
-
-const RESERVATION_STATUS_LABEL: Record<string, string> = {
-  pending: "En attente",
-  confirmed: "Confirmée",
-  checked_in: "En séjour",
-  checked_out: "Terminée",
-  completed: "Terminée",
-  cancelled: "Annulée",
-  no_show: "Non présenté",
-};
 
 type HistoryFilter = "all" | "reservations" | "payments" | "checkin_checkout";
 
@@ -81,16 +75,6 @@ type ActivityEvent = {
   roomNumber: string | null;
   amount: number | null;
   at: string;
-};
-
-const RESERVATION_STATUS_CLASSES: Record<string, string> = {
-  pending: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  confirmed: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-  checked_in: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  checked_out: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
-  completed: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
-  cancelled: "bg-red-500/10 text-red-600 dark:text-red-400",
-  no_show: "bg-red-500/10 text-red-600 dark:text-red-400",
 };
 
 const CARD_CLASS = "rounded-[24px] dark:bg-[#0F2E28] dark:border-white/5";
@@ -304,7 +288,7 @@ function HotelDashboard() {
           category: "checkin_checkout",
           icon: LogOut,
           iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-          title: "Check-out effectué",
+          title: "Départ effectué",
           guestName: guest,
           roomNumber: room,
           amount: null,
@@ -316,7 +300,7 @@ function HotelDashboard() {
           category: "checkin_checkout",
           icon: LogIn,
           iconClass: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-          title: "Check-in effectué",
+          title: "Arrivée effectuée",
           guestName: guest,
           roomNumber: room,
           amount: null,
@@ -614,11 +598,10 @@ function HotelDashboard() {
                         <span
                           className={cn(
                             "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                            RESERVATION_STATUS_CLASSES[r.status] ??
-                              "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+                            getHotelReservationStatusBadgeClass(r.status),
                           )}
                         >
-                          {RESERVATION_STATUS_LABEL[r.status] ?? r.status}
+                          {getHotelReservationStatusLabel(r.status)}
                         </span>
                       </li>
                     );
@@ -730,3 +713,4 @@ function HotelDashboard() {
 export const Route = createFileRoute("/hotel/")({
   component: HotelDashboard,
 });
+

@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { Building2 } from "lucide-react";
+import { Building2, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -56,6 +56,7 @@ export const Route = createFileRoute("/login")({
 
 export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [tenant, setTenant] = useState<LoginTenant | null>(null);
   const [tenantLoading, setTenantLoading] = useState(Boolean(tenantSlug));
@@ -142,6 +143,27 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    if (loading || googleLoading) return;
+
+    setGoogleLoading(true);
+    try {
+      const redirectUrl = new URL(window.location.href);
+      redirectUrl.search = "";
+      redirectUrl.hash = "";
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: redirectUrl.toString() },
+      });
+
+      if (error) throw error;
+    } catch {
+      toast.error("Impossible de continuer avec Google pour le moment.");
+      setGoogleLoading(false);
+    }
+  };
+
   const companyName = tenant?.name ?? PLATFORM_BRANDING.name;
   return (
     <AuthLayout
@@ -191,8 +213,55 @@ export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
             <Skeleton className="mx-auto mb-4 h-[118px] w-[118px] rounded-2xl" />
           ) : undefined
         }
+        footer={
+          <div className="space-y-3">
+            <div className="mt-4 flex items-center gap-3" aria-hidden="true">
+              <span className="h-px flex-1 bg-slate-300/90 dark:bg-slate-600/90" />
+              <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
+                ou
+              </span>
+              <span className="h-px flex-1 bg-slate-300/90 dark:bg-slate-600/90" />
+            </div>
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading || googleLoading || tenantLoading || tenantNotFound}
+              className="inline-flex h-[60px] w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
+            >
+              {googleLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-slate-500" aria-hidden="true" />
+              ) : (
+                <GoogleIcon className="h-5 w-5" />
+              )}
+              <span>{googleLoading ? "Connexion..." : "Continuer avec Google"}</span>
+            </button>
+          </div>
+        }
         premium
       />
     </AuthLayout>
+  );
+}
+
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.17.29-1.7V4.97H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.03l3-2.33Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.97l3 2.33C4.66 5.17 6.65 3.58 9 3.58Z"
+      />
+    </svg>
   );
 }

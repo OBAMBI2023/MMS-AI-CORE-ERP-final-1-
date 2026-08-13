@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,13 @@ export function HotelAppShell({
 }) {
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    document.body.classList.add("hotel-theme");
+    return () => {
+      document.body.classList.remove("hotel-theme");
+    };
+  }, []);
 
   return (
     <div className="hotel-theme flex h-screen w-full bg-background text-foreground">

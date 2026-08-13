@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -74,6 +74,7 @@ import { useCompanySettings } from "@/hooks/use-company-settings";
 import { formatCurrency, formatDate } from "@/lib/mms/format";
 import { createHotelListPdf } from "@/lib/mms/hotel-pdf-engine";
 import { downloadFile, downloadPdf } from "@/lib/mms/download-pdf";
+import { getHotelReservationStatusLabel } from "@/lib/hotel-reservation-status";
 
 // The generated Supabase types do not include the recently provisioned hotel tables yet.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1277,15 +1278,6 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-const stayStatusLabel: Record<string, string> = {
-  pending: "En attente",
-  confirmed: "Confirmée",
-  checked_in: "En séjour",
-  checked_out: "Terminée",
-  cancelled: "Annulée",
-  no_show: "Non présenté",
-};
-
 function ClientDetails({
   guest,
   stays,
@@ -1391,7 +1383,7 @@ function ClientDetails({
                   <div key={stay.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-xs">
                     <div className="min-w-0">
                       <p className="font-medium">
-                        Chambre {roomsById.get(stay.room_id)?.number ?? "—"} · {stayStatusLabel[stay.status] ?? stay.status}
+                        Chambre {roomsById.get(stay.room_id)?.number ?? "—"} · {getHotelReservationStatusLabel(stay.status)}
                       </p>
                       <p className="text-muted-foreground">
                         {formatDate(stay.check_in)} → {formatDate(stay.check_out)} · {stay.nights} nuit(s)
@@ -1504,3 +1496,5 @@ function useIdentityDocumentDownload(
 
   return { downloadIdentityDocument, downloadingIdentity, canDownloadIdentityDocument };
 }
+
+

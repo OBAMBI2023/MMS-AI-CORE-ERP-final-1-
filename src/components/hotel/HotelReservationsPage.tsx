@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
@@ -86,6 +86,7 @@ import { downloadPdf } from "@/lib/mms/download-pdf";
 import { HotelSmsDialog } from "@/components/hotel/HotelSmsDialog";
 import { HotelReservationDetailSheet } from "@/components/hotel/HotelReservationDetailSheet";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
+import { getHotelReservationStatusBadgeClass, getHotelReservationStatusLabel } from "@/lib/hotel-reservation-status";
 import {
   BLOCKING_RESERVATION_STATUSES,
   findReservationConflict,
@@ -102,14 +103,6 @@ const statuses = [
   "cancelled",
   "no_show",
 ] as const;
-const statusLabel: Record<string, string> = {
-  pending: "En attente",
-  confirmed: "Confirmée",
-  checked_in: "En séjour",
-  checked_out: "Terminée",
-  cancelled: "Annulée",
-  no_show: "Non présenté",
-};
 const WALK_IN_LABEL = "Client de passage";
 const emptyForm = {
   guest_id: "",
@@ -722,7 +715,7 @@ export function HotelReservationsPage() {
               <SelectContent>
                 {statuses.map((s) => (
                   <SelectItem key={s} value={s}>
-                    {statusLabel[s]}
+                    {getHotelReservationStatusLabel(s)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -836,7 +829,7 @@ export function HotelReservationsPage() {
               <SelectItem value="all">Tous les statuts</SelectItem>
               {statuses.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {statusLabel[s]}
+                  {getHotelReservationStatusLabel(s)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1243,7 +1236,7 @@ function ReservationTable({
                 </td>
                 <td>
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-xs dark:bg-white/10">
-                    {statusLabel[r.status] ?? r.status}
+                    {getHotelReservationStatusLabel(r.status)}
                   </span>
                 </td>
                 <td className="font-medium">{formatCurrency(Number(r.paid_total ?? 0))}</td>
@@ -1269,7 +1262,7 @@ function ReservationTable({
                         variant="outline"
                         onClick={() => changeStatus(r.id, "checked_in")}
                       >
-                        Check-in
+                        Arrivée
                       </Button>
                     )}
                     {r.status === "checked_in" && (
@@ -1278,7 +1271,7 @@ function ReservationTable({
                         variant="outline"
                         onClick={() => changeStatus(r.id, "checked_out")}
                       >
-                        Check-out
+                        Départ
                       </Button>
                     )}
                     {!["cancelled", "checked_out"].includes(r.status) && (
@@ -1393,7 +1386,7 @@ function ReservationMobileCard({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
-            {statusLabel[r.status] ?? r.status}
+            {getHotelReservationStatusLabel(r.status)}
           </span>
           <ReservationActionsMenu
             r={r}
@@ -1436,7 +1429,7 @@ function ReservationMobileCard({
               className="h-9 flex-1"
               onClick={() => changeStatus(r.id, "checked_in")}
             >
-              Check-in
+              Arrivée
             </Button>
           )}
           {r.status === "checked_in" && (
@@ -1446,7 +1439,7 @@ function ReservationMobileCard({
               className="h-9 flex-1"
               onClick={() => changeStatus(r.id, "checked_out")}
             >
-              Check-out
+              Départ
             </Button>
           )}
           {!["cancelled", "checked_out"].includes(r.status) && (
@@ -1544,9 +1537,9 @@ function HorizontalPlanning({
   );
   const today = key(new Date());
   const todayIndex = days.findIndex((d) => key(d) === today);
-  const reservationColors: Record<string, string> = {
+const reservationColors: Record<string, string> = {
     pending: "bg-orange-400",
-    confirmed: "bg-blue-500",
+    confirmed: "bg-primary",
     checked_in: "bg-red-500",
     checked_out: "bg-slate-500",
   };
@@ -1662,7 +1655,7 @@ function HorizontalPlanning({
           {[
             ["bg-emerald-400", "Disponible"],
             ["bg-orange-400", "En attente"],
-            ["bg-blue-500", "Réservé"],
+            ["bg-primary", "Réservé"],
             ["bg-red-500", "Occupé / conflit"],
             ["bg-violet-500", "Nettoyage"],
             ["bg-slate-400", "Maintenance"],
@@ -1743,7 +1736,7 @@ function HorizontalPlanning({
                         key={r.id}
                         onClick={() => onSelect(r)}
                         title={`${guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL} · ${travelerCount} voyageur(s)`}
-                        className={`absolute inset-y-2 z-10 overflow-hidden rounded-md px-2 text-left text-[11px] font-semibold text-white shadow-sm ${isFormConflict(r) ? "bg-red-600 ring-2 ring-red-300" : (reservationColors[r.status] ?? "bg-blue-500")}`}
+                        className={`absolute inset-y-2 z-10 overflow-hidden rounded-md px-2 text-left text-[11px] font-semibold text-white shadow-sm ${isFormConflict(r) ? "bg-red-600 ring-2 ring-red-300" : (reservationColors[r.status] ?? "bg-primary")}`}
                         style={{
                           left: `${(left / count) * 100}%`,
                           width: `${(width / count) * 100}%`,
@@ -1772,3 +1765,6 @@ function HorizontalPlanning({
     </div>
   );
 }
+
+
+

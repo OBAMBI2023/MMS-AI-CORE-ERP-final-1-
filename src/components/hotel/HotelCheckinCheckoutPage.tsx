@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
@@ -41,29 +41,11 @@ import {
 } from "@/lib/hotel-payments";
 import { logAction } from "@/lib/audit.server";
 import { cn } from "@/lib/utils";
+import { getHotelReservationStatusBadgeClass, getHotelReservationStatusLabel } from "@/lib/hotel-reservation-status";
 
 const db = supabase as any;
 const WALK_IN_LABEL = "Client de passage";
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: "En attente",
-  confirmed: "Confirmée",
-  checked_in: "En séjour",
-  checked_out: "Terminée",
-  completed: "Terminée",
-  cancelled: "Annulée",
-  no_show: "Non présenté",
-};
-
-const STATUS_BADGE: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  confirmed: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
-  checked_in: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-  checked_out: "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300",
-  completed: "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300",
-  cancelled: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
-  no_show: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
-};
 
 function todayISO() {
   const d = new Date();
@@ -184,14 +166,14 @@ export function HotelCheckinCheckoutPage() {
       if (error) throw error;
       if (!data) {
         throw new Error(
-          "Cette réservation n'est plus « Confirmée » : le check-in a peut-être déjà été effectué ou la réservation a été annulée.",
+          "Cette réservation n'est plus « Confirmée » : l'arrivée a peut-être déjà été effectuée ou la réservation a été annulée.",
         );
       }
       return r;
     },
     onSuccess: async (r) => {
       await logHotelAction("check_in", r);
-      toast.success("Check-in effectué");
+      toast.success("Arrivée effectuée");
       setAction(null);
       refresh();
     },
@@ -212,14 +194,14 @@ export function HotelCheckinCheckoutPage() {
       if (error) throw error;
       if (!data) {
         throw new Error(
-          "Cette réservation n'est plus « En séjour » : le check-out a peut-être déjà été effectué.",
+          "Cette réservation n'est plus « En séjour » : le départ a peut-être déjà été effectué.",
         );
       }
       return r;
     },
     onSuccess: async (r) => {
       await logHotelAction("check_out", r);
-      toast.success("Check-out effectué");
+      toast.success("Départ effectué");
       setAction(null);
       refresh();
     },
@@ -228,7 +210,7 @@ export function HotelCheckinCheckoutPage() {
 
   return (
     <HotelAppShell
-      title="Check-in / Check-out"
+      title="Arrivées / Départs"
       subtitle="Arrivées et départs"
       contentClassName="bg-[#F4FAF8] dark:bg-[#07211C]"
     >
@@ -392,7 +374,7 @@ function CheckActionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isCheckin ? <LogIn className="size-5" /> : <LogOut className="size-5" />}
-            {isCheckin ? "Confirmer le check-in" : "Confirmer le check-out"}
+            {isCheckin ? "Confirmer l'arrivée" : "Confirmer le départ"}
           </DialogTitle>
           <DialogDescription>
             {isCheckin
@@ -435,10 +417,10 @@ function CheckActionDialog({
           <Button variant="outline" onClick={onClose} disabled={pending}>
             Annuler
           </Button>
-          <Button onClick={onConfirm} disabled={pending}>
-            {pending && <Loader2 className="size-4 animate-spin" />}
-            {pending ? "Traitement…" : isCheckin ? "Confirmer le check-in" : "Confirmer le check-out"}
-          </Button>
+        <Button onClick={onConfirm} disabled={pending}>
+          {pending && <Loader2 className="size-4 animate-spin" />}
+          {pending ? "Traitement…" : isCheckin ? "Confirmer l'arrivée" : "Confirmer le départ"}
+        </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -567,10 +549,10 @@ function StatusBadge({ status }: { status: string }) {
     <span
       className={cn(
         "rounded-full px-2.5 py-1 text-[11px] font-semibold",
-        STATUS_BADGE[status] ?? "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300",
+        getHotelReservationStatusBadgeClass(status),
       )}
     >
-      {STATUS_LABEL[status] ?? status}
+      {getHotelReservationStatusLabel(status)}
     </span>
   );
 }
@@ -729,14 +711,17 @@ function RowAction({
     if (!canAct) return <span className="text-xs text-muted-foreground">Non autorisé</span>;
     return (
       <Button size="sm" className={full ? "w-full" : undefined} onClick={() => onAct?.(r)}>
-        Effectuer le check-in
+        Effectuer l'arrivée
       </Button>
     );
   }
   if (!canAct) return <span className="text-xs text-muted-foreground">Non autorisé</span>;
   return (
     <Button size="sm" variant="outline" className={full ? "w-full" : undefined} onClick={() => onAct?.(r)}>
-      Effectuer le check-out
+      Effectuer le départ
     </Button>
   );
 }
+
+
+
