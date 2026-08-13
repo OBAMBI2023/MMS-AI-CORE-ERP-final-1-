@@ -12,7 +12,9 @@ import {
 import { motion } from "framer-motion";
 import {
   BedDouble,
+  CalendarDays,
   CalendarPlus,
+  ChartPie,
   ChevronDown,
   Eye,
   ImagePlus,
@@ -24,9 +26,7 @@ import {
   SlidersHorizontal,
   Trash2,
   Users,
-  Wrench,
   FileText,
-  TrendingUp,
   Wallet,
   X,
 } from "lucide-react";
@@ -41,6 +41,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -154,14 +157,27 @@ const statusMeta: Record<RoomStatus, { label: string; className: string }> = {
   },
   occupied: {
     label: "Occupé",
-    className:
-      "bg-amber-50 text-amber-700 ring-amber-600/15 dark:bg-amber-400/10 dark:text-amber-300",
+    className: "bg-sky-50 text-sky-700 ring-sky-600/15 dark:bg-sky-400/10 dark:text-sky-300",
   },
-  cleaning: { label: "Nettoyage", className: "bg-sky-50 text-sky-700 ring-sky-600/15" },
+  cleaning: {
+    label: "Nettoyage",
+    className: "bg-violet-50 text-violet-700 ring-violet-600/15 dark:bg-violet-400/10 dark:text-violet-300",
+  },
   maintenance: { label: "Maintenance", className: "bg-orange-50 text-orange-700 ring-orange-600/15" },
   out_of_service: { label: "Hors service", className: "bg-slate-100 text-slate-700 ring-slate-500/15" },
 };
-const reservedMeta = { label: "Réservé", className: "bg-violet-50 text-violet-700 ring-violet-600/15" };
+const reservedMeta = { label: "Réservé", className: "bg-amber-50 text-amber-700 ring-amber-600/15" };
+const STATUS_OPTIONS: [RoomStatus, string][] = [
+  ["available", "Disponible"],
+  ["occupied", "Occupé"],
+  ["cleaning", "Nettoyage"],
+  ["maintenance", "Maintenance"],
+  ["out_of_service", "Hors service"],
+];
+
+function shortDate(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
 
 function assertRoomTenant(room: HotelRoom, tenantId?: string): asserts tenantId is string {
   if (!tenantId || room.tenant_id !== tenantId) throw new Error("Accès inter-tenant refusé.");
@@ -272,12 +288,33 @@ export function HotelRoomsPage() {
   const imageFor = (room: HotelRoom) =>
     room.cover_image_path ? imageUrlsQuery.data?.[room.cover_image_path] : undefined;
 
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const activeReservationRoomIds = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
     return new Set((contextQuery.data?.reservations ?? []).filter((r) =>
       ["pending", "confirmed"].includes(r.status) && r.check_in >= today,
     ).map((r) => r.room_id));
-  }, [contextQuery.data]);
+  }, [contextQuery.data, today]);
+  const nextBookingByRoom = useMemo(() => {
+    const reservations = contextQuery.data?.reservations ?? [];
+    const map = new Map<string, string>();
+    for (const room of roomsQuery.data ?? []) {
+      const roomReservations = reservations.filter((r) => r.room_id === room.id);
+      if (roomReservations.some((r) => r.status === "checked_in")) {
+        map.set(room.id, "En séjour");
+        continue;
+      }
+      const upcoming = roomReservations
+        .filter((r) => ["pending", "confirmed"].includes(r.status) && r.check_out >= today)
+        .sort((a, b) => a.check_in.localeCompare(b.check_in))[0];
+      map.set(
+        room.id,
+        upcoming
+          ? `${upcoming.check_in === today ? "Aujourd’hui" : shortDate(upcoming.check_in)} → ${shortDate(upcoming.check_out)}`
+          : "Aucune réservation",
+      );
+    }
+    return map;
+  }, [contextQuery.data, roomsQuery.data, today]);
   const roomTypes = useMemo(() => Array.from(new Set((roomsQuery.data ?? []).map((r) => r.hotel_room_types?.name).filter(Boolean) as string[])).sort(), [roomsQuery.data]);
 
   const rooms = useMemo(() => {
@@ -368,8 +405,8 @@ export function HotelRoomsPage() {
 
   return (
     <HotelAppShell
-      title="Logements"
-      subtitle="Gérez vos chambres et résidences avec élégance."
+      title="Chambres / Logements"
+      subtitle="Gérez vos chambres, studios et logements"
       actions={
         <>
           {/* Desktop / tablette : boutons complets, jamais masqués */}
@@ -418,29 +455,11 @@ export function HotelRoomsPage() {
       <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {([
           ["Total", totalRooms, BedDouble],
-          ["Disponibles", (roomsQuery.data ?? []).filter((r) => r.status === "available" && !activeReservationRoomIds.has(r.id)).length, Eye],
-          ["Occupés", occupiedCount, Users],
-          ["Réservés", activeReservationRoomIds.size, CalendarPlus],
-          ["Nettoyage", (roomsQuery.data ?? []).filter((r) => r.status === "cleaning").length, SlidersHorizontal],
-          ["Maintenance", (roomsQuery.data ?? []).filter((r) => ["maintenance", "out_of_service"].includes(r.status)).length, Wrench],
-          ["Taux d’occupation", `${occupancyRate}%`, TrendingUp],
+          ["Réservés", activeReservationRoomIds.size, CalendarDays],
+          ["Taux d’occupation", `${occupancyRate}%`, ChartPie],
           ["Revenu estimé", formatCurrency(estimatedRevenue), Wallet],
-        ] as const).map(([label, value, Icon], index) => (
-          <div
-            key={label}
-            className={cn(
-              "group items-center gap-2.5 rounded-2xl border border-[#D8C99E]/40 bg-card px-3 py-2.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:gap-3 sm:px-4 sm:py-3.5",
-              index < 4 ? "flex" : "hidden sm:flex",
-            )}
-          >
-            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105 sm:size-10">
-              <Icon className="size-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-base font-bold leading-none text-[#102A43] dark:text-white sm:text-lg lg:text-xl">{value}</p>
-              <p className="mt-1 truncate text-[10px] text-muted-foreground sm:mt-1.5 sm:text-[11px]">{label}</p>
-            </div>
-          </div>
+        ] as const).map(([label, value, Icon]) => (
+          <KpiTile key={label} label={label} value={value} Icon={Icon} />
         ))}
       </section>
 
@@ -567,24 +586,26 @@ export function HotelRoomsPage() {
         </div>
       ) : rooms.length ? (
         <div className="mt-3 overflow-hidden rounded-xl border bg-card shadow-sm sm:mt-4">
-          <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[820px] text-sm"><thead className="bg-[#102A43] text-white"><tr>{["Photo", "Nom ou numéro", "Type", "Prix par nuit", "Statut", "Actions"].map((h) => <th key={h} className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">{h}</th>)}</tr></thead><tbody className="divide-y">
+          <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[960px] text-sm"><thead className="bg-[#102A43] text-white"><tr>{["Photo", "Logement", "Type", "Prix / nuit", "Statut", "Prochaine réservation", "Actions"].map((h) => <th key={h} className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">{h}</th>)}</tr></thead><tbody className="divide-y">
           {rooms.map((room) => (
             <RoomRow
               key={room.id}
               room={room}
               image={imageFor(room)}
               reserved={activeReservationRoomIds.has(room.id)}
+              nextBooking={nextBookingByRoom.get(room.id) ?? "Aucune réservation"}
               canUpdate={canUpdate}
               canDelete={canDelete}
               onView={() => setViewing(room)}
               onEdit={() => openEdit(room)}
               onReserve={() => void navigate({ to: "/hotel/reservations" })}
+              onCalendar={() => void navigate({ to: "/hotel" })}
               onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })}
               onSetStatus={(newStatus) => changeRoomStatus.mutate({ room, status: newStatus })}
               onDelete={() => setDeleting(room)}
             />
           ))}</tbody></table></div>
-          <div className="divide-y md:hidden">{rooms.map((room) => <RoomMobileCard key={room.id} room={room} image={imageFor(room)} reserved={activeReservationRoomIds.has(room.id)} canUpdate={canUpdate} canDelete={canDelete} onView={() => setViewing(room)} onEdit={() => openEdit(room)} onReserve={() => void navigate({ to: "/hotel/reservations" })} onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })} onSetStatus={(newStatus) => changeRoomStatus.mutate({ room, status: newStatus })} onDelete={() => setDeleting(room)} />)}</div>
+          <div className="divide-y md:hidden">{rooms.map((room) => <RoomMobileCard key={room.id} room={room} image={imageFor(room)} reserved={activeReservationRoomIds.has(room.id)} nextBooking={nextBookingByRoom.get(room.id) ?? "Aucune réservation"} canUpdate={canUpdate} canDelete={canDelete} onView={() => setViewing(room)} onEdit={() => openEdit(room)} onReserve={() => void navigate({ to: "/hotel/reservations" })} onCalendar={() => void navigate({ to: "/hotel" })} onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })} onSetStatus={(newStatus) => changeRoomStatus.mutate({ room, status: newStatus })} onDelete={() => setDeleting(room)} />)}</div>
         </div>
       ) : (
         <EmptyState
@@ -650,6 +671,28 @@ export function HotelRoomsPage() {
   );
 }
 
+function KpiTile({
+  label,
+  value,
+  Icon,
+}: {
+  label: string;
+  value: string | number;
+  Icon: (props: { className?: string }) => ReactNode;
+}) {
+  return (
+    <div className="group flex items-center gap-2.5 rounded-2xl border border-[#D8C99E]/40 bg-card px-3 py-2.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:gap-3 sm:px-4 sm:py-3.5">
+      <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105 sm:size-10">
+        <Icon className="size-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-base font-bold leading-none text-[#102A43] dark:text-white sm:text-lg lg:text-xl">{value}</p>
+        <p className="mt-1 truncate text-[10px] text-muted-foreground sm:mt-1.5 sm:text-[11px]">{label}</p>
+      </div>
+    </div>
+  );
+}
+
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <div className="min-w-28 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
@@ -712,11 +755,13 @@ type ManageRoomProps = {
   room: HotelRoom;
   image?: string;
   reserved: boolean;
+  nextBooking: string;
   canUpdate: boolean;
   canDelete: boolean;
   onView: () => void;
   onEdit: () => void;
   onReserve: () => void;
+  onCalendar: () => void;
   onBlock: () => void;
   onSetStatus: (status: RoomStatus) => void;
   onDelete: () => void;
@@ -728,9 +773,10 @@ function RoomActions({
   onView,
   onEdit,
   onReserve,
+  onCalendar,
   onSetStatus,
   onDelete,
-}: Omit<ManageRoomProps, "image" | "reserved" | "onBlock">) {
+}: Omit<ManageRoomProps, "image" | "reserved" | "nextBooking" | "onBlock">) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -744,9 +790,6 @@ function RoomActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuItem onSelect={onView}>
-          <Eye className="size-4" /> Voir le logement
-        </DropdownMenuItem>
         {canUpdate && (
           <DropdownMenuItem onSelect={onEdit}>
             <Pencil className="size-4" /> Modifier
@@ -756,15 +799,25 @@ function RoomActions({
           <CalendarPlus className="size-4" /> Réserver
         </DropdownMenuItem>
         {canUpdate && (
-          <>
-            <DropdownMenuItem disabled={room.status === "maintenance"} onSelect={() => onSetStatus("maintenance")}>
-              <Wrench className="size-4" /> Maintenance
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={room.status === "cleaning"} onSelect={() => onSetStatus("cleaning")}>
-              <SlidersHorizontal className="size-4" /> Nettoyage
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <SlidersHorizontal className="size-4" /> Changer le statut
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              {STATUS_OPTIONS.filter(([key]) => key !== room.status).map(([key, label]) => (
+                <DropdownMenuItem key={key} onSelect={() => onSetStatus(key)}>
+                  {label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         )}
+        <DropdownMenuItem onSelect={onCalendar}>
+          <CalendarDays className="size-4" /> Voir le calendrier
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onView}>
+          <Eye className="size-4" /> Historique
+        </DropdownMenuItem>
         {canDelete && (
           <>
             <DropdownMenuSeparator />
@@ -782,19 +835,27 @@ function RoomActions({
 }
 
 function RoomRow(props: ManageRoomProps) {
-  const { room, image, reserved } = props; const meta = effectiveMeta(room, reserved);
+  const { room, image, reserved, nextBooking, onView } = props; const meta = effectiveMeta(room, reserved);
   return <tr className="hover:bg-muted/30">
     <td className="px-3 py-2"><RoomThumbnail room={room} image={image} /></td>
     <td className="min-w-[160px] px-3 py-2 font-semibold text-[#102A43] dark:text-white">{room.number}</td>
     <td className="min-w-[140px] px-3 py-2 text-muted-foreground">{room.hotel_room_types?.name ?? "—"}</td>
     <td className="px-3 py-2 font-medium">{formatCurrency(Number(room.rate))}</td>
     <td className="px-3 py-2"><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ring-1 ${meta.className}`}>{meta.label}</span></td>
-    <td className="px-3 py-2"><RoomActions {...props} /></td>
+    <td className="min-w-[150px] px-3 py-2 text-muted-foreground">{nextBooking}</td>
+    <td className="px-3 py-2">
+      <div className="flex items-center justify-end gap-1.5">
+        <Button size="sm" variant="outline" onClick={onView} className="h-8 rounded-lg px-2.5 text-xs">
+          <Eye className="size-3.5" /> Voir
+        </Button>
+        <RoomActions {...props} />
+      </div>
+    </td>
   </tr>;
 }
 
 function RoomMobileCard(props: ManageRoomProps) {
-  const { room, image, reserved } = props;
+  const { room, image, reserved, nextBooking, onView } = props;
   const meta = effectiveMeta(room, reserved);
   return (
     <article className="p-3.5 transition-colors active:bg-muted/20">
@@ -818,12 +879,18 @@ function RoomMobileCard(props: ManageRoomProps) {
               {meta.label}
             </span>
           </div>
+          <p className="mt-1.5 truncate text-xs text-muted-foreground">{nextBooking}</p>
           <div className="mt-2 flex items-center justify-between border-t pt-2">
             <p className="text-sm font-semibold text-[#9D7927] dark:text-[#E2C66E]">
               {formatCurrency(Number(room.rate))}{" "}
               <span className="text-[10px] font-normal text-muted-foreground">/ nuit</span>
             </p>
-            <RoomActions {...props} />
+            <div className="flex items-center gap-1.5">
+              <Button size="sm" variant="outline" onClick={onView} className="h-8 rounded-lg px-2.5 text-xs">
+                <Eye className="size-3.5" /> Voir
+              </Button>
+              <RoomActions {...props} />
+            </div>
           </div>
         </div>
       </div>
@@ -1272,13 +1339,7 @@ function RoomFormDialog({
                   value={form.status}
                   onChange={(value) => setForm({ ...form, status: value as RoomStatus })}
                   disabled={save.isPending}
-                  options={[
-                    ["available", "Disponible"],
-                    ["occupied", "Occupé"],
-                    ["cleaning", "Nettoyage"],
-                    ["maintenance", "Maintenance"],
-                    ["out_of_service", "Hors service"],
-                  ]}
+                  options={STATUS_OPTIONS}
                 />
               </div>
               <div>

@@ -49,6 +49,15 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ImageField } from "@/components/hotel/HotelImageField";
 import { cn } from "@/lib/utils";
 import {
@@ -137,6 +146,8 @@ export function HotelReservationsPage() {
   const [smsReservation, setSmsReservation] = useState<any | null>(null);
   const [detailReservationId, setDetailReservationId] = useState<string | null>(null);
   const [calendarIntentApplied, setCalendarIntentApplied] = useState(false);
+  const [mobileFormOpen, setMobileFormOpen] = useState(false);
+  const isMobile = useIsMobile();
   const canUpdate = useActionPermission("hotel.reservations.update");
   const canDelete = useActionPermission("hotel.reservations.delete");
   const canSendSms = useActionPermission("hotel.sms.send");
@@ -310,6 +321,7 @@ export function HotelReservationsPage() {
       setEditingId(null);
       setForm(emptyForm);
       setAttemptedSubmit(false);
+      setMobileFormOpen(false);
       refresh();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -437,7 +449,15 @@ export function HotelReservationsPage() {
       status: r.status,
       notes: r.notes ?? "",
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (isMobile) setMobileFormOpen(true);
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const startNewReservation = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setAttemptedSubmit(false);
+    if (isMobile) setMobileFormOpen(true);
+    else window.scrollTo({ top: 0, behavior: "smooth" });
   };
   useEffect(() => {
     if (calendarIntentApplied || !data) return;
@@ -454,11 +474,12 @@ export function HotelReservationsPage() {
         const departure = new Date(`${checkIn}T12:00:00`);
         departure.setDate(departure.getDate() + 1);
         setForm({ ...emptyForm, room_id: room.id, check_in: checkIn, check_out: departure.toISOString().slice(0, 10), nightly_rate: String(room.rate) });
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        if (isMobile) setMobileFormOpen(true);
+        else window.scrollTo({ top: 0, behavior: "smooth" });
       }
     }
     setCalendarIntentApplied(true);
-  }, [calendarIntentApplied, data]);
+  }, [calendarIntentApplied, data, isMobile]);
   const downloadReservationPdf = async (reservation: any) => {
     try {
       const guest: any = guests.get(reservation.guest_id);
@@ -531,9 +552,219 @@ export function HotelReservationsPage() {
       toast.error("Impossible de générer la confirmation PDF de cette réservation.");
     }
   };
+  const formFields = (
+    <>
+      <FormSection icon={User} title="Client">
+        <Label className="mb-1.5 block">Client *</Label>
+        <GuestPicker
+          guests={data?.guests ?? []}
+          value={form.guest_id}
+          tenantId={profile?.tenant_id}
+          onChange={(guestId) => setForm({ ...form, guest_id: guestId })}
+          onCreated={refresh}
+        />
+        {attemptedSubmit && !form.guest_id && (
+          <p className="mt-1.5 text-xs font-medium text-destructive">
+            Sélectionnez un client existant ou créez un nouveau client.
+          </p>
+        )}
+      </FormSection>
+
+      <FormSection icon={BedDouble} title="Chambre">
+        <Field label="Logement">
+          <Select
+            value={form.room_id}
+            onValueChange={(v) => {
+              const room = data?.rooms.find((r: any) => r.id === v);
+              setForm({ ...form, room_id: v, nightly_rate: String(room?.rate ?? "") });
+            }}
+          >
+            <SelectTrigger className="h-11">
+              <SelectValue placeholder="Sélectionner une chambre" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableRooms.map((r: any) => (
+                <SelectItem key={r.id} value={r.id}>
+                  N° {r.number}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {attemptedSubmit && !form.room_id && (
+            <p className="mt-1.5 text-xs font-medium text-destructive">
+              Sélectionnez une chambre.
+            </p>
+          )}
+          {selectedRoomUnavailable && (
+            <>
+              <p className="mt-1.5 text-xs font-medium text-destructive">
+                {conflictingReservation
+                  ? `Cette chambre est déjà réservée du ${formatDate(conflictingReservation.check_in)} au ${formatDate(conflictingReservation.check_out)}.`
+                  : "Ce logement est indisponible ou placé en maintenance."}
+              </p>
+              {conflictingReservation && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Veuillez sélectionner un autre logement disponible pour ces dates.
+                </p>
+              )}
+            </>
+          )}
+          {form.check_in && form.check_out && !selectedRoomUnavailable && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {availableRooms.length
+                ? `Logements disponibles aux mêmes dates : ${availableRooms.map((room: any) => `N° ${room.number}`).join(", ")}.`
+                : "Aucun logement disponible pour ces dates."}
+            </p>
+          )}
+        </Field>
+      </FormSection>
+
+      <FormSection title="Séjour">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Arrivée">
+            <Input
+              type="date"
+              className="h-11"
+              value={form.check_in}
+              onChange={(e) => setForm({ ...form, check_in: e.target.value })}
+            />
+          </Field>
+          <Field label="Départ">
+            <Input
+              type="date"
+              className="h-11"
+              value={form.check_out}
+              onChange={(e) => setForm({ ...form, check_out: e.target.value })}
+            />
+          </Field>
+        </div>
+        {attemptedSubmit && (!form.check_in || !form.check_out) && (
+          <p className="mt-1.5 text-xs font-medium text-destructive">
+            Renseignez les dates d’arrivée et de départ.
+          </p>
+        )}
+        {attemptedSubmit && form.check_in && form.check_out && nights < 1 && (
+          <p className="mt-1.5 text-xs font-medium text-destructive">
+            La date de départ doit être postérieure à la date d’arrivée.
+          </p>
+        )}
+      </FormSection>
+
+      <FormSection icon={Wallet} title="Tarif & paiement">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label="Tarif / nuit">
+            <div className="relative">
+              <Input
+                type="number"
+                min="0"
+                className="h-11 pr-14"
+                value={form.nightly_rate}
+                onChange={(e) => setForm({ ...form, nightly_rate: e.target.value })}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                FCFA
+              </span>
+            </div>
+          </Field>
+          <Field label="Remise">
+            <div className="relative">
+              <Input
+                type="number"
+                min="0"
+                className="h-11 pr-14"
+                value={form.discount}
+                onChange={(e) => setForm({ ...form, discount: e.target.value })}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                FCFA
+              </span>
+            </div>
+          </Field>
+          <Field label="Avance versée">
+            <div className="relative">
+              <Input
+                type="number"
+                min="0"
+                max={total}
+                className="h-11 pr-14"
+                value={form.advance}
+                onChange={(e) => setForm({ ...form, advance: e.target.value })}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                FCFA
+              </span>
+            </div>
+            {attemptedSubmit && invalidAdvance && (
+              <p className="mt-1.5 text-xs font-medium text-destructive">
+                L’avance ne peut pas être négative ni dépasser le total.
+              </p>
+            )}
+          </Field>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border bg-muted/30 px-3.5 py-2.5">
+            <span className="text-xs text-muted-foreground">Total</span>
+            <b className="block text-sm sm:text-base">{formatCurrency(total)}</b>
+          </div>
+          <div className="rounded-xl border bg-muted/30 px-3.5 py-2.5">
+            <span className="text-xs text-muted-foreground">Solde restant</span>
+            <b className="block text-sm sm:text-base">
+              {formatCurrency(Math.max(0, remainingBalance))}
+            </b>
+          </div>
+        </div>
+        <div className="mt-3">
+          <Field label="Statut">
+            <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+              <SelectTrigger className="h-11">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statuses.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {statusLabel[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+      </FormSection>
+
+      <FormSection icon={NotebookPen} title="Informations supplémentaires">
+        <Field label="Notes (optionnel)">
+          <Textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            placeholder="Demandes particulières, précisions utiles…"
+            rows={3}
+            className="resize-none"
+          />
+        </Field>
+      </FormSection>
+    </>
+  );
+  const formSubmitButton = (
+    <Button
+      size="lg"
+      className="w-full"
+      disabled={
+        save.isPending ||
+        !form.room_id ||
+        selectedRoomUnavailable ||
+        nights < 1 ||
+        invalidAdvance
+      }
+      onClick={submitReservation}
+    >
+      {save.isPending
+        ? "Enregistrement…"
+        : `${editingId ? "Enregistrer" : "Créer"} · ${formatCurrency(total)}`}
+    </Button>
+  );
   return (
     <HotelAppShell title="Réservations" subtitle="Liste, planning, arrivées et départs">
-      <section className="mb-5 space-y-3">
+      <section className="mb-5 hidden space-y-3 md:block">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold sm:text-lg">
@@ -557,213 +788,35 @@ export function HotelReservationsPage() {
             </Button>
           )}
         </div>
-
-        <FormSection icon={User} title="Client">
-          <Label className="mb-1.5 block">Client *</Label>
-          <GuestPicker
-            guests={data?.guests ?? []}
-            value={form.guest_id}
-            tenantId={profile?.tenant_id}
-            onChange={(guestId) => setForm({ ...form, guest_id: guestId })}
-            onCreated={refresh}
-          />
-          {attemptedSubmit && !form.guest_id && (
-            <p className="mt-1.5 text-xs font-medium text-destructive">
-              Sélectionnez un client existant ou créez un nouveau client.
-            </p>
-          )}
-        </FormSection>
-
-        <FormSection icon={BedDouble} title="Chambre">
-          <Field label="Logement">
-            <Select
-              value={form.room_id}
-              onValueChange={(v) => {
-                const room = data?.rooms.find((r: any) => r.id === v);
-                setForm({ ...form, room_id: v, nightly_rate: String(room?.rate ?? "") });
-              }}
-            >
-              <SelectTrigger className="h-11">
-                <SelectValue placeholder="Sélectionner une chambre" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableRooms.map((r: any) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    N° {r.number}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {attemptedSubmit && !form.room_id && (
-              <p className="mt-1.5 text-xs font-medium text-destructive">
-                Sélectionnez une chambre.
-              </p>
-            )}
-            {selectedRoomUnavailable && (
-              <>
-                <p className="mt-1.5 text-xs font-medium text-destructive">
-                  {conflictingReservation
-                    ? `Cette chambre est déjà réservée du ${formatDate(conflictingReservation.check_in)} au ${formatDate(conflictingReservation.check_out)}.`
-                    : "Ce logement est indisponible ou placé en maintenance."}
-                </p>
-                {conflictingReservation && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Veuillez sélectionner un autre logement disponible pour ces dates.
-                  </p>
-                )}
-              </>
-            )}
-            {form.check_in && form.check_out && !selectedRoomUnavailable && (
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {availableRooms.length
-                  ? `Logements disponibles aux mêmes dates : ${availableRooms.map((room: any) => `N° ${room.number}`).join(", ")}.`
-                  : "Aucun logement disponible pour ces dates."}
-              </p>
-            )}
-          </Field>
-        </FormSection>
-
-        <FormSection title="Séjour">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Arrivée">
-              <Input
-                type="date"
-                className="h-11"
-                value={form.check_in}
-                onChange={(e) => setForm({ ...form, check_in: e.target.value })}
-              />
-            </Field>
-            <Field label="Départ">
-              <Input
-                type="date"
-                className="h-11"
-                value={form.check_out}
-                onChange={(e) => setForm({ ...form, check_out: e.target.value })}
-              />
-            </Field>
-          </div>
-          {attemptedSubmit && (!form.check_in || !form.check_out) && (
-            <p className="mt-1.5 text-xs font-medium text-destructive">
-              Renseignez les dates d’arrivée et de départ.
-            </p>
-          )}
-          {attemptedSubmit && form.check_in && form.check_out && nights < 1 && (
-            <p className="mt-1.5 text-xs font-medium text-destructive">
-              La date de départ doit être postérieure à la date d’arrivée.
-            </p>
-          )}
-        </FormSection>
-
-        <FormSection icon={Wallet} title="Tarif & paiement">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Field label="Tarif / nuit">
-              <div className="relative">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-11 pr-14"
-                  value={form.nightly_rate}
-                  onChange={(e) => setForm({ ...form, nightly_rate: e.target.value })}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
-                  FCFA
-                </span>
-              </div>
-            </Field>
-            <Field label="Remise">
-              <div className="relative">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-11 pr-14"
-                  value={form.discount}
-                  onChange={(e) => setForm({ ...form, discount: e.target.value })}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
-                  FCFA
-                </span>
-              </div>
-            </Field>
-            <Field label="Avance versée">
-              <div className="relative">
-                <Input
-                  type="number"
-                  min="0"
-                  max={total}
-                  className="h-11 pr-14"
-                  value={form.advance}
-                  onChange={(e) => setForm({ ...form, advance: e.target.value })}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
-                  FCFA
-                </span>
-              </div>
-              {attemptedSubmit && invalidAdvance && (
-                <p className="mt-1.5 text-xs font-medium text-destructive">
-                  L’avance ne peut pas être négative ni dépasser le total.
-                </p>
-              )}
-            </Field>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border bg-muted/30 px-3.5 py-2.5">
-              <span className="text-xs text-muted-foreground">Total</span>
-              <b className="block text-sm sm:text-base">{formatCurrency(total)}</b>
-            </div>
-            <div className="rounded-xl border bg-muted/30 px-3.5 py-2.5">
-              <span className="text-xs text-muted-foreground">Solde restant</span>
-              <b className="block text-sm sm:text-base">
-                {formatCurrency(Math.max(0, remainingBalance))}
-              </b>
-            </div>
-          </div>
-          <div className="mt-3">
-            <Field label="Statut">
-              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                <SelectTrigger className="h-11">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {statusLabel[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-        </FormSection>
-
-        <FormSection icon={NotebookPen} title="Informations supplémentaires">
-          <Field label="Notes (optionnel)">
-            <Textarea
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Demandes particulières, précisions utiles…"
-              rows={3}
-              className="resize-none"
-            />
-          </Field>
-        </FormSection>
-
-        <Button
-          size="lg"
-          className="w-full"
-          disabled={
-            save.isPending ||
-            !form.room_id ||
-            selectedRoomUnavailable ||
-            nights < 1 ||
-            invalidAdvance
-          }
-          onClick={submitReservation}
-        >
-          {save.isPending
-            ? "Enregistrement…"
-            : `${editingId ? "Enregistrer" : "Créer"} · ${formatCurrency(total)}`}
-        </Button>
+        {formFields}
+        {formSubmitButton}
       </section>
+      <div className="mb-5 md:hidden">
+        <Button size="lg" className="w-full" onClick={startNewReservation}>
+          <Plus className="size-4" />
+          Nouvelle réservation
+        </Button>
+      </div>
+      <Dialog
+        open={mobileFormOpen}
+        onOpenChange={(open) => {
+          setMobileFormOpen(open);
+          if (!open) {
+            setEditingId(null);
+            setForm(emptyForm);
+            setAttemptedSubmit(false);
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-24px)] max-w-[440px] flex-col gap-0 overflow-hidden rounded-[20px] p-0">
+          <DialogHeader className="shrink-0 border-b px-4 py-4 text-left">
+            <DialogTitle>{editingId ? "Modifier la réservation" : "Nouvelle réservation"}</DialogTitle>
+            <DialogDescription>Renseignez le séjour et le tarif appliqué.</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">{formFields}</div>
+          <DialogFooter className="shrink-0 border-t px-4 py-4">{formSubmitButton}</DialogFooter>
+        </DialogContent>
+      </Dialog>
       <section className="hotel-panel">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <div className="relative min-w-56 flex-1">
@@ -817,11 +870,7 @@ export function HotelReservationsPage() {
             onDateChange={setPlanningDate}
             onModeChange={setPlanningMode}
             onList={() => setView("list")}
-            onNew={() => {
-              setEditingId(null);
-              setForm(emptyForm);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
+            onNew={startNewReservation}
             type={planningType}
             floor={planningFloor}
             types={planningTypes}
@@ -842,21 +891,50 @@ export function HotelReservationsPage() {
             onSelect={edit}
           />
         ) : (
-          <ReservationTable
-            rows={filtered}
-            guests={guests}
-            rooms={rooms}
-            edit={edit}
-            requestDelete={setDeleting}
-            canUpdate={canUpdate}
-            canDelete={canDelete}
-            downloadPdf={downloadReservationPdf}
-            downloadConfirmation={downloadConfirmationPdf}
-            openDocuments={(r: any) => setDetailReservationId(r.id)}
-            sendSms={setSmsReservation}
-            canSendSms={canSendSms && smsModuleEnabled}
-            changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
-          />
+          <>
+            <div className="hidden md:block">
+              <ReservationTable
+                rows={filtered}
+                guests={guests}
+                rooms={rooms}
+                edit={edit}
+                requestDelete={setDeleting}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                downloadPdf={downloadReservationPdf}
+                downloadConfirmation={downloadConfirmationPdf}
+                openDocuments={(r: any) => setDetailReservationId(r.id)}
+                sendSms={setSmsReservation}
+                canSendSms={canSendSms && smsModuleEnabled}
+                changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
+              />
+            </div>
+            <div className="space-y-3 md:hidden">
+              {filtered.map((r: any) => (
+                <ReservationMobileCard
+                  key={r.id}
+                  r={r}
+                  guest={guests.get(r.guest_id)}
+                  room={rooms.get(r.room_id)}
+                  edit={edit}
+                  requestDelete={setDeleting}
+                  canUpdate={canUpdate}
+                  canDelete={canDelete}
+                  downloadPdf={downloadReservationPdf}
+                  downloadConfirmation={downloadConfirmationPdf}
+                  openDocuments={(r: any) => setDetailReservationId(r.id)}
+                  sendSms={setSmsReservation}
+                  canSendSms={canSendSms && smsModuleEnabled}
+                  changeStatus={(id: string, status: string) => changeStatus.mutate({ id, status })}
+                />
+              ))}
+              {!filtered.length && (
+                <p className="py-12 text-center text-sm text-slate-400">
+                  Aucune réservation trouvée.
+                </p>
+              )}
+            </div>
+          </>
         )}
       </section>
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
@@ -1172,50 +1250,19 @@ function ReservationTable({
                 <td className="font-medium">{formatCurrency(Number(r.balance_due ?? 0))}</td>
                 <td className="text-right">
                   <div className="flex justify-end gap-1">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-8"
-                          aria-label="Plus d’actions"
-                        >
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-56">
-                        {canUpdate && (
-                          <DropdownMenuItem onSelect={() => edit(r)}>
-                            <Pencil /> Modifier la réservation
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
-                          <FileDown /> Détail de réservation
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => void downloadConfirmation(r)}>
-                          <FileCheck2 /> Confirmation de réservation
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => openDocuments(r)}>
-                          <BadgeCheck /> Documents (certificat, facture…)
-                        </DropdownMenuItem>
-                        {canSendSms && (
-                          <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!g?.phone}>
-                            <MessageSquareText /> Envoyer un SMS
-                          </DropdownMenuItem>
-                        )}
-                        {canDelete && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onSelect={() => requestDelete(r)}
-                            >
-                              <Trash2 /> Supprimer la réservation
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ReservationActionsMenu
+                      r={r}
+                      guest={g}
+                      edit={edit}
+                      requestDelete={requestDelete}
+                      canUpdate={canUpdate}
+                      canDelete={canDelete}
+                      downloadPdf={downloadPdf}
+                      downloadConfirmation={downloadConfirmation}
+                      openDocuments={openDocuments}
+                      sendSms={sendSms}
+                      canSendSms={canSendSms}
+                    />
                     {["pending", "confirmed"].includes(r.status) && (
                       <Button
                         size="sm"
@@ -1261,6 +1308,163 @@ function ReservationTable({
     </div>
   );
 }
+
+function ReservationActionsMenu({
+  r,
+  guest,
+  edit,
+  requestDelete,
+  canUpdate,
+  canDelete,
+  downloadPdf,
+  downloadConfirmation,
+  openDocuments,
+  sendSms,
+  canSendSms,
+}: any) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost" className="size-8" aria-label="Plus d’actions">
+          <MoreVertical className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        {canUpdate && (
+          <DropdownMenuItem onSelect={() => edit(r)}>
+            <Pencil /> Modifier la réservation
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={() => void downloadPdf(r)}>
+          <FileDown /> Détail de réservation
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void downloadConfirmation(r)}>
+          <FileCheck2 /> Confirmation de réservation
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => openDocuments(r)}>
+          <BadgeCheck /> Documents (certificat, facture…)
+        </DropdownMenuItem>
+        {canSendSms && (
+          <DropdownMenuItem onSelect={() => sendSms(r)} disabled={!guest?.phone}>
+            <MessageSquareText /> Envoyer un SMS
+          </DropdownMenuItem>
+        )}
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => requestDelete(r)}
+            >
+              <Trash2 /> Supprimer la réservation
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ReservationMobileCard({
+  r,
+  guest,
+  room,
+  edit,
+  requestDelete,
+  canUpdate,
+  canDelete,
+  downloadPdf,
+  downloadConfirmation,
+  openDocuments,
+  sendSms,
+  canSendSms,
+  changeStatus,
+}: any) {
+  const balance = Number(r.balance_due ?? 0);
+  const isSettled = balance <= 0;
+  return (
+    <article className="rounded-2xl border bg-card p-3.5 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold">
+            {guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL}
+          </h3>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">N° {room?.number ?? "—"}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+            {statusLabel[r.status] ?? r.status}
+          </span>
+          <ReservationActionsMenu
+            r={r}
+            guest={guest}
+            edit={edit}
+            requestDelete={requestDelete}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+            downloadPdf={downloadPdf}
+            downloadConfirmation={downloadConfirmation}
+            openDocuments={openDocuments}
+            sendSms={sendSms}
+            canSendSms={canSendSms}
+          />
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {formatDate(r.check_in)} → {formatDate(r.check_out)}
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-xl bg-muted/30 px-3 py-2">
+          <span className="block text-[11px] text-muted-foreground">Avance</span>
+          <b className="text-sm">{formatCurrency(Number(r.paid_total ?? 0))}</b>
+        </div>
+        <div className="rounded-xl bg-muted/30 px-3 py-2">
+          <span className="block text-[11px] text-muted-foreground">Solde</span>
+          <b className={cn("text-sm", isSettled && "text-primary")}>
+            {isSettled ? "Soldée" : formatCurrency(balance)}
+          </b>
+        </div>
+      </div>
+      {(["pending", "confirmed"].includes(r.status) ||
+        r.status === "checked_in" ||
+        !["cancelled", "checked_out"].includes(r.status)) && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {["pending", "confirmed"].includes(r.status) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 flex-1"
+              onClick={() => changeStatus(r.id, "checked_in")}
+            >
+              Check-in
+            </Button>
+          )}
+          {r.status === "checked_in" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 flex-1"
+              onClick={() => changeStatus(r.id, "checked_out")}
+            >
+              Check-out
+            </Button>
+          )}
+          {!["cancelled", "checked_out"].includes(r.status) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-9 text-red-600"
+              onClick={() => changeStatus(r.id, "cancelled")}
+            >
+              Annuler
+            </Button>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
 function Planning({ rows, guests, rooms }: any) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

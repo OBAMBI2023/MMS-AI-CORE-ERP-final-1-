@@ -229,7 +229,7 @@ export function HotelCheckinCheckoutPage() {
   return (
     <HotelAppShell
       title="Check-in / Check-out"
-      subtitle="SAOVIA HOTEL — Arrivées et départs"
+      subtitle="Arrivées et départs"
       contentClassName="bg-[#F4FAF8] dark:bg-[#07211C]"
     >
       <div className="space-y-5 pb-4 sm:space-y-6">
@@ -287,9 +287,9 @@ export function HotelCheckinCheckoutPage() {
         ) : (
           <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
             <TabsList className="flex h-auto w-full flex-wrap gap-1 bg-muted p-1 sm:inline-flex sm:w-auto">
-              <TabsTrigger value="arrivals">Arrivées aujourd'hui ({arrivals.length})</TabsTrigger>
+              <TabsTrigger value="arrivals">Arrivées ({arrivals.length})</TabsTrigger>
               <TabsTrigger value="inhouse">En séjour ({inHouse.length})</TabsTrigger>
-              <TabsTrigger value="departures">Départs aujourd'hui ({departures.length})</TabsTrigger>
+              <TabsTrigger value="departures">Départs ({departures.length})</TabsTrigger>
               <TabsTrigger value="history">Historique</TabsTrigger>
             </TabsList>
             <TabsContent value="arrivals">
@@ -297,10 +297,15 @@ export function HotelCheckinCheckoutPage() {
                 rows={arrivals}
                 guests={guests}
                 rooms={rooms}
+                variant="arrivals"
                 mode="checkin"
                 canAct={canCheckIn}
                 onAct={(r: HotelBillingReservation) => setAction({ mode: "checkin", reservation: r })}
-                emptyLabel="Aucune arrivée prévue."
+                emptyState={{
+                  title: "Aucune arrivée prévue aujourd'hui",
+                  description: "Consultez les réservations ou revenez demain.",
+                  action: { label: "Voir les réservations", to: "/hotel/reservations" },
+                }}
               />
             </TabsContent>
             <TabsContent value="inhouse">
@@ -308,10 +313,11 @@ export function HotelCheckinCheckoutPage() {
                 rows={inHouse}
                 guests={guests}
                 rooms={rooms}
+                variant="inhouse"
                 mode="checkout"
                 canAct={canCheckOut}
                 onAct={(r: HotelBillingReservation) => setAction({ mode: "checkout", reservation: r })}
-                emptyLabel="Aucun client en séjour."
+                emptyState={{ title: "Aucun client actuellement en séjour" }}
                 showLateBadge
                 today={today}
               />
@@ -321,10 +327,11 @@ export function HotelCheckinCheckoutPage() {
                 rows={departures}
                 guests={guests}
                 rooms={rooms}
+                variant="departures"
                 mode="checkout"
                 canAct={canCheckOut}
                 onAct={(r: HotelBillingReservation) => setAction({ mode: "checkout", reservation: r })}
-                emptyLabel="Aucun départ prévu aujourd'hui."
+                emptyState={{ title: "Aucun départ prévu aujourd'hui" }}
                 showLateBadge
                 today={today}
               />
@@ -334,8 +341,9 @@ export function HotelCheckinCheckoutPage() {
                 rows={history}
                 guests={guests}
                 rooms={rooms}
+                variant="history"
                 mode="history"
-                emptyLabel="Aucun historique pour le moment."
+                emptyState={{ title: "Aucun historique pour le moment" }}
               />
             </TabsContent>
           </Tabs>
@@ -446,41 +454,61 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
+type ListVariant = "arrivals" | "inhouse" | "departures" | "history";
+
+const VARIANT_COLUMNS: Record<ListVariant, string[]> = {
+  arrivals: ["Client", "Chambre", "Arrivée", "Statut", "Action"],
+  inhouse: ["Client", "Chambre", "Arrivée", "Départ prévu", "Paiement", "Action"],
+  departures: ["Client", "Chambre", "Départ", "Paiement", "Statut", "Action"],
+  history: ["Client", "Chambre", "Arrivée", "Départ", "Paiement", "Statut"],
+};
+
 function ReservationList({
   rows,
   guests,
   rooms,
+  variant,
   mode,
   canAct,
   onAct,
-  emptyLabel,
+  emptyState,
   showLateBadge,
   today,
 }: {
   rows: HotelBillingReservation[];
   guests: Map<string, any>;
   rooms: Map<string, any>;
+  variant: ListVariant;
   mode: "checkin" | "checkout" | "history";
   canAct?: boolean;
   onAct?: (r: HotelBillingReservation) => void;
-  emptyLabel: string;
+  emptyState: { title: string; description?: string; action?: { label: string; to: string } };
   showLateBadge?: boolean;
   today?: string;
 }) {
   if (!rows.length) {
     return (
-      <div className="mt-4 rounded-2xl border bg-card py-14 text-center text-sm text-muted-foreground shadow-sm">
-        {emptyLabel}
+      <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border bg-card py-14 text-center shadow-sm">
+        <p className="text-sm font-medium">{emptyState.title}</p>
+        {emptyState.description && (
+          <p className="max-w-xs text-xs text-muted-foreground">{emptyState.description}</p>
+        )}
+        {emptyState.action && (
+          <Button asChild size="sm" variant="outline" className="mt-2">
+            <Link to={emptyState.action.to}>{emptyState.action.label}</Link>
+          </Button>
+        )}
       </div>
     );
   }
+  const columns = VARIANT_COLUMNS[variant];
   return (
     <div className="mt-4 overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-[#102A43] text-white">
             <tr>
-              {["Client", "Logement", "Arrivée", "Départ", "Paiement", "Statut", "Action"].map((h) => (
+              {columns.map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">
                   {h}
                 </th>
@@ -494,6 +522,7 @@ function ReservationList({
                 r={r}
                 guest={guests.get(r.guest_id ?? "")}
                 room={rooms.get(r.room_id)}
+                variant={variant}
                 mode={mode}
                 canAct={canAct}
                 onAct={onAct}
@@ -511,6 +540,7 @@ function ReservationList({
             r={r}
             guest={guests.get(r.guest_id ?? "")}
             room={rooms.get(r.room_id)}
+            variant={variant}
             mode={mode}
             canAct={canAct}
             onAct={onAct}
@@ -523,58 +553,124 @@ function ReservationList({
   );
 }
 
-function ReservationRow({ r, guest, room, mode, canAct, onAct, showLateBadge, today }: any) {
+function ClientCell({ guest }: { guest: any }) {
+  return (
+    <>
+      {guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL}
+      <p className="text-xs font-normal text-muted-foreground">{guest?.phone || "—"}</p>
+    </>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+        STATUS_BADGE[status] ?? "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300",
+      )}
+    >
+      {STATUS_LABEL[status] ?? status}
+    </span>
+  );
+}
+
+function PaymentBadge({ r }: { r: HotelBillingReservation }) {
   const paymentStatus = hotelPaymentStatus(r.paid_total, r.balance_due);
+  return (
+    <>
+      <span
+        className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", HOTEL_PAYMENT_STATUS_BADGE[paymentStatus])}
+      >
+        {HOTEL_PAYMENT_STATUS_LABEL[paymentStatus]}
+      </span>
+      {Number(r.balance_due) > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">Reste : {formatCurrency(Number(r.balance_due))}</p>
+      )}
+    </>
+  );
+}
+
+function LateBadge() {
+  return (
+    <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
+      En retard
+    </span>
+  );
+}
+
+function ReservationRow({ r, guest, room, variant, mode, canAct, onAct, showLateBadge, today }: any) {
   const isLate = showLateBadge && r.status === "checked_in" && today && r.check_out < today;
   return (
     <tr className="align-top">
       <td className="px-3 py-3 font-medium">
-        {guest ? `${guest.first_name} ${guest.last_name}` : WALK_IN_LABEL}
-        <p className="text-xs font-normal text-muted-foreground">{guest?.phone || "—"}</p>
+        <ClientCell guest={guest} />
       </td>
       <td className="px-3 py-3">N° {room?.number ?? "—"}</td>
-      <td className="px-3 py-3">{formatDate(r.check_in)}</td>
-      <td className="px-3 py-3">
-        {formatDate(r.check_out)}
-        {isLate && (
-          <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
-            En retard
-          </span>
-        )}
-      </td>
-      <td className="px-3 py-3">
-        <span
-          className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-semibold",
-            HOTEL_PAYMENT_STATUS_BADGE[paymentStatus],
-          )}
-        >
-          {HOTEL_PAYMENT_STATUS_LABEL[paymentStatus]}
-        </span>
-        {Number(r.balance_due) > 0 && (
-          <p className="mt-1 text-xs text-muted-foreground">Reste : {formatCurrency(Number(r.balance_due))}</p>
-        )}
-      </td>
-      <td className="px-3 py-3">
-        <span
-          className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-semibold",
-            STATUS_BADGE[r.status] ?? "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300",
-          )}
-        >
-          {STATUS_LABEL[r.status] ?? r.status}
-        </span>
-      </td>
-      <td className="px-3 py-3 text-right">
-        <RowAction r={r} mode={mode} canAct={canAct} onAct={onAct} />
-      </td>
+      {variant === "arrivals" && (
+        <>
+          <td className="px-3 py-3">{formatDate(r.check_in)}</td>
+          <td className="px-3 py-3">
+            <StatusBadge status={r.status} />
+          </td>
+        </>
+      )}
+      {variant === "inhouse" && (
+        <>
+          <td className="px-3 py-3">{formatDate(r.check_in)}</td>
+          <td className="px-3 py-3">
+            {formatDate(r.check_out)}
+            {isLate && <LateBadge />}
+          </td>
+          <td className="px-3 py-3">
+            <PaymentBadge r={r} />
+          </td>
+        </>
+      )}
+      {variant === "departures" && (
+        <>
+          <td className="px-3 py-3">
+            {formatDate(r.check_out)}
+            {isLate && <LateBadge />}
+          </td>
+          <td className="px-3 py-3">
+            <PaymentBadge r={r} />
+          </td>
+          <td className="px-3 py-3">
+            <StatusBadge status={r.status} />
+          </td>
+        </>
+      )}
+      {variant === "history" && (
+        <>
+          <td className="px-3 py-3">{formatDate(r.check_in)}</td>
+          <td className="px-3 py-3">{formatDate(r.check_out)}</td>
+          <td className="px-3 py-3">
+            <PaymentBadge r={r} />
+          </td>
+          <td className="px-3 py-3">
+            <StatusBadge status={r.status} />
+          </td>
+        </>
+      )}
+      {variant !== "history" && (
+        <td className="px-3 py-3 text-right">
+          <RowAction r={r} mode={mode} canAct={canAct} onAct={onAct} />
+        </td>
+      )}
     </tr>
   );
 }
 
-function ReservationCard({ r, guest, room, mode, canAct, onAct, showLateBadge, today }: any) {
+function ReservationCard({ r, guest, room, variant, mode, canAct, onAct, showLateBadge, today }: any) {
   const paymentStatus = hotelPaymentStatus(r.paid_total, r.balance_due);
   const isLate = showLateBadge && r.status === "checked_in" && today && r.check_out < today;
+  const dateLine =
+    variant === "arrivals"
+      ? formatDate(r.check_in)
+      : variant === "departures"
+        ? formatDate(r.check_out)
+        : `${formatDate(r.check_in)} → ${formatDate(r.check_out)}`;
   return (
     <div className="space-y-2.5 p-4">
       <div className="flex items-start justify-between gap-2">
@@ -584,41 +680,30 @@ function ReservationCard({ r, guest, room, mode, canAct, onAct, showLateBadge, t
             {guest?.phone || "—"} · N° {room?.number ?? "—"}
           </p>
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-            STATUS_BADGE[r.status] ?? "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300",
-          )}
-        >
-          {STATUS_LABEL[r.status] ?? r.status}
-        </span>
+        <StatusBadge status={r.status} />
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          {formatDate(r.check_in)} → {formatDate(r.check_out)}
-        </span>
-        {isLate && (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
-            En retard
-          </span>
-        )}
+        <span>{dateLine}</span>
+        {isLate && <LateBadge />}
       </div>
-      <div className="flex items-center justify-between">
-        <span
-          className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-semibold",
-            HOTEL_PAYMENT_STATUS_BADGE[paymentStatus],
+      {variant !== "arrivals" && (
+        <div className="flex items-center justify-between">
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+              HOTEL_PAYMENT_STATUS_BADGE[paymentStatus],
+            )}
+          >
+            {HOTEL_PAYMENT_STATUS_LABEL[paymentStatus]}
+          </span>
+          {Number(r.balance_due) > 0 && (
+            <span className="text-xs font-medium text-muted-foreground">
+              Reste {formatCurrency(Number(r.balance_due))}
+            </span>
           )}
-        >
-          {HOTEL_PAYMENT_STATUS_LABEL[paymentStatus]}
-        </span>
-        {Number(r.balance_due) > 0 && (
-          <span className="text-xs font-medium text-muted-foreground">
-            Reste {formatCurrency(Number(r.balance_due))}
-          </span>
-        )}
-      </div>
-      <RowAction r={r} mode={mode} canAct={canAct} onAct={onAct} full />
+        </div>
+      )}
+      {variant !== "history" && <RowAction r={r} mode={mode} canAct={canAct} onAct={onAct} full />}
     </div>
   );
 }
