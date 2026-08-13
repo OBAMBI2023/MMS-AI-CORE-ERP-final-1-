@@ -1308,33 +1308,40 @@ function ClientDetails({
           ) : null}
           <Detail label="Client depuis" value={formatDate(guest.created_at)} />
         </div>
-        {canViewIdentity && canDownloadIdentityDocument && (
+        {canViewIdentity && guest.identity_document_path && (
           <div className="px-6 pb-2">
             <DetailSection
-              title="Document d’identité"
+              title="Pièce d’identité"
               actions={
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void downloadIdentityDocument()}
-                  disabled={downloadingIdentity}
-                  className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
-                >
-                  {downloadingIdentity ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Download className="size-3.5" />
-                  )}
-                  Télécharger
-                </Button>
+                canDownloadIdentityDocument ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void downloadIdentityDocument()}
+                    disabled={downloadingIdentity}
+                    className="gap-2 rounded-xl"
+                  >
+                    {downloadingIdentity ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Download className="size-4" />
+                    )}
+                    Télécharger la pièce d’identité
+                  </Button>
+                ) : null
               }
             >
-              {guest.identity_document_path?.startsWith("data:image/") ? (
-                <img src={guest.identity_document_path} alt="Pièce d’identité" className="max-h-56 rounded-xl border object-contain" />
-              ) : (
-                <p className="text-sm text-muted-foreground">{guest.identity_document_path}</p>
-              )}
+              <div className="space-y-3">
+                {guest.identity_document_path?.startsWith("data:image/") ? (
+                  <img
+                    src={guest.identity_document_path}
+                    alt="Pièce d’identité"
+                    className="max-h-56 rounded-xl border object-contain"
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">{guest.identity_document_path}</p>
+                )}
+              </div>
             </DetailSection>
           </div>
         )}
@@ -1449,7 +1456,7 @@ function useIdentityDocumentDownload(guest: Guest | null, canViewIdentity = true
       const filename = `piece-identite-${slugifyForFilename(guestName(guest))}.${extension}`;
       downloadFile(new File([blob], filename, { type: blob.type || "application/octet-stream" }));
     } catch {
-      toast.error("Impossible de télécharger le document d’identité.");
+      toast.error("Impossible de télécharger la pièce d’identité.");
     } finally {
       setDownloadingIdentity(false);
     }
