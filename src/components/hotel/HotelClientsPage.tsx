@@ -659,6 +659,7 @@ export function HotelClientsPage() {
                     key={guest.id}
                     guest={guest}
                     stays={staysByGuest.get(guest.id) ?? []}
+                    canViewIdentity={canViewIdentity}
                     canUpdate={canUpdate}
                     canDelete={canDelete}
                     onView={() => setViewing(guest)}
@@ -677,6 +678,7 @@ export function HotelClientsPage() {
                 key={guest.id}
                 guest={guest}
                 stays={staysByGuest.get(guest.id) ?? []}
+                canViewIdentity={canViewIdentity}
                 canUpdate={canUpdate}
                 canDelete={canDelete}
                 onView={() => setViewing(guest)}
@@ -812,6 +814,7 @@ function TypeBadge({ type }: { type: ClientType | null }) {
 type ManageClientProps = {
   guest: Guest;
   stays: Stay[];
+  canViewIdentity: boolean;
   canUpdate: boolean;
   canDelete: boolean;
   onView: () => void;
@@ -823,6 +826,7 @@ type ManageClientProps = {
 
 function ClientActions({
   guest,
+  canViewIdentity,
   canUpdate,
   canDelete,
   onView,
@@ -832,7 +836,7 @@ function ClientActions({
   onDelete,
 }: Omit<ManageClientProps, "stays">) {
   const { downloadIdentityDocument, downloadingIdentity, canDownloadIdentityDocument } =
-    useIdentityDocumentDownload(guest, true);
+    useIdentityDocumentDownload(guest, canViewIdentity);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
