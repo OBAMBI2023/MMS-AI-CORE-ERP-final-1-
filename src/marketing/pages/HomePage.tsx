@@ -1,7 +1,7 @@
 import { ArrowRight, BarChart3, Building2, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { PLATFORM_BRANDING } from "@/config/branding";
-import { MarketingCta } from "../components/MarketingCta";
 
 const capabilities = [
   {
@@ -22,6 +22,48 @@ const capabilities = [
 ] as const;
 
 export function HomePage() {
+  const shouldReduceMotion = useReducedMotion();
+
+  const containerVariants: Variants = {
+    hidden: { opacity: 0, y: 18, scale: 0.985 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.5,
+        ease: "easeOut" as const,
+        when: "beforeChildren",
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const cardVariants: Variants = {
+    hidden: { opacity: 0, y: 14 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.35,
+        ease: "easeOut" as const,
+      },
+    },
+  };
+
+  const barVariants: Variants = {
+    hidden: { width: 0, opacity: 0.45 },
+    visible: {
+      width: "5rem",
+      opacity: 1,
+      transition: {
+        duration: 0.7,
+        ease: "easeOut" as const,
+        delay: 0.25,
+      },
+    },
+  };
+
   return (
     <>
       <section className="relative overflow-hidden px-5 pb-24 pt-16 sm:py-32 lg:px-8">
@@ -56,7 +98,13 @@ export function HomePage() {
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-xl">
+          <motion.div
+            className="relative mx-auto w-full max-w-xl"
+            variants={shouldReduceMotion ? undefined : containerVariants}
+            initial={shouldReduceMotion ? false : "hidden"}
+            whileInView={shouldReduceMotion ? undefined : "visible"}
+            viewport={{ once: true, amount: 0.35 }}
+          >
             <div className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-blue-100/70 blur-2xl" />
             <div className="rounded-[2rem] border border-slate-200 bg-slate-950 p-6 text-white shadow-2xl">
               <div className="flex items-center justify-between border-b border-white/10 pb-5">
@@ -69,22 +117,58 @@ export function HomePage() {
                     <p className="text-xs text-slate-400">Organisation et opérations</p>
                   </div>
                 </div>
-                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                <motion.span
+                  className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300"
+                  animate={
+                    shouldReduceMotion
+                      ? undefined
+                      : {
+                          boxShadow: [
+                            "0 0 0 0 rgba(74, 222, 128, 0)",
+                            "0 0 0 6px rgba(74, 222, 128, 0.06)",
+                            "0 0 0 0 rgba(74, 222, 128, 0)",
+                          ],
+                        }
+                  }
+                  transition={shouldReduceMotion ? undefined : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                >
                   Centralisé
-                </span>
+                </motion.span>
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 {["Ventes & devis", "Achats & fournisseurs", "Clients & services", "Rapports & paramètres"].map(
-                  (label) => (
-                    <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <div className="mb-5 h-2 w-20 rounded-full bg-blue-400/60" />
+                  (label, index) => (
+                    <motion.div
+                      key={label}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-4 transition-colors duration-200"
+                      variants={shouldReduceMotion ? undefined : cardVariants}
+                      whileHover={
+                        shouldReduceMotion
+                          ? undefined
+                          : {
+                              y: -3,
+                              scale: 1.01,
+                              borderColor: "rgba(96, 165, 250, 0.28)",
+                              boxShadow: "0 10px 30px rgba(15, 23, 42, 0.25)",
+                            }
+                      }
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      custom={index}
+                    >
+                      <motion.div
+                        className="mb-5 h-2 w-20 rounded-full bg-blue-400/60"
+                        variants={shouldReduceMotion ? undefined : barVariants}
+                        initial={shouldReduceMotion ? false : "hidden"}
+                        whileInView={shouldReduceMotion ? undefined : "visible"}
+                        viewport={{ once: true, amount: 0.6 }}
+                      />
                       <p className="text-sm font-semibold">{label}</p>
-                    </div>
+                    </motion.div>
                   ),
                 )}
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -109,7 +193,6 @@ export function HomePage() {
           </div>
         </div>
       </section>
-      <MarketingCta />
     </>
   );
 }

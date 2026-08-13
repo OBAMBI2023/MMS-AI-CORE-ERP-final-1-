@@ -27,7 +27,7 @@ const contextClasses: Record<BrandLogoContext, string> = {
   // Wide (non-square) boxes sized to the logo's own aspect ratio so mobile
   // renders at a legible width without letterboxing or growing header height.
   marketingHeader: "h-[62px] w-[84px] p-0 md:size-12 md:p-1",
-  marketingFooter: "h-[75px] w-[102px] p-0 md:size-12 md:p-1",
+  marketingFooter: "h-[44px] w-[136px] p-0",
   trialHeader: "h-[66px] w-[90px] p-0 md:size-14 md:p-1",
 };
 

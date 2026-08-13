@@ -1,6 +1,7 @@
 import { Building2 } from "lucide-react";
 import { useTenant } from "@/providers/TenantProvider";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export function HotelSidebarHeader({
@@ -11,8 +12,10 @@ export function HotelSidebarHeader({
   className?: string;
 }) {
   const { profile } = useTenant();
-  const { settings, logoUrl } = useCompanySettings(profile?.tenant_id);
+  const { settings, logoUrl, isLoading } = useCompanySettings(profile?.tenant_id);
   const establishmentName = settings?.company_name?.trim() || "SAOVIA HOTEL";
+  const frameSize = compact ? "size-12" : "size-16";
+  const iconSize = compact ? "h-5 w-5" : "h-7 w-7";
 
   return (
     <div
@@ -22,20 +25,24 @@ export function HotelSidebarHeader({
         className,
       )}
     >
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt={`Logo ${establishmentName}`}
-          className={cn("shrink-0 rounded-xl object-contain", compact ? "size-10" : "size-11")}
-        />
+      {isLoading ? (
+        <Skeleton className={cn("shrink-0 rounded-2xl bg-white/15", frameSize)} />
+      ) : logoUrl ? (
+        <div className={cn("shrink-0 overflow-hidden rounded-2xl bg-white p-1", frameSize)}>
+          <img
+            src={logoUrl}
+            alt={`Logo ${establishmentName}`}
+            className="h-full w-full object-contain"
+          />
+        </div>
       ) : (
         <div
           className={cn(
             "grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary-glow text-white shadow-[0_6px_18px_rgba(0,0,0,0.25)]",
-            compact ? "size-11" : "size-16",
+            frameSize,
           )}
         >
-          <Building2 className={compact ? "h-5 w-5" : "h-7 w-7"} />
+          <Building2 className={iconSize} />
         </div>
       )}
       <div className="min-w-0 flex-1">
