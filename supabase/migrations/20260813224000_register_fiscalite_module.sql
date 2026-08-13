@@ -1,4 +1,4 @@
--- Fiscalité becomes a first-class ERP module, wired through the same
+-- FiscalitÃ© becomes a first-class ERP module, wired through the same
 -- erp_modules / tenant_modules / current_user_module_enabled path as the
 -- existing business modules.
 
@@ -7,7 +7,7 @@ INSERT INTO public.erp_modules
 VALUES
   (
     'fiscalite',
-    'Fiscalité',
+    'FiscalitÃ©',
     'Anticipation des obligations fiscales',
     'Landmark',
     72,
