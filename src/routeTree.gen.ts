@@ -29,6 +29,7 @@ import { Route as JournalRouteImport } from './routes/journal'
 import { Route as FournisseursRouteImport } from './routes/fournisseurs'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as FonctionnalitesRouteImport } from './routes/fonctionnalites'
+import { Route as FiscaliteRouteImport } from './routes/fiscalite'
 import { Route as EssaiGratuitRouteImport } from './routes/essai-gratuit'
 import { Route as DevisRouteImport } from './routes/devis'
 import { Route as DepensesRouteImport } from './routes/depenses'
@@ -163,6 +164,11 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
 const FonctionnalitesRoute = FonctionnalitesRouteImport.update({
   id: '/fonctionnalites',
   path: '/fonctionnalites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FiscaliteRoute = FiscaliteRouteImport.update({
+  id: '/fiscalite',
+  path: '/fiscalite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EssaiGratuitRoute = EssaiGratuitRouteImport.update({
@@ -351,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/essai-gratuit': typeof EssaiGratuitRoute
+  '/fiscalite': typeof FiscaliteRoute
   '/fonctionnalites': typeof FonctionnalitesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
@@ -408,6 +415,7 @@ export interface FileRoutesByTo {
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/essai-gratuit': typeof EssaiGratuitRoute
+  '/fiscalite': typeof FiscaliteRoute
   '/fonctionnalites': typeof FonctionnalitesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
@@ -466,6 +474,7 @@ export interface FileRoutesById {
   '/depenses': typeof DepensesRoute
   '/devis': typeof DevisRoute
   '/essai-gratuit': typeof EssaiGratuitRoute
+  '/fiscalite': typeof FiscaliteRoute
   '/fonctionnalites': typeof FonctionnalitesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
@@ -525,6 +534,7 @@ export interface FileRouteTypes {
     | '/depenses'
     | '/devis'
     | '/essai-gratuit'
+    | '/fiscalite'
     | '/fonctionnalites'
     | '/forgot-password'
     | '/fournisseurs'
@@ -582,6 +592,7 @@ export interface FileRouteTypes {
     | '/depenses'
     | '/devis'
     | '/essai-gratuit'
+    | '/fiscalite'
     | '/fonctionnalites'
     | '/forgot-password'
     | '/fournisseurs'
@@ -639,6 +650,7 @@ export interface FileRouteTypes {
     | '/depenses'
     | '/devis'
     | '/essai-gratuit'
+    | '/fiscalite'
     | '/fonctionnalites'
     | '/forgot-password'
     | '/fournisseurs'
@@ -697,6 +709,7 @@ export interface RootRouteChildren {
   DepensesRoute: typeof DepensesRoute
   DevisRoute: typeof DevisRoute
   EssaiGratuitRoute: typeof EssaiGratuitRoute
+  FiscaliteRoute: typeof FiscaliteRoute
   FonctionnalitesRoute: typeof FonctionnalitesRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   FournisseursRoute: typeof FournisseursRoute
@@ -881,6 +894,13 @@ declare module '@tanstack/react-router' {
       path: '/fonctionnalites'
       fullPath: '/fonctionnalites'
       preLoaderRoute: typeof FonctionnalitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fiscalite': {
+      id: '/fiscalite'
+      path: '/fiscalite'
+      fullPath: '/fiscalite'
+      preLoaderRoute: typeof FiscaliteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/essai-gratuit': {
@@ -1159,6 +1179,7 @@ const rootRouteChildren: RootRouteChildren = {
   DepensesRoute: DepensesRoute,
   DevisRoute: DevisRoute,
   EssaiGratuitRoute: EssaiGratuitRoute,
+  FiscaliteRoute: FiscaliteRoute,
   FonctionnalitesRoute: FonctionnalitesRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   FournisseursRoute: FournisseursRoute,

@@ -50,12 +50,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { DashboardKpiCard } from "@/components/mms/dashboard/DashboardKpiCard";
 import { DashboardSecondaryCard } from "@/components/mms/dashboard/DashboardSecondaryCard";
+import { FiscalReserveCard } from "@/components/mms/dashboard/FiscalReserveCard";
 import { DashboardEmptyState } from "@/components/mms/dashboard/DashboardEmptyState";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import type { ActivityItem } from "@/hooks/use-dashboard-data";
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from "@/lib/mms/format";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import { useCompanySettings } from "@/hooks/use-company-settings";
+import { estimateFiscalReserve } from "@/lib/fiscalite";
 import { cn } from "@/lib/utils";
 
 const PIE_COLORS = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4", "#6366f1"];
@@ -123,6 +126,7 @@ function Dashboard() {
   const { data, isLoading, error } = useDashboardData();
   const modulesQuery = useTenantModules();
   const catalogSettingsQuery = useCatalogSettings();
+  const { settings: companySettings } = useCompanySettings();
   const catalogSettings = catalogSettingsQuery.data;
   const catalogMode = catalogSettings?.catalog_mode;
   const canViewClients = modulesQuery.data?.has("customers") ?? false;
@@ -172,6 +176,21 @@ function Dashboard() {
   const overflowActions = quickActions.filter(
     (a) => !primaryActionRoutes.includes(a.route),
   );
+  const fiscalEstimate = useMemo(() => {
+    if (!data) return null;
+    return estimateFiscalReserve({
+      revenue: data.kpis.revenue.value,
+      purchases: data.kpis.achats.value,
+      expenses: data.kpis.depenses.value,
+      companySettings,
+      config: {
+        country: companySettings?.country ?? null,
+        taxRegime: companySettings?.tax_regime ?? null,
+        declarationFrequency: "Mensuelle",
+        nextDueDate: null,
+      },
+    });
+  }, [companySettings, data]);
 
   if (error) {
     return (
@@ -417,6 +436,14 @@ function Dashboard() {
               </>
             )}
           </div>
+        )}
+
+        {isLoading || catalogSettingsQuery.isLoading || !data ? null : (
+          <FiscalReserveCard
+            data={fiscalEstimate}
+            isLoading={!fiscalEstimate}
+            currency={companySettings?.currency}
+          />
         )}
 
         {isLoading || !data ? (

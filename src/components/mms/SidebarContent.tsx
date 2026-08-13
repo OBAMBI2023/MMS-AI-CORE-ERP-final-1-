@@ -10,6 +10,7 @@ import {
   Handshake,
   Receipt,
   TrendingUp,
+  Landmark,
   Settings,
   Boxes,
   Tags,
@@ -38,6 +39,7 @@ const items = [
   { icon: ShoppingCart, label: "Achats", to: "/achats" },
   { icon: Handshake, label: "Fournisseurs", to: "/fournisseurs" },
   { icon: Receipt, label: "Dépenses", to: "/depenses" },
+  { icon: Landmark, label: "Fiscalité", to: "/fiscalite" },
   { icon: TrendingUp, label: "Rapports", to: "/rapports" },
   { icon: MessageCircle, label: "Support", to: "/support" },
   { icon: Settings, label: "Paramètres", to: "/parametres" },
@@ -121,3 +123,4 @@ export function SidebarContent({
     </nav>
   );
 }
+

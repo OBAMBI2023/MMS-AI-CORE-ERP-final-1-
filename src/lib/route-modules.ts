@@ -9,6 +9,7 @@ export const routeModules: Record<string, string> = {
   "/fournisseurs": "suppliers",
   "/achats": "purchases",
   "/depenses": "expenses",
+  "/fiscalite": "fiscalite",
   "/devis": "quotes",
   "/rapports": "reports",
   "/parametres": "settings",
