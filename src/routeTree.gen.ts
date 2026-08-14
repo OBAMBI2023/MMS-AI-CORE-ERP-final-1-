@@ -45,6 +45,7 @@ import { Route as SuperAdminUsersRouteImport } from './routes/super-admin.users'
 import { Route as SuperAdminSupportRouteImport } from './routes/super-admin.support'
 import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
 import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.ia-platform'
+import { Route as SuperAdminAnalyticsRouteImport } from './routes/super-admin.analytics'
 import { Route as SettingsUsersRouteImport } from './routes/settings.users'
 import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
 import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
@@ -246,6 +247,11 @@ const SuperAdminIaPlatformRoute = SuperAdminIaPlatformRouteImport.update({
   path: '/ia-platform',
   getParentRoute: () => SuperAdminRoute,
 } as any)
+const SuperAdminAnalyticsRoute = SuperAdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => SuperAdminRoute,
+} as any)
 const SettingsUsersRoute = SettingsUsersRouteImport.update({
   id: '/settings/users',
   path: '/settings/users',
@@ -398,6 +404,7 @@ export interface FileRoutesByFullPath {
   '/login/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
+  '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/support': typeof SuperAdminSupportRoute
@@ -456,6 +463,7 @@ export interface FileRoutesByTo {
   '/login/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
+  '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/support': typeof SuperAdminSupportRoute
@@ -515,6 +523,7 @@ export interface FileRoutesById {
   '/login_/$slug': typeof LoginSlugRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
+  '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/support': typeof SuperAdminSupportRoute
@@ -575,6 +584,7 @@ export interface FileRouteTypes {
     | '/login/$slug'
     | '/settings/catalogue'
     | '/settings/users'
+    | '/super-admin/analytics'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/super-admin/support'
@@ -633,6 +643,7 @@ export interface FileRouteTypes {
     | '/login/$slug'
     | '/settings/catalogue'
     | '/settings/users'
+    | '/super-admin/analytics'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/super-admin/support'
@@ -691,6 +702,7 @@ export interface FileRouteTypes {
     | '/login_/$slug'
     | '/settings/catalogue'
     | '/settings/users'
+    | '/super-admin/analytics'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/super-admin/support'
@@ -1008,6 +1020,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperAdminIaPlatformRouteImport
       parentRoute: typeof SuperAdminRoute
     }
+    '/super-admin/analytics': {
+      id: '/super-admin/analytics'
+      path: '/analytics'
+      fullPath: '/super-admin/analytics'
+      preLoaderRoute: typeof SuperAdminAnalyticsRouteImport
+      parentRoute: typeof SuperAdminRoute
+    }
     '/settings/users': {
       id: '/settings/users'
       path: '/settings/users'
@@ -1152,6 +1171,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface SuperAdminRouteChildren {
+  SuperAdminAnalyticsRoute: typeof SuperAdminAnalyticsRoute
   SuperAdminIaPlatformRoute: typeof SuperAdminIaPlatformRoute
   SuperAdminPartnersRoute: typeof SuperAdminPartnersRoute
   SuperAdminSupportRoute: typeof SuperAdminSupportRoute
@@ -1159,6 +1179,7 @@ interface SuperAdminRouteChildren {
 }
 
 const SuperAdminRouteChildren: SuperAdminRouteChildren = {
+  SuperAdminAnalyticsRoute: SuperAdminAnalyticsRoute,
   SuperAdminIaPlatformRoute: SuperAdminIaPlatformRoute,
   SuperAdminPartnersRoute: SuperAdminPartnersRoute,
   SuperAdminSupportRoute: SuperAdminSupportRoute,

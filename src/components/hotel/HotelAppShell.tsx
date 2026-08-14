@@ -27,6 +27,7 @@ export function HotelAppShell({
 }) {
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const mobileContentPadding = "calc(1rem + 5.5rem + env(safe-area-inset-bottom))";
 
   useEffect(() => {
     document.body.classList.add("hotel-theme");
@@ -103,9 +104,10 @@ export function HotelAppShell({
         </header>
         <div
           className={cn(
-            "flex-1 overflow-y-auto p-4 pb-20 md:p-8 md:pb-8",
+            "flex-1 overflow-y-auto p-4 pb-[var(--hotel-mobile-content-padding)] md:p-8 md:pb-8",
             contentClassName,
           )}
+          style={{ ["--hotel-mobile-content-padding" as any]: mobileContentPadding }}
         >
           {children}
         </div>

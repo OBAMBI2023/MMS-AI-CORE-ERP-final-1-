@@ -93,6 +93,8 @@ import {
   periodsOverlap,
   roomIsAvailable,
 } from "@/lib/hotel-availability";
+import { analyticsEvents } from "@/lib/analytics";
+import { trackBusinessEvent } from "@/lib/analytics/business";
 
 const db = supabase as any;
 const statuses = [
@@ -189,6 +191,15 @@ export function HotelReservationsPage() {
     qc.invalidateQueries({ queryKey: ["hotel_rooms", profile?.tenant_id] });
     qc.invalidateQueries({ queryKey: ["hotel-room-management-context", profile?.tenant_id] });
     qc.invalidateQueries({ queryKey: ["hotel-reports", profile?.tenant_id] });
+  };
+  const appendGuestToReservationCache = (guest: Guest) => {
+    if (!profile?.tenant_id) return;
+    qc.setQueryData(["hotel-reservations", profile.tenant_id], (current: any) => {
+      if (!current) return current;
+      const guests = current.guests ?? [];
+      if (guests.some((existing: Guest) => existing.id === guest.id)) return current;
+      return { ...current, guests: [guest, ...guests] };
+    });
   };
   useEffect(() => {
     if (!profile?.tenant_id) return;
@@ -310,6 +321,23 @@ export function HotelReservationsPage() {
       }
     },
     onSuccess: () => {
+      trackBusinessEvent(
+        editingId ? analyticsEvents.hotelReservationUpdated : analyticsEvents.hotelReservationCreated,
+        {
+          tenant_id: profile?.tenant_id ?? null,
+          platform_type: "HOTEL",
+          module: "hotel_reservations",
+          pathname: window.location.pathname,
+          user_role: null,
+        },
+        {
+          reservation_id: editingId ?? undefined,
+          room_id: form.room_id,
+          guest_id: form.guest_id,
+          amount: total,
+          currency: "XOF",
+        },
+      );
       toast.success(editingId ? "Réservation mise à jour" : "Réservation créée");
       setEditingId(null);
       setForm(emptyForm);
@@ -330,7 +358,29 @@ export function HotelReservationsPage() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const eventName =
+        variables.status === "checked_in"
+          ? analyticsEvents.hotelCheckinCompleted
+          : variables.status === "checked_out"
+            ? analyticsEvents.hotelCheckoutCompleted
+            : null;
+      if (eventName) {
+        trackBusinessEvent(
+          eventName,
+          {
+            tenant_id: profile?.tenant_id ?? null,
+            platform_type: "HOTEL",
+            module: "hotel_reservations",
+            pathname: window.location.pathname,
+            user_role: null,
+          },
+          {
+            reservation_id: variables.id,
+            room_id: null,
+          },
+        );
+      }
       toast.success("Statut mis à jour");
       refresh();
     },
@@ -554,7 +604,10 @@ export function HotelReservationsPage() {
           value={form.guest_id}
           tenantId={profile?.tenant_id}
           onChange={(guestId) => setForm({ ...form, guest_id: guestId })}
-          onCreated={refresh}
+          onCreated={(guest) => {
+            appendGuestToReservationCache(guest);
+            refresh();
+          }}
         />
         {attemptedSubmit && !form.guest_id && (
           <p className="mt-1.5 text-xs font-medium text-destructive">
@@ -983,7 +1036,7 @@ function GuestPicker({
   value: string;
   tenantId?: string;
   onChange: (id: string) => void;
-  onCreated: () => void;
+  onCreated: (guest: Guest) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -1009,7 +1062,7 @@ function GuestPicker({
       const duplicate = guests.find(
         (guest) => normalizePhone(guest.phone ?? "") === normalizedPhone,
       );
-      if (duplicate) return duplicate.id;
+      if (duplicate) return duplicate;
       const [firstName, ...lastParts] = name.split(" ");
       const { data, error } = await db
         .from("hotel_guests")
@@ -1020,14 +1073,14 @@ function GuestPicker({
           phone: phone.trim(),
           identity_document_path: photo || null,
         })
-        .select("id")
+        .select("id,first_name,last_name,phone")
         .single();
       if (error) throw error;
-      return data.id as string;
+      return data as Guest;
     },
-    onSuccess: (id: string) => {
-      onChange(id);
-      onCreated();
+    onSuccess: (guest: Guest) => {
+      onChange(guest.id);
+      onCreated(guest);
       setCreating(false);
       setOpen(false);
       setFullName("");

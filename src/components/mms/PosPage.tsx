@@ -54,6 +54,8 @@ import { useCatalogCategories } from "@/hooks/use-catalog-categories";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
 import { catalogTypeEnabled } from "@/lib/catalog-settings";
+import { trackBusinessEvent } from "@/lib/analytics/business";
+import { analyticsEvents } from "@/lib/analytics";
 
 // ---------------- Types & catalogue ----------------
 type Category = string;
@@ -308,6 +310,22 @@ export function PosPage() {
         .select("id")
         .single();
       if (e1 || !venteRow) throw e1 ?? new Error("Insertion échouée");
+      trackBusinessEvent(
+        analyticsEvents.saleCreated,
+        {
+          tenant_id: profile.tenant_id,
+          platform_type: "ERP",
+          module: "ventes",
+          pathname: window.location.pathname,
+          user_role: permissionsQuery.data?.role ?? null,
+        },
+        {
+          sale_id: venteRow.id,
+          sale_number: dbNumber,
+          amount: total,
+          currency: "XOF",
+        },
+      );
       const rows = cart.map((i) => ({
         vente_id: venteRow.id,
         service_id: /^[0-9a-f-]{36}$/i.test(i.id) ? i.id : null,
@@ -322,6 +340,23 @@ export function PosPage() {
       }));
       const { error: e2 } = await supabase.from("vente_items").insert(rows);
       if (e2) throw e2;
+      trackBusinessEvent(
+        analyticsEvents.saleCompleted,
+        {
+          tenant_id: profile.tenant_id,
+          platform_type: "ERP",
+          module: "ventes",
+          pathname: window.location.pathname,
+          user_role: permissionsQuery.data?.role ?? null,
+        },
+        {
+          sale_id: venteRow.id,
+          sale_number: dbNumber,
+          payment_method: payment,
+          amount: total,
+          currency: "XOF",
+        },
+      );
       queryClient.invalidateQueries({ queryKey: ["ventes", "history"] });
       void reloadCatalog();
       toast.success(`Vente enregistrée (${dbNumber})`);

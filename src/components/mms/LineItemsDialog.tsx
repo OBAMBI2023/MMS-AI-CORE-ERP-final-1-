@@ -7,6 +7,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, makeNumber } from "@/lib/mms/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCatalogSettings } from "@/hooks/use-catalog-settings";
+import { analyticsEvents } from "@/lib/analytics";
+import { trackBusinessEvent } from "@/lib/analytics/business";
 
 export interface LineItem {
   id?: string;
@@ -268,6 +270,19 @@ export function LineItemsDialog(props: LineItemsDialogProps) {
     },
     onSuccess: () => {
       toast.success(isEdit ? `${singular} mis à jour` : `${singular} créé`);
+      const eventName = isDevis ? (isEdit ? analyticsEvents.quoteUpdated : analyticsEvents.quoteCreated) : null;
+      if (eventName) {
+        trackBusinessEvent(eventName, {
+          pathname: window.location.pathname,
+          module: headerTable,
+          tenant_id: tenantId ?? null,
+          platform_type: tenantId ? "ERP" : null,
+          user_role: permissionsQuery.data?.role ?? null,
+        }, {
+          amount: total,
+          currency: "XOF",
+        });
+      }
       qc.invalidateQueries({ queryKey: [headerTable] });
       onClose();
     },

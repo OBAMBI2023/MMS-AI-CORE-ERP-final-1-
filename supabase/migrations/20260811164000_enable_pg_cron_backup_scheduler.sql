@@ -20,7 +20,7 @@ SELECT cron.schedule(
   SELECT net.http_post(
     url := 'https://sobcdanmtibjoxvkezfz.supabase.co/functions/v1/run-scheduled-backups',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key'),
+      'apikey', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key'),
       'Content-Type', 'application/json'
     ),
     body := '{}'::jsonb

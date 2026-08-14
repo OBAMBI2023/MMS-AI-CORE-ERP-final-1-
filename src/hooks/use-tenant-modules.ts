@@ -28,6 +28,8 @@ export function useTenantModules() {
       );
     },
     enabled: !loading && Boolean(tenantId),
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
   });
 }

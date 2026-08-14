@@ -22,6 +22,8 @@ import {
 import { getRouteModule } from "@/lib/route-modules";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TenantProvider } from "@/providers/TenantProvider";
+import { captureError, identify, initializeAnalytics, pageView, resetAnalytics, setUserContext, track } from "@/lib/analytics";
+import { analyticsEvents } from "@/lib/analytics";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { getPlatformAdminAccess } from "@/lib/super-admin.server";
@@ -411,6 +413,7 @@ function RootShell({ children }: { children: ReactNode }) {
 import { DynamicFavicon } from "@/components/mms/DynamicFavicon";
 import { PwaUpdatePrompt } from "@/components/pwa/PwaUpdatePrompt";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { PosthogRootProvider } from "@/lib/posthog";
 
 // Renderless: must be rendered inside <TenantProvider> to see the real
 // tenant (mirrors DynamicFavicon's placement below). Outside TenantProvider
@@ -425,6 +428,7 @@ function DocumentTitleManager() {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const isPlatformArea = useLocation({
     select: (location) => isPlatformRoute(location.pathname) || isPartnerRoute(location.pathname),
   });
@@ -433,10 +437,32 @@ function RootComponent() {
   });
 
   useEffect(() => {
+    initializeAnalytics();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    pageView({ pathname, page_title: document.title });
+    const handleError = (event: ErrorEvent) => {
+      captureError(event.error ?? event.message, { pathname, source: "window.error" });
+    };
+    const handleUnhandled = (event: PromiseRejectionEvent) => {
+      captureError(event.reason, { pathname, source: "unhandledrejection" });
+    };
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleUnhandled);
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleUnhandled);
+    };
+  }, [pathname]);
+
+  useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT" && !isPublicRoute(window.location.pathname)) {
+        resetAnalytics();
         navigate({ to: "/login", replace: true });
       }
     });
@@ -444,25 +470,68 @@ function RootComponent() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const syncIdentity = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        resetAnalytics();
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("tenant_id, roles(name), status")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const tenantId = profile?.tenant_id ?? null;
+      const platformType = (() => {
+        if (isPlatformArea) return pathname.startsWith("/super-admin") ? "PLATFORM" : null;
+        return null;
+      })();
+      identify(session.user.id, {
+        user_id: session.user.id,
+        tenant_id: tenantId,
+        platform_type: platformType,
+        role: profile && typeof profile === "object" && "roles" in profile ? (profile as any).roles?.name ?? null : null,
+        account_type: "authenticated",
+      });
+      setUserContext({ tenant_id: tenantId, platform_type: platformType });
+      if (pathname && !isPublicArea) {
+        track(analyticsEvents.moduleOpened, {
+          module: pathname.split("/")[1] || "root",
+          tenant_id: tenantId,
+          platform_type: platformType,
+        });
+      }
+    };
+    void syncIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPlatformArea, isPublicArea, pathname]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <PwaUpdatePrompt />
       <ThemeProvider>
-        {isPlatformArea || isPublicArea ? (
-          <>
-            <DynamicFavicon platform />
-            <DocumentTitleManager />
-            <Outlet />
-            <Toaster richColors position="top-right" />
-          </>
-        ) : (
-          <TenantProvider>
-            <DynamicFavicon />
-            <DocumentTitleManager />
-            <Outlet />
-            <Toaster richColors position="top-right" />
-          </TenantProvider>
-        )}
+        <PosthogRootProvider>
+          {isPlatformArea || isPublicArea ? (
+            <>
+              <DynamicFavicon platform />
+              <DocumentTitleManager />
+              <Outlet />
+              <Toaster richColors position="top-right" />
+            </>
+          ) : (
+            <TenantProvider>
+              <DynamicFavicon />
+              <DocumentTitleManager />
+              <Outlet />
+              <Toaster richColors position="top-right" />
+            </TenantProvider>
+          )}
+        </PosthogRootProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

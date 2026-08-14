@@ -69,6 +69,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
 import { useTenant } from "@/providers/TenantProvider";
+import { analyticsEvents, track } from "@/lib/analytics";
 
 type SettlementStatus = "en_attente" | "partiel" | "reglé" | null;
 
@@ -207,6 +208,13 @@ function DevisPaymentDialog({
       toast.success(
         parsedAmount >= remaining ? "Devis réglé intégralement." : "Paiement partiel enregistré.",
       );
+      track(analyticsEvents.quotePaymentRecorded, {
+        quote_id: devis.id,
+        amount: parsedAmount,
+        currency: "XOF",
+        platform_type: "ERP",
+        module: "devis",
+      });
       onOpenChange(false);
       onSuccess();
     } catch (error) {
@@ -371,7 +379,15 @@ function DevisCard({
       const { error } = await (supabase.from("devis").update({ status }) as any).eq("id", row.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["devis"] }),
+    onSuccess: () => {
+      track(analyticsEvents.quoteUpdated, {
+        quote_id: row.id,
+        quote_status: row.status,
+        platform_type: "ERP",
+        module: "devis",
+      });
+      qc.invalidateQueries({ queryKey: ["devis"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -795,6 +811,12 @@ function DevisPage() {
           devis_number: devis.number,
         });
       }
+      track(analyticsEvents.quoteDeleted, {
+        quote_id: devis.id,
+        quote_number: devis.number,
+        platform_type: "ERP",
+        module: "devis",
+      });
       toast.success("Devis supprimé");
       qc.invalidateQueries({ queryKey: ["devis"] });
     },

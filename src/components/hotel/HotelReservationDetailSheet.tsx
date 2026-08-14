@@ -33,6 +33,7 @@ import { formatCurrency, formatDate } from "@/lib/mms/format";
 import { cn } from "@/lib/utils";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useHotelSettings } from "@/hooks/use-hotel-settings";
+import { getHotelReservationStatusBadgeClass, getHotelReservationStatusLabel } from "@/lib/hotel-reservation-status";
 import {
   useHotelBillingData,
   useHotelPaymentHistory,

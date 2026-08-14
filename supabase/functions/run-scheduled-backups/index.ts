@@ -23,6 +23,36 @@ const FREQUENCY_MS: Record<string, number> = {
   mensuelle: 30 * 24 * 3600 * 1000,
 };
 
+function parseSecretKeys(envValue: string | undefined): string[] {
+  if (!envValue) return [];
+
+  const trimmed = envValue.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .flatMap((entry) => {
+          if (typeof entry === "string") return [entry];
+          if (entry && typeof entry === "object") {
+            const candidate = (entry as { value?: unknown }).value;
+            return typeof candidate === "string" ? [candidate] : [];
+          }
+          return [];
+        })
+        .filter((value): value is string => value.length > 0);
+    }
+  } catch {
+    // Fall through to delimiter parsing.
+  }
+
+  return trimmed
+    .split(/[\s,]+/)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
 function isDue(frequency: string | null, lastRunAt: string | null): boolean {
   if (!frequency || !(frequency in FREQUENCY_MS)) return false;
   if (!lastRunAt) return true;
@@ -30,17 +60,20 @@ function isDue(frequency: string | null, lastRunAt: string | null): boolean {
 }
 
 Deno.serve(async (req: Request) => {
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const secretKeys = parseSecretKeys(Deno.env.get("SUPABASE_SECRET_KEYS"));
 
   // Only the project's own service_role key (as sent by pg_net per the cron
   // job definition) may trigger a run across all tenants — never accept an
-  // ordinary user session here.
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader !== `Bearer ${serviceRoleKey}`) {
+  // ordinary user session here. The scheduler sends the project secret in
+  // the apikey header, so the request must match one of the configured
+  // Supabase secret values instead of the legacy service role JWT.
+  const apiKey = req.headers.get("apikey");
+  if (!apiKey || !secretKeys.includes(apiKey)) {
     return new Response(JSON.stringify({ error: "Accès refusé." }), { status: 403 });
   }
 
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
   try {
