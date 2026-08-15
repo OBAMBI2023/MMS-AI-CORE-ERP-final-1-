@@ -1,56 +1,50 @@
 import { useState } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
-import { PLATFORM_BRANDING } from "@/config/branding";
 import { BrandLogo } from "@/components/branding/BrandLogo";
 
 const navigationItems = [
-  { label: "Accueil", to: "/" },
-  { label: "Fonctionnalités", to: "/fonctionnalites" },
-  { label: "Tarifs", to: "/tarifs" },
-  { label: "Démonstration", to: "/demo" },
+  { label: "Produits", href: "#produits" },
+  { label: "Solutions", href: "#solutions" },
+  { label: "Modules", href: "#modules" },
+  { label: "Tarifs", href: "#tarifs" },
+  { label: "Support", href: "#support" },
+  { label: "Contact", href: "#contact" },
 ] as const;
 
 export function MarketingNavigation() {
   const [isOpen, setIsOpen] = useState(false);
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
       <nav
         aria-label="Navigation principale"
-        className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8"
+        className="mx-auto flex min-h-[84px] max-w-7xl items-center justify-between px-5 lg:px-8"
       >
         <Link to="/" className="flex items-center" onClick={() => setIsOpen(false)}>
-          <BrandLogo context="marketingHeader" />
+          <BrandLogo context="marketingHeader" className="h-[70px] w-[132px] p-0 md:h-[76px] md:w-[144px]" />
         </Link>
 
         <div className="hidden items-center gap-7 lg:flex">
           {navigationItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`text-sm font-medium transition-colors hover:text-blue-600 ${
-                pathname === item.to ? "text-blue-600" : "text-slate-600"
-              }`}
-            >
+            <a key={item.href} href={item.href} className="text-sm font-medium text-slate-600 transition-colors hover:text-[#0f5b4e]">
               {item.label}
-            </Link>
+            </a>
           ))}
         </div>
 
         <div className="hidden items-center gap-3 lg:flex">
           <Link
             to="/login"
-            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[#0f5b4e] transition-colors hover:bg-[#0f5b4e]/6"
           >
             Connexion
           </Link>
           <Link
             to="/essai-gratuit"
-            className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-700"
+            className="rounded-xl bg-[#0f5b4e] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#0f5b4e]/20 transition-colors hover:bg-[#0b4c41]"
           >
-            Essai gratuit
+            Essayer gratuitement
           </Link>
         </div>
 
@@ -70,18 +64,14 @@ export function MarketingNavigation() {
         <div id="mobile-navigation" className="border-t border-slate-200 bg-white px-5 py-5 lg:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-1">
             {navigationItems.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
+              <a
+                key={item.href}
+                href={item.href}
                 onClick={() => setIsOpen(false)}
-                className={`rounded-xl px-3 py-3 text-sm font-semibold ${
-                  pathname === item.to
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-700 hover:bg-slate-50"
-                }`}
+                className="rounded-xl px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 {item.label}
-              </Link>
+              </a>
             ))}
             <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-200 pt-4">
               <Link
@@ -94,9 +84,9 @@ export function MarketingNavigation() {
               <Link
                 to="/essai-gratuit"
                 onClick={() => setIsOpen(false)}
-                className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white"
+                className="rounded-xl bg-[#0f5b4e] px-4 py-3 text-center text-sm font-semibold text-white"
               >
-                Essai gratuit
+                Essayer gratuitement
               </Link>
             </div>
           </div>
