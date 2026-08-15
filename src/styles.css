@@ -170,6 +170,29 @@
   --sidebar-border: oklch(1 0 0 / 10%);
 }
 
+/*
+ * SAOVIA Analytics cockpit (Super Admin) — petrol green / petrol blue accents.
+ * Scoped via `.analytics-cockpit`; reuses the SAOVIA HOTEL petrol tokens above
+ * so the palette stays consistent with the rest of the brand system.
+ */
+.analytics-cockpit {
+  --analytics-accent: oklch(0.4 0.08 170);
+  --analytics-accent-soft: oklch(0.94 0.03 165);
+  --analytics-technical: oklch(0.45 0.09 220);
+  --analytics-technical-soft: oklch(0.94 0.02 220);
+  --analytics-danger: oklch(0.62 0.14 25);
+  --analytics-danger-soft: oklch(0.96 0.03 25);
+}
+
+.dark .analytics-cockpit {
+  --analytics-accent: oklch(0.696 0.149 162.5);
+  --analytics-accent-soft: oklch(0.279 0.041 178.7);
+  --analytics-technical: oklch(0.65 0.1 220);
+  --analytics-technical-soft: oklch(0.279 0.041 220);
+  --analytics-danger: oklch(0.704 0.14 25);
+  --analytics-danger-soft: oklch(0.279 0.06 25);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

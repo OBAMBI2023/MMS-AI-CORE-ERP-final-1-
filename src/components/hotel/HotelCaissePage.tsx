@@ -54,6 +54,8 @@ import {
 import { createHotelPaymentReceiptPdf } from "@/lib/mms/hotel-payment-receipt-pdf";
 import { downloadPdf } from "@/lib/mms/download-pdf";
 import { HotelComingSoon } from "@/components/hotel/HotelComingSoon";
+import { analyticsEvents } from "@/lib/analytics";
+import { trackBusinessEvent } from "@/lib/analytics/business";
 
 const db = supabase as any;
 const WALK_IN_LABEL = "Client de passage";
@@ -166,6 +168,20 @@ export function HotelCaissePage() {
           .single();
         if (created.error) throw created.error;
         invoiceId = created.data.id;
+        trackBusinessEvent(
+          analyticsEvents.hotelInvoiceCreated,
+          {
+            tenant_id: profile?.tenant_id ?? null,
+            platform_type: "HOTEL",
+            module: "hotel_facturation",
+            pathname: window.location.pathname,
+            user_role: null,
+          },
+          {
+            invoice_id: invoiceId,
+            reservation_id: selected.id,
+          },
+        );
       }
 
       const paidAtIso = new Date(`${form.paidAt}T12:00:00`).toISOString();
@@ -179,6 +195,22 @@ export function HotelCaissePage() {
         requested_paid_at: paidAtIso,
       });
       if (error) throw error;
+      trackBusinessEvent(
+        analyticsEvents.hotelInvoicePaymentRecorded,
+        {
+          tenant_id: profile?.tenant_id ?? null,
+          platform_type: "HOTEL",
+          module: "hotel_caisse",
+          pathname: window.location.pathname,
+          user_role: null,
+        },
+        {
+          invoice_id: invoiceId,
+          reservation_id: selected.id,
+          amount: amountValue,
+          currency: "XOF",
+        },
+      );
       return {
         paymentId: paymentId as string,
         amount: amountValue,

@@ -69,6 +69,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { logAction } from "@/lib/audit.server";
 import { useTenant } from "@/providers/TenantProvider";
+import { analyticsEvents } from "@/lib/analytics";
+import { trackBusinessEvent } from "@/lib/analytics/business";
 
 type SettlementStatus = "en_attente" | "partiel" | "reglé" | null;
 
@@ -206,6 +208,19 @@ function DevisPaymentDialog({
       if (error) throw error;
       toast.success(
         parsedAmount >= remaining ? "Devis réglé intégralement." : "Paiement partiel enregistré.",
+      );
+      trackBusinessEvent(
+        analyticsEvents.quotePaymentRecorded,
+        {
+          tenant_id: typeof devis.tenant_id === "string" ? devis.tenant_id : null,
+          platform_type: "ERP",
+          module: "devis",
+        },
+        {
+          quote_id: devis.id,
+          amount: parsedAmount,
+          currency: "XOF",
+        },
       );
       onOpenChange(false);
       onSuccess();
@@ -371,7 +386,21 @@ function DevisCard({
       const { error } = await (supabase.from("devis").update({ status }) as any).eq("id", row.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["devis"] }),
+    onSuccess: () => {
+      trackBusinessEvent(
+        analyticsEvents.quoteUpdated,
+        {
+          tenant_id: typeof row.tenant_id === "string" ? row.tenant_id : null,
+          platform_type: "ERP",
+          module: "devis",
+        },
+        {
+          quote_id: row.id,
+          quote_status: row.status,
+        },
+      );
+      qc.invalidateQueries({ queryKey: ["devis"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -795,6 +824,18 @@ function DevisPage() {
           devis_number: devis.number,
         });
       }
+      trackBusinessEvent(
+        analyticsEvents.quoteDeleted,
+        {
+          tenant_id: tenantId ?? null,
+          platform_type: "ERP",
+          module: "devis",
+        },
+        {
+          quote_id: devis.id,
+          quote_number: devis.number,
+        },
+      );
       toast.success("Devis supprimé");
       qc.invalidateQueries({ queryKey: ["devis"] });
     },

@@ -9,3 +9,4 @@ bun.lock
 *.log
 
 .env
+.supabase/

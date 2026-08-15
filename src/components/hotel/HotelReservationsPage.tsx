@@ -93,6 +93,8 @@ import {
   periodsOverlap,
   roomIsAvailable,
 } from "@/lib/hotel-availability";
+import { analyticsEvents } from "@/lib/analytics";
+import { trackBusinessEvent } from "@/lib/analytics/business";
 
 const db = supabase as any;
 const statuses = [
@@ -308,8 +310,44 @@ export function HotelReservationsPage() {
         });
         if (payment.error) throw payment.error;
       }
+      return { reservationId: result.data.id, paymentToAdd };
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      trackBusinessEvent(
+        editingId ? analyticsEvents.hotelReservationUpdated : analyticsEvents.hotelReservationCreated,
+        {
+          tenant_id: profile?.tenant_id ?? null,
+          platform_type: "HOTEL",
+          module: "hotel_reservations",
+          pathname: window.location.pathname,
+          user_role: null,
+        },
+        {
+          reservation_id: editingId ?? undefined,
+          room_id: form.room_id,
+          guest_id: form.guest_id,
+          amount: total,
+          currency: "XOF",
+        },
+      );
+      if (saved.paymentToAdd > 0) {
+        trackBusinessEvent(
+          analyticsEvents.hotelPaymentRecorded,
+          {
+            tenant_id: profile?.tenant_id ?? null,
+            platform_type: "HOTEL",
+            module: "hotel_reservations",
+            pathname: window.location.pathname,
+            user_role: null,
+          },
+          {
+            reservation_id: saved.reservationId,
+            amount: saved.paymentToAdd,
+            currency: "XOF",
+            method: "Avance",
+          },
+        );
+      }
       toast.success(editingId ? "Réservation mise à jour" : "Réservation créée");
       setEditingId(null);
       setForm(emptyForm);
@@ -330,7 +368,29 @@ export function HotelReservationsPage() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const eventName =
+        variables.status === "checked_in"
+          ? analyticsEvents.hotelCheckinCompleted
+          : variables.status === "checked_out"
+            ? analyticsEvents.hotelCheckoutCompleted
+            : null;
+      if (eventName) {
+        trackBusinessEvent(
+          eventName,
+          {
+            tenant_id: profile?.tenant_id ?? null,
+            platform_type: "HOTEL",
+            module: "hotel_reservations",
+            pathname: window.location.pathname,
+            user_role: null,
+          },
+          {
+            reservation_id: variables.id,
+            room_id: null,
+          },
+        );
+      }
       toast.success("Statut mis à jour");
       refresh();
     },
