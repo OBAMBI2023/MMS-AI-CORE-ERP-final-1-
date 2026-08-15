@@ -319,8 +319,9 @@ export function HotelReservationsPage() {
         });
         if (payment.error) throw payment.error;
       }
+      return { reservationId: result.data.id, paymentToAdd };
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       trackBusinessEvent(
         editingId ? analyticsEvents.hotelReservationUpdated : analyticsEvents.hotelReservationCreated,
         {
@@ -338,6 +339,24 @@ export function HotelReservationsPage() {
           currency: "XOF",
         },
       );
+      if (saved.paymentToAdd > 0) {
+        trackBusinessEvent(
+          analyticsEvents.hotelPaymentRecorded,
+          {
+            tenant_id: profile?.tenant_id ?? null,
+            platform_type: "HOTEL",
+            module: "hotel_reservations",
+            pathname: window.location.pathname,
+            user_role: null,
+          },
+          {
+            reservation_id: saved.reservationId,
+            amount: saved.paymentToAdd,
+            currency: "XOF",
+            method: "Avance",
+          },
+        );
+      }
       toast.success(editingId ? "Réservation mise à jour" : "Réservation créée");
       setEditingId(null);
       setForm(emptyForm);

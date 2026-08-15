@@ -78,9 +78,18 @@ export function resetAnalytics() {
   hasIdentified = false;
 }
 
+/** Fetch aborts (component unmount, superseded request, cancelled navigation)
+ *  are expected control flow, not incidents — never report them as errors. */
+function isExpectedCancellation(error: Error): boolean {
+  if (error.name === "AbortError" || error.name === "CancelledError") return true;
+  const message = error.message?.toLowerCase() ?? "";
+  return message.includes("aborted") || message.includes("the operation was aborted");
+}
+
 export function captureError(error: unknown, context: Record<string, unknown> = {}) {
   if (!analyticsEnabled()) return;
   const err = error instanceof Error ? error : new Error(String(error));
+  if (isExpectedCancellation(err)) return;
   track(analyticsEvents.frontendError, {
     message: err.message,
     error_name: err.name,
