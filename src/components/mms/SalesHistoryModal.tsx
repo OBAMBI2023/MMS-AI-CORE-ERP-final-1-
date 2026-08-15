@@ -60,6 +60,8 @@ import { downloadPdf } from "@/lib/mms/download-pdf";
 import { tenantFromSettings } from "@/lib/mms/PdfTheme";
 import { PdfLayoutEngine } from "@/lib/mms/PdfLayoutEngine";
 import { useTenant } from "@/providers/TenantProvider";
+import { analyticsEvents } from "@/lib/analytics";
+import { trackBusinessEvent } from "@/lib/analytics/business";
 
 interface SalesHistoryModalProps {
   isOpen: boolean;
@@ -441,6 +443,20 @@ export function SalesHistoryModal({ isOpen, onClose, onEdit }: SalesHistoryModal
     if (error) {
       toast.error("Erreur lors de la suppression");
     } else {
+      trackBusinessEvent(
+        analyticsEvents.saleCancelled,
+        {
+          tenant_id: profile?.tenant_id ?? null,
+          platform_type: "ERP",
+          module: "ventes",
+          pathname: window.location.pathname,
+          user_role: permissionsQuery.data?.role ?? null,
+        },
+        {
+          sale_id: saleToDelete.id,
+          sale_number: saleToDelete.number,
+        },
+      );
       await logAction(userId, roleId ?? null, "delete", "ventes", {
         sale_number: saleToDelete.number,
       });
