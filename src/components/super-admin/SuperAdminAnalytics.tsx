@@ -1,8 +1,10 @@
 import { useMemo, useState, type ComponentType } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   AlertCircle,
   ArrowUpRight,
   Bug,
+  ArrowLeft,
   Building2,
   CalendarRange,
   CheckCircle2,
@@ -403,24 +405,26 @@ export function SuperAdminAnalyticsView({
   return (
     <main className="analytics-cockpit space-y-6 bg-muted/20 p-4 sm:p-6 xl:p-8">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Analytics SAOVIA</h1>
-          <p className="text-sm text-muted-foreground">
-            Pilotage de l'utilisation, de la performance métier et de la qualité de la plateforme.
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
-              <ShieldAlert className="size-3.5" />
-              Accès Super Admin
-            </span>
-            <Button variant="outline" onClick={onRefresh}>
-              <RefreshCcw className="mr-2 size-4" />
-              Actualiser
-            </Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 h-9 px-2.5 text-muted-foreground hover:text-foreground">
+            <Link to="/super-admin" aria-label="Retour au Super Admin">
+              <ArrowLeft className="mr-2 size-4" />
+              <span>Retour au Super Admin</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Analytics SAOVIA</h1>
+            <p className="text-sm text-muted-foreground">
+              Pilotage de l'utilisation, de la performance métier et de la qualité de la plateforme.
+            </p>
           </div>
+        </div>
+        <div className="flex flex-col items-start gap-1.5 sm:items-end">
+          <Button variant="outline" onClick={onRefresh}>
+            <RefreshCcw className="mr-2 size-4" />
+            Actualiser
+          </Button>
           {lastUpdated ? (
             <p className="text-xs text-muted-foreground">Dernière actualisation : {lastUpdated}</p>
           ) : null}
