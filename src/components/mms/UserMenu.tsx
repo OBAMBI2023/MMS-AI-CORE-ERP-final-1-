@@ -14,6 +14,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ProfileAvatar } from "./ProfileAvatar";
 import { AvatarManager } from "./AvatarManager";
 import { useTenant } from "@/providers/TenantProvider";
+import { usePermissions } from "@/hooks/use-permissions";
+import { isAdministratorRole } from "@/lib/route-permissions";
 import {
   Dialog,
   DialogContent,
@@ -27,10 +29,11 @@ export function UserMenu() {
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const { tenant, refreshTenant } = useTenant();
-  // /parametres (ERP) et /hotel/parametres (Hôtel) sont deux interfaces
-  // distinctes : le menu compte est partagé entre les deux plateformes, donc
-  // sa destination doit suivre tenants.platform_type plutôt qu'être figée.
+  const { data: permissions } = usePermissions();
   const parametresRoute = tenant?.platform_type === "HOTEL" ? "/hotel/parametres" : "/parametres";
+  const canSeeSettings = tenant?.platform_type === "HOTEL"
+    ? isAdministratorRole(permissions?.role)
+    : true;
 
   const { data: profile } = useQuery({
     queryKey: ["userProfile"],
@@ -75,7 +78,7 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-muted transition-colors">
+        <button className="flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors hover:bg-muted">
           <ProfileAvatar path={profile?.avatar_url} name={name} email={profile?.email} className="h-8 w-8" />
           <div className="hidden md:flex flex-col items-start text-left">
             <span className="text-sm font-medium">{name}</span>
@@ -91,10 +94,12 @@ export function UserMenu() {
           <User className="mr-2 h-4 w-4" />
           <span>Mon profil</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate({ to: parametresRoute })}>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Paramètres</span>
-        </DropdownMenuItem>
+        {canSeeSettings && (
+          <DropdownMenuItem onClick={() => navigate({ to: parametresRoute })}>
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Paramètres</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />

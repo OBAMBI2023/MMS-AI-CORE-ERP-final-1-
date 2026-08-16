@@ -74,7 +74,7 @@ export function SidebarCompanyHeader({
   const loading = isLoading || tenantLoading || settingsLoading;
   const companyName = tenantText(tenant?.name);
   const businessActivity =
-    shortBusinessActivity(settings?.business_sector) || "Secteur non renseignÃ©";
+    shortBusinessActivity(settings?.business_sector) || "Secteur non renseigné";
 
   return (
     <SidebarCompanyHeaderView

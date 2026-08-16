@@ -2,8 +2,9 @@ import { motion } from "framer-motion";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { HOTEL_NAV_ITEMS } from "./hotel-nav-items";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
-import { isHotelSettingsRoute } from "@/lib/route-permissions";
+import { isAdministratorRole } from "@/lib/route-permissions";
 import { hotelRouteModules } from "@/lib/route-modules";
 import { cn } from "@/lib/utils";
 
@@ -15,18 +16,20 @@ export function HotelSidebarContent({
   compact?: boolean;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  // Le lien Paramètres n'est affiché que si l'utilisateur a réellement
-  // hotel.settings.view (RBAC), pas seulement s'il est Administrateur : un
-  // rôle secondaire (ex: "Gérant") peut s'être vu attribuer cette
-  // permission pour le tenant (cf. isHotelSettingsRoute).
-  const canViewHotelSettings = useActionPermission("hotel.settings.view");
+  const { data, isLoading: permissionsLoading } = usePermissions();
   const modulesQuery = useTenantModules();
+  const canViewHotelSettings = isAdministratorRole(data?.role);
+  const canViewMaintenance = useActionPermission("hotel.maintenance.view");
 
   const visibleItems = HOTEL_NAV_ITEMS.filter((it) => {
-    if (isHotelSettingsRoute(it.to) && !canViewHotelSettings) return false;
+    if (it.to === "/hotel/parametres" && !canViewHotelSettings) return false;
+    if (it.to === "/hotel/maintenance") {
+      if (!canViewMaintenance) return false;
+      return true;
+    }
     const requiredModule = hotelRouteModules[it.to];
     if (requiredModule) {
-      if (modulesQuery.isLoading) return false;
+      if (modulesQuery.isLoading || permissionsLoading) return false;
       if (!modulesQuery.data?.has(requiredModule)) return false;
     }
     return true;

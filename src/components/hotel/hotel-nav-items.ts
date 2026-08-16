@@ -9,8 +9,8 @@ import {
   ReceiptText,
   Banknote,
   BarChart3,
-  Settings,
   Wrench,
+  Settings,
   MessageCircle,
 } from "lucide-react";
 
@@ -29,10 +29,10 @@ export const HOTEL_NAV_ITEMS: HotelNavItem[] = [
   { icon: Receipt, label: "Facturation", to: "/hotel/facturation" },
   { icon: Banknote, label: "Caisse", to: "/hotel/caisse" },
   { icon: ReceiptText, label: "Dépenses", to: "/hotel/depenses" },
-  { icon: BarChart3, label: "Rapports", to: "/hotel/rapports" },
   { icon: Wrench, label: "Prestataires", to: "/hotel/maintenance" },
-  { icon: MessageCircle, label: "Support", to: "/support" },
+  { icon: BarChart3, label: "Rapports", to: "/hotel/rapports" },
   { icon: Settings, label: "Paramètres", to: "/hotel/parametres" },
+  { icon: MessageCircle, label: "Support", to: "/support" },
 ];
 
 export const HOTEL_BOTTOM_NAV_ITEMS: HotelNavItem[] = [

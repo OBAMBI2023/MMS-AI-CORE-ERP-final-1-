@@ -45,6 +45,10 @@ import { createHotelReservationConfirmationPdf } from "@/lib/mms/hotel-reservati
 import { createHotelInvoicePdf } from "@/lib/mms/hotel-invoice-pdf";
 import { createHotelPaymentReceiptPdf } from "@/lib/mms/hotel-payment-receipt-pdf";
 import {
+  getHotelReservationStatusBadgeClass,
+  getHotelReservationStatusLabel,
+} from "@/lib/hotel-reservation-status";
+import {
   createHotelAccommodationCertificatePdf,
   isHotelCertificateIssueDateValid,
   HOTEL_CERTIFICATE_DATE_ERROR,

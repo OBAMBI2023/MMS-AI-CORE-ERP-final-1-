@@ -74,6 +74,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/providers/TenantProvider";
 import { formatCurrency, formatDate } from "@/lib/mms/format";
 import { useCompanySettings } from "@/hooks/use-company-settings";
@@ -207,11 +208,12 @@ export function HotelRoomsPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { profile } = useTenant();
+  const { data: permissions } = usePermissions();
   const tenantId = profile?.tenant_id;
   const { settings, logoUrl } = useCompanySettings(tenantId);
   const canCreate = useActionPermission("hotel.rooms.create");
   const canUpdate = useActionPermission("hotel.rooms.update");
-  const canDelete = useActionPermission("hotel.rooms.delete");
+  const canDelete = permissions?.role === "Administrateur" && useActionPermission("hotel.rooms.delete");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | RoomStatus | "reserved">("all");
   const [type, setType] = useState("all");
@@ -602,10 +604,12 @@ export function HotelRoomsPage() {
               onCalendar={() => void navigate({ to: "/hotel" })}
               onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })}
               onSetStatus={(newStatus) => changeRoomStatus.mutate({ room, status: newStatus })}
-              onDelete={() => setDeleting(room)}
+              onDelete={() => {
+                if (canDelete) setDeleting(room);
+              }}
             />
           ))}</tbody></table></div>
-          <div className="divide-y md:hidden">{rooms.map((room) => <RoomMobileCard key={room.id} room={room} image={imageFor(room)} reserved={activeReservationRoomIds.has(room.id)} nextBooking={nextBookingByRoom.get(room.id) ?? "Aucune réservation"} canUpdate={canUpdate} canDelete={canDelete} onView={() => setViewing(room)} onEdit={() => openEdit(room)} onReserve={() => void navigate({ to: "/hotel/reservations" })} onCalendar={() => void navigate({ to: "/hotel" })} onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })} onSetStatus={(newStatus) => changeRoomStatus.mutate({ room, status: newStatus })} onDelete={() => setDeleting(room)} />)}</div>
+          <div className="divide-y md:hidden">{rooms.map((room) => <RoomMobileCard key={room.id} room={room} image={imageFor(room)} reserved={activeReservationRoomIds.has(room.id)} nextBooking={nextBookingByRoom.get(room.id) ?? "Aucune réservation"} canUpdate={canUpdate} canDelete={canDelete} onView={() => setViewing(room)} onEdit={() => openEdit(room)} onReserve={() => void navigate({ to: "/hotel/reservations" })} onCalendar={() => void navigate({ to: "/hotel" })} onBlock={() => changeRoomStatus.mutate({ room, status: room.status === "out_of_service" ? "available" : "out_of_service" })} onSetStatus={(newStatus) => changeRoomStatus.mutate({ room, status: newStatus })} onDelete={() => { if (canDelete) setDeleting(room); }} />)}</div>
         </div>
       ) : (
         <EmptyState
@@ -643,7 +647,12 @@ export function HotelRoomsPage() {
             : undefined
         }
       />
-      <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
+      <AlertDialog
+        open={Boolean(deleting) && canDelete}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer ce logement ?</AlertDialogTitle>

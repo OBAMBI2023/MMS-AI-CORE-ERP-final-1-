@@ -56,7 +56,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/providers/TenantProvider";
-import { useActionPermission } from "@/hooks/use-action-permission";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useHotelSubscription } from "@/hooks/use-hotel-subscription";
 import { useSignedUrl } from "@/hooks/use-signed-url";
@@ -69,6 +69,7 @@ import {
 import { configureCurrency } from "@/lib/mms/format";
 import type { Tables } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
+import { isAdministratorRole } from "@/lib/route-permissions";
 
 type ParametresRow = Tables<"parametres">;
 
@@ -120,10 +121,11 @@ export function HotelParametresPage() {
   const qc = useQueryClient();
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
-  const canView = useActionPermission("hotel.settings.view");
-  const canEdit = useActionPermission("hotel.settings.update");
-  const canViewUsers = useActionPermission("hotel.users.view");
-  const canViewBackups = useActionPermission("hotel.backups.view");
+  const { data: permissions } = usePermissions();
+  const canView = isAdministratorRole(permissions?.role);
+  const canEdit = canView;
+  const canViewUsers = canView;
+  const canViewBackups = canView;
 
   const hotelSettingsQuery = useHotelSettings();
   const hotelSubscriptionQuery = useHotelSubscription();
