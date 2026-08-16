@@ -1,10 +1,16 @@
 -- Sécurise la disponibilité et automatise le cycle opérationnel Hôtel.
 CREATE OR REPLACE FUNCTION public.validate_hotel_reservation_availability() RETURNS trigger
-LANGUAGE plpgsql SET search_path=public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE room_status text;
+DECLARE resolved_tenant_id uuid;
 BEGIN
+ resolved_tenant_id := COALESCE(NEW.tenant_id, public.hotel_tenant_id());
+ IF resolved_tenant_id IS NULL THEN
+  RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='Tenant authentifié introuvable';
+ END IF;
+ NEW.tenant_id := resolved_tenant_id;
  SELECT status INTO room_status FROM public.hotel_rooms
- WHERE id=NEW.room_id AND tenant_id=NEW.tenant_id FOR KEY SHARE;
+ WHERE id=NEW.room_id AND tenant_id=resolved_tenant_id FOR KEY SHARE;
  IF room_status IS NULL THEN RAISE EXCEPTION USING ERRCODE='23503',MESSAGE='Logement introuvable pour cet établissement'; END IF;
  IF room_status IN ('maintenance','out_of_service') AND NEW.status IN ('pending','confirmed','checked_in') THEN
   RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='Ce logement est en maintenance et ne peut pas être réservé';
