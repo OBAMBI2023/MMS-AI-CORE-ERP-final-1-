@@ -16,12 +16,16 @@ export function HotelAppShell({
   title,
   subtitle,
   actions,
+  mobileSubtitle,
+  mobileActions,
   children,
   contentClassName,
 }: {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  mobileSubtitle?: string;
+  mobileActions?: ReactNode;
   children: ReactNode;
   contentClassName?: string;
 }) {
@@ -39,11 +43,11 @@ export function HotelAppShell({
     <div className="hotel-theme flex h-screen w-full bg-background text-foreground">
       <HotelSidebar />
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5 sm:gap-4 md:px-8 md:pb-4 md:pt-5">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <header className="border-b border-border/70 px-4 py-3.5 md:px-8 md:pb-4 md:pt-5">
+          <div className="flex items-start gap-3 md:hidden">
             <Sheet open={open} onOpenChange={setOpen}>
-              <SheetTrigger asChild className="md:hidden">
-                <Button variant="ghost" size="icon" className="shrink-0">
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0" aria-label="Ouvrir le menu">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
@@ -60,44 +64,85 @@ export function HotelAppShell({
                 </div>
               </SheetContent>
             </Sheet>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h1 className="whitespace-nowrap text-[1.05rem] font-bold tracking-tight text-foreground">
+                {title}
+              </h1>
+              {mobileSubtitle ?? subtitle ? (
+                <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground">
+                  {mobileSubtitle ?? subtitle}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
+                title={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
+              >
+                {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Notifications" title="Notifications">
+                    <Bell className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72">
+                  <p className="text-sm font-semibold">Notifications</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Aucune nouvelle notification pour le moment.
+                  </p>
+                </PopoverContent>
+              </Popover>
+              <div className="ml-1">
+                <UserMenu />
+              </div>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-col gap-2 md:hidden">
+            {mobileActions && <div className="flex min-w-0 items-center justify-end gap-2">{mobileActions}</div>}
+          </div>
+          <div className="hidden items-center justify-between gap-3 md:flex">
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold tracking-tight sm:text-xl md:text-2xl">
+              <h1 className="truncate text-lg font-bold tracking-tight md:text-2xl">
                 {title}
               </h1>
               {subtitle && (
-                <p className="truncate text-xs text-muted-foreground mt-0.5 md:mt-1 md:text-sm">
+                <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground md:mt-1 md:truncate md:text-sm">
                   {subtitle}
                 </p>
               )}
             </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-            {actions && <div className="flex items-center gap-2 shrink-0 mr-1 sm:mr-2">{actions}</div>}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              aria-label={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
-              title={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
-            >
-              {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Notifications" title="Notifications">
-                  <Bell className="h-5 w-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72">
-                <p className="text-sm font-semibold">Notifications</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Aucune nouvelle notification pour le moment.
-                </p>
-              </PopoverContent>
-            </Popover>
-            <div className="ml-1 sm:ml-1.5">
-              <UserMenu />
+            <div className="flex shrink-0 items-center gap-1.5">
+              {actions && <div className="mr-1 flex items-center gap-2 shrink-0">{actions}</div>}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
+                title={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
+              >
+                {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Notifications" title="Notifications">
+                    <Bell className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72">
+                  <p className="text-sm font-semibold">Notifications</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Aucune nouvelle notification pour le moment.
+                  </p>
+                </PopoverContent>
+              </Popover>
+              <div className="ml-1.5">
+                <UserMenu />
+              </div>
             </div>
           </div>
         </header>

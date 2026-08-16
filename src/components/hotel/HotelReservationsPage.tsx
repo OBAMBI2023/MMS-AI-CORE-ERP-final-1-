@@ -145,6 +145,8 @@ export function HotelReservationsPage() {
   const isMobile = useIsMobile();
   const canUpdate = useActionPermission("hotel.reservations.update");
   const canDelete = useActionPermission("hotel.reservations.delete");
+  const canCheckIn = useActionPermission("hotel.reservations.check_in");
+  const canCheckOut = useActionPermission("hotel.reservations.check_out");
   const canSendSms = useActionPermission("hotel.sms.send");
   const modulesQuery = useTenantModules();
   const smsModuleEnabled = modulesQuery.data?.has("hotel_sms") === true;
@@ -954,6 +956,8 @@ export function HotelReservationsPage() {
                 requestDelete={setDeleting}
                 canUpdate={canUpdate}
                 canDelete={canDelete}
+                canCheckIn={canCheckIn}
+                canCheckOut={canCheckOut}
                 downloadPdf={downloadReservationPdf}
                 downloadConfirmation={downloadConfirmationPdf}
                 openDocuments={(r: any) => setDetailReservationId(r.id)}
@@ -973,6 +977,8 @@ export function HotelReservationsPage() {
                   requestDelete={setDeleting}
                   canUpdate={canUpdate}
                   canDelete={canDelete}
+                  canCheckIn={canCheckIn}
+                  canCheckOut={canCheckOut}
                   downloadPdf={downloadReservationPdf}
                   downloadConfirmation={downloadConfirmationPdf}
                   openDocuments={(r: any) => setDetailReservationId(r.id)}
@@ -1251,6 +1257,8 @@ function ReservationTable({
   requestDelete,
   canUpdate,
   canDelete,
+  canCheckIn,
+  canCheckOut,
   downloadPdf,
   downloadConfirmation,
   openDocuments,
@@ -1316,7 +1324,7 @@ function ReservationTable({
                       sendSms={sendSms}
                       canSendSms={canSendSms}
                     />
-                    {["pending", "confirmed"].includes(r.status) && (
+                    {["pending", "confirmed"].includes(r.status) && canCheckIn && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1325,7 +1333,7 @@ function ReservationTable({
                         Arrivée
                       </Button>
                     )}
-                    {r.status === "checked_in" && (
+                    {r.status === "checked_in" && canCheckOut && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1426,6 +1434,8 @@ function ReservationMobileCard({
   requestDelete,
   canUpdate,
   canDelete,
+  canCheckIn,
+  canCheckOut,
   downloadPdf,
   downloadConfirmation,
   openDocuments,
@@ -1482,7 +1492,7 @@ function ReservationMobileCard({
         r.status === "checked_in" ||
         !["cancelled", "checked_out"].includes(r.status)) && (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {["pending", "confirmed"].includes(r.status) && (
+          {["pending", "confirmed"].includes(r.status) && canCheckIn && (
             <Button
               size="sm"
               variant="outline"
@@ -1492,7 +1502,7 @@ function ReservationMobileCard({
               Arrivée
             </Button>
           )}
-          {r.status === "checked_in" && (
+          {r.status === "checked_in" && canCheckOut && (
             <Button
               size="sm"
               variant="outline"

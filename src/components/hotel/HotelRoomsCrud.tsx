@@ -76,7 +76,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/providers/TenantProvider";
-import { formatCurrency, formatDate } from "@/lib/mms/format";
+import { formatCurrency, formatDate, getCurrency } from "@/lib/mms/format";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { createHotelListPdf, formatHotelPdfAmount } from "@/lib/mms/hotel-pdf-engine";
 import { downloadPdf } from "@/lib/mms/download-pdf";
@@ -317,13 +317,23 @@ export function HotelRoomsPage() {
     }
     return map;
   }, [contextQuery.data, roomsQuery.data, today]);
-  const roomTypes = useMemo(() => Array.from(new Set((roomsQuery.data ?? []).map((r) => r.hotel_room_types?.name).filter(Boolean) as string[])).sort(), [roomsQuery.data]);
+  const roomTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (roomsQuery.data ?? [])
+            .map((r) => (r.property_type ? PROPERTY_TYPE_LABELS[r.property_type] ?? r.property_type : null))
+            .filter(Boolean) as string[],
+        ),
+      ).sort(),
+    [roomsQuery.data],
+  );
 
   const rooms = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("fr");
     return (roomsQuery.data ?? [])
       .filter((room) => status === "all" || (status === "reserved" ? activeReservationRoomIds.has(room.id) : room.status === status))
-      .filter((room) => type === "all" || room.hotel_room_types?.name === type)
+      .filter((room) => type === "all" || (room.property_type ? (PROPERTY_TYPE_LABELS[room.property_type] ?? room.property_type) === type : false))
       .filter((room) => !normalized || room.number.toLocaleLowerCase("fr").includes(normalized))
       .sort((a, b) =>
         sort === "price"
@@ -379,7 +389,7 @@ export function HotelRoomsPage() {
       head: ["Logement", "Type", "Capacité", "Tarif / nuit", "Statut"],
       body: rooms.map((room) => [
         room.number,
-        room.hotel_room_types?.name,
+        room.property_type ? PROPERTY_TYPE_LABELS[room.property_type] ?? room.property_type : "Type non défini",
         room.capacity,
         formatHotelPdfAmount(room.rate),
         activeReservationRoomIds.has(room.id) ? "Réservé" : (statusMeta[room.status as RoomStatus]?.label ?? room.status),
@@ -407,8 +417,9 @@ export function HotelRoomsPage() {
 
   return (
     <HotelAppShell
-      title="Chambres / Logements"
+      title="Chambres"
       subtitle="Gérez vos chambres, studios et logements"
+      mobileSubtitle="Gérez vos chambres et logements"
       actions={
         <>
           {/* Desktop / tablette : boutons complets, jamais masqués */}
@@ -426,38 +437,35 @@ export function HotelRoomsPage() {
               </Button>
             ) : null}
           </div>
-          {/* Mobile : rien n'est caché, tout reste accessible via un menu compact */}
-          <div className="flex items-center gap-2 sm:hidden">
-            {canCreate ? (
-              <Button
-                size="icon"
-                onClick={openCreate}
-                aria-label="Ajouter un logement"
-                className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                <Plus className="size-4" />
-              </Button>
-            ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-xl" aria-label="Plus d’actions">
-                  <MoreVertical className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-56">
-                <DropdownMenuItem disabled={!rooms.length} onSelect={() => void exportRooms()}>
-                  <FileText className="size-4" /> Exporter en PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </>
+      }
+      mobileActions={
+        <div className="flex w-full items-center gap-2">
+          {canCreate ? (
+            <Button
+              onClick={openCreate}
+              className="h-10 flex-1 rounded-xl bg-primary px-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 sm:flex-none sm:px-3.5 sm:text-sm"
+            >
+              <Plus className="size-4" />
+              <span className="min-w-0 whitespace-nowrap">Ajouter logement</span>
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            onClick={() => void exportRooms()}
+            disabled={!rooms.length}
+            className="h-10 flex-1 rounded-xl px-2.5 text-[13px] font-medium sm:flex-none sm:px-3.5 sm:text-sm"
+          >
+            <FileText className="size-4" />
+            <span className="min-w-0 whitespace-nowrap">Exporter PDF</span>
+          </Button>
+        </div>
       }
     >
       <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {([
           ["Total", totalRooms, BedDouble],
-          ["Réservés", activeReservationRoomIds.size, CalendarDays],
+          ["Réservations à venir", activeReservationRoomIds.size, CalendarDays],
           ["Taux d’occupation", `${occupancyRate}%`, ChartPie],
           ["Revenu estimé", formatCurrency(estimatedRevenue), Wallet],
         ] as const).map(([label, value, Icon]) => (
@@ -848,7 +856,7 @@ function RoomRow(props: ManageRoomProps) {
   return <tr className="hover:bg-muted/30">
     <td className="px-3 py-2"><RoomThumbnail room={room} image={image} /></td>
     <td className="min-w-[160px] px-3 py-2 font-semibold text-[#102A43] dark:text-white">{room.number}</td>
-    <td className="min-w-[140px] px-3 py-2 text-muted-foreground">{room.hotel_room_types?.name ?? "—"}</td>
+    <td className="min-w-[140px] px-3 py-2 text-muted-foreground">{room.property_type ? PROPERTY_TYPE_LABELS[room.property_type] ?? room.property_type : "—"}</td>
     <td className="px-3 py-2 font-medium">{formatCurrency(Number(room.rate))}</td>
     <td className="px-3 py-2"><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ring-1 ${meta.className}`}>{meta.label}</span></td>
     <td className="min-w-[150px] px-3 py-2 text-muted-foreground">{nextBooking}</td>
@@ -877,7 +885,7 @@ function RoomMobileCard(props: ManageRoomProps) {
             <div className="min-w-0">
               <h3 className="truncate font-semibold text-[#102A43] dark:text-white">{room.number}</h3>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {room.hotel_room_types?.name ?? "Type non défini"}
+                {room.property_type ? PROPERTY_TYPE_LABELS[room.property_type] ?? room.property_type : "Type non défini"}
               </p>
               <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
                 <Users className="size-3.5" />
@@ -1059,6 +1067,7 @@ function RoomFormDialog({
   const [attempted, setAttempted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isEdit = Boolean(room);
+  const currencyLabel = getCurrency();
   const reset = () =>
     setForm(
       room
@@ -1337,7 +1346,7 @@ function RoomFormDialog({
                     className={cn(fieldClass(attempted && Boolean(errors.price)), "pr-16")}
                   />
                   <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
-                    FCFA
+                    {currencyLabel}
                   </span>
                 </div>
                 {attempted && errors.price && <FieldError text={errors.price} />}
@@ -1506,11 +1515,11 @@ function RoomDetails({
         </div>
         <div className="grid gap-5 p-6 sm:grid-cols-3">
           <Detail label="Tarif par nuit" value={formatCurrency(Number(room.rate))} />
-          <Detail label="Type" value={room.hotel_room_types?.name ?? "Non défini"} />
+          <Detail
+            label="Type de logement"
+            value={room.property_type ? PROPERTY_TYPE_LABELS[room.property_type] ?? room.property_type : "Non défini"}
+          />
           <Detail label="Capacité" value={`${room.capacity} personne${room.capacity > 1 ? "s" : ""}`} />
-          {room.property_type && (
-            <Detail label="Type de logement" value={PROPERTY_TYPE_LABELS[room.property_type] ?? room.property_type} />
-          )}
           {room.room_count != null && (
             <Detail label="Nombre de pièces" value={`${room.room_count} pièce${room.room_count > 1 ? "s" : ""}`} />
           )}

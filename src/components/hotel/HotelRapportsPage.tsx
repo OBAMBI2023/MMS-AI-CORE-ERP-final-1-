@@ -218,7 +218,88 @@ function DotLegend({ items }: { items: { label: string; color: string; dashed?: 
 }
 
 function EmptyNote({ text = "Aucune donnée disponible pour cette période." }: { text?: string }) {
-  return <p className="py-6 text-center text-xs text-muted-foreground">{text}</p>;
+  return <p className="py-4 text-center text-xs text-muted-foreground sm:py-6">{text}</p>;
+}
+
+function PaymentDetailCard({
+  payment,
+}: {
+  payment: {
+    id: string;
+    date: string;
+    amount: number;
+    method: string | null;
+    guestName: string;
+    roomNumber: string;
+  };
+}) {
+  return (
+    <article className="rounded-xl border bg-card p-3.5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-snug">{payment.guestName}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(payment.date)}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(payment.amount)}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{payment.method || "—"}</p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">Chambre {payment.roomNumber}</span>
+      </div>
+    </article>
+  );
+}
+
+function RoomPerformanceCard({
+  row,
+}: {
+  row: {
+    room: {
+      id: string;
+      number: string;
+      hotel_room_types?: { name?: string | null } | null;
+    };
+    reservationsCount: number;
+    nights: number;
+    occupancyRate: number;
+    revenue: number;
+  };
+}) {
+  return (
+    <article className="rounded-xl border bg-card p-3.5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-snug">
+            Chambre {row.room.number}
+          </p>
+          {row.room.hotel_room_types?.name ? (
+            <p className="mt-1 truncate text-xs text-muted-foreground">{row.room.hotel_room_types.name}</p>
+          ) : null}
+        </div>
+        <p className="shrink-0 text-sm font-semibold text-primary">{formatCurrency(row.revenue)}</p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+          <p className="text-muted-foreground">Réservations</p>
+          <p className="mt-1 text-sm font-semibold">{row.reservationsCount}</p>
+        </div>
+        <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+          <p className="text-muted-foreground">Nuitées</p>
+          <p className="mt-1 text-sm font-semibold">{row.nights}</p>
+        </div>
+        <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+          <p className="text-muted-foreground">Occupation</p>
+          <p className="mt-1 text-sm font-semibold">{row.occupancyRate}%</p>
+        </div>
+        <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+          <p className="text-muted-foreground">CA encaissé</p>
+          <p className="mt-1 text-sm font-semibold">{formatCurrency(row.revenue)}</p>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export function HotelRapportsPage() {
@@ -589,7 +670,11 @@ export function HotelRapportsPage() {
 
   if (!canView) {
     return (
-      <HotelAppShell title="Rapports" subtitle="Analysez les performances de votre établissement">
+    <HotelAppShell
+      title="Rapports"
+      subtitle="Analysez les performances de votre établissement"
+      contentClassName="pb-32 md:pb-8"
+    >
         <div className="mt-4 grid min-h-72 place-items-center rounded-[24px] border border-dashed bg-muted/20 p-8 text-center">
           <div>
             <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-destructive/10 text-destructive">
@@ -865,11 +950,17 @@ export function HotelRapportsPage() {
             <div className="mt-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Détail par réservation</p>
               {paymentDetails.length ? (
-                <div className="max-h-72 overflow-x-auto overflow-y-auto rounded-xl border">
-                  <table className="w-full min-w-max border-collapse text-sm">
-                    <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2.5 text-left align-middle">Date</th>
+                <div className="overflow-hidden rounded-xl border">
+                  <div className="space-y-3 p-3 md:hidden">
+                    {paymentDetails.map((payment) => (
+                      <PaymentDetailCard key={payment.id} payment={payment} />
+                    ))}
+                  </div>
+                  <div className="hidden max-h-72 overflow-x-auto overflow-y-auto md:block">
+                    <table className="w-full min-w-max border-collapse text-sm">
+                      <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2.5 text-left align-middle">Date</th>
                         <th className="px-3 py-2.5 text-left align-middle">Client</th>
                         <th className="px-3 py-2.5 text-left align-middle">Chambre</th>
                         <th className="px-3 py-2.5 text-left align-middle">Mode</th>
@@ -888,8 +979,9 @@ export function HotelRapportsPage() {
                           </td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : (
                 <EmptyNote />
@@ -932,7 +1024,7 @@ export function HotelRapportsPage() {
                   <EmptyNote />
                 )}
               </div>
-              <div>
+              <div className={cn("min-w-0", expensesByCategory.length ? "" : "lg:pt-0")}>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Répartition par catégorie</p>
                 {expensesByCategory.length ? (
                   <ul className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
@@ -963,8 +1055,14 @@ export function HotelRapportsPage() {
           {/* Performance des logements */}
           <SectionCard title="Performance des logements" icon={Building2}>
             {topRooms.length ? (
-              <div className="overflow-x-auto rounded-xl border">
-                <table className="w-full min-w-[560px] text-sm">
+              <>
+                <div className="space-y-3 md:hidden">
+                  {topRooms.map((row) => (
+                    <RoomPerformanceCard key={row.room.id} row={row} />
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto rounded-xl border md:block">
+                  <table className="w-full min-w-[560px] text-sm">
                   <thead className="bg-muted/60 text-xs text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2 text-left">Logement</th>
@@ -991,7 +1089,8 @@ export function HotelRapportsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              </>
             ) : (
               <EmptyNote />
             )}
