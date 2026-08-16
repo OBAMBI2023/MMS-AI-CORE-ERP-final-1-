@@ -417,7 +417,7 @@ export function HotelRoomsPage() {
             {canCreate ? (
               <Button
                 onClick={openCreate}
-                className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]"
+                className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <Plus className="size-4" />
                 Ajouter un logement
@@ -431,7 +431,7 @@ export function HotelRoomsPage() {
                 size="icon"
                 onClick={openCreate}
                 aria-label="Ajouter un logement"
-                className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]"
+                className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <Plus className="size-4" />
               </Button>
@@ -472,7 +472,7 @@ export function HotelRoomsPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Rechercher un logement…"
-              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
           </div>
           <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
@@ -481,7 +481,7 @@ export function HotelRoomsPage() {
                 <SlidersHorizontal className="size-4" />
                 Filtres
                 {hasFilterSelections && (
-                  <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-[#B89236]" />
+                  <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-primary" />
                 )}
               </Button>
             </SheetTrigger>
@@ -521,7 +521,7 @@ export function HotelRoomsPage() {
                   </Button>
                 )}
                 <SheetClose asChild>
-                  <Button className="rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]">
+                  <Button className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
                     Appliquer
                   </Button>
                 </SheetClose>
@@ -538,7 +538,7 @@ export function HotelRoomsPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Rechercher un logement…"
-              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
           </div>
           <FilterSelect value={type} onChange={setType} options={[["all", "Tous les types"], ...roomTypes.map((v) => [v, v])]} />
@@ -582,7 +582,7 @@ export function HotelRoomsPage() {
 
       {roomsQuery.isLoading ? (
         <div className="grid min-h-72 place-items-center">
-          <Loader2 className="size-7 animate-spin text-[#B89236]" />
+          <Loader2 className="size-7 animate-spin text-primary" />
         </div>
       ) : rooms.length ? (
         <div className="mt-3 overflow-hidden rounded-xl border bg-card shadow-sm sm:mt-4">
@@ -681,8 +681,8 @@ function KpiTile({
   Icon: (props: { className?: string }) => ReactNode;
 }) {
   return (
-    <div className="group flex items-center gap-2.5 rounded-2xl border border-[#D8C99E]/40 bg-card px-3 py-2.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:gap-3 sm:px-4 sm:py-3.5">
-      <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105 sm:size-10">
+    <div className="group flex items-center gap-2.5 rounded-2xl border border-primary/25 bg-card px-3 py-2.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:gap-3 sm:px-4 sm:py-3.5">
+      <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#102A43] text-hotel-petrol-accent transition-transform duration-300 group-hover:scale-105 sm:size-10">
         <Icon className="size-4" />
       </div>
       <div className="min-w-0">
@@ -696,7 +696,7 @@ function KpiTile({
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <div className="min-w-28 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
-      <b className="text-2xl text-[#E2C66E]">{value}</b>
+      <b className="text-2xl text-hotel-petrol-accent">{value}</b>
       <p className="text-xs text-slate-300">{label}</p>
     </div>
   );
@@ -783,7 +783,7 @@ function RoomActions({
         <Button
           size="icon"
           variant="ghost"
-          className="size-8 text-[#102A43] hover:bg-[#B89236]/10 hover:text-[#9D7927] dark:text-[#E2C66E]"
+          className="size-8 text-[#102A43] hover:bg-primary/10 hover:text-primary dark:text-hotel-petrol-accent"
           aria-label="Plus d’actions"
         >
           <MoreVertical className="size-4" />
@@ -881,7 +881,7 @@ function RoomMobileCard(props: ManageRoomProps) {
           </div>
           <p className="mt-1.5 truncate text-xs text-muted-foreground">{nextBooking}</p>
           <div className="mt-2 flex items-center justify-between border-t pt-2">
-            <p className="text-sm font-semibold text-[#9D7927] dark:text-[#E2C66E]">
+            <p className="text-sm font-semibold text-primary">
               {formatCurrency(Number(room.rate))}{" "}
               <span className="text-[10px] font-normal text-muted-foreground">/ nuit</span>
             </p>
@@ -928,7 +928,7 @@ function RoomCard({
       transition={{ delay: Math.min(index * 0.04, 0.2) }}
       className="group overflow-hidden rounded-[22px] border bg-card shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-950/5"
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-[#D8C99E] via-[#AEB9AD] to-[#53665D]">
+      <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900">
         {image ? (
           <img
             src={image}
@@ -956,7 +956,7 @@ function RoomCard({
             <h3 className="text-lg font-semibold tracking-tight">{room.number}</h3>
             <p className="mt-1 text-sm text-muted-foreground">Tarif par nuit</p>
           </div>
-          <p className="text-right font-semibold text-[#9D7927] dark:text-[#E2C66E]">
+          <p className="text-right font-semibold text-primary">
             {formatCurrency(Number(room.rate))}
           </p>
         </div>
@@ -1006,7 +1006,7 @@ function EmptyState({
   return (
     <div className="mt-6 grid min-h-72 place-items-center rounded-[24px] border border-dashed bg-muted/20 p-8 text-center">
       <div>
-        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#B89236]/10 text-[#9D7927]">
+        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary">
           <BedDouble className="size-7" />
         </div>
         <h3 className="mt-4 font-semibold">
@@ -1249,8 +1249,8 @@ function RoomFormDialog({
                 className={cn(
                   "group relative mt-1.5 flex aspect-video w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed text-muted-foreground transition",
                   dragActive
-                    ? "border-[#B89236] bg-[#B89236]/10"
-                    : "border-border bg-muted/30 hover:border-[#B89236] hover:bg-[#B89236]/5",
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-muted/30 hover:border-primary hover:bg-primary/10",
                   save.isPending && "pointer-events-none opacity-60",
                 )}
               >
@@ -1277,7 +1277,7 @@ function RoomFormDialog({
                   </>
                 ) : (
                   <div className="px-4 text-center">
-                    <div className="mx-auto grid size-11 place-items-center rounded-full bg-[#B89236]/10 text-[#B89236]">
+                    <div className="mx-auto grid size-11 place-items-center rounded-full bg-primary/10 text-primary">
                       <ImagePlus className="size-6" />
                     </div>
                     <p className="mt-2.5 text-sm font-semibold text-foreground">
@@ -1388,7 +1388,7 @@ function RoomFormDialog({
             <Button
               type="submit"
               disabled={save.isPending}
-              className="w-full rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927] sm:w-auto"
+              className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
             >
               {save.isPending && <Loader2 className="size-4 animate-spin" />}
               {isEdit ? "Mettre à jour" : "Ajouter le logement"}
@@ -1405,7 +1405,7 @@ function fieldClass(hasError: boolean) {
     "mt-2 h-11 w-full rounded-xl border bg-background px-3.5 text-sm outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60",
     hasError
       ? "border-destructive focus:border-destructive focus:ring-destructive/15"
-      : "focus:border-[#B89236] focus:ring-[#B89236]/15",
+      : "focus:border-primary focus:ring-primary/15",
   );
 }
 
@@ -1481,7 +1481,7 @@ function RoomDetails({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[24px] p-0 sm:max-w-3xl">
-        <div className="relative aspect-[21/9] overflow-hidden rounded-t-[24px] bg-gradient-to-br from-[#D8C99E] to-[#53665D]">
+        <div className="relative aspect-[21/9] overflow-hidden rounded-t-[24px] bg-gradient-to-br from-slate-200 to-slate-400 dark:from-slate-700 dark:to-slate-900">
           {image ? (
             <img src={image} alt={room.number} className="size-full object-cover" />
           ) : (
@@ -1530,7 +1530,7 @@ function RoomDetails({
           {onEdit && (
             <Button
               onClick={onEdit}
-              className="rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]"
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Pencil className="size-4" />
               Modifier

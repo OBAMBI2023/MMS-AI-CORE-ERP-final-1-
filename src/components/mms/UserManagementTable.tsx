@@ -429,12 +429,12 @@ export function UserManagement() {
         <Card className="border-gray-200 bg-white p-4 shadow-sm dark:bg-card">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+              <p className="text-2xl font-bold text-saovia-secondary">
                 {stats.rolesAssigned}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">Rôles attribués</p>
             </div>
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-saovia-primary-soft text-saovia-secondary">
               <Shield className="h-4 w-4" />
             </div>
           </div>
@@ -492,18 +492,18 @@ export function UserManagement() {
         <Card className="overflow-hidden border-gray-100 bg-white p-0 shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:bg-card">
           <div className="flex items-start justify-between gap-2 p-3.5">
             <div className="min-w-0">
-              <p className="text-xl font-bold leading-tight text-violet-600 dark:text-violet-400">
+              <p className="text-xl font-bold leading-tight text-saovia-secondary">
                 {stats.rolesAssigned}
               </p>
               <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
                 Rôles attribués
               </p>
             </div>
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-saovia-primary-soft text-saovia-secondary">
               <Shield className="h-4 w-4" />
             </div>
           </div>
-          <div className="h-1 w-full bg-violet-500" />
+          <div className="h-1 w-full bg-saovia-secondary" />
         </Card>
       </div>
 

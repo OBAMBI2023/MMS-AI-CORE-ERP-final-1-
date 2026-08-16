@@ -27,7 +27,10 @@ const contextClasses: Record<BrandLogoContext, string> = {
   // Wide (non-square) boxes sized to the logo's own aspect ratio so mobile
   // renders at a legible width without letterboxing or growing header height.
   marketingHeader: "h-[62px] w-[84px] p-0 md:size-12 md:p-1",
-  marketingFooter: "h-[75px] w-[102px] p-0 md:size-12 md:p-1",
+  // Matches the marketing header logo's real on-screen size exactly (see
+  // the explicit className override on the BrandLogo call in
+  // MarketingNavigation.tsx) so the footer logo never outweighs the header.
+  marketingFooter: "h-[70px] w-[132px] p-0 md:h-[76px] md:w-[144px]",
   trialHeader: "h-[66px] w-[90px] p-0 md:size-14 md:p-1",
 };
 

@@ -2,7 +2,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { startOfDay, startOfMonth, endOfMonth, subDays, subMonths, addDays } from "date-fns";
+import { startOfDay, startOfMonth, subDays, subMonths, addDays } from "date-fns";
 import {
   Percent,
   LogIn,
@@ -31,6 +31,7 @@ import {
   getHotelReservationStatusBadgeClass,
   getHotelReservationStatusLabel,
 } from "@/lib/hotel-reservation-status";
+import { computeOccupancyRate, type OccupancyReservationLike } from "@/lib/hotel-occupancy";
 
 const db = supabase as any;
 
@@ -86,13 +87,6 @@ function formatFrTime(isoStr: string | null | undefined): string | null {
   if (isNaN(date.getTime())) return null;
   return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
-
-function parseIsoDate(dateStr: string): Date {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y || 0, (m || 1) - 1, d || 1);
-}
-
-const OCCUPANCY_STATUSES = new Set(["confirmed", "checked_in", "checked_out", "completed"]);
 
 function HotelDashboard() {
   const { profile } = useTenant();
@@ -153,6 +147,10 @@ function HotelDashboard() {
   const occupiedRooms = (roomsQuery.data ?? []).filter((r) => r.status === "occupied").length;
   const availableRooms = (roomsQuery.data ?? []).filter((r) => r.status === "available").length;
   const occupancyRate = totalRooms ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+  // Out-of-service rooms aren't commercializable, so they shouldn't inflate
+  // the "Taux d'occupation du mois" denominator. Scoped to this KPI only —
+  // totalRooms above stays as-is for the other room KPIs on this dashboard.
+  const commercializableRoomCount = (roomsQuery.data ?? []).filter((r) => r.status !== "out_of_service").length;
 
   const revenueByPeriod = useMemo(() => {
     const payments = paymentsQuery.data ?? [];
@@ -197,24 +195,18 @@ function HotelDashboard() {
   ).length;
 
   const monthlyOccupancyRate = useMemo(() => {
-    if (!totalRooms) return 0;
     const now = new Date();
-    const monthStart = startOfMonth(now);
-    const monthEndExclusive = addDays(endOfMonth(now), 1);
-    let occupiedNights = 0;
-    for (const r of reservations) {
-      if (!OCCUPANCY_STATUSES.has(r.status)) continue;
-      const checkIn = parseIsoDate(r.check_in);
-      const checkOut = parseIsoDate(r.check_out);
-      const start = checkIn < monthStart ? monthStart : checkIn;
-      const end = checkOut > monthEndExclusive ? monthEndExclusive : checkOut;
-      const nights = Math.round((end.getTime() - start.getTime()) / 86_400_000);
-      if (nights > 0) occupiedNights += nights;
-    }
-    const daysInMonth = Math.round((monthEndExclusive.getTime() - monthStart.getTime()) / 86_400_000);
-    const availableRoomNights = totalRooms * daysInMonth;
-    return availableRoomNights > 0 ? Math.round((occupiedNights / availableRoomNights) * 100) : 0;
-  }, [reservations, totalRooms]);
+    const { rate } = computeOccupancyRate({
+      reservations: reservations as OccupancyReservationLike[],
+      roomCount: commercializableRoomCount,
+      rangeStart: startOfMonth(now),
+      // Month-to-date: only nights up to and including today, matching the
+      // "Taux d'occupation du mois" definition (not a forecast through
+      // month-end).
+      rangeEndExclusive: addDays(startOfDay(now), 1),
+    });
+    return rate;
+  }, [reservations, commercializableRoomCount]);
 
   const totalUnpaid = useMemo(
     () =>

@@ -27,7 +27,7 @@ export function MarketingNavigation() {
 
         <div className="hidden items-center gap-7 lg:flex">
           {navigationItems.map((item) => (
-            <a key={item.href} href={item.href} className="text-sm font-medium text-slate-600 transition-colors hover:text-[#0f5b4e]">
+            <a key={item.href} href={item.href} className="text-sm font-medium text-slate-600 transition-colors hover:text-saovia-primary">
               {item.label}
             </a>
           ))}
@@ -36,13 +36,13 @@ export function MarketingNavigation() {
         <div className="hidden items-center gap-3 lg:flex">
           <Link
             to="/login"
-            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[#0f5b4e] transition-colors hover:bg-[#0f5b4e]/6"
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:text-saovia-primary"
           >
             Connexion
           </Link>
           <Link
             to="/essai-gratuit"
-            className="rounded-xl bg-[#0f5b4e] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#0f5b4e]/20 transition-colors hover:bg-[#0b4c41]"
+            className="rounded-xl bg-saovia-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-saovia-primary/20 transition-colors hover:bg-saovia-primary-hover"
           >
             Essayer gratuitement
           </Link>
@@ -61,30 +61,30 @@ export function MarketingNavigation() {
       </nav>
 
       {isOpen && (
-        <div id="mobile-navigation" className="border-t border-slate-200 bg-white px-5 py-5 lg:hidden">
-          <div className="mx-auto flex max-w-7xl flex-col gap-1">
+        <div id="mobile-navigation" className="border-t border-slate-200 bg-white px-5 py-4 lg:hidden">
+          <div className="mx-auto flex max-w-7xl flex-col">
             {navigationItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
-                className="rounded-xl px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-saovia-primary"
               >
                 {item.label}
               </a>
             ))}
-            <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-200 pt-4">
+            <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
               <Link
                 to="/login"
                 onClick={() => setIsOpen(false)}
-                className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700"
+                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-saovia-primary"
               >
                 Connexion
               </Link>
               <Link
                 to="/essai-gratuit"
                 onClick={() => setIsOpen(false)}
-                className="rounded-xl bg-[#0f5b4e] px-4 py-3 text-center text-sm font-semibold text-white"
+                className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-saovia-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-saovia-primary-hover"
               >
                 Essayer gratuitement
               </Link>

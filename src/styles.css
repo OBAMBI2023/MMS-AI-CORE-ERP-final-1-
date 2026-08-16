@@ -63,6 +63,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-saovia-primary: var(--saovia-primary);
+  --color-saovia-primary-hover: var(--saovia-primary-hover);
+  --color-saovia-primary-soft: var(--saovia-primary-soft);
+  --color-saovia-primary-border: var(--saovia-primary-border);
+  --color-saovia-secondary: var(--saovia-secondary);
+  --color-saovia-accent: var(--saovia-accent);
+  --color-hotel-petrol-accent: var(--hotel-petrol-accent);
 }
 
 :root {
@@ -100,6 +107,19 @@
   --sidebar-accent-foreground: oklch(1 0 0);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.55 0.22 264);
+
+  /*
+   * SAOVIA brand tokens — derived directly from the official logo
+   * (public/branding/saovia-logo-full.png), sampled and averaged across
+   * the mark's gradient. Do not hand-pick new blues here; if the logo
+   * changes, re-sample it and update these six values only.
+   */
+  --saovia-primary: oklch(0.55 0.22 264); /* logo mid blue, ~#2b62ef */
+  --saovia-primary-hover: oklch(0.46 0.22 264); /* ~#1244d0 */
+  --saovia-primary-soft: oklch(0.96 0.03 264); /* ~#e8f2ff */
+  --saovia-primary-border: oklch(0.85 0.06 264); /* ~#bacef6 */
+  --saovia-secondary: oklch(0.256 0.13 263.1); /* logo deep navy, ~#001860 */
+  --saovia-accent: oklch(0.647 0.189 251.2); /* logo bright cyan-blue tip, ~#0190fc */
 }
 
 .dark {
@@ -135,6 +155,13 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+
+  --saovia-primary: oklch(0.68 0.18 260); /* ~#5195ff */
+  --saovia-primary-hover: oklch(0.75 0.16 260); /* ~#70adff */
+  --saovia-primary-soft: oklch(0.28 0.06 264); /* ~#192846 */
+  --saovia-primary-border: oklch(0.4 0.1 264); /* ~#2b457d */
+  --saovia-secondary: oklch(0.256 0.13 263.1); /* ~#001860 */
+  --saovia-accent: oklch(0.75 0.13 251.2); /* ~#6cb3fd */
 }
 
 /*
@@ -157,6 +184,12 @@
   --sidebar-accent-foreground: oklch(1 0 0);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.696 0.149 162.5);
+
+  /* Fixed bright petrol accent for text/icons over dark navy chips or
+   * photo overlays, where a theme-adaptive --primary would be unreadable
+   * (light-mode --primary is too dark to read on those fixed-dark surfaces).
+   * Value is the same green used by dark-mode --primary above. */
+  --hotel-petrol-accent: oklch(0.696 0.149 162.5);
 }
 
 .dark .hotel-theme {
@@ -171,13 +204,16 @@
 }
 
 /*
- * SAOVIA Analytics cockpit (Super Admin) — petrol green / petrol blue accents.
- * Scoped via `.analytics-cockpit`; reuses the SAOVIA HOTEL petrol tokens above
- * so the palette stays consistent with the rest of the brand system.
+ * SAOVIA Analytics cockpit (Super Admin).
+ * Scoped via `.analytics-cockpit`. Historically shared the SAOVIA HOTEL
+ * petrol tokens; now rotated to blue for the same reason as `.hotel-theme`
+ * above. `--analytics-technical` keeps its distinct cyan-blue hue (220) as
+ * a secondary accent, and `--analytics-danger` stays red (semantic, not
+ * brand) — neither was ever the offending green.
  */
 .analytics-cockpit {
-  --analytics-accent: oklch(0.4 0.08 170);
-  --analytics-accent-soft: oklch(0.94 0.03 165);
+  --analytics-accent: oklch(0.4 0.08 264);
+  --analytics-accent-soft: oklch(0.94 0.03 260);
   --analytics-technical: oklch(0.45 0.09 220);
   --analytics-technical-soft: oklch(0.94 0.02 220);
   --analytics-danger: oklch(0.62 0.14 25);
@@ -185,8 +221,8 @@
 }
 
 .dark .analytics-cockpit {
-  --analytics-accent: oklch(0.696 0.149 162.5);
-  --analytics-accent-soft: oklch(0.279 0.041 178.7);
+  --analytics-accent: oklch(0.696 0.149 260);
+  --analytics-accent-soft: oklch(0.279 0.041 264);
   --analytics-technical: oklch(0.65 0.1 220);
   --analytics-technical-soft: oklch(0.279 0.041 220);
   --analytics-danger: oklch(0.704 0.14 25);

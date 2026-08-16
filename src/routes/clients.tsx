@@ -105,7 +105,7 @@ function ClientCard({ row, actions }: { row: Client; actions: MobileCardActions 
         leading={{
           variant: "avatar",
           initials: getInitials(row.name),
-          className: "bg-gradient-to-br from-emerald-500 to-teal-500 shadow-emerald-500/30",
+          className: "bg-gradient-to-br from-saovia-primary to-saovia-accent shadow-saovia-primary/30",
         }}
         title={row.name}
         menuAriaLabel="Menu du client"
@@ -145,7 +145,7 @@ function ClientCard({ row, actions }: { row: Client; actions: MobileCardActions 
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-sm font-semibold text-white">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-saovia-primary to-saovia-accent text-sm font-semibold text-white">
                 {getInitials(row.name)}
               </div>
               <div className="min-w-0">

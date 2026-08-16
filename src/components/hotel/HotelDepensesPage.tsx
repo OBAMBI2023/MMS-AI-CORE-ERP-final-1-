@@ -272,7 +272,7 @@ export function HotelDepensesPage() {
       subtitle="Suivez les dépenses de votre établissement"
       actions={
         canCreate ? (
-          <Button onClick={openCreate} className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]">
+          <Button onClick={openCreate} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
             <Plus className="size-4" />
             Nouvelle dépense
           </Button>
@@ -289,9 +289,9 @@ export function HotelDepensesPage() {
         ).map(([label, value, Icon]) => (
           <div
             key={label}
-            className="group flex items-center gap-3 rounded-2xl border border-[#D8C99E]/40 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+            className="group flex items-center gap-3 rounded-2xl border border-primary/25 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
           >
-            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#102A43] text-hotel-petrol-accent transition-transform duration-300 group-hover:scale-105">
               <Icon className="size-4" />
             </div>
             <div className="min-w-0">
@@ -310,7 +310,7 @@ export function HotelDepensesPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Description, bénéficiaire, référence…"
-              className="h-11 w-full rounded-xl border bg-background pl-10 pr-9 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-9 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
             {query && (
               <button
@@ -332,7 +332,7 @@ export function HotelDepensesPage() {
             className="relative h-11 w-11 shrink-0 rounded-xl"
           >
             <SlidersHorizontal className="size-4" />
-            {hasActiveFilters && <span className="absolute right-2 top-2 size-2 rounded-full bg-[#B89236]" />}
+            {hasActiveFilters && <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />}
           </Button>
         </div>
 
@@ -343,7 +343,7 @@ export function HotelDepensesPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Description, bénéficiaire, référence…"
-              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
           </div>
           <FilterSelect
@@ -388,7 +388,7 @@ export function HotelDepensesPage() {
                     type="button"
                     onClick={() => setCategory(key)}
                     className={`h-10 rounded-xl px-3 text-sm font-medium ring-1 transition-colors ${
-                      category === key ? "bg-[#B89236] text-white ring-[#B89236]" : "bg-background text-foreground ring-border hover:bg-muted"
+                      category === key ? "bg-primary text-primary-foreground ring-primary" : "bg-background text-foreground ring-border hover:bg-muted"
                     }`}
                   >
                     {label}
@@ -405,7 +405,7 @@ export function HotelDepensesPage() {
                     type="button"
                     onClick={() => setMethod(key)}
                     className={`h-10 rounded-xl px-3 text-sm font-medium ring-1 transition-colors ${
-                      method === key ? "bg-[#B89236] text-white ring-[#B89236]" : "bg-background text-foreground ring-border hover:bg-muted"
+                      method === key ? "bg-primary text-primary-foreground ring-primary" : "bg-background text-foreground ring-border hover:bg-muted"
                     }`}
                   >
                     {label}
@@ -431,7 +431,7 @@ export function HotelDepensesPage() {
             <Button
               type="button"
               onClick={() => setFilterSheetOpen(false)}
-              className="flex-1 rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]"
+              className="flex-1 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Voir {filtered.length} dépense{filtered.length > 1 ? "s" : ""}
             </Button>
@@ -442,7 +442,7 @@ export function HotelDepensesPage() {
       {expensesQuery.isLoading ? (
         <>
           <div className="hidden min-h-72 place-items-center md:grid">
-            <Loader2 className="size-7 animate-spin text-[#B89236]" />
+            <Loader2 className="size-7 animate-spin text-primary" />
           </div>
           <div className="mt-4 space-y-3 md:hidden">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -520,7 +520,7 @@ export function HotelDepensesPage() {
               {hasActiveFilters ? "Aucun résultat pour ces filtres." : "Ajoutez votre première dépense pour commencer le suivi."}
             </p>
             {canCreate && !hasActiveFilters && (
-              <Button onClick={openCreate} className="mt-5 rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]">
+              <Button onClick={openCreate} className="mt-5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="size-4" />
                 Nouvelle dépense
               </Button>
@@ -598,7 +598,7 @@ function ReceiptLink({ path }: { path: string | null }) {
       href={url}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1 text-[#B89236] hover:underline"
+      className="inline-flex items-center gap-1 text-primary hover:underline"
     >
       <Paperclip className="size-3.5" /> Voir <ExternalLink className="size-3" />
     </a>
@@ -667,7 +667,7 @@ function ExpenseMobileCard({ expense, canUpdate, canDelete, onEdit, onDelete }: 
     <div className="p-3.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[#102A43] text-[#E2C66E]">
+          <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[#102A43] text-hotel-petrol-accent">
             <PaymentIcon className="size-4" />
           </div>
           <div className="min-w-0">
@@ -872,7 +872,7 @@ function ExpenseFormDialog({
             <Button
               type="submit"
               disabled={save.isPending}
-              className="h-11 w-full rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927] sm:w-auto"
+              className="h-11 w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
             >
               {save.isPending && <Loader2 className="size-4 animate-spin" />}
               {isEdit ? "Mettre à jour" : "Enregistrer la dépense"}

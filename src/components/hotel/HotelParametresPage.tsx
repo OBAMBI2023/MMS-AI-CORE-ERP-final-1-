@@ -523,7 +523,7 @@ function SubscriptionTab({
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button
                 type="button"
-                className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400 sm:w-auto"
+                className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
                 disabled={!canRenew}
               >
                 Renouveler l’abonnement

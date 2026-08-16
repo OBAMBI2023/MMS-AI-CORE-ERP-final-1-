@@ -1,96 +1,114 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { motion, useReducedMotion } from "framer-motion";
 import {
+  AlertCircle,
   ArrowRight,
-  BadgeCheck,
   BriefcaseBusiness,
-  Cloud,
-  Headphones,
-  Lock,
-  Shield,
   ShoppingCart,
   Sparkles,
   Store,
+  TrendingUp,
   WalletCards,
 } from "lucide-react";
 import { PLATFORM_BRANDING } from "@/config/branding";
-
-const trustItems = [
-  { label: "Sécurisé", icon: Shield },
-  { label: "Accessible partout", icon: Cloud },
-  { label: "Support réactif", icon: Headphones },
-  { label: "Données protégées", icon: Lock },
-] as const;
+import { AnimatedCounter } from "../components/AnimatedCounter";
 
 const solutions = [
   {
     name: "Commerce",
     icon: ShoppingCart,
     description: "Pour boutiques, commerces, points de vente et distributeurs.",
-    modules: [
-      "Tableau de bord",
-      "Ventes (POS)",
-      "Devis",
-      "Clients",
-      "Produits & Services",
-      "Catégories",
-      "Stock",
-      "Achats",
-      "Fournisseurs",
-      "Dépenses",
-      "Rapports",
-      "Support",
-      "Paramètres",
-    ],
   },
   {
     name: "Services",
     icon: BriefcaseBusiness,
     description: "Pour entreprises de services, agences, cabinets et prestataires.",
-    modules: ["Tableau de bord", "Devis", "Clients", "Produits & Services", "Facturation", "Dépenses", "Rapports", "Support", "Paramètres"],
   },
   {
     name: "Hôtel",
     icon: Store,
     description: "Pour établissements d’hébergement, résidences et hospitality.",
-    modules: ["Réservations", "Chambres", "Clients", "Facturation", "Caisse", "Dépenses", "Rapports", "Paramètres"],
   },
   {
     name: "Restauration",
     icon: WalletCards,
     description: "Pour restaurants, lounges, bars et opérations multi-sites.",
-    modules: ["Tableau de bord", "Commandes", "Ventes", "Clients", "Inventaire", "Achats", "Rapports", "Support", "Paramètres"],
   },
 ] as const;
 
-const featuredModules = [
-  "Ventes",
-  "Stocks",
-  "Clients",
-  "Facturation",
-  "Réservations",
-  "Rapports",
-] as const;
+type HeroKpiCardProps = {
+  icon: typeof TrendingUp;
+  label: string;
+  valueTarget: number;
+  valueDecimals: number;
+  valueUnit: string;
+  deltaTarget: number;
+  positionClassName: string;
+  aspectRatio: string;
+};
+
+/**
+ * Overlays a live, animatable replica on top of the KPI card baked into the
+ * hero PNG at the same spot, so its two figures can count up — the rest of
+ * the artwork (the woman, tablet, other cards) stays the flat image.
+ */
+function HeroKpiCard({
+  icon: Icon,
+  label,
+  valueTarget,
+  valueDecimals,
+  valueUnit,
+  deltaTarget,
+  positionClassName,
+  aspectRatio,
+}: HeroKpiCardProps) {
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      className={`pointer-events-none absolute [container-type:inline-size] ${positionClassName}`}
+      style={{ aspectRatio }}
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.4 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+    >
+      <div className="flex h-full w-full flex-col justify-center rounded-[7cqw] bg-white px-[7cqw] py-[5.5cqw] shadow-[0_18px_45px_rgba(7,26,20,0.14)] ring-1 ring-black/5">
+        <div className="flex items-center gap-[3cqw]">
+          <span className="grid h-[14cqw] w-[14cqw] shrink-0 place-items-center rounded-[3.2cqw] bg-saovia-primary text-white">
+            <Icon className="h-[7cqw] w-[7cqw]" />
+          </span>
+          <span className="text-[4.4cqw] font-medium leading-tight text-slate-600">{label}</span>
+        </div>
+        <p className="mt-[3cqw] whitespace-nowrap text-[8.5cqw] font-bold leading-none tracking-tight text-slate-950">
+          <AnimatedCounter target={valueTarget} decimals={valueDecimals} durationMs={1300} />{" "}
+          <span className="text-[6.5cqw] font-semibold text-slate-700">{valueUnit}</span>
+        </p>
+        <p className="mt-[2.5cqw] flex items-center gap-[1.5cqw] text-[4.2cqw] font-semibold text-saovia-primary">
+          <span aria-hidden="true">▲</span>
+          <AnimatedCounter target={deltaTarget} decimals={1} suffix="%" durationMs={1300} />
+        </p>
+        <p className="text-[3.6cqw] text-slate-400">vs mois dernier</p>
+      </div>
+    </motion.div>
+  );
+}
 
 export function HomePage() {
   const [selectedSolution, setSelectedSolution] = useState<(typeof solutions)[number]["name"]>("Commerce");
 
-  const activeSolution = useMemo(
-    () => solutions.find((solution) => solution.name === selectedSolution) ?? solutions[0],
-    [selectedSolution],
-  );
-
   return (
-    <main className="bg-[#f5f7f4] px-3 py-3 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+    <main className="bg-[#f3f5f9] px-3 py-3 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
       <div className="mx-auto max-w-[1470px] overflow-hidden rounded-[32px] bg-white shadow-[0_28px_90px_rgba(7,26,20,0.10)] ring-1 ring-black/5">
         <section id="produits" className="relative overflow-hidden px-5 pb-10 pt-8 sm:px-8 sm:pb-12 sm:pt-10 lg:px-12 lg:pb-14 lg:pt-12">
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(15,91,78,0.08),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(212,175,55,0.10),transparent_28%)]" />
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(43,98,239,0.08),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(212,175,55,0.10),transparent_28%)]" />
 
           <div className="mx-auto grid max-w-[1360px] items-start gap-10 lg:grid-cols-[0.45fr_0.55fr] lg:gap-12 xl:gap-16">
             <div className="max-w-2xl">
               <h1 className="text-[clamp(2.7rem,5vw,5.15rem)] font-black leading-[0.96] tracking-[-0.055em] text-slate-950">
                 Pilotez votre activité avec{" "}
-                <span className="text-[#0f5b4e]">{PLATFORM_BRANDING.name}</span>
+                <span className="text-saovia-primary">{PLATFORM_BRANDING.name}</span>
               </h1>
 
               <p className="mt-6 max-w-[620px] text-[1.03rem] leading-8 text-slate-600 sm:text-[1.08rem] sm:leading-8">
@@ -102,7 +120,7 @@ export function HomePage() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
                   to="/essai-gratuit"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0f5b4e] px-6 py-4 text-base font-semibold text-white shadow-[0_18px_40px_rgba(15,91,78,0.22)] transition-transform hover:-translate-y-0.5"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-saovia-primary px-6 py-4 text-base font-semibold text-white shadow-[0_18px_40px_rgba(43,98,239,0.22)] transition-transform transition-colors hover:-translate-y-0.5 hover:bg-saovia-primary-hover"
                 >
                   Essayer gratuitement
                   <ArrowRight className="h-4 w-4" />
@@ -114,38 +132,36 @@ export function HomePage() {
                   Découvrir les solutions
                 </a>
               </div>
-
-              <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-4 text-sm font-medium text-slate-700">
-                {featuredModules.map((item, index) => (
-                  <div key={item} className="flex items-center gap-3">
-                    <BadgeCheck className="h-5 w-5 text-[#0f5b4e]" />
-                    <span>{item}</span>
-                    {index < featuredModules.length - 1 ? <span className="hidden h-1 w-1 rounded-full bg-amber-500 sm:inline-block" /> : null}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                {trustItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <div key={item.label} className="flex items-center gap-3 rounded-2xl bg-[#f8faf8] px-4 py-3 shadow-[0_8px_24px_rgba(7,26,20,0.04)] ring-1 ring-black/5">
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-[#0f5b4e] shadow-sm">
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      <span className="text-sm font-semibold text-slate-800">{item.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
 
             <div className="relative mx-auto flex w-full max-w-[420px] items-center justify-center sm:max-w-[520px] lg:max-w-none lg:justify-end lg:self-center">
-              <img
-                src="/branding/landing.png"
-                alt="Femme d’affaires tenant une tablette affichant le tableau de bord SAOVIA, entourée d’indicateurs clés : chiffre d’affaires, impayés, arrivées/départs et disponibilité des logements"
-                className="h-auto w-full max-w-[420px] object-contain sm:max-w-[520px] lg:max-w-[640px] xl:max-w-[720px]"
-              />
+              <div className="relative w-full max-w-[420px] sm:max-w-[520px] lg:max-w-[640px] xl:max-w-[720px]">
+                <img
+                  src="/branding/b5c578f9-b170-44f4-bd3a-4579f691342b.png"
+                  alt="Femme d’affaires tenant une tablette affichant le tableau de bord SAOVIA, entourée d’indicateurs clés : chiffre d’affaires, impayés, arrivées/départs et disponibilité des logements"
+                  className="block h-auto w-full object-contain"
+                />
+                <HeroKpiCard
+                  icon={TrendingUp}
+                  label="Chiffre d'affaires"
+                  valueTarget={2.35}
+                  valueDecimals={2}
+                  valueUnit="M FCFA"
+                  deltaTarget={18.3}
+                  positionClassName="left-[4.1%] top-[7.2%] w-[37.6%]"
+                  aspectRatio="414 / 272"
+                />
+                <HeroKpiCard
+                  icon={AlertCircle}
+                  label="Impayés"
+                  valueTarget={6.87}
+                  valueDecimals={2}
+                  valueUnit="M FCFA"
+                  deltaTarget={12.6}
+                  positionClassName="left-[62.7%] top-[29.9%] w-[36.7%]"
+                  aspectRatio="404 / 232"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -153,7 +169,7 @@ export function HomePage() {
         <section id="solutions" className="px-5 pb-16 sm:px-8 lg:px-12">
           <div className="mx-auto max-w-[1360px]">
             <div className="max-w-3xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0f5b4e]">Solutions</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-saovia-primary">Solutions</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
                 Une solution adaptée à votre activité
               </h2>
@@ -162,7 +178,7 @@ export function HomePage() {
               </p>
             </div>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div id="modules" className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {solutions.map((solution) => {
                 const Icon = solution.icon;
                 const active = solution.name === selectedSolution;
@@ -173,15 +189,15 @@ export function HomePage() {
                     onClick={() => setSelectedSolution(solution.name)}
                     className={`rounded-[28px] border p-5 text-left transition-all ${
                       active
-                        ? "border-[#0f5b4e]/20 bg-[#0f5b4e]/4 shadow-[0_18px_50px_rgba(7,26,20,0.08)]"
+                        ? "border-saovia-primary/20 bg-saovia-primary/4 shadow-[0_18px_50px_rgba(7,26,20,0.08)]"
                         : "border-black/5 bg-white shadow-[0_12px_35px_rgba(7,26,20,0.04)] hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(7,26,20,0.08)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#0f5b4e]/10 text-[#0f5b4e]">
+                      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-saovia-primary/10 text-saovia-primary">
                         <Icon className="h-6 w-6" />
                       </div>
-                      {active ? <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#0f5b4e] ring-1 ring-[#0f5b4e]/15">Sélectionnée</span> : null}
+                      {active ? <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-saovia-primary ring-1 ring-saovia-primary/15">Sélectionnée</span> : null}
                     </div>
                     <h3 className="mt-5 text-xl font-semibold text-slate-950">{solution.name}</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{solution.description}</p>
@@ -189,32 +205,11 @@ export function HomePage() {
                 );
               })}
             </div>
-
-            <div id="modules" className="mt-6 overflow-hidden rounded-[32px] bg-[#f8faf8] p-5 shadow-[0_20px_60px_rgba(7,26,20,0.06)] ring-1 ring-black/5 sm:p-6 lg:p-8">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Modules</p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{activeSolution.name}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{activeSolution.description}</p>
-                </div>
-                <a href="#contact" className="text-sm font-semibold text-[#0f5b4e] hover:underline">
-                  Parler à l’équipe
-                </a>
-              </div>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {activeSolution.modules.map((module) => (
-                  <div key={module} className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-black/5">
-                    {module}
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </section>
 
         <section id="support" className="px-5 pb-10 sm:px-8 lg:px-12">
-          <div className="mx-auto max-w-[1360px] rounded-[32px] bg-[#0b271f] px-6 py-10 text-white shadow-[0_24px_70px_rgba(7,26,20,0.18)] sm:px-10 lg:px-12">
+          <div className="mx-auto max-w-[1360px] rounded-[32px] bg-saovia-secondary px-6 py-10 text-white shadow-[0_24px_70px_rgba(0,24,96,0.18)] sm:px-10 lg:px-12">
             <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/65">Support</p>
@@ -247,7 +242,7 @@ export function HomePage() {
           <div className="mx-auto max-w-[1360px] rounded-[32px] bg-white px-6 py-10 ring-1 ring-black/5 sm:px-10">
             <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#0f5b4e]">Tarifs</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-saovia-primary">Tarifs</p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
                   Une base claire pour démarrer sans friction
                 </h2>
@@ -262,7 +257,7 @@ export function HomePage() {
                   ["Modules", "Selon l’activité"],
                   ["Support", "Inclus"],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-[24px] bg-[#f8faf8] p-5 ring-1 ring-black/5">
+                  <div key={label} className="rounded-[24px] bg-saovia-primary-soft p-5 ring-1 ring-black/5">
                     <p className="text-sm text-slate-500">{label}</p>
                     <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
                   </div>
@@ -273,10 +268,10 @@ export function HomePage() {
         </section>
 
         <section id="contact" className="px-5 pb-16 sm:px-8 lg:px-12">
-          <div className="mx-auto max-w-[1360px] rounded-[32px] bg-[#f8faf8] px-6 py-10 ring-1 ring-black/5 sm:px-10">
+          <div className="mx-auto max-w-[1360px] rounded-[32px] bg-saovia-primary-soft px-6 py-10 ring-1 ring-black/5 sm:px-10">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#0f5b4e]">Contact</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-saovia-primary">Contact</p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Prêt à essayer SAOVIA gratuitement ?</h2>
                 <p className="mt-3 text-base leading-7 text-slate-600">
                   Lancez votre espace, testez les modules et validez l’adéquation avec votre activité en quelques minutes.
@@ -285,7 +280,7 @@ export function HomePage() {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
                   to="/essai-gratuit"
-                  className="inline-flex items-center justify-center rounded-2xl bg-[#0f5b4e] px-6 py-4 text-base font-semibold text-white shadow-[0_18px_40px_rgba(15,91,78,0.20)] transition-transform hover:-translate-y-0.5"
+                  className="inline-flex items-center justify-center rounded-2xl bg-saovia-primary px-6 py-4 text-base font-semibold text-white shadow-[0_18px_40px_rgba(43,98,239,0.20)] transition-transform transition-colors hover:-translate-y-0.5 hover:bg-saovia-primary-hover"
                 >
                   Essayer gratuitement
                 </Link>

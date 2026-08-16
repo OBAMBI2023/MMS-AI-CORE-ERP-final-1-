@@ -90,7 +90,7 @@ export function LoginCard({
                 <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-[#0F5BFF] accent-[#0F5BFF] focus:ring-blue-500/20" />
                 Se souvenir de moi
               </label>
-              <ShieldCheck className="h-[18px] w-[18px] text-emerald-500" aria-label="Connexion sécurisée" />
+              <ShieldCheck className="h-[18px] w-[18px] text-saovia-primary" aria-label="Connexion sécurisée" />
             </div>
             <Button type="submit" className="group mt-1 h-[58px] w-full rounded-2xl bg-gradient-to-r from-[#0F5BFF] to-[#3478FF] font-semibold text-white shadow-[0_12px_26px_rgba(15,91,255,0.26)] transition-all duration-300 hover:-translate-y-0.5 hover:from-[#0B4FDF] hover:to-[#2468ED] hover:shadow-[0_16px_32px_rgba(15,91,255,0.34)] active:translate-y-0" disabled={inputsDisabled}>
               {submitting ? (

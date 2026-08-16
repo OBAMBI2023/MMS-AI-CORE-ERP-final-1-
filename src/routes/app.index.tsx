@@ -10,7 +10,6 @@ import {
   Package,
   TrendingUp,
   Truck,
-  Wrench,
   FileText,
   Plus,
   UserPlus,
@@ -20,6 +19,7 @@ import {
   Settings,
   Bot,
   ShoppingBag,
+  PackagePlus,
   Receipt,
   Clock,
   LogIn,
@@ -80,8 +80,8 @@ type ActionColor = "blue" | "indigo" | "emerald" | "violet" | "amber" | "sky" | 
 const ACTION_COLOR_CLASSES: Record<ActionColor, string> = {
   blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   indigo: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-  emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  emerald: "bg-saovia-primary/10 text-saovia-primary",
+  violet: "bg-saovia-secondary/10 text-saovia-secondary",
   amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   sky: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
   rose: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
@@ -114,8 +114,8 @@ const ACTIVITY_ICON: Record<
   },
   fournisseur: {
     icon: Truck,
-    className: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-    textClassName: "text-violet-600 dark:text-violet-400",
+    className: "bg-saovia-secondary/10 text-saovia-secondary",
+    textClassName: "text-saovia-secondary",
   },
 };
 
@@ -155,7 +155,7 @@ function Dashboard() {
     ...(catalogSettings?.suppliers_enabled ? [{ title: "Nouveau fournisseur", icon: Building2, route: "/fournisseurs", color: "sky" as ActionColor }] : []),
     ...(catalogSettings?.purchases_enabled ? [{ title: "Nouvel achat", icon: ShoppingBag, route: "/achats", color: "amber" as ActionColor }] : []),
     { title: "Nouvelle dépense", icon: CreditCard, route: "/depenses", color: "rose" as ActionColor },
-    { title: catalogMode === "products" ? "Nouveau produit" : catalogMode === "services" ? "Nouveau service" : "Nouvel article", icon: Wrench, route: "/services", color: "violet" as ActionColor },
+    { title: catalogMode === "products" ? "Nouveau produit" : catalogMode === "services" ? "Nouveau service" : "Nouvel article", icon: PackagePlus, route: "/services", color: "violet" as ActionColor },
     { title: "Rapports", icon: BarChart3, route: "/rapports", color: "indigo" as ActionColor },
     { title: "Paramètres", icon: Settings, route: "/parametres", color: "slate" as ActionColor },
     // { title: "Assistant IA", icon: Bot, route: "/assistant" },
@@ -202,7 +202,7 @@ function Dashboard() {
         className="space-y-5 pb-4 sm:space-y-6"
       >
         {/* Welcome card */}
-        <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 p-6 shadow-lg shadow-indigo-500/20 sm:p-7 dark:shadow-indigo-950/50">
+        <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-saovia-primary via-blue-600 to-saovia-secondary p-6 shadow-lg shadow-saovia-primary/20 sm:p-7 dark:shadow-saovia-secondary/40">
           <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-14 right-16 h-32 w-32 rounded-full bg-white/10 blur-xl" />
           <Sparkles className="pointer-events-none absolute right-6 top-6 h-9 w-9 text-white/25 sm:h-10 sm:w-10" />

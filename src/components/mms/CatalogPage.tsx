@@ -707,9 +707,9 @@ export function CatalogPage() {
 
 const SECTION_TONE_CLASSES: Record<string, string> = {
   blue: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400",
-  green: "bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400",
+  green: "bg-saovia-primary-soft text-saovia-accent",
   orange: "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400",
-  violet: "bg-violet-50 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400",
+  violet: "bg-saovia-primary-soft text-saovia-secondary",
 };
 
 function SectionCard({
@@ -980,7 +980,7 @@ function CatalogItemDialog({
                     Prix de vente <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <DollarSign className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-green-600" />
+                    <DollarSign className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-saovia-accent" />
                     <Input
                       inputMode="decimal"
                       value={formatNumberInput(form.price)}
@@ -998,7 +998,7 @@ function CatalogItemDialog({
                   <label className="space-y-1.5">
                     <Label>Prix de revient</Label>
                     <div className="relative">
-                      <DollarSign className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-green-600" />
+                      <DollarSign className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-saovia-accent" />
                       <Input
                         inputMode="decimal"
                         value={formatNumberInput(form.cost_price)}

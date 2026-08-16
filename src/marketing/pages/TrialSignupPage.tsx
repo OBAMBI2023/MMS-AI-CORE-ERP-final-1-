@@ -206,9 +206,9 @@ export function TrialSignupPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#070B18] text-white">
-      {/* Header sombre premium (simplifié pour la page d'essai gratuit) */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#070B18]/95 backdrop-blur-xl">
+    <div className="relative min-h-screen overflow-x-hidden bg-white text-slate-950">
+      {/* Header clair premium (simplifié pour la page d'essai gratuit) */}
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
         <nav
           aria-label="Navigation principale"
           className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 lg:px-10"
@@ -218,10 +218,10 @@ export function TrialSignupPage() {
           </Link>
 
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-slate-300 sm:inline">Déjà un compte ?</span>
+            <span className="hidden text-sm text-slate-500 sm:inline">Déjà un compte ?</span>
             <Link
               to="/login"
-              className="inline-flex rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              className="inline-flex rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saovia-primary/40"
             >
               Se connecter
             </Link>
@@ -230,10 +230,10 @@ export function TrialSignupPage() {
       </header>
 
       <main className="relative">
-        {/* Halo bleu/violet */}
+        {/* Halo bleu SAOVIA (très léger sur fond blanc) */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-          <div className="absolute -top-32 left-1/2 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full bg-blue-600/25 blur-[130px]" />
-          <div className="absolute top-24 right-[-6rem] h-[26rem] w-[26rem] rounded-full bg-violet-600/20 blur-[120px]" />
+          <div className="absolute -top-32 left-1/2 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full bg-saovia-primary/10 blur-[130px]" />
+          <div className="absolute top-24 right-[-6rem] h-[26rem] w-[26rem] rounded-full bg-saovia-accent/10 blur-[120px]" />
         </div>
 
         {/* Hero */}
@@ -241,19 +241,19 @@ export function TrialSignupPage() {
           <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-14">
             {/* Colonne gauche : pitch + illustration + confiance */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold text-blue-200">
+              <span className="inline-flex items-center gap-2 rounded-full border border-saovia-primary-border bg-saovia-primary-soft px-4 py-1.5 text-xs font-semibold text-saovia-primary">
                 <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                 Essai gratuit 7 jours
               </span>
 
-              <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-[3.4rem]">
+              <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-950 sm:text-5xl lg:text-[3.4rem]">
                 Pilotez votre entreprise avec{" "}
-                <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
+                <span className="text-saovia-primary">
                   puissance et simplicité
                 </span>
               </h1>
 
-              <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
+              <p className="mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
                 Découvrez {PLATFORM_BRANDING.productName}, la plateforme tout-en-un qui centralise
                 ventes, stocks, finances et équipes. Testez toutes les fonctionnalités pendant 7
                 jours, sans engagement.
@@ -262,15 +262,15 @@ export function TrialSignupPage() {
               {/* Illustration : aperçu tableau de bord ERP */}
               <div className="relative mt-10 hidden sm:block">
                 <div
-                  className="absolute -inset-6 rounded-[32px] bg-gradient-to-br from-blue-500/20 via-indigo-500/10 to-violet-500/20 blur-2xl"
+                  className="absolute -inset-6 rounded-[32px] bg-gradient-to-br from-saovia-primary/10 via-saovia-accent/5 to-saovia-primary/10 blur-2xl"
                   aria-hidden="true"
                 />
-                <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_60px_-20px_rgba(2,6,23,0.7)] backdrop-blur-xl">
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_20px_60px_-20px_rgba(0,24,96,0.18)]">
                   <div className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
                     <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
-                    <span className="ml-3 h-2 w-24 rounded-full bg-white/10" />
+                    <span className="ml-3 h-2 w-24 rounded-full bg-slate-100" />
                   </div>
                   <div className="mt-5 grid grid-cols-3 gap-3">
                     {[
@@ -280,20 +280,20 @@ export function TrialSignupPage() {
                     ].map((stat) => (
                       <div
                         key={stat.label}
-                        className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                        className="rounded-xl border border-slate-200 bg-saovia-primary-soft p-3"
                       >
-                        <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500">
                           {stat.label}
                         </p>
-                        <p className="mt-1 text-base font-bold text-white">{stat.value}</p>
+                        <p className="mt-1 text-base font-bold text-slate-950">{stat.value}</p>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-4 flex h-24 items-end gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="mt-4 flex h-24 items-end gap-2 rounded-xl border border-slate-200 bg-saovia-primary-soft p-4">
                     {[40, 65, 50, 80, 60, 95, 70].map((height, index) => (
                       <div
                         key={index}
-                        className="flex-1 rounded-t-md bg-gradient-to-t from-blue-500/70 to-violet-400/70"
+                        className="flex-1 rounded-t-md bg-gradient-to-t from-saovia-primary to-saovia-accent"
                         style={{ height: `${height}%` }}
                       />
                     ))}
@@ -306,19 +306,19 @@ export function TrialSignupPage() {
                 {trustBadges.map(({ icon: Icon, label }) => (
                   <div
                     key={label}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-4 text-center backdrop-blur-xl transition-colors hover:border-blue-400/30"
+                    className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-4 text-center shadow-sm transition-colors hover:border-saovia-primary/30"
                   >
-                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-blue-500/20 to-violet-500/20 text-blue-300">
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-saovia-primary-soft text-saovia-primary">
                       <Icon className="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <p className="text-[11px] font-semibold leading-tight text-slate-200">
+                    <p className="text-[11px] font-semibold leading-tight text-slate-700">
                       {label}
                     </p>
                   </div>
                 ))}
               </div>
 
-              <p className="mt-4 text-center text-[13px] text-slate-300 sm:text-left">
+              <p className="mt-4 text-center text-[13px] text-slate-500 sm:text-left">
                 Compatible avec toutes les devises (FCFA, EUR, USD, GBP, etc.). SAOVIA adapte
                 automatiquement la devise selon la configuration de votre entreprise.
               </p>
@@ -327,7 +327,7 @@ export function TrialSignupPage() {
             {/* Carte blanche premium avec le formulaire */}
             <div
               id="formulaire-essai"
-              className="scroll-mt-24 animate-in fade-in slide-in-from-bottom-4 rounded-3xl border border-white/10 bg-white p-6 text-slate-900 shadow-[0_25px_70px_-20px_rgba(2,6,23,0.65)] duration-700 sm:p-8 lg:p-9"
+              className="scroll-mt-24 animate-in fade-in slide-in-from-bottom-4 rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_25px_70px_-20px_rgba(0,24,96,0.20)] duration-700 sm:p-8 lg:p-9"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -336,7 +336,7 @@ export function TrialSignupPage() {
                     Remplissez les informations ci-dessous pour commencer.
                   </p>
                 </div>
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-saovia-primary-soft text-saovia-primary">
                   <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                 </span>
               </div>
@@ -527,7 +527,7 @@ export function TrialSignupPage() {
                   type="submit"
                   disabled={busy || !turnstileToken}
                   aria-label="Créer mon espace gratuitement"
-                  className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-violet-600/30 active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                  className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-saovia-primary text-sm font-bold text-white shadow-lg shadow-saovia-primary/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-saovia-primary-hover hover:shadow-xl active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saovia-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                 >
                   {busy ? (
                     <>
@@ -564,10 +564,10 @@ export function TrialSignupPage() {
         {/* Solution complète */}
         <section className="relative mx-auto max-w-6xl px-5 py-16 sm:py-20 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
               Une solution complète pour votre entreprise
             </h2>
-            <p className="mt-4 text-slate-300">
+            <p className="mt-4 text-slate-600">
               Tous les modules dont vous avez besoin, réunis dans une seule plateforme intelligente.
             </p>
           </div>
@@ -576,20 +576,20 @@ export function TrialSignupPage() {
             {solutionCards.map(({ icon: Icon, title, description }) => (
               <div
                 key={title}
-                className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition-colors hover:border-blue-400/30"
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-colors hover:border-saovia-primary/30"
               >
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 text-blue-300">
+                <span className="grid h-12 w-12 place-items-center rounded-xl bg-saovia-primary-soft text-saovia-primary">
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </span>
-                <h3 className="mt-4 text-base font-semibold text-white">{title}</h3>
-                <p className="mt-2 text-sm text-slate-400">{description}</p>
+                <h3 className="mt-4 text-base font-semibold text-slate-950">{title}</h3>
+                <p className="mt-2 text-sm text-slate-500">{description}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* Bande de confiance (noms fictifs) */}
-        <section className="border-y border-white/10 bg-white/[0.02] py-10">
+        <section className="border-y border-slate-200 bg-slate-50 py-10">
           <div className="mx-auto max-w-6xl px-5 lg:px-8">
             <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               Elles nous font confiance
@@ -598,7 +598,7 @@ export function TrialSignupPage() {
               {trustCompanies.map((name) => (
                 <span
                   key={name}
-                  className="text-lg font-bold tracking-tight text-slate-500/70 transition-colors hover:text-slate-300"
+                  className="text-lg font-bold tracking-tight text-slate-400 transition-colors hover:text-slate-600"
                 >
                   {name}
                 </span>
@@ -609,7 +609,7 @@ export function TrialSignupPage() {
 
         {/* Bandeau final */}
         <section className="px-5 py-16 sm:py-20 lg:px-8">
-          <div className="mx-auto max-w-5xl overflow-hidden rounded-[2rem] bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-6 py-12 text-center shadow-2xl shadow-blue-900/40 sm:px-12">
+          <div className="mx-auto max-w-5xl overflow-hidden rounded-[2rem] bg-gradient-to-r from-saovia-primary to-saovia-secondary px-6 py-12 text-center shadow-2xl shadow-saovia-primary/30 sm:px-12">
             <h2 className="text-2xl font-extrabold text-white sm:text-3xl">
               Prêt à transformer la gestion de votre entreprise ?
             </h2>
@@ -630,7 +630,7 @@ export function TrialSignupPage() {
             <button
               type="button"
               onClick={scrollToForm}
-              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-bold text-blue-700 shadow-lg transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-bold text-saovia-primary shadow-lg transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-saovia-primary motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
               Créer mon espace gratuitement

@@ -419,7 +419,7 @@ export function HotelClientsPage() {
               <FileText className="size-4" /> Exporter PDF
             </Button>
             {canCreate ? (
-              <Button onClick={openCreate} className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]">
+              <Button onClick={openCreate} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="size-4" />
                 Ajouter un client
               </Button>
@@ -427,7 +427,7 @@ export function HotelClientsPage() {
           </div>
           <div className="flex items-center gap-2 sm:hidden">
             {canCreate ? (
-              <Button size="icon" onClick={openCreate} aria-label="Ajouter un client" className="rounded-xl bg-[#B89236] text-white shadow-lg shadow-amber-950/10 hover:bg-[#9D7927]">
+              <Button size="icon" onClick={openCreate} aria-label="Ajouter un client" className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="size-4" />
               </Button>
             ) : null}
@@ -458,11 +458,11 @@ export function HotelClientsPage() {
         ).map(([label, value, Icon, hideOnMobile]) => (
           <div
             key={label}
-            className={`group items-center gap-3 rounded-2xl border border-[#D8C99E]/40 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
+            className={`group items-center gap-3 rounded-2xl border border-primary/25 bg-card px-4 py-3.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
               hideOnMobile ? "hidden sm:flex" : "flex"
             }`}
           >
-            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#102A43] text-[#E2C66E] transition-transform duration-300 group-hover:scale-105">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#102A43] text-hotel-petrol-accent transition-transform duration-300 group-hover:scale-105">
               <Icon className="size-4" />
             </div>
             <div className="min-w-0">
@@ -482,7 +482,7 @@ export function HotelClientsPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Nom, téléphone, email ou entreprise…"
-              className="h-11 w-full rounded-xl border bg-background pl-10 pr-9 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-9 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
             {query && (
               <button
@@ -505,7 +505,7 @@ export function HotelClientsPage() {
           >
             <SlidersHorizontal className="size-4" />
             {hasActiveMobileFilters && (
-              <span className="absolute right-2 top-2 size-2 rounded-full bg-[#B89236]" />
+              <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
             )}
           </Button>
         </div>
@@ -518,7 +518,7 @@ export function HotelClientsPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Nom, téléphone, email ou entreprise…"
-              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-[#B89236] focus:ring-2 focus:ring-[#B89236]/15"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
           </div>
           <FilterSelect
@@ -564,7 +564,7 @@ export function HotelClientsPage() {
                     onClick={() => setType(key)}
                     className={`h-11 rounded-xl px-3.5 text-sm font-medium ring-1 transition-colors ${
                       type === key
-                        ? "bg-[#B89236] text-white ring-[#B89236]"
+                        ? "bg-primary text-primary-foreground ring-primary"
                         : "bg-background text-foreground ring-border hover:bg-muted"
                     }`}
                   >
@@ -585,12 +585,12 @@ export function HotelClientsPage() {
                     onClick={() => setSortBy(option.key)}
                     className={`flex h-11 items-center justify-between rounded-xl border px-3.5 text-sm font-medium transition-colors ${
                       sortBy === option.key
-                        ? "border-[#B89236] bg-[#B89236]/10 text-[#9D7927]"
+                        ? "border-primary bg-primary/10 text-primary"
                         : "border-border text-foreground hover:bg-muted"
                     }`}
                   >
                     {option.label}
-                    {sortBy === option.key && <span className="size-2 rounded-full bg-[#B89236]" />}
+                    {sortBy === option.key && <span className="size-2 rounded-full bg-primary" />}
                   </button>
                 ))}
               </div>
@@ -603,7 +603,7 @@ export function HotelClientsPage() {
             <Button
               type="button"
               onClick={() => setFilterSheetOpen(false)}
-              className="flex-1 rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]"
+              className="flex-1 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Voir {clients.length} client{clients.length > 1 ? "s" : ""}
             </Button>
@@ -614,7 +614,7 @@ export function HotelClientsPage() {
       {guestsQuery.isLoading ? (
         <>
           <div className="hidden min-h-72 place-items-center md:grid">
-            <Loader2 className="size-7 animate-spin text-[#B89236]" />
+            <Loader2 className="size-7 animate-spin text-primary" />
           </div>
           <div className="mt-4 space-y-3 md:hidden">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -841,7 +841,7 @@ function ClientActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" className="size-11 text-[#102A43] hover:bg-[#B89236]/10 hover:text-[#9D7927] dark:text-[#E2C66E] md:size-8" aria-label="Plus d’actions">
+        <Button size="icon" variant="ghost" className="size-11 text-[#102A43] hover:bg-primary/10 hover:text-primary dark:text-hotel-petrol-accent md:size-8" aria-label="Plus d’actions">
           <MoreVertical className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -969,7 +969,7 @@ function EmptyState({ filtered, canCreate, onCreate }: { filtered: boolean; canC
   return (
     <div className="mt-6 grid min-h-72 place-items-center rounded-[24px] border border-dashed bg-muted/20 p-8 text-center">
       <div>
-        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#B89236]/10 text-[#9D7927]">
+        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary">
           <Users className="size-7" />
         </div>
         <h3 className="mt-4 font-semibold">{filtered ? "Aucun client trouvé" : "Aucun client enregistré"}</h3>
@@ -1254,7 +1254,7 @@ function ClientFormDialog({
             <Button
               type="submit"
               disabled={save.isPending}
-              className="h-11 w-full rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927] sm:w-auto"
+              className="h-11 w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
             >
               {save.isPending && <Loader2 className="size-4 animate-spin" />}
               {isEdit ? "Mettre à jour" : "Enregistrer le client"}
@@ -1412,7 +1412,7 @@ function ClientDetails({
             </Button>
           )}
           {onEdit && (
-            <Button onClick={onEdit} className="rounded-xl bg-[#B89236] text-white hover:bg-[#9D7927]">
+            <Button onClick={onEdit} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
               <Pencil className="size-4" />
               Modifier
             </Button>

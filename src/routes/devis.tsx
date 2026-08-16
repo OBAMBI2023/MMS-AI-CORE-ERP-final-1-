@@ -498,7 +498,7 @@ function DevisCard({
             label: "Modifier",
             onClick: onEdit,
             colorClass:
-              "text-violet-600 hover:bg-violet-50 active:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-500/10",
+              "text-saovia-secondary hover:bg-saovia-primary-soft active:bg-saovia-primary-border/40",
           },
         ]),
     // Masqué (pas seulement désactivé) dès qu'un règlement existe : un devis
@@ -522,11 +522,11 @@ function DevisCard({
   return (
     <>
       <ResourceCard
-        leading={{ variant: "icon", icon: FileText, className: "bg-violet-500" }}
+        leading={{ variant: "icon", icon: FileText, className: "bg-saovia-secondary" }}
         title={title.toUpperCase()}
         badge={{
           label: row.number,
-          className: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+          className: "bg-saovia-primary-soft text-saovia-secondary",
         }}
         headerInfo={{ value: formatCurrency(Number(row.total)), className: "text-primary" }}
         details={details}
@@ -545,7 +545,7 @@ function DevisCard({
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500 text-white">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-saovia-secondary text-white">
                 <FileText className="h-5 w-5" />
               </div>
               <div className="min-w-0">

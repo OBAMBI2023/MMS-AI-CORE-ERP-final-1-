@@ -1360,7 +1360,7 @@ function RapportsPage() {
                           %
                         </strong>
                       </div>
-                      <div className="rounded-xl bg-green-50 p-3 text-green-700">
+                      <div className="rounded-xl bg-saovia-primary-soft p-3 text-saovia-secondary">
                         Services{" "}
                         <strong>
                           {((report.target.serviceRevenue / report.target.totalRevenue) * 100).toFixed(
@@ -1564,7 +1564,7 @@ function PerformanceTable({
                 <td className="py-3 text-right">{row.quantity.toLocaleString("fr-FR")}</td>
                 <td className="py-3 text-right">{formatCurrency(row.revenue)}</td>
                 <td
-                  className={`py-3 text-right font-semibold ${type === "product" ? "text-blue-600" : "text-green-600"}`}
+                  className={`py-3 text-right font-semibold ${type === "product" ? "text-blue-600" : "text-saovia-secondary"}`}
                 >
                   {formatCurrency(row.margin)}
                 </td>
@@ -1591,7 +1591,7 @@ function TypeBadge({ type }: { type: string }) {
     type === "Produit"
       ? "bg-blue-50 text-blue-700"
       : type === "Service"
-        ? "bg-green-50 text-green-700"
+        ? "bg-saovia-primary-soft text-saovia-secondary"
         : "bg-slate-100 text-slate-700";
   return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${style}`}>{type}</span>;
 }

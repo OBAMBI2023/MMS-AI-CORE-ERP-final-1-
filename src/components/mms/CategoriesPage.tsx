@@ -189,9 +189,9 @@ export function CategoriesPage() {
           </TabsTrigger>}
           {catalogTypeEnabled(catalogSettingsQuery.data, "service") && <TabsTrigger
             value="service"
-            className="h-auto justify-start gap-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md data-[state=active]:border-violet-500 data-[state=active]:bg-violet-50 data-[state=active]:text-violet-950 data-[state=active]:shadow-md dark:border-violet-900/60 dark:from-violet-950/50 dark:to-background dark:data-[state=active]:border-violet-500"
+            className="h-auto justify-start gap-4 rounded-2xl border border-saovia-accent/30 bg-gradient-to-br from-saovia-accent/10 to-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-saovia-accent/50 hover:shadow-md data-[state=active]:border-saovia-accent data-[state=active]:bg-saovia-accent/10 data-[state=active]:text-saovia-secondary data-[state=active]:shadow-md dark:border-saovia-accent/40 dark:from-saovia-accent/10 dark:to-background dark:data-[state=active]:border-saovia-accent"
           >
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-violet-600 text-white shadow-sm shadow-violet-500/30">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-saovia-accent text-white shadow-sm shadow-saovia-accent/30">
               <Wrench className="size-5" />
             </span>
             <span className="min-w-0">
@@ -200,7 +200,7 @@ export function CategoriesPage() {
                 Classement des prestations
               </span>
             </span>
-            <span className="ml-auto rounded-full bg-violet-100 px-2.5 py-1 text-sm font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+            <span className="ml-auto rounded-full bg-saovia-accent/15 px-2.5 py-1 text-sm font-semibold text-saovia-secondary dark:bg-saovia-accent/20 dark:text-saovia-accent">
               {categoryCounts.service}
             </span>
           </TabsTrigger>}
@@ -236,7 +236,7 @@ export function CategoriesPage() {
               className={
                 activeType === "product"
                   ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-violet-600 hover:bg-violet-700"
+                  : "bg-saovia-accent hover:brightness-90"
               }
             >
               <Plus className="size-4" />

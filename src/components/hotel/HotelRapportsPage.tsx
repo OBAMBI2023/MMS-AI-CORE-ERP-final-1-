@@ -777,38 +777,24 @@ export function HotelRapportsPage() {
               />
             </div>
             {paymentsInPeriod.length ? (
-              <>
-                <div className="mt-4 h-56 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={revenueBuckets}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} tick={{ fontSize: 11 }} width={64} />
-                      <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                      <Line type="monotone" dataKey="current" name="Période actuelle" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="previous" name="Période précédente" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 4" dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-4 max-h-56 overflow-y-auto rounded-xl border">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-muted/60 text-xs text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2 text-left">Période</th>
-                        <th className="px-3 py-2 text-right">Montant encaissé</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {revenueBuckets.map((b) => (
-                        <tr key={b.label}>
-                          <td className="px-3 py-2">{b.label}</td>
-                          <td className="px-3 py-2 text-right font-medium">{formatCurrency(b.current)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+              <div className="mt-4 h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={revenueBuckets} margin={{ top: 4, right: 12, bottom: 4, left: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11 }}
+                      tickMargin={8}
+                      interval="preserveStartEnd"
+                      minTickGap={24}
+                    />
+                    <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} tick={{ fontSize: 11 }} width={64} />
+                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Line type="monotone" dataKey="current" name="Période actuelle" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="previous" name="Période précédente" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <EmptyNote />
             )}
@@ -879,25 +865,25 @@ export function HotelRapportsPage() {
             <div className="mt-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Détail par réservation</p>
               {paymentDetails.length ? (
-                <div className="max-h-72 overflow-y-auto rounded-xl border">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-muted/60 text-xs text-muted-foreground">
+                <div className="max-h-72 overflow-x-auto overflow-y-auto rounded-xl border">
+                  <table className="w-full min-w-max border-collapse text-sm">
+                    <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground">
                       <tr>
-                        <th className="px-3 py-2 text-left">Date</th>
-                        <th className="px-3 py-2 text-left">Client</th>
-                        <th className="px-3 py-2 text-left">Chambre</th>
-                        <th className="px-3 py-2 text-left">Mode</th>
-                        <th className="px-3 py-2 text-right">Montant</th>
+                        <th className="px-3 py-2.5 text-left align-middle">Date</th>
+                        <th className="px-3 py-2.5 text-left align-middle">Client</th>
+                        <th className="px-3 py-2.5 text-left align-middle">Chambre</th>
+                        <th className="px-3 py-2.5 text-left align-middle">Mode</th>
+                        <th className="px-3 py-2.5 text-right align-middle">Montant</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {paymentDetails.map((p) => (
                         <tr key={p.id}>
-                          <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatDateTime(p.date)}</td>
-                          <td className="px-3 py-2">{p.guestName}</td>
-                          <td className="px-3 py-2">{p.roomNumber}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{p.method || "—"}</td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          <td className="whitespace-nowrap px-3 py-2.5 align-middle text-muted-foreground">{formatDateTime(p.date)}</td>
+                          <td className="px-3 py-2.5 align-middle">{p.guestName}</td>
+                          <td className="px-3 py-2.5 align-middle">{p.roomNumber}</td>
+                          <td className="px-3 py-2.5 align-middle text-muted-foreground">{p.method || "—"}</td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right align-middle font-semibold text-emerald-600 dark:text-emerald-400">
                             {formatCurrency(p.amount)}
                           </td>
                         </tr>

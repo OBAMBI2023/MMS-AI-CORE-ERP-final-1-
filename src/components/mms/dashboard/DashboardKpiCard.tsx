@@ -24,9 +24,13 @@ const accentMap: Record<KpiAccent, { icon: string; glow: string; stroke: string 
     stroke: "#f59e0b",
   },
   violet: {
-    icon: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-    glow: "from-violet-500/15",
-    stroke: "#8b5cf6",
+    // Historically Tailwind violet; rotated to SAOVIA navy as part of the
+    // 2026-08 brand alignment (violet is not present in the logo). Kept the
+    // "violet" key so every `accent="violet"` call site across ERP/HOTEL
+    // stays valid without touching each one individually.
+    icon: "bg-saovia-primary-soft text-saovia-secondary",
+    glow: "from-saovia-secondary/15",
+    stroke: "#001860",
   },
   sky: {
     icon: "bg-sky-500/10 text-sky-600 dark:text-sky-400",

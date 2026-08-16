@@ -1542,7 +1542,7 @@ function Planning({ rows, guests, rooms }: any) {
               <p className="text-sm text-slate-500">
                 Chambre {room?.number ?? "—"} · jusqu’au {formatDate(r.check_out)}
               </p>
-              <div className="mt-3 h-1.5 rounded-full bg-[#C9A227]" />
+              <div className="mt-3 h-1.5 rounded-full bg-primary" />
             </article>
           );
         })}

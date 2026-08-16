@@ -196,7 +196,7 @@ export function TenantModuleControlPanel({
             >
               {tenant ? (
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-violet-500/15 to-blue-500/15 text-xs font-semibold text-violet-600 dark:text-violet-300">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-saovia-secondary/15 to-saovia-primary/15 text-xs font-semibold text-saovia-primary">
                     {tenant.name.charAt(0).toLocaleUpperCase("fr")}
                   </span>
                   <span className="truncate">{tenant.name}</span>
