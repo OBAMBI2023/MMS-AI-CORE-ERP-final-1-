@@ -16,6 +16,7 @@ import { Route as SupportRouteImport } from './routes/support'
 import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as ServicesRouteImport } from './routes/services'
+import { Route as RestaurantRouteImport } from './routes/restaurant'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RapportsRouteImport } from './routes/rapports'
 import { Route as PreviewAchatsRouteImport } from './routes/preview-achats'
@@ -99,6 +100,11 @@ const StockRoute = StockRouteImport.update({
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RestaurantRoute = RestaurantRouteImport.update({
+  id: '/restaurant',
+  path: '/restaurant',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -370,6 +376,7 @@ export interface FileRoutesByFullPath {
   '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/restaurant': typeof RestaurantRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -428,6 +435,7 @@ export interface FileRoutesByTo {
   '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/restaurant': typeof RestaurantRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -487,6 +495,7 @@ export interface FileRoutesById {
   '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/restaurant': typeof RestaurantRoute
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -547,6 +556,7 @@ export interface FileRouteTypes {
     | '/preview-achats'
     | '/rapports'
     | '/reset-password'
+    | '/restaurant'
     | '/services'
     | '/stock'
     | '/super-admin'
@@ -605,6 +615,7 @@ export interface FileRouteTypes {
     | '/preview-achats'
     | '/rapports'
     | '/reset-password'
+    | '/restaurant'
     | '/services'
     | '/stock'
     | '/super-admin'
@@ -663,6 +674,7 @@ export interface FileRouteTypes {
     | '/preview-achats'
     | '/rapports'
     | '/reset-password'
+    | '/restaurant'
     | '/services'
     | '/stock'
     | '/super-admin'
@@ -722,6 +734,7 @@ export interface RootRouteChildren {
   PreviewAchatsRoute: typeof PreviewAchatsRoute
   RapportsRoute: typeof RapportsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  RestaurantRoute: typeof RestaurantRoute
   ServicesRoute: typeof ServicesRoute
   StockRoute: typeof StockRoute
   SuperAdminRoute: typeof SuperAdminRouteWithChildren
@@ -802,6 +815,13 @@ declare module '@tanstack/react-router' {
       path: '/services'
       fullPath: '/services'
       preLoaderRoute: typeof ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/restaurant': {
+      id: '/restaurant'
+      path: '/restaurant'
+      fullPath: '/restaurant'
+      preLoaderRoute: typeof RestaurantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -1193,6 +1213,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewAchatsRoute: PreviewAchatsRoute,
   RapportsRoute: RapportsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  RestaurantRoute: RestaurantRoute,
   ServicesRoute: ServicesRoute,
   StockRoute: StockRoute,
   SuperAdminRoute: SuperAdminRouteWithChildren,
