@@ -48,6 +48,7 @@ import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.i
 import { Route as SuperAdminAnalyticsRouteImport } from './routes/super-admin.analytics'
 import { Route as SettingsUsersRouteImport } from './routes/settings.users'
 import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
+import { Route as RestaurantLoginRouteImport } from './routes/restaurant.login'
 import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
 import { Route as HotelStocksRouteImport } from './routes/hotel.stocks'
 import { Route as HotelRestaurantBarRouteImport } from './routes/hotel.restaurant-bar'
@@ -262,6 +263,11 @@ const SettingsCatalogueRoute = SettingsCatalogueRouteImport.update({
   path: '/settings/catalogue',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RestaurantLoginRoute = RestaurantLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => RestaurantRoute,
+} as any)
 const LoginSlugRoute = LoginSlugRouteImport.update({
   id: '/login_/$slug',
   path: '/login/$slug',
@@ -376,7 +382,7 @@ export interface FileRoutesByFullPath {
   '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/restaurant': typeof RestaurantRoute
+  '/restaurant': typeof RestaurantRouteWithChildren
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -402,6 +408,7 @@ export interface FileRoutesByFullPath {
   '/hotel/restaurant-bar': typeof HotelRestaurantBarRoute
   '/hotel/stocks': typeof HotelStocksRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/restaurant/login': typeof RestaurantLoginRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
@@ -435,7 +442,7 @@ export interface FileRoutesByTo {
   '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/restaurant': typeof RestaurantRoute
+  '/restaurant': typeof RestaurantRouteWithChildren
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -461,6 +468,7 @@ export interface FileRoutesByTo {
   '/hotel/restaurant-bar': typeof HotelRestaurantBarRoute
   '/hotel/stocks': typeof HotelStocksRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/restaurant/login': typeof RestaurantLoginRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
@@ -495,7 +503,7 @@ export interface FileRoutesById {
   '/preview-achats': typeof PreviewAchatsRoute
   '/rapports': typeof RapportsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/restaurant': typeof RestaurantRoute
+  '/restaurant': typeof RestaurantRouteWithChildren
   '/services': typeof ServicesRoute
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
@@ -521,6 +529,7 @@ export interface FileRoutesById {
   '/hotel/restaurant-bar': typeof HotelRestaurantBarRoute
   '/hotel/stocks': typeof HotelStocksRoute
   '/login_/$slug': typeof LoginSlugRoute
+  '/restaurant/login': typeof RestaurantLoginRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
@@ -582,6 +591,7 @@ export interface FileRouteTypes {
     | '/hotel/restaurant-bar'
     | '/hotel/stocks'
     | '/login/$slug'
+    | '/restaurant/login'
     | '/settings/catalogue'
     | '/settings/users'
     | '/super-admin/analytics'
@@ -641,6 +651,7 @@ export interface FileRouteTypes {
     | '/hotel/restaurant-bar'
     | '/hotel/stocks'
     | '/login/$slug'
+    | '/restaurant/login'
     | '/settings/catalogue'
     | '/settings/users'
     | '/super-admin/analytics'
@@ -700,6 +711,7 @@ export interface FileRouteTypes {
     | '/hotel/restaurant-bar'
     | '/hotel/stocks'
     | '/login_/$slug'
+    | '/restaurant/login'
     | '/settings/catalogue'
     | '/settings/users'
     | '/super-admin/analytics'
@@ -734,7 +746,7 @@ export interface RootRouteChildren {
   PreviewAchatsRoute: typeof PreviewAchatsRoute
   RapportsRoute: typeof RapportsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  RestaurantRoute: typeof RestaurantRoute
+  RestaurantRoute: typeof RestaurantRouteWithChildren
   ServicesRoute: typeof ServicesRoute
   StockRoute: typeof StockRoute
   SuperAdminRoute: typeof SuperAdminRouteWithChildren
@@ -1041,6 +1053,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsCatalogueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/restaurant/login': {
+      id: '/restaurant/login'
+      path: '/login'
+      fullPath: '/restaurant/login'
+      preLoaderRoute: typeof RestaurantLoginRouteImport
+      parentRoute: typeof RestaurantRoute
+    }
     '/login_/$slug': {
       id: '/login_/$slug'
       path: '/login/$slug'
@@ -1170,6 +1189,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface RestaurantRouteChildren {
+  RestaurantLoginRoute: typeof RestaurantLoginRoute
+}
+
+const RestaurantRouteChildren: RestaurantRouteChildren = {
+  RestaurantLoginRoute: RestaurantLoginRoute,
+}
+
+const RestaurantRouteWithChildren = RestaurantRoute._addFileChildren(
+  RestaurantRouteChildren,
+)
+
 interface SuperAdminRouteChildren {
   SuperAdminAnalyticsRoute: typeof SuperAdminAnalyticsRoute
   SuperAdminIaPlatformRoute: typeof SuperAdminIaPlatformRoute
@@ -1213,7 +1244,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewAchatsRoute: PreviewAchatsRoute,
   RapportsRoute: RapportsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  RestaurantRoute: RestaurantRoute,
+  RestaurantRoute: RestaurantRouteWithChildren,
   ServicesRoute: ServicesRoute,
   StockRoute: StockRoute,
   SuperAdminRoute: SuperAdminRouteWithChildren,

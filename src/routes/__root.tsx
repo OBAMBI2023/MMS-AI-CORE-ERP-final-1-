@@ -71,6 +71,15 @@ function isHotelRoute(pathname: string) {
   return pathname === "/hotel" || pathname.startsWith("/hotel/");
 }
 
+// Le namespace Restaurant a son propre système d'authentification
+// (restaurantSupabase / RestaurantProtectedRoute) et ne doit jamais dépendre
+// d'une session ERP/Hôtel : le guard global ci-dessous le laisse passer
+// entièrement, y compris les futures sous-routes (/restaurant/commandes,
+// /restaurant/menus, ...).
+function isRestaurantRoute(pathname: string) {
+  return pathname === "/restaurant" || pathname.startsWith("/restaurant/");
+}
+
 const publicRoutes = new Set([
   "/",
   "/fonctionnalites",
@@ -174,7 +183,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       session: !!session,
     });
 
-    if (isPublicRoute(location.pathname)) {
+    if (isPublicRoute(location.pathname) || isRestaurantRoute(location.pathname)) {
       return;
     }
 
@@ -439,6 +448,9 @@ function RootComponent() {
   const isPublicArea = useLocation({
     select: (location) => isPublicRoute(location.pathname),
   });
+  const isRestaurantArea = useLocation({
+    select: (location) => isRestaurantRoute(location.pathname),
+  });
 
   useEffect(() => {
     initializeAnalytics();
@@ -520,7 +532,7 @@ function RootComponent() {
       <PwaUpdatePrompt />
       <ThemeProvider>
         <PosthogRootProvider>
-          {isPlatformArea || isPublicArea ? (
+          {isPlatformArea || isPublicArea || isRestaurantArea ? (
             <>
               <DynamicFavicon platform />
               <DocumentTitleManager />

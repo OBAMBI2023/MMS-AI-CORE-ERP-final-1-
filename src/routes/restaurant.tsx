@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { RestaurantApp } from "@/components/restaurant/RestaurantApp";
 import { restaurantSupabase } from "@/integrations/restaurant/restaurant-supabase-client";
@@ -11,6 +11,16 @@ export const Route = createFileRoute("/restaurant")({
 });
 
 function RestaurantRoute() {
+  const location = useLocation();
+
+  if (location.pathname === "/restaurant") {
+    return <RestaurantProtectedRoute />;
+  }
+
+  return <Outlet />;
+}
+
+export function RestaurantProtectedRoute() {
   const [email, setEmail] = useState<string | null>(null);
   const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,7 +39,7 @@ function RestaurantRoute() {
         console.error("restaurant route redirecting to login", {
           reason: "missing restaurant session",
         });
-        window.location.replace("/login");
+        window.location.replace("/restaurant/login");
         return;
       }
 
@@ -38,7 +48,7 @@ function RestaurantRoute() {
         console.error("restaurant route redirecting to login", {
           reason: userError?.message ?? "missing restaurant user",
         });
-        window.location.replace("/login");
+        window.location.replace("/restaurant/login");
         return;
       }
 
@@ -58,7 +68,7 @@ function RestaurantRoute() {
         console.error("restaurant route redirecting to login", {
           reason: membershipError?.message ?? "missing active restaurant membership",
         });
-        window.location.replace("/login");
+        window.location.replace("/restaurant/login");
         return;
       }
 
@@ -87,7 +97,7 @@ function RestaurantRoute() {
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-saovia-primary">Restaurant</p>
           <p className="mt-3 text-slate-600">Chargement de votre espace Restaurant...</p>
           <Link to="/essai-gratuit" className="mt-4 inline-flex text-sm font-semibold text-saovia-primary">
-            Retour à l’essai
+            Retour à l'essai
           </Link>
         </div>
       </main>
