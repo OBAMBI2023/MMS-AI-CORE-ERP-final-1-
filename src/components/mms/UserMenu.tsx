@@ -66,6 +66,12 @@ export function UserMenu() {
         roles: { name: string } | null;
       };
     },
+    // Identity/name/avatar rarely change mid-session; avoid refetching this
+    // on every navigation (this query is also duplicated by design — this
+    // component renders twice, desktop + mobile header — React Query already
+    // dedupes concurrent identical-key requests, staleTime avoids repeat
+    // ones across navigations too).
+    staleTime: 60_000,
   });
 
   const handleSignOut = async () => {

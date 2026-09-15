@@ -28,6 +28,9 @@ export function useTenantModules() {
       );
     },
     enabled: !loading && Boolean(tenantId),
-    staleTime: 30_000,
+    // Module activation changes only via an explicit admin action, never
+    // during normal navigation; 30s was already set but still triggered a
+    // refetch on almost every module switch during manual testing.
+    staleTime: 60_000,
   });
 }

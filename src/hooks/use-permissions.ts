@@ -48,5 +48,9 @@ export function usePermissions() {
       };
     },
     enabled: !loading && Boolean(tenantId),
+    // Role/permission assignments rarely change mid-session; avoid
+    // refetching on every navigation while still catching a role change
+    // within a minute (e.g. after an admin edits it in another tab).
+    staleTime: 60_000,
   });
 }

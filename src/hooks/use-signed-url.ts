@@ -1,38 +1,36 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-type SignedUrlState = {
-  path: string | null;
-  url: string | null;
-};
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+// Signed URLs stay valid 1h server-side. Re-signing a few minutes early
+// (rather than at the exact expiry) keeps every consumer safely inside the
+// URL's real validity window while still deduplicating the identical
+// (bucket, path) request that several components (sidebar logo, mobile
+// sidebar logo, avatar in desktop + mobile UserMenu, ...) previously issued
+// independently on every mount.
+const SIGNED_URL_STALE_TIME = 55 * 60 * 1000;
 
 export function useSignedUrlState(
   path: string | null,
   bucket: string = "company-assets",
   refreshKey: number = 0,
 ) {
-  const [state, setState] = useState<SignedUrlState>({ path: null, url: null });
-
-  useEffect(() => {
-    let alive = true;
-    if (!path) {
-      setState({ path: null, url: null });
-      return;
-    }
-    supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 60)
-      .then(({ data }) => {
-        if (alive) setState({ path, url: data?.signedUrl ?? null });
-      });
-    return () => {
-      alive = false;
-    };
-  }, [path, bucket, refreshKey]);
+  const { data, isLoading } = useQuery({
+    queryKey: ["signed-url", bucket, path, refreshKey],
+    queryFn: async () => {
+      const { data } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(path as string, SIGNED_URL_TTL_SECONDS);
+      return data?.signedUrl ?? null;
+    },
+    enabled: Boolean(path),
+    staleTime: SIGNED_URL_STALE_TIME,
+    gcTime: SIGNED_URL_STALE_TIME + 5 * 60 * 1000,
+  });
 
   return {
-    url: state.path === path ? state.url : null,
-    isLoading: Boolean(path) && state.path !== path,
+    url: path ? (data ?? null) : null,
+    isLoading: Boolean(path) && isLoading,
   };
 }
 

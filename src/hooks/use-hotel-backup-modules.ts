@@ -49,6 +49,9 @@ export function useHotelBackupModules() {
       return options.sort((a, b) => MODULE_ORDER.indexOf(a.code) - MODULE_ORDER.indexOf(b.code));
     },
     enabled: Boolean(tenantId),
-    staleTime: 30_000,
+    // Same tenant_modules/erp_modules data as useTenantModules(); kept in
+    // sync with its staleTime for the same reason (module activation only
+    // changes via an explicit admin action).
+    staleTime: 60_000,
   });
 }

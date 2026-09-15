@@ -17,6 +17,10 @@ export function useCompanySettings(tenantId?: string | null) {
       return data;
     },
     enabled: resolvedTenantId !== null,
+    // Company/tenant branding settings rarely change mid-session; avoid
+    // refetching them (and their derived logo/signature/stamp signed URLs)
+    // on every navigation.
+    staleTime: 60_000,
   });
 
   const { url: logoUrl, isLoading: logoLoading } = useSignedUrlState(

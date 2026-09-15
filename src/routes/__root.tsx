@@ -192,9 +192,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     }
 
     if (session) {
-      // La qualité de compte plateforme est vérifiée côté serveur avant toute
-      // lecture de profil, de tenant ou de permission RBAC.
-      const { isPlatformAdmin } = await getPlatformAdminAccess();
+      // La qualité de compte plateforme (Super Admin) et Partner est vérifiée
+      // côté serveur avant toute lecture de profil, de tenant ou de
+      // permission RBAC. Les deux appels sont indépendants l'un de l'autre
+      // (aucun ne dépend du résultat de l'autre) : ils sont parallélisés pour
+      // éviter un waterfall réseau séquentiel sur chaque navigation.
+      const [{ isPlatformAdmin }, { isPartnerAdmin }] = await Promise.all([
+        getPlatformAdminAccess(),
+        getPartnerAdminAccess(),
+      ]);
+
       if (isPlatformAdmin) {
         const catalogTenantId = new URLSearchParams(location.searchStr).get("tenantId");
         const isTenantCatalogView =
@@ -209,7 +216,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         return;
       }
 
-      const { isPartnerAdmin } = await getPartnerAdminAccess();
       if (isPartnerAdmin) {
         if (!isPartnerRoute(location.pathname)) {
           throw redirect({ to: "/partner" });
