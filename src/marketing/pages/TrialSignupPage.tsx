@@ -34,12 +34,9 @@ import { TRIAL_ACTIVITIES, TRIAL_ACTIVITY_CODES } from "@/lib/trial-activities";
 import { supabase } from "@/integrations/supabase/client";
 import { readEnvVar } from "@/integrations/supabase/env";
 
-// Chaque activité détermine automatiquement la configuration ERP du tenant
-// créé (voir create_trial_workspace) — aucun choix de pack n'est exposé ici.
+// Ce formulaire ne provisionne que l'espace ERP générique — aucun choix de
+// pack n'est exposé ici (voir create_trial_workspace).
 function resolvePostSignupRoute(_platformType: string): "/app" {
-  // Toutes les activités (y compris hôtel) provisionnent l'espace ERP
-  // générique pour l'instant. Ajouter un cas "HOTEL" ici branchera la
-  // redirection dédiée le jour où cette expérience existera.
   return "/app";
 }
 
@@ -54,12 +51,12 @@ const solutionCards = [
   {
     icon: LayoutGrid,
     title: "Gestion centralisée",
-    description: "Pilotez ventes, stocks, achats et finances depuis une seule plateforme.",
+    description: "Pilotez vos ventes, stocks, achats et finances depuis une seule plateforme.",
   },
   {
     icon: Users,
     title: "Collaboration efficace",
-    description: "Travaillez en équipe avec des rôles et permissions adaptés à chaque métier.",
+    description: "Travaillez en équipe avec des rôles et permissions adaptés à votre organisation.",
   },
   {
     icon: BarChart3,
@@ -69,7 +66,8 @@ const solutionCards = [
   {
     icon: ShieldCheck,
     title: "Sécurité maximale",
-    description: "Chiffrement, sauvegardes automatiques et isolation totale de vos données.",
+    description:
+      "Chiffrement, sauvegardes et isolation des données pour protéger votre entreprise.",
   },
 ] as const;
 
@@ -248,15 +246,13 @@ export function TrialSignupPage() {
 
               <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-950 sm:text-5xl lg:text-[3.4rem]">
                 Pilotez votre entreprise avec{" "}
-                <span className="text-saovia-primary">
-                  puissance et simplicité
-                </span>
+                <span className="text-saovia-primary">puissance et simplicité</span>
               </h1>
 
               <p className="mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
                 Découvrez {PLATFORM_BRANDING.productName}, la plateforme tout-en-un qui centralise
-                ventes, stocks, finances et équipes. Testez toutes les fonctionnalités pendant 7
-                jours, sans engagement.
+                vos ventes, stocks, achats, finances, clients et équipes. Testez toutes les
+                fonctionnalités pendant 7 jours, sans engagement.
               </p>
 
               {/* Illustration : aperçu tableau de bord ERP */}
