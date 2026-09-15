@@ -51,6 +51,7 @@ import { formatCurrency, formatDate } from "@/lib/mms/format";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { useHotelSettings } from "@/hooks/use-hotel-settings";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
@@ -83,6 +84,12 @@ export function HotelFacturationPage() {
   const refresh = useHotelBillingRefresh();
   const modulesQuery = useTenantModules();
   const invoicingEnabled = modulesQuery.data?.has("hotel_invoicing") !== false;
+  // isPending, not isLoading: usePermissions() is enabled: !loading &&
+  // Boolean(tenantId), and React Query v5's isLoading (isPending &&
+  // isFetching) stays false for a disabled query — isPending alone is true
+  // whenever permissions data is still undefined, which is what "don't show
+  // Accès restreint yet" actually needs.
+  const { isPending: permissionsLoading } = usePermissions();
   const canView = useActionPermission("hotel.invoices.view");
   const canCreate = useActionPermission("hotel.invoices.create");
   const [query, setQuery] = useState("");
@@ -328,6 +335,20 @@ export function HotelFacturationPage() {
         icon={Receipt}
         description="Le module Facturation Hôtel n'est pas activé pour cet établissement. Contactez un administrateur pour l'activer."
       />
+    );
+  }
+
+  // `canView` defaults to false while permissions are still resolving
+  // (useActionPermission can't distinguish "loading" from "denied" on its
+  // own), so gate on permissionsLoading first — otherwise every visit
+  // flashes "Accès restreint" before flipping to the real content.
+  if (permissionsLoading) {
+    return (
+      <HotelAppShell title="Facturation" contentClassName="bg-[#F4FAF8] dark:bg-[#07211C]">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+        </div>
+      </HotelAppShell>
     );
   }
 

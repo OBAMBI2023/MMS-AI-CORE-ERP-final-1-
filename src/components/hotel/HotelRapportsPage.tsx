@@ -43,6 +43,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useActionPermission } from "@/hooks/use-action-permission";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useHotelReportsData } from "@/hooks/use-hotel-reports";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { computeOccupancyRate, type OccupancyReservationLike } from "@/lib/hotel-occupancy";
@@ -303,6 +304,9 @@ function RoomPerformanceCard({
 }
 
 export function HotelRapportsPage() {
+  // isPending, not isLoading — see the identical comment in
+  // HotelFacturationPage.tsx for why.
+  const { isPending: permissionsLoading } = usePermissions();
   const canView = useActionPermission("hotel.reports.view");
   const canExport = useActionPermission("hotel.reports.export");
   const reportsQuery = useHotelReportsData();
@@ -667,6 +671,18 @@ export function HotelRapportsPage() {
       setExporting(false);
     }
   };
+
+  // Same rationale as HotelFacturationPage: useActionPermission can't tell
+  // "still loading" from "denied", so check permissionsLoading first.
+  if (permissionsLoading) {
+    return (
+      <HotelAppShell title="Rapports" subtitle="Analysez les performances de votre établissement">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+        </div>
+      </HotelAppShell>
+    );
+  }
 
   if (!canView) {
     return (

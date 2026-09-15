@@ -69,7 +69,7 @@ import {
 import { configureCurrency } from "@/lib/mms/format";
 import type { Tables } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
-import { isAdministratorRole } from "@/lib/route-permissions";
+import { useActionPermission } from "@/hooks/use-action-permission";
 
 type ParametresRow = Tables<"parametres">;
 
@@ -121,11 +121,24 @@ export function HotelParametresPage() {
   const qc = useQueryClient();
   const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
-  const { data: permissions } = usePermissions();
-  const canView = isAdministratorRole(permissions?.role);
-  const canEdit = canView;
-  const canViewUsers = canView;
-  const canViewBackups = canView;
+  // Governed by the hotel.settings.view RBAC permission, not the
+  // Administrateur role name: a secondary role (e.g. "Gérant") can
+  // legitimately be granted this permission per tenant, and several tenants
+  // already have it configured that way in role_permissions.
+  // useActionPermission's has_permission-equivalent check already includes
+  // the Administrateur bypass, so admins keep working exactly as before.
+  const { isPending: permissionsLoading } = usePermissions();
+  const canView = useActionPermission("hotel.settings.view");
+  const canEdit = useActionPermission("hotel.settings.update");
+  // Utilisateurs & accès / Sauvegardes are gated on their own dedicated
+  // permissions (already granted per-role in role_permissions for this
+  // tenant, e.g. "Gérant" has hotel.users.manage but "Manager" does not) —
+  // not aliased to the page-level canView, otherwise a role with only
+  // hotel.settings.view would see tabs it has no actual grant for.
+  // HotelUsersAccessTab / BackupsPanel already re-check the same permission
+  // internally, so this only controls whether the tab trigger itself shows.
+  const canViewUsers = useActionPermission("hotel.users.view");
+  const canViewBackups = useActionPermission("hotel.backups.view");
 
   const hotelSettingsQuery = useHotelSettings();
   const hotelSubscriptionQuery = useHotelSubscription();
@@ -213,7 +226,7 @@ export function HotelParametresPage() {
     },
   });
 
-  const isLoading = tenantLoading || hotelSettingsQuery.isLoading || paramsLoading;
+  const isLoading = tenantLoading || hotelSettingsQuery.isLoading || paramsLoading || permissionsLoading;
 
   return (
     <HotelAppShell

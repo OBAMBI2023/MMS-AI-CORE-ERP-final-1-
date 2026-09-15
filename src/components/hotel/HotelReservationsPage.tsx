@@ -11,6 +11,7 @@ import {
   FileDown,
   FileCheck2,
   List,
+  Loader2,
   type LucideIcon,
   MoreVertical,
   NotebookPen,
@@ -151,7 +152,7 @@ export function HotelReservationsPage() {
   const modulesQuery = useTenantModules();
   const smsModuleEnabled = modulesQuery.data?.has("hotel_sms") === true;
 
-  const { data } = useQuery({
+  const { data, isPending: reservationsLoading } = useQuery({
     queryKey: ["hotel-reservations", profile?.tenant_id],
     enabled: Boolean(profile?.tenant_id),
     queryFn: async () => {
@@ -945,6 +946,10 @@ export function HotelReservationsPage() {
             onFloorChange={setPlanningFloor}
             onSelect={edit}
           />
+        ) : reservationsLoading ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Chargement des réservations…
+          </div>
         ) : (
           <>
             <div className="hidden md:block">

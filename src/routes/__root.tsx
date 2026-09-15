@@ -321,15 +321,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // tenant (public.current_tenant_id()), donc ce contrôle reste
       // équivalent à la RLS qui protège les données affichées par la page.
       if (isHotelSettingsRoute(location.pathname)) {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("roles(name)")
-          .eq("id", session.user.id)
-          .single();
+        const { data: allowed, error: permissionError } = await supabase.rpc("has_permission", {
+          required_permission: "hotel.settings.view",
+        });
 
-        const roleName = profile?.roles?.name ?? null;
-
-        if (profileError || !isAdministratorRole(roleName)) {
+        if (permissionError || !allowed) {
           throw redirect({ to: "/403" });
         }
       }

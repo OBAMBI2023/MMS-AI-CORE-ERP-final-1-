@@ -4,7 +4,6 @@ import { HOTEL_NAV_ITEMS } from "./hotel-nav-items";
 import { useActionPermission } from "@/hooks/use-action-permission";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTenantModules } from "@/hooks/use-tenant-modules";
-import { isAdministratorRole } from "@/lib/route-permissions";
 import { hotelRouteModules } from "@/lib/route-modules";
 import { cn } from "@/lib/utils";
 
@@ -16,9 +15,16 @@ export function HotelSidebarContent({
   compact?: boolean;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { data, isLoading: permissionsLoading } = usePermissions();
+  // isPending, not isLoading: usePermissions() is enabled: !loading &&
+  // Boolean(tenantId), and a disabled query's isLoading stays false even
+  // with no data yet — isPending is the flag that's actually true whenever
+  // permissions data is still unresolved.
+  const { isPending: permissionsLoading } = usePermissions();
   const modulesQuery = useTenantModules();
-  const canViewHotelSettings = isAdministratorRole(data?.role);
+  // Governed by the hotel.settings.view RBAC permission, not the
+  // Administrateur role name — see the identical fix/rationale in
+  // HotelParametresPage.tsx, the page this link points to.
+  const canViewHotelSettings = useActionPermission("hotel.settings.view");
   const canViewMaintenance = useActionPermission("hotel.maintenance.view");
 
   const visibleItems = HOTEL_NAV_ITEMS.filter((it) => {

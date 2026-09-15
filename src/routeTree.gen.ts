@@ -27,6 +27,7 @@ import { Route as ParametresRouteImport } from './routes/parametres'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicenceRouteImport } from './routes/licence'
 import { Route as JournalRouteImport } from './routes/journal'
+import { Route as HotelRouteImport } from './routes/hotel'
 import { Route as FournisseursRouteImport } from './routes/fournisseurs'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as FonctionnalitesRouteImport } from './routes/fonctionnalites'
@@ -49,6 +50,7 @@ import { Route as SuperAdminAnalyticsRouteImport } from './routes/super-admin.an
 import { Route as SettingsUsersRouteImport } from './routes/settings.users'
 import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
 import { Route as RestaurantLoginRouteImport } from './routes/restaurant.login'
+import { Route as RTenantSlugRouteImport } from './routes/r.$tenantSlug'
 import { Route as LoginSlugRouteImport } from './routes/login_.$slug'
 import { Route as HotelStocksRouteImport } from './routes/hotel.stocks'
 import { Route as HotelRestaurantBarRouteImport } from './routes/hotel.restaurant-bar'
@@ -158,6 +160,11 @@ const JournalRoute = JournalRouteImport.update({
   path: '/journal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HotelRoute = HotelRouteImport.update({
+  id: '/hotel',
+  path: '/hotel',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FournisseursRoute = FournisseursRouteImport.update({
   id: '/fournisseurs',
   path: '/fournisseurs',
@@ -219,9 +226,9 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const HotelIndexRoute = HotelIndexRouteImport.update({
-  id: '/hotel/',
-  path: '/hotel/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => HotelRoute,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/app/',
@@ -268,85 +275,90 @@ const RestaurantLoginRoute = RestaurantLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => RestaurantRoute,
 } as any)
+const RTenantSlugRoute = RTenantSlugRouteImport.update({
+  id: '/r/$tenantSlug',
+  path: '/r/$tenantSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginSlugRoute = LoginSlugRouteImport.update({
   id: '/login_/$slug',
   path: '/login/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HotelStocksRoute = HotelStocksRouteImport.update({
-  id: '/hotel/stocks',
-  path: '/hotel/stocks',
-  getParentRoute: () => rootRouteImport,
+  id: '/stocks',
+  path: '/stocks',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelRestaurantBarRoute = HotelRestaurantBarRouteImport.update({
-  id: '/hotel/restaurant-bar',
-  path: '/hotel/restaurant-bar',
-  getParentRoute: () => rootRouteImport,
+  id: '/restaurant-bar',
+  path: '/restaurant-bar',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelReservationsRoute = HotelReservationsRouteImport.update({
-  id: '/hotel/reservations',
-  path: '/hotel/reservations',
-  getParentRoute: () => rootRouteImport,
+  id: '/reservations',
+  path: '/reservations',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelRapportsRoute = HotelRapportsRouteImport.update({
-  id: '/hotel/rapports',
-  path: '/hotel/rapports',
-  getParentRoute: () => rootRouteImport,
+  id: '/rapports',
+  path: '/rapports',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelPersonnelRoute = HotelPersonnelRouteImport.update({
-  id: '/hotel/personnel',
-  path: '/hotel/personnel',
-  getParentRoute: () => rootRouteImport,
+  id: '/personnel',
+  path: '/personnel',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelParametresRoute = HotelParametresRouteImport.update({
-  id: '/hotel/parametres',
-  path: '/hotel/parametres',
-  getParentRoute: () => rootRouteImport,
+  id: '/parametres',
+  path: '/parametres',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelMaintenanceRoute = HotelMaintenanceRouteImport.update({
-  id: '/hotel/maintenance',
-  path: '/hotel/maintenance',
-  getParentRoute: () => rootRouteImport,
+  id: '/maintenance',
+  path: '/maintenance',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelHousekeepingRoute = HotelHousekeepingRouteImport.update({
-  id: '/hotel/housekeeping',
-  path: '/hotel/housekeeping',
-  getParentRoute: () => rootRouteImport,
+  id: '/housekeeping',
+  path: '/housekeeping',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelFacturationRoute = HotelFacturationRouteImport.update({
-  id: '/hotel/facturation',
-  path: '/hotel/facturation',
-  getParentRoute: () => rootRouteImport,
+  id: '/facturation',
+  path: '/facturation',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelDepensesRoute = HotelDepensesRouteImport.update({
-  id: '/hotel/depenses',
-  path: '/hotel/depenses',
-  getParentRoute: () => rootRouteImport,
+  id: '/depenses',
+  path: '/depenses',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelComptabiliteRoute = HotelComptabiliteRouteImport.update({
-  id: '/hotel/comptabilite',
-  path: '/hotel/comptabilite',
-  getParentRoute: () => rootRouteImport,
+  id: '/comptabilite',
+  path: '/comptabilite',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelClientsRoute = HotelClientsRouteImport.update({
-  id: '/hotel/clients',
-  path: '/hotel/clients',
-  getParentRoute: () => rootRouteImport,
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelCheckinCheckoutRoute = HotelCheckinCheckoutRouteImport.update({
-  id: '/hotel/checkin-checkout',
-  path: '/hotel/checkin-checkout',
-  getParentRoute: () => rootRouteImport,
+  id: '/checkin-checkout',
+  path: '/checkin-checkout',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelChambresRoute = HotelChambresRouteImport.update({
-  id: '/hotel/chambres',
-  path: '/hotel/chambres',
-  getParentRoute: () => rootRouteImport,
+  id: '/chambres',
+  path: '/chambres',
+  getParentRoute: () => HotelRoute,
 } as any)
 const HotelCaisseRoute = HotelCaisseRouteImport.update({
-  id: '/hotel/caisse',
-  path: '/hotel/caisse',
-  getParentRoute: () => rootRouteImport,
+  id: '/caisse',
+  path: '/caisse',
+  getParentRoute: () => HotelRoute,
 } as any)
 const AppAssistantIaRoute = AppAssistantIaRouteImport.update({
   id: '/app/assistant-ia',
@@ -372,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/fonctionnalites': typeof FonctionnalitesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/hotel': typeof HotelRouteWithChildren
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
@@ -408,6 +421,7 @@ export interface FileRoutesByFullPath {
   '/hotel/restaurant-bar': typeof HotelRestaurantBarRoute
   '/hotel/stocks': typeof HotelStocksRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/r/$tenantSlug': typeof RTenantSlugRoute
   '/restaurant/login': typeof RestaurantLoginRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
@@ -468,6 +482,7 @@ export interface FileRoutesByTo {
   '/hotel/restaurant-bar': typeof HotelRestaurantBarRoute
   '/hotel/stocks': typeof HotelStocksRoute
   '/login/$slug': typeof LoginSlugRoute
+  '/r/$tenantSlug': typeof RTenantSlugRoute
   '/restaurant/login': typeof RestaurantLoginRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
@@ -493,6 +508,7 @@ export interface FileRoutesById {
   '/fonctionnalites': typeof FonctionnalitesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
+  '/hotel': typeof HotelRouteWithChildren
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
@@ -529,6 +545,7 @@ export interface FileRoutesById {
   '/hotel/restaurant-bar': typeof HotelRestaurantBarRoute
   '/hotel/stocks': typeof HotelStocksRoute
   '/login_/$slug': typeof LoginSlugRoute
+  '/r/$tenantSlug': typeof RTenantSlugRoute
   '/restaurant/login': typeof RestaurantLoginRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
@@ -555,6 +572,7 @@ export interface FileRouteTypes {
     | '/fonctionnalites'
     | '/forgot-password'
     | '/fournisseurs'
+    | '/hotel'
     | '/journal'
     | '/licence'
     | '/login'
@@ -591,6 +609,7 @@ export interface FileRouteTypes {
     | '/hotel/restaurant-bar'
     | '/hotel/stocks'
     | '/login/$slug'
+    | '/r/$tenantSlug'
     | '/restaurant/login'
     | '/settings/catalogue'
     | '/settings/users'
@@ -651,6 +670,7 @@ export interface FileRouteTypes {
     | '/hotel/restaurant-bar'
     | '/hotel/stocks'
     | '/login/$slug'
+    | '/r/$tenantSlug'
     | '/restaurant/login'
     | '/settings/catalogue'
     | '/settings/users'
@@ -675,6 +695,7 @@ export interface FileRouteTypes {
     | '/fonctionnalites'
     | '/forgot-password'
     | '/fournisseurs'
+    | '/hotel'
     | '/journal'
     | '/licence'
     | '/login'
@@ -711,6 +732,7 @@ export interface FileRouteTypes {
     | '/hotel/restaurant-bar'
     | '/hotel/stocks'
     | '/login_/$slug'
+    | '/r/$tenantSlug'
     | '/restaurant/login'
     | '/settings/catalogue'
     | '/settings/users'
@@ -736,6 +758,7 @@ export interface RootRouteChildren {
   FonctionnalitesRoute: typeof FonctionnalitesRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   FournisseursRoute: typeof FournisseursRoute
+  HotelRoute: typeof HotelRouteWithChildren
   JournalRoute: typeof JournalRoute
   LicenceRoute: typeof LicenceRoute
   LoginRoute: typeof LoginRoute
@@ -756,26 +779,11 @@ export interface RootRouteChildren {
   VentesRoute: typeof VentesRoute
   AppSplatRoute: typeof AppSplatRoute
   AppAssistantIaRoute: typeof AppAssistantIaRoute
-  HotelCaisseRoute: typeof HotelCaisseRoute
-  HotelChambresRoute: typeof HotelChambresRoute
-  HotelCheckinCheckoutRoute: typeof HotelCheckinCheckoutRoute
-  HotelClientsRoute: typeof HotelClientsRoute
-  HotelComptabiliteRoute: typeof HotelComptabiliteRoute
-  HotelDepensesRoute: typeof HotelDepensesRoute
-  HotelFacturationRoute: typeof HotelFacturationRoute
-  HotelHousekeepingRoute: typeof HotelHousekeepingRoute
-  HotelMaintenanceRoute: typeof HotelMaintenanceRoute
-  HotelParametresRoute: typeof HotelParametresRoute
-  HotelPersonnelRoute: typeof HotelPersonnelRoute
-  HotelRapportsRoute: typeof HotelRapportsRoute
-  HotelReservationsRoute: typeof HotelReservationsRoute
-  HotelRestaurantBarRoute: typeof HotelRestaurantBarRoute
-  HotelStocksRoute: typeof HotelStocksRoute
   LoginSlugRoute: typeof LoginSlugRoute
+  RTenantSlugRoute: typeof RTenantSlugRoute
   SettingsCatalogueRoute: typeof SettingsCatalogueRoute
   SettingsUsersRoute: typeof SettingsUsersRoute
   AppIndexRoute: typeof AppIndexRoute
-  HotelIndexRoute: typeof HotelIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -906,6 +914,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JournalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hotel': {
+      id: '/hotel'
+      path: '/hotel'
+      fullPath: '/hotel'
+      preLoaderRoute: typeof HotelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/fournisseurs': {
       id: '/fournisseurs'
       path: '/fournisseurs'
@@ -992,10 +1007,10 @@ declare module '@tanstack/react-router' {
     }
     '/hotel/': {
       id: '/hotel/'
-      path: '/hotel'
+      path: '/'
       fullPath: '/hotel/'
       preLoaderRoute: typeof HotelIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/app/': {
       id: '/app/'
@@ -1060,6 +1075,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RestaurantLoginRouteImport
       parentRoute: typeof RestaurantRoute
     }
+    '/r/$tenantSlug': {
+      id: '/r/$tenantSlug'
+      path: '/r/$tenantSlug'
+      fullPath: '/r/$tenantSlug'
+      preLoaderRoute: typeof RTenantSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login_/$slug': {
       id: '/login_/$slug'
       path: '/login/$slug'
@@ -1069,108 +1091,108 @@ declare module '@tanstack/react-router' {
     }
     '/hotel/stocks': {
       id: '/hotel/stocks'
-      path: '/hotel/stocks'
+      path: '/stocks'
       fullPath: '/hotel/stocks'
       preLoaderRoute: typeof HotelStocksRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/restaurant-bar': {
       id: '/hotel/restaurant-bar'
-      path: '/hotel/restaurant-bar'
+      path: '/restaurant-bar'
       fullPath: '/hotel/restaurant-bar'
       preLoaderRoute: typeof HotelRestaurantBarRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/reservations': {
       id: '/hotel/reservations'
-      path: '/hotel/reservations'
+      path: '/reservations'
       fullPath: '/hotel/reservations'
       preLoaderRoute: typeof HotelReservationsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/rapports': {
       id: '/hotel/rapports'
-      path: '/hotel/rapports'
+      path: '/rapports'
       fullPath: '/hotel/rapports'
       preLoaderRoute: typeof HotelRapportsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/personnel': {
       id: '/hotel/personnel'
-      path: '/hotel/personnel'
+      path: '/personnel'
       fullPath: '/hotel/personnel'
       preLoaderRoute: typeof HotelPersonnelRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/parametres': {
       id: '/hotel/parametres'
-      path: '/hotel/parametres'
+      path: '/parametres'
       fullPath: '/hotel/parametres'
       preLoaderRoute: typeof HotelParametresRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/maintenance': {
       id: '/hotel/maintenance'
-      path: '/hotel/maintenance'
+      path: '/maintenance'
       fullPath: '/hotel/maintenance'
       preLoaderRoute: typeof HotelMaintenanceRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/housekeeping': {
       id: '/hotel/housekeeping'
-      path: '/hotel/housekeeping'
+      path: '/housekeeping'
       fullPath: '/hotel/housekeeping'
       preLoaderRoute: typeof HotelHousekeepingRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/facturation': {
       id: '/hotel/facturation'
-      path: '/hotel/facturation'
+      path: '/facturation'
       fullPath: '/hotel/facturation'
       preLoaderRoute: typeof HotelFacturationRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/depenses': {
       id: '/hotel/depenses'
-      path: '/hotel/depenses'
+      path: '/depenses'
       fullPath: '/hotel/depenses'
       preLoaderRoute: typeof HotelDepensesRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/comptabilite': {
       id: '/hotel/comptabilite'
-      path: '/hotel/comptabilite'
+      path: '/comptabilite'
       fullPath: '/hotel/comptabilite'
       preLoaderRoute: typeof HotelComptabiliteRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/clients': {
       id: '/hotel/clients'
-      path: '/hotel/clients'
+      path: '/clients'
       fullPath: '/hotel/clients'
       preLoaderRoute: typeof HotelClientsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/checkin-checkout': {
       id: '/hotel/checkin-checkout'
-      path: '/hotel/checkin-checkout'
+      path: '/checkin-checkout'
       fullPath: '/hotel/checkin-checkout'
       preLoaderRoute: typeof HotelCheckinCheckoutRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/chambres': {
       id: '/hotel/chambres'
-      path: '/hotel/chambres'
+      path: '/chambres'
       fullPath: '/hotel/chambres'
       preLoaderRoute: typeof HotelChambresRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/hotel/caisse': {
       id: '/hotel/caisse'
-      path: '/hotel/caisse'
+      path: '/caisse'
       fullPath: '/hotel/caisse'
       preLoaderRoute: typeof HotelCaisseRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HotelRoute
     }
     '/app/assistant-ia': {
       id: '/app/assistant-ia'
@@ -1188,6 +1210,46 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface HotelRouteChildren {
+  HotelCaisseRoute: typeof HotelCaisseRoute
+  HotelChambresRoute: typeof HotelChambresRoute
+  HotelCheckinCheckoutRoute: typeof HotelCheckinCheckoutRoute
+  HotelClientsRoute: typeof HotelClientsRoute
+  HotelComptabiliteRoute: typeof HotelComptabiliteRoute
+  HotelDepensesRoute: typeof HotelDepensesRoute
+  HotelFacturationRoute: typeof HotelFacturationRoute
+  HotelHousekeepingRoute: typeof HotelHousekeepingRoute
+  HotelMaintenanceRoute: typeof HotelMaintenanceRoute
+  HotelParametresRoute: typeof HotelParametresRoute
+  HotelPersonnelRoute: typeof HotelPersonnelRoute
+  HotelRapportsRoute: typeof HotelRapportsRoute
+  HotelReservationsRoute: typeof HotelReservationsRoute
+  HotelRestaurantBarRoute: typeof HotelRestaurantBarRoute
+  HotelStocksRoute: typeof HotelStocksRoute
+  HotelIndexRoute: typeof HotelIndexRoute
+}
+
+const HotelRouteChildren: HotelRouteChildren = {
+  HotelCaisseRoute: HotelCaisseRoute,
+  HotelChambresRoute: HotelChambresRoute,
+  HotelCheckinCheckoutRoute: HotelCheckinCheckoutRoute,
+  HotelClientsRoute: HotelClientsRoute,
+  HotelComptabiliteRoute: HotelComptabiliteRoute,
+  HotelDepensesRoute: HotelDepensesRoute,
+  HotelFacturationRoute: HotelFacturationRoute,
+  HotelHousekeepingRoute: HotelHousekeepingRoute,
+  HotelMaintenanceRoute: HotelMaintenanceRoute,
+  HotelParametresRoute: HotelParametresRoute,
+  HotelPersonnelRoute: HotelPersonnelRoute,
+  HotelRapportsRoute: HotelRapportsRoute,
+  HotelReservationsRoute: HotelReservationsRoute,
+  HotelRestaurantBarRoute: HotelRestaurantBarRoute,
+  HotelStocksRoute: HotelStocksRoute,
+  HotelIndexRoute: HotelIndexRoute,
+}
+
+const HotelRouteWithChildren = HotelRoute._addFileChildren(HotelRouteChildren)
 
 interface RestaurantRouteChildren {
   RestaurantLoginRoute: typeof RestaurantLoginRoute
@@ -1234,6 +1296,7 @@ const rootRouteChildren: RootRouteChildren = {
   FonctionnalitesRoute: FonctionnalitesRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   FournisseursRoute: FournisseursRoute,
+  HotelRoute: HotelRouteWithChildren,
   JournalRoute: JournalRoute,
   LicenceRoute: LicenceRoute,
   LoginRoute: LoginRoute,
@@ -1254,26 +1317,11 @@ const rootRouteChildren: RootRouteChildren = {
   VentesRoute: VentesRoute,
   AppSplatRoute: AppSplatRoute,
   AppAssistantIaRoute: AppAssistantIaRoute,
-  HotelCaisseRoute: HotelCaisseRoute,
-  HotelChambresRoute: HotelChambresRoute,
-  HotelCheckinCheckoutRoute: HotelCheckinCheckoutRoute,
-  HotelClientsRoute: HotelClientsRoute,
-  HotelComptabiliteRoute: HotelComptabiliteRoute,
-  HotelDepensesRoute: HotelDepensesRoute,
-  HotelFacturationRoute: HotelFacturationRoute,
-  HotelHousekeepingRoute: HotelHousekeepingRoute,
-  HotelMaintenanceRoute: HotelMaintenanceRoute,
-  HotelParametresRoute: HotelParametresRoute,
-  HotelPersonnelRoute: HotelPersonnelRoute,
-  HotelRapportsRoute: HotelRapportsRoute,
-  HotelReservationsRoute: HotelReservationsRoute,
-  HotelRestaurantBarRoute: HotelRestaurantBarRoute,
-  HotelStocksRoute: HotelStocksRoute,
   LoginSlugRoute: LoginSlugRoute,
+  RTenantSlugRoute: RTenantSlugRoute,
   SettingsCatalogueRoute: SettingsCatalogueRoute,
   SettingsUsersRoute: SettingsUsersRoute,
   AppIndexRoute: AppIndexRoute,
-  HotelIndexRoute: HotelIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

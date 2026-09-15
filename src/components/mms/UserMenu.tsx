@@ -13,9 +13,9 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { ProfileAvatar } from "./ProfileAvatar";
 import { AvatarManager } from "./AvatarManager";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useTenant } from "@/providers/TenantProvider";
-import { usePermissions } from "@/hooks/use-permissions";
-import { isAdministratorRole } from "@/lib/route-permissions";
+import { useActionPermission } from "@/hooks/use-action-permission";
 import {
   Dialog,
   DialogContent,
@@ -29,13 +29,20 @@ export function UserMenu() {
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const { tenant, refreshTenant } = useTenant();
-  const { data: permissions } = usePermissions();
   const parametresRoute = tenant?.platform_type === "HOTEL" ? "/hotel/parametres" : "/parametres";
-  const canSeeSettings = tenant?.platform_type === "HOTEL"
-    ? isAdministratorRole(permissions?.role)
-    : true;
+  // Governed by the hotel.settings.view RBAC permission, not the
+  // Administrateur role name — see the identical fix/rationale in
+  // HotelParametresPage.tsx, the page this link points to. The ERP branch
+  // (platform_type !== "HOTEL") is untouched: /parametres there is
+  // deliberately Administrateur-only regardless of RBAC (see
+  // isAdminOnlyRoute in route-permissions.ts), and the actual route guard
+  // enforces that independently of this link's visibility. The hook is
+  // called unconditionally (Rules of Hooks) and the platform check is
+  // applied to its result instead.
+  const hasHotelSettingsView = useActionPermission("hotel.settings.view");
+  const canSeeSettings = tenant?.platform_type === "HOTEL" ? hasHotelSettingsView : true;
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
       const {
@@ -72,6 +79,8 @@ export function UserMenu() {
     }
   };
 
+  // Never render "Utilisateur" / "Rôle inconnu" while the profile query is
+  // still resolving — that text means "genuinely unknown", not "loading".
   const name = profile?.full_name || "Utilisateur";
   const role = profile?.roles?.name || "Rôle inconnu";
 
@@ -79,11 +88,23 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors hover:bg-muted">
-          <ProfileAvatar path={profile?.avatar_url} name={name} email={profile?.email} className="h-8 w-8" />
-          <div className="hidden md:flex flex-col items-start text-left">
-            <span className="text-sm font-medium">{name}</span>
-            <span className="text-xs text-muted-foreground">{role}</span>
-          </div>
+          {profileLoading ? (
+            <>
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <div className="hidden md:flex flex-col items-start gap-1">
+                <Skeleton className="h-3.5 w-20" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </>
+          ) : (
+            <>
+              <ProfileAvatar path={profile?.avatar_url} name={name} email={profile?.email} className="h-8 w-8" />
+              <div className="hidden md:flex flex-col items-start text-left">
+                <span className="text-sm font-medium">{name}</span>
+                <span className="text-xs text-muted-foreground">{role}</span>
+              </div>
+            </>
+          )}
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>

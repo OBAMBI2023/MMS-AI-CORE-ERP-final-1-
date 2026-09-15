@@ -74,7 +74,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useActionPermission } from "@/hooks/use-action-permission";
-import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/providers/TenantProvider";
 import { formatCurrency, formatDate, getCurrency } from "@/lib/mms/format";
 import { useCompanySettings } from "@/hooks/use-company-settings";
@@ -208,12 +207,11 @@ export function HotelRoomsPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { profile } = useTenant();
-  const { data: permissions } = usePermissions();
   const tenantId = profile?.tenant_id;
   const { settings, logoUrl } = useCompanySettings(tenantId);
   const canCreate = useActionPermission("hotel.rooms.create");
   const canUpdate = useActionPermission("hotel.rooms.update");
-  const canDelete = permissions?.role === "Administrateur" && useActionPermission("hotel.rooms.delete");
+  const canDelete = useActionPermission("hotel.rooms.delete");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | RoomStatus | "reserved">("all");
   const [type, setType] = useState("all");

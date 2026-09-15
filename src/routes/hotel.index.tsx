@@ -89,7 +89,7 @@ function formatFrTime(isoStr: string | null | undefined): string | null {
 }
 
 function HotelDashboard() {
-  const { profile } = useTenant();
+  const { profile, loading: tenantLoading } = useTenant();
   const tenantId = profile?.tenant_id;
   const qc = useQueryClient();
   const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("today");
@@ -359,6 +359,16 @@ function HotelDashboard() {
 
   const userName = profile?.full_name?.trim() || profile?.email?.split("@")[0]?.trim() || "utilisateur";
   const greeting = now.getHours() < 18 ? "Bonjour" : "Bonsoir";
+  // The hero stat row (CA du mois / Taux d'occupation / Impayés) is derived
+  // from roomsQuery/paymentsQuery/billing — while any of them are still
+  // loading, showing "0 F CFA" / "0%" is indistinguishable from a genuinely
+  // empty establishment, so a skeleton is shown instead until they settle.
+  // isPending (not isLoading) is what's needed here: these queries are
+  // `enabled: Boolean(tenantId)`, and React Query v5's isLoading is
+  // `isPending && isFetching` — false for a disabled query that has never
+  // fetched, even though it has no data yet. isPending alone is true
+  // whenever data is still undefined, disabled or not.
+  const heroStatsLoading = roomsQuery.isPending || paymentsQuery.isPending || billing.isPending;
 
   return (
     <HotelAppShell title="Tableau de bord" contentClassName="bg-[#F4FAF8] dark:bg-[#07211C]">
@@ -374,7 +384,13 @@ function HotelDashboard() {
           <div className="pointer-events-none absolute -bottom-14 right-16 h-32 w-32 rounded-full bg-white/10 blur-xl" />
           <div className="relative">
             <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
-              {greeting} {userName} 👋
+              {tenantLoading ? (
+                <span className="inline-block h-7 w-48 animate-pulse rounded bg-white/20 align-middle" />
+              ) : (
+                <>
+                  {greeting} {userName} 👋
+                </>
+              )}
             </h1>
             <p className="mt-1.5 text-sm text-white/80 capitalize">{today}</p>
 
@@ -407,16 +423,20 @@ function HotelDashboard() {
                     <stat.icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 leading-tight">
-                    <p className="break-words text-sm font-bold leading-tight text-white sm:truncate">
-                      {stat.compactValue ? (
-                        <>
-                          <span className="sm:hidden">{stat.compactValue}</span>
-                          <span className="hidden sm:inline">{stat.value}</span>
-                        </>
-                      ) : (
-                        stat.value
-                      )}
-                    </p>
+                    {heroStatsLoading ? (
+                      <div className="h-4 w-14 animate-pulse rounded bg-white/20" />
+                    ) : (
+                      <p className="break-words text-sm font-bold leading-tight text-white sm:truncate">
+                        {stat.compactValue ? (
+                          <>
+                            <span className="sm:hidden">{stat.compactValue}</span>
+                            <span className="hidden sm:inline">{stat.value}</span>
+                          </>
+                        ) : (
+                          stat.value
+                        )}
+                      </p>
+                    )}
                     <p className="truncate text-[10px] text-white/75">{stat.label}</p>
                   </div>
                 </div>
