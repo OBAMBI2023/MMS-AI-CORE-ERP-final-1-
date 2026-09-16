@@ -4154,6 +4154,7 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          is_public: boolean
           logo_url: string | null
           name: string
           onboarding_status: string
@@ -4179,6 +4180,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_public?: boolean
           logo_url?: string | null
           name: string
           onboarding_status?: string
@@ -4204,6 +4206,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_public?: boolean
           logo_url?: string | null
           name?: string
           onboarding_status?: string
