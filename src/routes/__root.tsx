@@ -80,6 +80,22 @@ function isRestaurantRoute(pathname: string) {
   return pathname === "/restaurant" || pathname.startsWith("/restaurant/");
 }
 
+// Vitrine publique de commande d'un restaurant (/r/:tenantSlug). Entièrement
+// anonyme (aucune session ERP/Hôtel ni Restaurant admin requise) : le tenant
+// est résolu depuis le slug de l'URL via restaurantSupabase, jamais depuis
+// une session.
+function isPublicOrderingRoute(pathname: string) {
+  return pathname === "/r" || pathname.startsWith("/r/");
+}
+
+// Vitrine publique SAOVIA Hôtel (/hotel-vitrine, /hotel-vitrine/hotels,
+// /hotel-vitrine/hotels/:slug). Entièrement anonyme, sans rapport avec le
+// back-office /hotel/* (qui reste protégé par la garde ci-dessous) : chaque
+// tenant est résolu depuis son slug public, jamais depuis une session.
+function isHotelVitrineRoute(pathname: string) {
+  return pathname === "/hotel-vitrine" || pathname.startsWith("/hotel-vitrine/");
+}
+
 const publicRoutes = new Set([
   "/",
   "/fonctionnalites",
@@ -183,7 +199,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       session: !!session,
     });
 
-    if (isPublicRoute(location.pathname) || isRestaurantRoute(location.pathname)) {
+    if (
+      isPublicRoute(location.pathname) ||
+      isRestaurantRoute(location.pathname) ||
+      isPublicOrderingRoute(location.pathname) ||
+      isHotelVitrineRoute(location.pathname)
+    ) {
       return;
     }
 
@@ -362,7 +383,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, viewport-fit=cover",
+      },
       { title: PLATFORM_BRANDING.name },
       {
         name: "description",
@@ -392,10 +416,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content: socialLogoUrl,
       },
       { name: "theme-color", content: PLATFORM_BRANDING.primaryColor },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: PLATFORM_BRANDING.shortName },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: PLATFORM_BRANDING.assets.favicon, type: "image/png", sizes: "32x32" },
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
@@ -418,6 +446,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <PwaSplashScreen />
         {children}
         <Scripts />
       </body>
@@ -426,6 +455,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 import { DynamicFavicon } from "@/components/mms/DynamicFavicon";
+import { PwaSplashScreen } from "@/components/pwa/PwaSplashScreen";
 import { PwaUpdatePrompt } from "@/components/pwa/PwaUpdatePrompt";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PosthogRootProvider } from "@/lib/posthog";
@@ -451,7 +481,10 @@ function RootComponent() {
     select: (location) => isPublicRoute(location.pathname),
   });
   const isRestaurantArea = useLocation({
-    select: (location) => isRestaurantRoute(location.pathname),
+    select: (location) => isRestaurantRoute(location.pathname) || isPublicOrderingRoute(location.pathname),
+  });
+  const isHotelVitrineArea = useLocation({
+    select: (location) => isHotelVitrineRoute(location.pathname),
   });
 
   useEffect(() => {
@@ -534,7 +567,7 @@ function RootComponent() {
       <PwaUpdatePrompt />
       <ThemeProvider>
         <PosthogRootProvider>
-          {isPlatformArea || isPublicArea || isRestaurantArea ? (
+          {isPlatformArea || isPublicArea || isRestaurantArea || isHotelVitrineArea ? (
             <>
               <DynamicFavicon platform />
               <DocumentTitleManager />

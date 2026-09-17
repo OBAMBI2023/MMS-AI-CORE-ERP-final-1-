@@ -317,3 +317,93 @@
     display: none;
   }
 }
+
+/* Discreet, spaced-out "available to chat" ring for the WhatsApp button. */
+@keyframes whatsapp-pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  30% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.whatsapp-pulse-ring {
+  z-index: -1;
+  animation: whatsapp-pulse-ring 3.6s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whatsapp-pulse-ring {
+    animation: none;
+    display: none;
+  }
+
+  .whatsapp-fab {
+    transition-property: box-shadow;
+  }
+
+  .whatsapp-fab:hover,
+  .whatsapp-fab:active {
+    transform: none;
+  }
+}
+
+/*
+ * PWA launch splash (src/components/pwa/PwaSplashScreen.tsx).
+ *
+ * Hidden by default (regular browser tab: zero footprint, zero layout
+ * cost). Only ever shown when the page is actually running as an installed
+ * PWA (`display-mode: standalone`), where it bridges the moment between the
+ * OS-drawn native splash (Android's automatic manifest splash / the raw SSR
+ * HTML on iOS) and the app becoming interactive. It never re-appears on
+ * client-side route changes: PwaSplashScreen only ever transitions
+ * visible -> leaving -> unmounted, once per full document load.
+ */
+.pwa-splash {
+  display: none;
+  opacity: 1;
+  transition: opacity 400ms ease-in-out;
+}
+
+@media (display-mode: standalone) {
+  .pwa-splash {
+    display: flex;
+  }
+}
+
+.pwa-splash[data-leaving="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes pwa-splash-logo-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pwa-splash-logo {
+  animation: pwa-splash-logo-in 500ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-splash {
+    transition: none;
+  }
+
+  .pwa-splash-logo {
+    animation: none;
+  }
+}
