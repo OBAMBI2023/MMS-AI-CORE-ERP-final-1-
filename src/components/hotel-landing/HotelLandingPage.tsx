@@ -29,7 +29,10 @@ import {
 } from "lucide-react";
 
 const PROBLEMS = [
-  { icon: CalendarX, text: "Réservations difficiles à suivre, éparpillées entre carnets et messages" },
+  {
+    icon: CalendarX,
+    text: "Réservations difficiles à suivre, éparpillées entre carnets et messages",
+  },
   { icon: BedDouble, text: "Disponibilités des chambres et logements incertaines en temps réel" },
   { icon: Users2, text: "Historique clients dispersé, aucune vue d'ensemble" },
   { icon: FileWarning, text: "Suivi des chambres/logements géré à la main" },
@@ -87,10 +90,29 @@ const FEATURES = [
 // schéma "SAOVIA reçoit puis propose au tenant" — pour ne pas décrire un
 // mécanisme qui n'existe pas.
 const WORKFLOW_STEPS = [
-  { icon: Send, title: "Découverte", description: "Le visiteur découvre un logement publié sur la vitrine SAOVIA." },
-  { icon: MessageCircle, title: "Contact direct", description: "Il contacte l'établissement par WhatsApp ou téléphone, directement depuis la fiche du logement." },
-  { icon: Inbox, title: "Échange", description: "L'établissement échange avec lui pour confirmer les disponibilités et les modalités." },
-  { icon: CheckCheck, title: "Confirmation", description: "Le séjour est confirmé directement entre l'établissement et le voyageur, sans intermédiaire." },
+  {
+    icon: Send,
+    title: "Découverte",
+    description: "Le visiteur découvre un logement publié sur la vitrine SAOVIA.",
+  },
+  {
+    icon: MessageCircle,
+    title: "Contact direct",
+    description:
+      "Il contacte l'établissement par WhatsApp ou téléphone, directement depuis la fiche du logement.",
+  },
+  {
+    icon: Inbox,
+    title: "Échange",
+    description:
+      "L'établissement échange avec lui pour confirmer les disponibilités et les modalités.",
+  },
+  {
+    icon: CheckCheck,
+    title: "Confirmation",
+    description:
+      "Le séjour est confirmé directement entre l'établissement et le voyageur, sans intermédiaire.",
+  },
 ];
 
 const TARGETS = [
@@ -102,10 +124,26 @@ const TARGETS = [
 ];
 
 const WHY_SAOVIA = [
-  { icon: LayoutDashboard, title: "Centralisé", description: "Chambres, réservations, clients et revenus dans un seul espace." },
-  { icon: Zap, title: "Simple", description: "Une interface pensée pour les équipes terrain comme pour le pilotage." },
-  { icon: Globe2, title: "Accessible", description: "Disponible partout, sur ordinateur comme sur mobile." },
-  { icon: Puzzle, title: "Évolutif", description: "Des modules qui s'adaptent à la taille de votre établissement." },
+  {
+    icon: LayoutDashboard,
+    title: "Centralisé",
+    description: "Chambres, réservations, clients et revenus dans un seul espace.",
+  },
+  {
+    icon: Zap,
+    title: "Simple",
+    description: "Une interface pensée pour les équipes terrain comme pour le pilotage.",
+  },
+  {
+    icon: Globe2,
+    title: "Accessible",
+    description: "Disponible partout, sur ordinateur comme sur mobile.",
+  },
+  {
+    icon: Puzzle,
+    title: "Évolutif",
+    description: "Des modules qui s'adaptent à la taille de votre établissement.",
+  },
 ];
 
 function DashboardPreview() {
@@ -155,40 +193,61 @@ export function HotelLandingPage() {
           }}
         />
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/40 bg-white/5 px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-[#D4AF37]">
-              <Sparkles className="h-3.5 w-3.5" />
-              SAOVIA HOTEL · Solution de gestion
-            </span>
-            <h1 className="mt-6 text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
-              Pilotez votre hôtel. Développez votre activité.
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-base text-white/70 sm:text-lg">
-              Une plateforme intelligente pour gérer vos chambres, logements, réservations,
-              clients, disponibilités et revenus depuis un seul espace.
-            </p>
-            <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+            <div className="text-center lg:text-left">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/40 bg-white/5 px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-[#D4AF37]">
+                <Sparkles className="h-3.5 w-3.5" />
+                SAOVIA HOTEL · Solution de gestion
+              </span>
+              <h1 className="mt-6 text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
+                Pilotez votre hôtel. Développez votre activité.
+              </h1>
+              <p className="mx-auto mt-6 max-w-2xl text-base text-white/70 sm:text-lg lg:mx-0">
+                Une plateforme intelligente pour gérer vos chambres, logements, réservations,
+                clients, disponibilités et revenus depuis un seul espace.
+              </p>
+              <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start">
+                <Link
+                  to="/essai-gratuit"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#D4AF37] px-6 py-4 text-base font-semibold text-[#0B1F4D] shadow-lg shadow-[#D4AF37]/20 transition-transform hover:-translate-y-0.5"
+                >
+                  Créer mon établissement
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/login"
+                  className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/5 px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-white/10"
+                >
+                  Se connecter
+                </Link>
+              </div>
               <Link
-                to="/essai-gratuit"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#D4AF37] px-6 py-4 text-base font-semibold text-[#0B1F4D] shadow-lg shadow-[#D4AF37]/20 transition-transform hover:-translate-y-0.5"
+                to="/sitevitrine"
+                className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-white/60 transition-colors hover:text-white"
               >
-                Créer mon établissement
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/5 px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-white/10"
-              >
-                Se connecter
+                Découvrir la vitrine
+                <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
-            <Link
-              to="/sitevitrine"
-              className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-white/60 transition-colors hover:text-white"
-            >
-              Découvrir la vitrine
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+
+            <div className="relative mx-auto w-full max-w-lg lg:max-w-none">
+              <div
+                className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-[#D4AF37]/20 via-transparent to-transparent blur-xl"
+                aria-hidden="true"
+              />
+              <div className="relative aspect-[3/2] overflow-hidden rounded-[1.75rem] ring-1 ring-white/15 shadow-2xl shadow-black/40">
+                <img
+                  src="/images/hotel/saovia-hotel-hero.jpg"
+                  alt="Réceptionniste souriante accueillant les clients depuis une chambre d'hôtel moderne et haut de gamme"
+                  width={1536}
+                  height={1024}
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -202,7 +261,10 @@ export function HotelLandingPage() {
         </div>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PROBLEMS.map(({ icon: Icon, text }) => (
-            <div key={text} className="flex items-start gap-3 rounded-2xl border border-black/5 bg-slate-50 p-4">
+            <div
+              key={text}
+              className="flex items-start gap-3 rounded-2xl border border-black/5 bg-slate-50 p-4"
+            >
               <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#0B1F4D]/50" />
               <p className="text-sm text-muted-foreground">{text}</p>
             </div>
@@ -265,9 +327,9 @@ export function HotelLandingPage() {
                 Donnez de la visibilité à vos logements
               </h2>
               <p className="mt-4 max-w-lg leading-relaxed text-white/70">
-                Les établissements gérés sur SAOVIA peuvent publier leurs logements disponibles
-                sur la vitrine publique SAOVIA HOTEL, consultée par des voyageurs à la recherche
-                d'un séjour.
+                Les établissements gérés sur SAOVIA peuvent publier leurs logements disponibles sur
+                la vitrine publique SAOVIA HOTEL, consultée par des voyageurs à la recherche d'un
+                séjour.
               </p>
               <Link
                 to="/sitevitrine"
@@ -296,7 +358,10 @@ export function HotelLandingPage() {
         </div>
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {WORKFLOW_STEPS.map(({ icon: Icon, title, description }, index) => (
-            <div key={title} className="relative rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+            <div
+              key={title}
+              className="relative rounded-2xl border border-black/5 bg-white p-5 shadow-sm"
+            >
               <span className="absolute -top-3 left-5 flex h-7 w-7 items-center justify-center rounded-full bg-[#0B1F4D] text-xs font-bold text-white">
                 {index + 1}
               </span>
@@ -337,7 +402,10 @@ export function HotelLandingPage() {
         </div>
         <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {WHY_SAOVIA.map(({ icon: Icon, title, description }) => (
-            <div key={title} className="flex flex-col items-center text-center sm:items-start sm:text-left">
+            <div
+              key={title}
+              className="flex flex-col items-center text-center sm:items-start sm:text-left"
+            >
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0B1F4D]/5 text-[#0B1F4D]">
                 <Icon className="h-6 w-6" />
               </div>
