@@ -34,3 +34,12 @@ export const HOTEL_VITRINE_DESCRIPTION =
 export function hotelVitrineHeadMeta() {
   return buildHeadMeta(HOTEL_VITRINE_TITLE, HOTEL_VITRINE_DESCRIPTION, "SAOVIA HOTEL");
 }
+
+// hotelTrialSignupHeadMeta() → hotel.saovia.net/essai-gratuit (inscription professionnels)
+export const HOTEL_TRIAL_SIGNUP_TITLE = "Essai gratuit 7 jours | SAOVIA HOTEL";
+export const HOTEL_TRIAL_SIGNUP_DESCRIPTION =
+  "Créez votre espace SAOVIA HOTEL et gérez simplement votre hôtel ou votre résidence. Essai gratuit 7 jours, sans carte bancaire.";
+
+export function hotelTrialSignupHeadMeta() {
+  return buildHeadMeta(HOTEL_TRIAL_SIGNUP_TITLE, HOTEL_TRIAL_SIGNUP_DESCRIPTION, "SAOVIA HOTEL");
+}
