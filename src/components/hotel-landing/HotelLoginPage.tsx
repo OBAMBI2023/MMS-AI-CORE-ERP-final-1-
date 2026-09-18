@@ -128,14 +128,14 @@ export function HotelLoginPage() {
             Pilotez votre établissement avec simplicité.
           </p>
 
-          <div className="mt-8 grid max-w-sm grid-cols-4 gap-3">
+          <div className="mt-8 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             {heroFeatures.map(({ icon: Icon, label }) => (
               <div
                 key={label}
                 className="flex flex-col items-center gap-2 rounded-xl border border-white/25 bg-white/10 p-2.5 text-center backdrop-blur-sm"
               >
                 <Icon className="h-4 w-4 text-[#D4AF37]" aria-hidden="true" />
-                <p className="text-[11px] leading-tight text-white/85">{label}</p>
+                <p className="whitespace-nowrap text-[11px] leading-tight text-white/85">{label}</p>
               </div>
             ))}
           </div>
