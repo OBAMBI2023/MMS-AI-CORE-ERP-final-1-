@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  BedDouble,
   BedSingle,
   Building2,
   CalendarCheck,
@@ -16,18 +17,22 @@ import {
   Eye,
   EyeOff,
   Globe2,
+  Home,
   Hotel,
   Info,
+  Layers,
   LayoutDashboard,
   Loader2,
   Lock,
   Mail,
   Phone,
+  Rocket,
   ShieldCheck,
   Sparkles,
-  UserCog,
   UserRound,
   Wallet,
+  Warehouse,
+  Zap,
 } from "lucide-react";
 import { z } from "zod";
 import { Turnstile, type TurnstileHandle } from "@/components/Turnstile";
@@ -46,27 +51,38 @@ import { getAuthenticatedDestination } from "@/lib/partner-admin.server";
 // l'accepter en plus — aucun changement Supabase.
 const HOTEL_ACTIVITY_CODE = "hotel" as const;
 
-const trustBadges = [
+// Garanties affichées dans le hero (4 items).
+const heroGuarantees = [
   { icon: Calendar, label: "7 jours gratuits" },
   { icon: CreditCard, label: "Sans carte bancaire" },
-  { icon: ShieldCheck, label: "Annulation à tout moment" },
+  { icon: ShieldCheck, label: "Données sécurisées" },
+  { icon: Rocket, label: "Mise en service rapide" },
+] as const;
+
+// Garanties affichées sous le formulaire et dans le bandeau final (3 items,
+// volontairement distinctes des garanties du hero — "Annulation à tout
+// moment" plutôt que "Données sécurisées"/"Mise en service rapide").
+const formGuarantees = [
+  { icon: Calendar, label: "7 jours gratuits" },
+  { icon: CreditCard, label: "Sans carte bancaire" },
+  { icon: Check, label: "Annulation à tout moment" },
 ] as const;
 
 const featureCards = [
   {
     icon: BedSingle,
-    title: "Gestion des chambres",
-    description: "Suivez vos chambres, logements, tarifs et disponibilités.",
+    title: "Chambres & logements",
+    description: "Organisez vos chambres, logements, tarifs et disponibilités depuis une seule interface.",
   },
   {
     icon: CalendarCheck,
     title: "Réservations",
-    description: "Centralisez vos réservations et gardez une vision claire de votre activité.",
+    description: "Gardez une vision claire des réservations, arrivées, départs et disponibilités.",
   },
   {
     icon: Contact,
     title: "Clients",
-    description: "Retrouvez facilement les informations de vos clients et séjours.",
+    description: "Centralisez les informations de vos clients et facilitez le suivi de leurs séjours.",
   },
   {
     icon: LayoutDashboard,
@@ -74,14 +90,14 @@ const featureCards = [
     description: "Visualisez les indicateurs essentiels de votre établissement.",
   },
   {
-    icon: UserCog,
-    title: "Équipe",
-    description: "Organisez les accès et les responsabilités de votre équipe.",
+    icon: Wallet,
+    title: "Revenus",
+    description: "Suivez votre activité et vos revenus avec une vision claire de vos performances.",
   },
   {
     icon: Globe2,
     title: "Présence en ligne",
-    description: "Donnez plus de visibilité à vos logements grâce à votre présence SAOVIA HOTEL.",
+    description: "Donnez plus de visibilité à vos chambres et logements grâce à la vitrine SAOVIA HOTEL.",
   },
 ] as const;
 
@@ -89,6 +105,20 @@ const previewHighlights = [
   { icon: BedSingle, label: "Gestion des chambres" },
   { icon: CalendarCheck, label: "Réservations centralisées" },
   { icon: Wallet, label: "Suivi des revenus" },
+] as const;
+
+const problemBenefits = [
+  { icon: Layers, label: "Une vision centralisée" },
+  { icon: Zap, label: "Moins de tâches répétitives" },
+  { icon: Eye, label: "Une meilleure visibilité sur votre activité" },
+] as const;
+
+const positioningTargets = [
+  { icon: Building2, label: "Hôtels" },
+  { icon: Home, label: "Résidences" },
+  { icon: Warehouse, label: "Appart'hôtels" },
+  { icon: Layers, label: "Maisons d'hôtes" },
+  { icon: BedDouble, label: "Résidences meublées" },
 ] as const;
 
 const signupSchema = z
@@ -222,12 +252,17 @@ export function HotelTrialSignupPage() {
           aria-label="Navigation principale"
           className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 lg:px-10"
         >
-          <Link to="/" className="flex items-center gap-2">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#D4AF37]/50 bg-[#0B1F4D]">
+          <Link to="/" className="flex items-center gap-2.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#D4AF37]/50 bg-[#0B1F4D]">
               <Hotel className="h-5 w-5 text-[#D4AF37]" />
             </span>
-            <span className="text-lg font-semibold tracking-tight text-[#0B1F4D]">
-              SAOVIA <span className="text-[#D4AF37]">HOTEL</span>
+            <span className="flex flex-col leading-tight">
+              <span className="text-lg font-semibold tracking-tight text-[#0B1F4D]">
+                SAOVIA <span className="text-[#D4AF37]">HOTEL</span>
+              </span>
+              <span className="hidden text-[11px] text-slate-500 sm:block">
+                Logiciel de gestion pour hôtels et résidences
+              </span>
             </span>
           </Link>
 
@@ -255,22 +290,33 @@ export function HotelTrialSignupPage() {
           <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-14">
             {/* Colonne gauche : positionnement + aperçu + confiance */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-4 py-1.5 text-xs font-semibold text-[#0B1F4D]">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#0B1F4D]">
                 <Sparkles className="h-3.5 w-3.5 text-[#D4AF37]" aria-hidden="true" />
                 Essai gratuit 7 jours
               </span>
 
               <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-950 sm:text-5xl lg:text-[3.4rem]">
-                Créez votre espace <span className="text-[#0B1F4D]">SAOVIA HOTEL</span>
+                Pilotez votre hôtel.
+                <br />
+                Développez votre <span className="text-[#0B1F4D]">activité.</span>
               </h1>
 
               <p className="mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
-                Gérez votre hôtel ou votre résidence simplement pendant 7 jours, sans engagement.
+                Découvrez SAOVIA HOTEL, la plateforme de gestion conçue pour les hôtels,
+                résidences, appart'hôtels et établissements d'hébergement.
               </p>
               <p className="mt-3 max-w-xl text-sm font-semibold text-[#0B1F4D] sm:text-base">
-                SAOVIA HOTEL — la plateforme de gestion pour hôtels, résidences et établissements
-                d'hébergement.
+                Centralisez vos chambres, réservations, clients, disponibilités et revenus dans
+                une seule plateforme.
               </p>
+
+              <Link
+                to="/"
+                className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[#0B1F4D] hover:underline"
+              >
+                Découvrir SAOVIA HOTEL
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
 
               {/* Aperçu : bénéfices réels, aucune donnée fictive */}
               <div className="relative mt-10 hidden sm:block">
@@ -302,8 +348,8 @@ export function HotelTrialSignupPage() {
               </div>
 
               {/* Garanties */}
-              <div className="mt-8 grid grid-cols-3 gap-3">
-                {trustBadges.map(({ icon: Icon, label }) => (
+              <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {heroGuarantees.map(({ icon: Icon, label }) => (
                   <div
                     key={label}
                     className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-4 text-center shadow-sm transition-colors hover:border-[#0B1F4D]/30"
@@ -326,9 +372,10 @@ export function HotelTrialSignupPage() {
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">Créer votre espace d'essai</h2>
+                  <h2 className="text-xl font-bold text-slate-900">Créez votre espace SAOVIA HOTEL</h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Remplissez les informations ci-dessous pour commencer.
+                    Commencez votre essai gratuit de 7 jours et découvrez une nouvelle façon de
+                    gérer votre établissement.
                   </p>
                 </div>
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#0B1F4D]/[0.06] text-[#0B1F4D]">
@@ -514,21 +561,45 @@ export function HotelTrialSignupPage() {
                 </button>
 
                 <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium text-slate-500">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-                    Données sécurisées
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-                    Essai 7 jours
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-                    Annulation à tout moment
-                  </span>
+                  {formGuarantees.map(({ icon: Icon, label }) => (
+                    <span key={label} className="inline-flex items-center gap-1.5">
+                      <Icon className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                      {label}
+                    </span>
+                  ))}
                 </div>
               </form>
             </div>
+          </div>
+        </section>
+
+        {/* Problème */}
+        <section className="border-y border-slate-100 bg-slate-50 px-5 py-16 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
+              Votre établissement mérite mieux que des outils dispersés.
+            </h2>
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              Fichiers Excel, carnets, messages WhatsApp et informations dispersées compliquent
+              rapidement la gestion d'un établissement.
+            </p>
+            <p className="mt-3 text-base font-semibold text-[#0B1F4D]">
+              Avec SAOVIA HOTEL, retrouvez l'essentiel de votre activité au même endroit.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-10 grid max-w-3xl gap-4 sm:grid-cols-3">
+            {problemBenefits.map(({ icon: Icon, label }) => (
+              <div
+                key={label}
+                className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-5 text-center shadow-sm"
+              >
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#0B1F4D]/[0.06] text-[#0B1F4D]">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <p className="text-sm font-semibold text-slate-800">{label}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -538,6 +609,10 @@ export function HotelTrialSignupPage() {
             <h2 className="text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
               Tout ce qu'il faut pour mieux gérer votre établissement
             </h2>
+            <p className="mt-4 text-slate-600">
+              SAOVIA HOTEL centralise les opérations essentielles de votre établissement dans une
+              seule plateforme.
+            </p>
           </div>
 
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -556,6 +631,28 @@ export function HotelTrialSignupPage() {
           </div>
         </section>
 
+        {/* Positionnement */}
+        <section className="bg-slate-50 px-5 py-16 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
+              Pensé pour les professionnels de l'hébergement
+            </h2>
+          </div>
+          <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {positioningTargets.map(({ icon: Icon, label }) => (
+              <div
+                key={label}
+                className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center shadow-sm"
+              >
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#0B1F4D]/[0.06] text-[#0B1F4D]">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <p className="text-sm font-semibold text-slate-800">{label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Bandeau final */}
         <section className="px-5 py-16 sm:py-20 lg:px-8">
           <div className="mx-auto max-w-5xl overflow-hidden rounded-[2rem] bg-gradient-to-r from-[#0B1F4D] to-[#12295e] px-6 py-12 text-center shadow-2xl shadow-[#0B1F4D]/30 sm:px-12">
@@ -563,21 +660,15 @@ export function HotelTrialSignupPage() {
               Prêt à mieux gérer votre établissement ?
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-white/70 sm:text-base">
-              Rejoignez SAOVIA et centralisez votre activité hôtelière.
+              Commencez votre essai gratuit de 7 jours et découvrez SAOVIA HOTEL.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm font-semibold text-white/90">
-              <span className="inline-flex items-center gap-2">
-                <Check className="h-4 w-4" aria-hidden="true" />
-                7 jours gratuits
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <Check className="h-4 w-4" aria-hidden="true" />
-                Sans carte bancaire
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <Check className="h-4 w-4" aria-hidden="true" />
-                Annulation à tout moment
-              </span>
+              {formGuarantees.map(({ icon: Icon, label }) => (
+                <span key={label} className="inline-flex items-center gap-2">
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  {label}
+                </span>
+              ))}
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <button
@@ -598,7 +689,89 @@ export function HotelTrialSignupPage() {
           </div>
         </section>
       </main>
+
+      <HotelTrialFooter />
     </div>
+  );
+}
+
+function HotelTrialFooter() {
+  return (
+    <footer className="border-t border-slate-200 bg-[#0B1F4D] text-white/70">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-4 lg:px-10">
+        <div className="md:col-span-2">
+          <div className="flex items-center gap-2 text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#D4AF37]/50 bg-[#D4AF37]/10">
+              <Hotel className="h-4 w-4 text-[#D4AF37]" />
+            </span>
+            <span className="text-base font-semibold">SAOVIA HOTEL</span>
+          </div>
+          <p className="mt-4 max-w-sm text-sm leading-relaxed">
+            La plateforme de gestion pensée pour les hôtels, résidences et établissements
+            d'hébergement.
+          </p>
+        </div>
+        <div className="text-sm">
+          <p className="font-semibold uppercase tracking-wide text-white">SAOVIA HOTEL</p>
+          <ul className="mt-4 space-y-2.5">
+            <li>
+              <Link to="/" hash="fonctionnalites" className="hover:text-white">
+                Fonctionnalités
+              </Link>
+            </li>
+            <li>
+              <Link to="/tarifs" className="hover:text-white">
+                Tarifs
+              </Link>
+            </li>
+            <li>
+              <a href="#formulaire-essai" className="hover:text-white">
+                Essai gratuit
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div className="text-sm">
+          <p className="font-semibold uppercase tracking-wide text-white">Professionnels</p>
+          <ul className="mt-4 space-y-2.5">
+            <li>
+              <Link to="/login" className="hover:text-white">
+                Connexion
+              </Link>
+            </li>
+            <li>
+              <a href="#formulaire-essai" className="hover:text-white">
+                Créer mon espace
+              </a>
+            </li>
+            <li>
+              <Link to="/support" className="hover:text-white">
+                Centre d'aide
+              </Link>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-white/10">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-6 text-xs text-white/50 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+          <p>© {new Date().getFullYear()} SAOVIA. Tous droits réservés.</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link to="/" className="hover:text-white">
+              À propos
+            </Link>
+            <a href="mailto:contact@saovia.net" className="hover:text-white">
+              Contact
+            </a>
+            <Link to="/tarifs" className="hover:text-white">
+              Conditions d'utilisation
+            </Link>
+            <Link to="/tarifs" className="hover:text-white">
+              Politique de confidentialité
+            </Link>
+          </div>
+        </div>
+      </div>
+    </footer>
   );
 }
 

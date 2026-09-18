@@ -5,17 +5,24 @@
 // l'inverse.
 // - hotelLandingHeadMeta()  → hotel.saovia.net/    (professionnels)
 // - hotelVitrineHeadMeta()  → hotel.saovia.net/sitevitrine (visiteurs)
-function buildHeadMeta(title: string, description: string, siteName: string) {
+function buildHeadMeta(
+  title: string,
+  description: string,
+  siteName: string,
+  og?: { title: string; description: string },
+) {
+  const ogTitle = og?.title ?? title;
+  const ogDescription = og?.description ?? description;
   return [
     { title },
     { name: "description", content: description },
-    { property: "og:title", content: title },
-    { property: "og:description", content: description },
+    { property: "og:title", content: ogTitle },
+    { property: "og:description", content: ogDescription },
     { property: "og:type", content: "website" },
     { property: "og:site_name", content: siteName },
     { name: "twitter:card", content: "summary_large_image" },
-    { name: "twitter:title", content: title },
-    { name: "twitter:description", content: description },
+    { name: "twitter:title", content: ogTitle },
+    { name: "twitter:description", content: ogDescription },
   ];
 }
 
@@ -39,7 +46,15 @@ export function hotelVitrineHeadMeta() {
 export const HOTEL_TRIAL_SIGNUP_TITLE = "Essai gratuit 7 jours | SAOVIA HOTEL";
 export const HOTEL_TRIAL_SIGNUP_DESCRIPTION =
   "Créez votre espace SAOVIA HOTEL et gérez simplement votre hôtel ou votre résidence. Essai gratuit 7 jours, sans carte bancaire.";
+// OG/Twitter volontairement distincts du title/description (formulés pour le
+// partage social plutôt que pour l'onglet du navigateur).
+export const HOTEL_TRIAL_SIGNUP_OG_TITLE = "SAOVIA HOTEL — Essai gratuit 7 jours";
+export const HOTEL_TRIAL_SIGNUP_OG_DESCRIPTION =
+  "Une plateforme simple et centralisée pour gérer votre hôtel, vos chambres, vos réservations et votre activité.";
 
 export function hotelTrialSignupHeadMeta() {
-  return buildHeadMeta(HOTEL_TRIAL_SIGNUP_TITLE, HOTEL_TRIAL_SIGNUP_DESCRIPTION, "SAOVIA HOTEL");
+  return buildHeadMeta(HOTEL_TRIAL_SIGNUP_TITLE, HOTEL_TRIAL_SIGNUP_DESCRIPTION, "SAOVIA HOTEL", {
+    title: HOTEL_TRIAL_SIGNUP_OG_TITLE,
+    description: HOTEL_TRIAL_SIGNUP_OG_DESCRIPTION,
+  });
 }
