@@ -178,8 +178,8 @@ function DashboardPreview() {
           <img
             src="/images/hotel/saovia-hotel-dashboard-preview.jpg"
             alt="Aperçu de l'interface de démonstration du tableau de bord SAOVIA HOTEL, affichant occupation, réservations et revenus"
-            width={791}
-            height={660}
+            width={1280}
+            height={720}
             loading="lazy"
             decoding="async"
             className="h-auto w-full"
