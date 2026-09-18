@@ -364,10 +364,13 @@ export function HotelLandingPage() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gradient-to-br from-[#12295e] via-[#1c3a7a] to-[#0B1F4D]">
-              <div className="absolute inset-0 grid place-items-center">
-                <Globe2 className="h-16 w-16 text-[#D4AF37]/60" />
-              </div>
+            <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
+              <img
+                src="/images/hotel/saovia-hotel-visibility-showcase.jpg"
+                alt="Vitrine publique de réservation affichée sur ordinateur et smartphone"
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
             </div>
           </div>
         </div>
