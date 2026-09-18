@@ -93,15 +93,22 @@ export function HotelLoginPage() {
   return (
     <div className="flex min-h-screen flex-col bg-white lg:flex-row">
       {/* Gauche : photographie hôtel + overlay navy + positionnement */}
-      <div className="relative min-h-[38vh] overflow-hidden lg:min-h-screen lg:w-1/2">
-        <img
-          src="/images/hotel/saovia-hotel-hero.jpg"
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+      <div className="relative h-[240px] overflow-hidden sm:h-[280px] md:h-[320px] lg:h-auto lg:min-h-screen lg:w-[58%]">
+        <picture>
+          {/* Desktop/tablette large : crop portrait dédié, sujet centré, jamais coupé */}
+          <source
+            media="(min-width: 1024px)"
+            srcSet="/images/hotel/saovia-hotel-login-hero.jpg"
+          />
+          <img
+            src="/images/hotel/saovia-hotel-login-hero-mobile.jpg"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+        </picture>
         <div
-          className="absolute inset-0 bg-gradient-to-t from-[#0B1F4D]/95 via-[#0B1F4D]/65 to-[#0B1F4D]/25"
+          className="absolute inset-0 bg-gradient-to-t from-[#0B1F4D]/90 via-[#0B1F4D]/45 to-[#0B1F4D]/20"
           aria-hidden="true"
         />
         <div className="relative flex h-full flex-col justify-end p-8 text-white sm:p-12 lg:p-14">
@@ -113,28 +120,25 @@ export function HotelLoginPage() {
           </div>
 
           <p className="mt-6 max-w-md text-2xl font-semibold leading-snug sm:text-3xl">
-            Pilotez votre établissement
-            <br />
-            avec simplicité.
-          </p>
-
-          <div className="mt-10 grid max-w-sm grid-cols-4 gap-4">
-            {heroFeatures.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex flex-col items-center gap-2 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/30">
-                  <Icon className="h-5 w-5 text-[#D4AF37]" aria-hidden="true" />
-                </span>
-                <p className="text-xs text-white/80">{label}</p>
-              </div>
-            ))}
-          </div>
-
-          <span className="mt-10 block h-px w-14 bg-[#D4AF37]" aria-hidden="true" />
-          <p className="mt-6 max-w-sm text-sm leading-relaxed text-white/70">
             L'hospitalité d'aujourd'hui,
             <br />
             une gestion plus performante.
           </p>
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/75 sm:text-base">
+            Pilotez votre établissement avec simplicité.
+          </p>
+
+          <div className="mt-8 grid max-w-sm grid-cols-4 gap-3">
+            {heroFeatures.map(({ icon: Icon, label }) => (
+              <div
+                key={label}
+                className="flex flex-col items-center gap-2 rounded-xl border border-white/25 bg-white/10 p-2.5 text-center backdrop-blur-sm"
+              >
+                <Icon className="h-4 w-4 text-[#D4AF37]" aria-hidden="true" />
+                <p className="text-[11px] leading-tight text-white/85">{label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
