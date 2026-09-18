@@ -14,45 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _clients_cleanup_backup_20260809: {
-        Row: {
-          address: string | null
-          backup_taken_at: string
-          created_at: string | null
-          email: string | null
-          id: string
-          name: string | null
-          notes: string | null
-          phone: string | null
-          tenant_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          address?: string | null
-          backup_taken_at?: string
-          created_at?: string | null
-          email?: string | null
-          id: string
-          name?: string | null
-          notes?: string | null
-          phone?: string | null
-          tenant_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          address?: string | null
-          backup_taken_at?: string
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          name?: string | null
-          notes?: string | null
-          phone?: string | null
-          tenant_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       achat_items: {
         Row: {
           achat_id: string
@@ -1785,12 +1746,15 @@ export type Database = {
           check_in: string
           check_out: string
           created_at: string
+          created_by: string | null
           discount: number
           guest_id: string | null
           id: string
+          is_retroactive: boolean
           nightly_rate: number
           nights: number | null
           notes: string | null
+          retroactive_reason: string | null
           room_id: string
           status: string
           tenant_id: string
@@ -1803,12 +1767,15 @@ export type Database = {
           check_in: string
           check_out: string
           created_at?: string
+          created_by?: string | null
           discount?: number
           guest_id?: string | null
           id?: string
+          is_retroactive?: boolean
           nightly_rate: number
           nights?: number | null
           notes?: string | null
+          retroactive_reason?: string | null
           room_id: string
           status?: string
           tenant_id: string
@@ -1821,18 +1788,28 @@ export type Database = {
           check_in?: string
           check_out?: string
           created_at?: string
+          created_by?: string | null
           discount?: number
           guest_id?: string | null
           id?: string
+          is_retroactive?: boolean
           nightly_rate?: number
           nights?: number | null
           notes?: string | null
+          retroactive_reason?: string | null
           room_id?: string
           status?: string
           tenant_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "hotel_reservations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hotel_reservations_guest_id_tenant_id_fkey"
             columns: ["guest_id", "tenant_id"]
@@ -1900,9 +1877,11 @@ export type Database = {
           capacity: number
           cover_image_path: string | null
           created_at: string
+          description: string | null
           id: string
           number: string
           property_type: string | null
+          publication_status: string
           rate: number
           room_count: number | null
           room_type_id: string | null
@@ -1915,9 +1894,11 @@ export type Database = {
           capacity?: number
           cover_image_path?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           number: string
           property_type?: string | null
+          publication_status?: string
           rate?: number
           room_count?: number | null
           room_type_id?: string | null
@@ -1930,9 +1911,11 @@ export type Database = {
           capacity?: number
           cover_image_path?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           number?: string
           property_type?: string | null
+          publication_status?: string
           rate?: number
           room_count?: number | null
           room_type_id?: string | null
@@ -4151,6 +4134,7 @@ export type Database = {
           deleted_at: string | null
           deleted_by: string | null
           deletion_reason: string | null
+          description: string | null
           email: string | null
           id: string
           is_active: boolean | null
@@ -4166,6 +4150,7 @@ export type Database = {
           suspended_at: string | null
           suspended_by: string | null
           suspension_reason: string | null
+          whatsapp: string | null
         }
         Insert: {
           activity?: string | null
@@ -4177,6 +4162,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           deletion_reason?: string | null
+          description?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
@@ -4192,6 +4178,7 @@ export type Database = {
           suspended_at?: string | null
           suspended_by?: string | null
           suspension_reason?: string | null
+          whatsapp?: string | null
         }
         Update: {
           activity?: string | null
@@ -4203,6 +4190,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           deletion_reason?: string | null
+          description?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
@@ -4218,6 +4206,7 @@ export type Database = {
           suspended_at?: string | null
           suspended_by?: string | null
           suspension_reason?: string | null
+          whatsapp?: string | null
         }
         Relationships: [
           {
@@ -4525,21 +4514,31 @@ export type Database = {
           check_in: string | null
           check_out: string | null
           created_at: string | null
+          created_by: string | null
           discount: number | null
           extras_total: number | null
           grand_total: number | null
           guest_id: string | null
           id: string | null
+          is_retroactive: boolean | null
           nightly_rate: number | null
           nights: number | null
           notes: string | null
           paid_total: number | null
+          retroactive_reason: string | null
           room_id: string | null
           status: string | null
           tenant_id: string | null
           updated_at: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "hotel_reservations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hotel_reservations_guest_id_tenant_id_fkey"
             columns: ["guest_id", "tenant_id"]
@@ -5132,6 +5131,68 @@ export type Database = {
         }
         Returns: boolean
       }
+      hotel_guest_delete_for_ui: {
+        Args: { p_guest_id: string }
+        Returns: boolean
+      }
+      hotel_guest_identity_for_ui: {
+        Args: { p_guest_id: string }
+        Returns: {
+          address: string
+          client_type: string
+          company: string
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          identity_document_path: string
+          identity_number: string
+          identity_type: string
+          last_name: string
+          nationality: string
+          notes: string
+          phone: string
+          tenant_id: string
+          updated_at: string
+        }[]
+      }
+      hotel_guest_list_for_ui: {
+        Args: never
+        Returns: {
+          address: string
+          client_type: string
+          company: string
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          identity_document_path: string
+          last_name: string
+          nationality: string
+          notes: string
+          phone: string
+          tenant_id: string
+          updated_at: string
+        }[]
+      }
+      hotel_guest_update_for_ui: {
+        Args: {
+          p_address: string
+          p_client_type: string
+          p_company: string
+          p_email: string
+          p_first_name: string
+          p_guest_id: string
+          p_identity_document_path?: string
+          p_identity_number?: string
+          p_identity_type?: string
+          p_last_name: string
+          p_nationality: string
+          p_notes: string
+          p_phone: string
+        }
+        Returns: boolean
+      }
       hotel_module_enabled: { Args: { code: string }; Returns: boolean }
       hotel_permission_for: {
         Args: {
@@ -5454,12 +5515,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5483,11 +5544,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5508,11 +5569,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5533,11 +5594,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5550,11 +5611,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
