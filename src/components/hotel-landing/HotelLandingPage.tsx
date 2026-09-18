@@ -148,33 +148,55 @@ const WHY_SAOVIA = [
 
 function DashboardPreview() {
   const tiles = [
-    { label: "Occupation", value: "•••", icon: BedDouble },
-    { label: "Réservations", value: "•••", icon: CalendarCheck },
-    { label: "Arrivées", value: "•••", icon: ArrowRight },
-    { label: "Départs", value: "•••", icon: ArrowRight },
-    { label: "Revenus", value: "•••", icon: Wallet },
-    { label: "Disponibilité", value: "•••", icon: LayoutDashboard },
+    { label: "Occupation", icon: BedDouble },
+    { label: "Réservations", icon: CalendarCheck },
+    { label: "Arrivées", icon: ArrowRight },
+    { label: "Départs", icon: ArrowRight },
+    { label: "Revenus", icon: Wallet },
+    { label: "Disponibilité", icon: LayoutDashboard },
   ];
   return (
-    <div className="relative">
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-2xl sm:p-6">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">
-            Aperçu de l'interface — Tableau de bord Hôtel
-          </span>
-          <span className="rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-medium text-white/40">
-            Interface de démonstration
-          </span>
+    <div className="relative mt-12">
+      <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-white/50">
+          Aperçu de l'interface — Tableau de bord Hôtel
+        </span>
+        <span className="shrink-0 rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-medium text-white/40">
+          Interface de démonstration
+        </span>
+      </div>
+
+      {/* Visuel principal : capture d'écran de démonstration, aucun chiffre
+          HTML ajouté ici — ceux visibles dans l'image font partie du mockup
+          fourni et restent sous l'étiquette "Interface de démonstration". */}
+      <div className="relative mx-auto mt-4 max-w-4xl">
+        <div
+          className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-[#D4AF37]/15 via-transparent to-transparent blur-2xl"
+          aria-hidden="true"
+        />
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/40">
+          <img
+            src="/images/hotel/saovia-hotel-dashboard-preview.jpg"
+            alt="Aperçu de l'interface de démonstration du tableau de bord SAOVIA HOTEL, affichant occupation, réservations et revenus"
+            width={791}
+            height={660}
+            loading="lazy"
+            decoding="async"
+            className="h-auto w-full"
+          />
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {tiles.map(({ label, value, icon: Icon }) => (
-            <div key={label} className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/5">
-              <Icon className="h-4 w-4 text-[#D4AF37]" />
-              <p className="mt-3 text-xl font-bold text-white">{value}</p>
-              <p className="mt-1 text-xs text-white/50">{label}</p>
-            </div>
-          ))}
-        </div>
+      </div>
+
+      <div className="mx-auto mt-8 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {tiles.map(({ label, icon: Icon }) => (
+          <div
+            key={label}
+            className="flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-center"
+          >
+            <Icon className="h-4 w-4 text-[#D4AF37]" />
+            <p className="text-xs font-medium text-white/70">{label}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -277,15 +299,18 @@ export function HotelLandingPage() {
 
       {/* Dashboard */}
       <section className="bg-[#0B1F4D] py-16 sm:py-20">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-          <div>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
             <span className="text-xs font-medium uppercase tracking-wider text-[#D4AF37]">
-              Votre tableau de bord
+              SAOVIA centralise votre activité dans une seule plateforme.
             </span>
             <h2 className="mt-3 text-2xl font-bold text-white sm:text-3xl">
-              Toute votre activité, visible en un coup d'œil.
+              Votre tableau de bord
             </h2>
-            <p className="mt-4 max-w-lg leading-relaxed text-white/70">
+            <p className="mt-2 text-lg font-semibold text-white">
+              Toute votre activité, visible en un coup d'œil.
+            </p>
+            <p className="mt-4 leading-relaxed text-white/70">
               Occupation, réservations, arrivées, départs, revenus et disponibilité : l'ERP Hôtel
               SAOVIA réunit les indicateurs essentiels de votre établissement dans une seule
               interface.
