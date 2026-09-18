@@ -72,7 +72,8 @@ const featureCards = [
   {
     icon: BedSingle,
     title: "Chambres & logements",
-    description: "Organisez vos chambres, logements, tarifs et disponibilités depuis une seule interface.",
+    description:
+      "Organisez vos chambres, logements, tarifs et disponibilités depuis une seule interface.",
   },
   {
     icon: CalendarCheck,
@@ -82,7 +83,8 @@ const featureCards = [
   {
     icon: Contact,
     title: "Clients",
-    description: "Centralisez les informations de vos clients et facilitez le suivi de leurs séjours.",
+    description:
+      "Centralisez les informations de vos clients et facilitez le suivi de leurs séjours.",
   },
   {
     icon: LayoutDashboard,
@@ -97,7 +99,8 @@ const featureCards = [
   {
     icon: Globe2,
     title: "Présence en ligne",
-    description: "Donnez plus de visibilité à vos chambres et logements grâce à la vitrine SAOVIA HOTEL.",
+    description:
+      "Donnez plus de visibilité à vos chambres et logements grâce à la vitrine SAOVIA HOTEL.",
   },
 ] as const;
 
@@ -302,12 +305,12 @@ export function HotelTrialSignupPage() {
               </h1>
 
               <p className="mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
-                Découvrez SAOVIA HOTEL, la plateforme de gestion conçue pour les hôtels,
-                résidences, appart'hôtels et établissements d'hébergement.
+                Découvrez SAOVIA HOTEL, la plateforme de gestion conçue pour les hôtels, résidences,
+                appart'hôtels et établissements d'hébergement.
               </p>
               <p className="mt-3 max-w-xl text-sm font-semibold text-[#0B1F4D] sm:text-base">
-                Centralisez vos chambres, réservations, clients, disponibilités et revenus dans
-                une seule plateforme.
+                Centralisez vos chambres, réservations, clients, disponibilités et revenus dans une
+                seule plateforme.
               </p>
 
               <Link
@@ -372,7 +375,9 @@ export function HotelTrialSignupPage() {
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">Créez votre espace SAOVIA HOTEL</h2>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Créez votre espace SAOVIA HOTEL
+                  </h2>
                   <p className="mt-1 text-sm text-slate-500">
                     Commencez votre essai gratuit de 7 jours et découvrez une nouvelle façon de
                     gérer votre établissement.
