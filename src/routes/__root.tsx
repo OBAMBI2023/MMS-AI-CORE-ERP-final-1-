@@ -92,8 +92,17 @@ function isPublicOrderingRoute(pathname: string) {
 // /sitevitrine/hotels/:slug). Entièrement anonyme, sans rapport avec le
 // back-office /hotel/* (qui reste protégé par la garde ci-dessous) : chaque
 // tenant est résolu depuis son slug public, jamais depuis une session.
+// /hotel-vitrine* reste listé ici uniquement comme ancien préfixe : ces
+// routes ne font plus que rediriger vers /sitevitrine (hotel-vitrine.index.tsx,
+// hotel-vitrine.$.tsx) et doivent donc rester anonymes pour que la
+// redirection s'exécute avant toute garde d'authentification.
 function isHotelVitrineRoute(pathname: string) {
-  return pathname === "/sitevitrine" || pathname.startsWith("/sitevitrine/");
+  return (
+    pathname === "/sitevitrine" ||
+    pathname.startsWith("/sitevitrine/") ||
+    pathname === "/hotel-vitrine" ||
+    pathname.startsWith("/hotel-vitrine/")
+  );
 }
 
 const publicRoutes = new Set([

@@ -43,6 +43,7 @@ import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SitevitrineIndexRouteImport } from './routes/sitevitrine.index'
 import { Route as HotelIndexRouteImport } from './routes/hotel.index'
+import { Route as HotelVitrineIndexRouteImport } from './routes/hotel-vitrine.index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as SuperAdminUsersRouteImport } from './routes/super-admin.users'
 import { Route as SuperAdminSupportRouteImport } from './routes/super-admin.support'
@@ -69,6 +70,7 @@ import { Route as HotelClientsRouteImport } from './routes/hotel.clients'
 import { Route as HotelCheckinCheckoutRouteImport } from './routes/hotel.checkin-checkout'
 import { Route as HotelChambresRouteImport } from './routes/hotel.chambres'
 import { Route as HotelCaisseRouteImport } from './routes/hotel.caisse'
+import { Route as HotelVitrineSplatRouteImport } from './routes/hotel-vitrine.$'
 import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as AppSplatRouteImport } from './routes/app.$'
 import { Route as SitevitrineHotelsIndexRouteImport } from './routes/sitevitrine.hotels.index'
@@ -244,6 +246,11 @@ const HotelIndexRoute = HotelIndexRouteImport.update({
   path: '/',
   getParentRoute: () => HotelRoute,
 } as any)
+const HotelVitrineIndexRoute = HotelVitrineIndexRouteImport.update({
+  id: '/hotel-vitrine/',
+  path: '/hotel-vitrine/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/app/',
   path: '/app/',
@@ -374,6 +381,11 @@ const HotelCaisseRoute = HotelCaisseRouteImport.update({
   path: '/caisse',
   getParentRoute: () => HotelRoute,
 } as any)
+const HotelVitrineSplatRoute = HotelVitrineSplatRouteImport.update({
+  id: '/hotel-vitrine/$',
+  path: '/hotel-vitrine/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppAssistantIaRoute = AppAssistantIaRouteImport.update({
   id: '/app/assistant-ia',
   path: '/app/assistant-ia',
@@ -430,6 +442,7 @@ export interface FileRoutesByFullPath {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel-vitrine/$': typeof HotelVitrineSplatRoute
   '/hotel/caisse': typeof HotelCaisseRoute
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/checkin-checkout': typeof HotelCheckinCheckoutRoute
@@ -456,6 +469,7 @@ export interface FileRoutesByFullPath {
   '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app/': typeof AppIndexRoute
+  '/hotel-vitrine/': typeof HotelVitrineIndexRoute
   '/hotel/': typeof HotelIndexRoute
   '/sitevitrine/': typeof SitevitrineIndexRoute
   '/sitevitrine/hotels/$slug': typeof SitevitrineHotelsSlugRoute
@@ -494,6 +508,7 @@ export interface FileRoutesByTo {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel-vitrine/$': typeof HotelVitrineSplatRoute
   '/hotel/caisse': typeof HotelCaisseRoute
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/checkin-checkout': typeof HotelCheckinCheckoutRoute
@@ -519,6 +534,7 @@ export interface FileRoutesByTo {
   '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app': typeof AppIndexRoute
+  '/hotel-vitrine': typeof HotelVitrineIndexRoute
   '/hotel': typeof HotelIndexRoute
   '/sitevitrine': typeof SitevitrineIndexRoute
   '/sitevitrine/hotels/$slug': typeof SitevitrineHotelsSlugRoute
@@ -560,6 +576,7 @@ export interface FileRoutesById {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
+  '/hotel-vitrine/$': typeof HotelVitrineSplatRoute
   '/hotel/caisse': typeof HotelCaisseRoute
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/checkin-checkout': typeof HotelCheckinCheckoutRoute
@@ -586,6 +603,7 @@ export interface FileRoutesById {
   '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app/': typeof AppIndexRoute
+  '/hotel-vitrine/': typeof HotelVitrineIndexRoute
   '/hotel/': typeof HotelIndexRoute
   '/sitevitrine/': typeof SitevitrineIndexRoute
   '/sitevitrine/hotels/$slug': typeof SitevitrineHotelsSlugRoute
@@ -628,6 +646,7 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel-vitrine/$'
     | '/hotel/caisse'
     | '/hotel/chambres'
     | '/hotel/checkin-checkout'
@@ -654,6 +673,7 @@ export interface FileRouteTypes {
     | '/super-admin/support'
     | '/super-admin/users'
     | '/app/'
+    | '/hotel-vitrine/'
     | '/hotel/'
     | '/sitevitrine/'
     | '/sitevitrine/hotels/$slug'
@@ -692,6 +712,7 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel-vitrine/$'
     | '/hotel/caisse'
     | '/hotel/chambres'
     | '/hotel/checkin-checkout'
@@ -717,6 +738,7 @@ export interface FileRouteTypes {
     | '/super-admin/support'
     | '/super-admin/users'
     | '/app'
+    | '/hotel-vitrine'
     | '/hotel'
     | '/sitevitrine'
     | '/sitevitrine/hotels/$slug'
@@ -757,6 +779,7 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
+    | '/hotel-vitrine/$'
     | '/hotel/caisse'
     | '/hotel/chambres'
     | '/hotel/checkin-checkout'
@@ -783,6 +806,7 @@ export interface FileRouteTypes {
     | '/super-admin/support'
     | '/super-admin/users'
     | '/app/'
+    | '/hotel-vitrine/'
     | '/hotel/'
     | '/sitevitrine/'
     | '/sitevitrine/hotels/$slug'
@@ -824,10 +848,12 @@ export interface RootRouteChildren {
   VentesRoute: typeof VentesRoute
   AppSplatRoute: typeof AppSplatRoute
   AppAssistantIaRoute: typeof AppAssistantIaRoute
+  HotelVitrineSplatRoute: typeof HotelVitrineSplatRoute
   LoginSlugRoute: typeof LoginSlugRoute
   SettingsCatalogueRoute: typeof SettingsCatalogueRoute
   SettingsUsersRoute: typeof SettingsUsersRoute
   AppIndexRoute: typeof AppIndexRoute
+  HotelVitrineIndexRoute: typeof HotelVitrineIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1070,6 +1096,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelIndexRouteImport
       parentRoute: typeof HotelRoute
     }
+    '/hotel-vitrine/': {
+      id: '/hotel-vitrine/'
+      path: '/hotel-vitrine'
+      fullPath: '/hotel-vitrine/'
+      preLoaderRoute: typeof HotelVitrineIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/': {
       id: '/app/'
       path: '/app'
@@ -1252,6 +1285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelCaisseRouteImport
       parentRoute: typeof HotelRoute
     }
+    '/hotel-vitrine/$': {
+      id: '/hotel-vitrine/$'
+      path: '/hotel-vitrine/$'
+      fullPath: '/hotel-vitrine/$'
+      preLoaderRoute: typeof HotelVitrineSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/assistant-ia': {
       id: '/app/assistant-ia'
       path: '/app/assistant-ia'
@@ -1417,10 +1457,12 @@ const rootRouteChildren: RootRouteChildren = {
   VentesRoute: VentesRoute,
   AppSplatRoute: AppSplatRoute,
   AppAssistantIaRoute: AppAssistantIaRoute,
+  HotelVitrineSplatRoute: HotelVitrineSplatRoute,
   LoginSlugRoute: LoginSlugRoute,
   SettingsCatalogueRoute: SettingsCatalogueRoute,
   SettingsUsersRoute: SettingsUsersRoute,
   AppIndexRoute: AppIndexRoute,
+  HotelVitrineIndexRoute: HotelVitrineIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
