@@ -88,12 +88,12 @@ function isPublicOrderingRoute(pathname: string) {
   return pathname === "/r" || pathname.startsWith("/r/");
 }
 
-// Vitrine publique SAOVIA Hôtel (/hotel-vitrine, /hotel-vitrine/hotels,
-// /hotel-vitrine/hotels/:slug). Entièrement anonyme, sans rapport avec le
+// Vitrine publique SAOVIA Hôtel (/sitevitrine, /sitevitrine/hotels,
+// /sitevitrine/hotels/:slug). Entièrement anonyme, sans rapport avec le
 // back-office /hotel/* (qui reste protégé par la garde ci-dessous) : chaque
 // tenant est résolu depuis son slug public, jamais depuis une session.
 function isHotelVitrineRoute(pathname: string) {
-  return pathname === "/hotel-vitrine" || pathname.startsWith("/hotel-vitrine/");
+  return pathname === "/sitevitrine" || pathname.startsWith("/sitevitrine/");
 }
 
 const publicRoutes = new Set([

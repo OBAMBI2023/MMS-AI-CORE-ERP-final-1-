@@ -13,28 +13,11 @@ import {
   fetchPublicHotelBySlug,
   type PublicHotelLodging,
 } from "@/integrations/hotel/public-directory";
+import { propertyTypeLabel, lodgingWhatsappHref } from "@/lib/hotel/public-lodging-display";
 
-export const Route = createFileRoute("/hotel-vitrine/hotels/$slug")({
+export const Route = createFileRoute("/sitevitrine/hotels/$slug")({
   component: HotelVitrineDetail,
 });
-
-const PROPERTY_TYPE_LABELS: Record<string, string> = {
-  studio: "Studio",
-  chambre: "Chambre",
-  appartement: "Appartement",
-  suite: "Suite",
-  villa: "Villa",
-  maison: "Maison",
-  autre: "Logement",
-};
-
-function whatsappHref(whatsapp: string, hotelName: string, lodgingName?: string) {
-  const digits = whatsapp.replace(/[^\d]/g, "");
-  const message = lodgingName
-    ? `Bonjour, je souhaite réserver "${lodgingName}" à ${hotelName}.`
-    : `Bonjour, je souhaite obtenir des informations sur ${hotelName}.`;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-}
 
 function HotelVitrineDetail() {
   const { slug } = Route.useParams();
@@ -79,7 +62,7 @@ function HotelVitrineDetail() {
           Cet établissement n'existe pas ou n'est pas publié pour le moment.
         </p>
         <Button asChild variant="outline" className="mt-6">
-          <Link to="/hotel-vitrine/hotels">
+          <Link to="/sitevitrine/hotels">
             <ArrowLeft className="h-4 w-4" />
             Retour aux établissements
           </Link>
@@ -104,7 +87,7 @@ function HotelVitrineDetail() {
 
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
         <Link
-          to="/hotel-vitrine/hotels"
+          to="/sitevitrine/hotels"
           className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-[#0B1F4D]"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -130,7 +113,7 @@ function HotelVitrineDetail() {
         {hotel.whatsapp && (
           <Button asChild size="lg" className="mt-6 bg-[#25D366] text-white hover:bg-[#25D366]/90">
             <a
-              href={whatsappHref(hotel.whatsapp, hotel.name)}
+              href={lodgingWhatsappHref(hotel.whatsapp, hotel.name)}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -192,9 +175,7 @@ function LodgingCard({
   hotelPhone: string | null;
   hotelWhatsapp: string | null;
 }) {
-  const typeLabel = lodging.propertyType
-    ? PROPERTY_TYPE_LABELS[lodging.propertyType] ?? lodging.propertyType
-    : null;
+  const typeLabel = propertyTypeLabel(lodging.propertyType);
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm transition-shadow hover:shadow-lg">
       <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-slate-200 to-slate-300">
@@ -258,7 +239,7 @@ function LodgingCard({
           {hotelWhatsapp ? (
             <Button asChild size="sm" className="bg-[#0B1F4D] hover:bg-[#0B1F4D]/90">
               <a
-                href={whatsappHref(hotelWhatsapp, hotelName, lodging.name)}
+                href={lodgingWhatsappHref(hotelWhatsapp, hotelName, lodging.name)}
                 target="_blank"
                 rel="noopener noreferrer"
               >

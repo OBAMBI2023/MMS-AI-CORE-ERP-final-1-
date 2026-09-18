@@ -30,7 +30,7 @@ export function HotelCard({ hotel }: { hotel: PublicHotelSummary }) {
           Un établissement hôtelier partenaire SAOVIA, prêt à vous accueillir.
         </p>
         <Button asChild variant="outline" className="mt-2 w-full justify-between">
-          <Link to="/hotel-vitrine/hotels/$slug" params={{ slug: hotel.slug }}>
+          <Link to="/sitevitrine/hotels/$slug" params={{ slug: hotel.slug }}>
             Découvrir
             <ArrowRight className="h-4 w-4" />
           </Link>

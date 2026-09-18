@@ -15,6 +15,7 @@ import { Route as TarifsRouteImport } from './routes/tarifs'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as StockRouteImport } from './routes/stock'
+import { Route as SitevitrineRouteImport } from './routes/sitevitrine'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RestaurantRouteImport } from './routes/restaurant'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -27,7 +28,6 @@ import { Route as ParametresRouteImport } from './routes/parametres'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicenceRouteImport } from './routes/licence'
 import { Route as JournalRouteImport } from './routes/journal'
-import { Route as HotelVitrineRouteImport } from './routes/hotel-vitrine'
 import { Route as HotelRouteImport } from './routes/hotel'
 import { Route as FournisseursRouteImport } from './routes/fournisseurs'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
@@ -41,14 +41,15 @@ import { Route as CategoriesRouteImport } from './routes/categories'
 import { Route as AchatsRouteImport } from './routes/achats'
 import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SitevitrineIndexRouteImport } from './routes/sitevitrine.index'
 import { Route as HotelIndexRouteImport } from './routes/hotel.index'
-import { Route as HotelVitrineIndexRouteImport } from './routes/hotel-vitrine.index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as SuperAdminUsersRouteImport } from './routes/super-admin.users'
 import { Route as SuperAdminSupportRouteImport } from './routes/super-admin.support'
 import { Route as SuperAdminPartnersRouteImport } from './routes/super-admin.partners'
 import { Route as SuperAdminIaPlatformRouteImport } from './routes/super-admin.ia-platform'
 import { Route as SuperAdminAnalyticsRouteImport } from './routes/super-admin.analytics'
+import { Route as SitevitrineHotelsRouteImport } from './routes/sitevitrine.hotels'
 import { Route as SettingsUsersRouteImport } from './routes/settings.users'
 import { Route as SettingsCatalogueRouteImport } from './routes/settings.catalogue'
 import { Route as RestaurantLoginRouteImport } from './routes/restaurant.login'
@@ -68,11 +69,10 @@ import { Route as HotelClientsRouteImport } from './routes/hotel.clients'
 import { Route as HotelCheckinCheckoutRouteImport } from './routes/hotel.checkin-checkout'
 import { Route as HotelChambresRouteImport } from './routes/hotel.chambres'
 import { Route as HotelCaisseRouteImport } from './routes/hotel.caisse'
-import { Route as HotelVitrineHotelsRouteImport } from './routes/hotel-vitrine.hotels'
 import { Route as AppAssistantIaRouteImport } from './routes/app.assistant-ia'
 import { Route as AppSplatRouteImport } from './routes/app.$'
-import { Route as HotelVitrineHotelsIndexRouteImport } from './routes/hotel-vitrine.hotels.index'
-import { Route as HotelVitrineHotelsSlugRouteImport } from './routes/hotel-vitrine.hotels.$slug'
+import { Route as SitevitrineHotelsIndexRouteImport } from './routes/sitevitrine.hotels.index'
+import { Route as SitevitrineHotelsSlugRouteImport } from './routes/sitevitrine.hotels.$slug'
 
 const VentesRoute = VentesRouteImport.update({
   id: '/ventes',
@@ -102,6 +102,11 @@ const SuperAdminRoute = SuperAdminRouteImport.update({
 const StockRoute = StockRouteImport.update({
   id: '/stock',
   path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitevitrineRoute = SitevitrineRouteImport.update({
+  id: '/sitevitrine',
+  path: '/sitevitrine',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ServicesRoute = ServicesRouteImport.update({
@@ -162,11 +167,6 @@ const LicenceRoute = LicenceRouteImport.update({
 const JournalRoute = JournalRouteImport.update({
   id: '/journal',
   path: '/journal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HotelVitrineRoute = HotelVitrineRouteImport.update({
-  id: '/hotel-vitrine',
-  path: '/hotel-vitrine',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HotelRoute = HotelRouteImport.update({
@@ -234,15 +234,15 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitevitrineIndexRoute = SitevitrineIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SitevitrineRoute,
+} as any)
 const HotelIndexRoute = HotelIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => HotelRoute,
-} as any)
-const HotelVitrineIndexRoute = HotelVitrineIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => HotelVitrineRoute,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/app/',
@@ -273,6 +273,11 @@ const SuperAdminAnalyticsRoute = SuperAdminAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
   getParentRoute: () => SuperAdminRoute,
+} as any)
+const SitevitrineHotelsRoute = SitevitrineHotelsRouteImport.update({
+  id: '/hotels',
+  path: '/hotels',
+  getParentRoute: () => SitevitrineRoute,
 } as any)
 const SettingsUsersRoute = SettingsUsersRouteImport.update({
   id: '/settings/users',
@@ -369,11 +374,6 @@ const HotelCaisseRoute = HotelCaisseRouteImport.update({
   path: '/caisse',
   getParentRoute: () => HotelRoute,
 } as any)
-const HotelVitrineHotelsRoute = HotelVitrineHotelsRouteImport.update({
-  id: '/hotels',
-  path: '/hotels',
-  getParentRoute: () => HotelVitrineRoute,
-} as any)
 const AppAssistantIaRoute = AppAssistantIaRouteImport.update({
   id: '/app/assistant-ia',
   path: '/app/assistant-ia',
@@ -384,15 +384,15 @@ const AppSplatRoute = AppSplatRouteImport.update({
   path: '/app/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HotelVitrineHotelsIndexRoute = HotelVitrineHotelsIndexRouteImport.update({
+const SitevitrineHotelsIndexRoute = SitevitrineHotelsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => HotelVitrineHotelsRoute,
+  getParentRoute: () => SitevitrineHotelsRoute,
 } as any)
-const HotelVitrineHotelsSlugRoute = HotelVitrineHotelsSlugRouteImport.update({
+const SitevitrineHotelsSlugRoute = SitevitrineHotelsSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
-  getParentRoute: () => HotelVitrineHotelsRoute,
+  getParentRoute: () => SitevitrineHotelsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -409,7 +409,6 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
   '/hotel': typeof HotelRouteWithChildren
-  '/hotel-vitrine': typeof HotelVitrineRouteWithChildren
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
@@ -422,6 +421,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/restaurant': typeof RestaurantRouteWithChildren
   '/services': typeof ServicesRoute
+  '/sitevitrine': typeof SitevitrineRouteWithChildren
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
   '/support': typeof SupportRoute
@@ -430,7 +430,6 @@ export interface FileRoutesByFullPath {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
-  '/hotel-vitrine/hotels': typeof HotelVitrineHotelsRouteWithChildren
   '/hotel/caisse': typeof HotelCaisseRoute
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/checkin-checkout': typeof HotelCheckinCheckoutRoute
@@ -450,16 +449,17 @@ export interface FileRoutesByFullPath {
   '/restaurant/login': typeof RestaurantLoginRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
+  '/sitevitrine/hotels': typeof SitevitrineHotelsRouteWithChildren
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app/': typeof AppIndexRoute
-  '/hotel-vitrine/': typeof HotelVitrineIndexRoute
   '/hotel/': typeof HotelIndexRoute
-  '/hotel-vitrine/hotels/$slug': typeof HotelVitrineHotelsSlugRoute
-  '/hotel-vitrine/hotels/': typeof HotelVitrineHotelsIndexRoute
+  '/sitevitrine/': typeof SitevitrineIndexRoute
+  '/sitevitrine/hotels/$slug': typeof SitevitrineHotelsSlugRoute
+  '/sitevitrine/hotels/': typeof SitevitrineHotelsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -519,10 +519,10 @@ export interface FileRoutesByTo {
   '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app': typeof AppIndexRoute
-  '/hotel-vitrine': typeof HotelVitrineIndexRoute
   '/hotel': typeof HotelIndexRoute
-  '/hotel-vitrine/hotels/$slug': typeof HotelVitrineHotelsSlugRoute
-  '/hotel-vitrine/hotels': typeof HotelVitrineHotelsIndexRoute
+  '/sitevitrine': typeof SitevitrineIndexRoute
+  '/sitevitrine/hotels/$slug': typeof SitevitrineHotelsSlugRoute
+  '/sitevitrine/hotels': typeof SitevitrineHotelsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -539,7 +539,6 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/fournisseurs': typeof FournisseursRoute
   '/hotel': typeof HotelRouteWithChildren
-  '/hotel-vitrine': typeof HotelVitrineRouteWithChildren
   '/journal': typeof JournalRoute
   '/licence': typeof LicenceRoute
   '/login': typeof LoginRoute
@@ -552,6 +551,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/restaurant': typeof RestaurantRouteWithChildren
   '/services': typeof ServicesRoute
+  '/sitevitrine': typeof SitevitrineRouteWithChildren
   '/stock': typeof StockRoute
   '/super-admin': typeof SuperAdminRouteWithChildren
   '/support': typeof SupportRoute
@@ -560,7 +560,6 @@ export interface FileRoutesById {
   '/ventes': typeof VentesRoute
   '/app/$': typeof AppSplatRoute
   '/app/assistant-ia': typeof AppAssistantIaRoute
-  '/hotel-vitrine/hotels': typeof HotelVitrineHotelsRouteWithChildren
   '/hotel/caisse': typeof HotelCaisseRoute
   '/hotel/chambres': typeof HotelChambresRoute
   '/hotel/checkin-checkout': typeof HotelCheckinCheckoutRoute
@@ -580,16 +579,17 @@ export interface FileRoutesById {
   '/restaurant/login': typeof RestaurantLoginRoute
   '/settings/catalogue': typeof SettingsCatalogueRoute
   '/settings/users': typeof SettingsUsersRoute
+  '/sitevitrine/hotels': typeof SitevitrineHotelsRouteWithChildren
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/ia-platform': typeof SuperAdminIaPlatformRoute
   '/super-admin/partners': typeof SuperAdminPartnersRoute
   '/super-admin/support': typeof SuperAdminSupportRoute
   '/super-admin/users': typeof SuperAdminUsersRoute
   '/app/': typeof AppIndexRoute
-  '/hotel-vitrine/': typeof HotelVitrineIndexRoute
   '/hotel/': typeof HotelIndexRoute
-  '/hotel-vitrine/hotels/$slug': typeof HotelVitrineHotelsSlugRoute
-  '/hotel-vitrine/hotels/': typeof HotelVitrineHotelsIndexRoute
+  '/sitevitrine/': typeof SitevitrineIndexRoute
+  '/sitevitrine/hotels/$slug': typeof SitevitrineHotelsSlugRoute
+  '/sitevitrine/hotels/': typeof SitevitrineHotelsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -607,7 +607,6 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/fournisseurs'
     | '/hotel'
-    | '/hotel-vitrine'
     | '/journal'
     | '/licence'
     | '/login'
@@ -620,6 +619,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/restaurant'
     | '/services'
+    | '/sitevitrine'
     | '/stock'
     | '/super-admin'
     | '/support'
@@ -628,7 +628,6 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
-    | '/hotel-vitrine/hotels'
     | '/hotel/caisse'
     | '/hotel/chambres'
     | '/hotel/checkin-checkout'
@@ -648,16 +647,17 @@ export interface FileRouteTypes {
     | '/restaurant/login'
     | '/settings/catalogue'
     | '/settings/users'
+    | '/sitevitrine/hotels'
     | '/super-admin/analytics'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/super-admin/support'
     | '/super-admin/users'
     | '/app/'
-    | '/hotel-vitrine/'
     | '/hotel/'
-    | '/hotel-vitrine/hotels/$slug'
-    | '/hotel-vitrine/hotels/'
+    | '/sitevitrine/'
+    | '/sitevitrine/hotels/$slug'
+    | '/sitevitrine/hotels/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -717,10 +717,10 @@ export interface FileRouteTypes {
     | '/super-admin/support'
     | '/super-admin/users'
     | '/app'
-    | '/hotel-vitrine'
     | '/hotel'
-    | '/hotel-vitrine/hotels/$slug'
-    | '/hotel-vitrine/hotels'
+    | '/sitevitrine'
+    | '/sitevitrine/hotels/$slug'
+    | '/sitevitrine/hotels'
   id:
     | '__root__'
     | '/'
@@ -736,7 +736,6 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/fournisseurs'
     | '/hotel'
-    | '/hotel-vitrine'
     | '/journal'
     | '/licence'
     | '/login'
@@ -749,6 +748,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/restaurant'
     | '/services'
+    | '/sitevitrine'
     | '/stock'
     | '/super-admin'
     | '/support'
@@ -757,7 +757,6 @@ export interface FileRouteTypes {
     | '/ventes'
     | '/app/$'
     | '/app/assistant-ia'
-    | '/hotel-vitrine/hotels'
     | '/hotel/caisse'
     | '/hotel/chambres'
     | '/hotel/checkin-checkout'
@@ -777,16 +776,17 @@ export interface FileRouteTypes {
     | '/restaurant/login'
     | '/settings/catalogue'
     | '/settings/users'
+    | '/sitevitrine/hotels'
     | '/super-admin/analytics'
     | '/super-admin/ia-platform'
     | '/super-admin/partners'
     | '/super-admin/support'
     | '/super-admin/users'
     | '/app/'
-    | '/hotel-vitrine/'
     | '/hotel/'
-    | '/hotel-vitrine/hotels/$slug'
-    | '/hotel-vitrine/hotels/'
+    | '/sitevitrine/'
+    | '/sitevitrine/hotels/$slug'
+    | '/sitevitrine/hotels/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -803,7 +803,6 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   FournisseursRoute: typeof FournisseursRoute
   HotelRoute: typeof HotelRouteWithChildren
-  HotelVitrineRoute: typeof HotelVitrineRouteWithChildren
   JournalRoute: typeof JournalRoute
   LicenceRoute: typeof LicenceRoute
   LoginRoute: typeof LoginRoute
@@ -816,6 +815,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   RestaurantRoute: typeof RestaurantRouteWithChildren
   ServicesRoute: typeof ServicesRoute
+  SitevitrineRoute: typeof SitevitrineRouteWithChildren
   StockRoute: typeof StockRoute
   SuperAdminRoute: typeof SuperAdminRouteWithChildren
   SupportRoute: typeof SupportRoute
@@ -872,6 +872,13 @@ declare module '@tanstack/react-router' {
       path: '/stock'
       fullPath: '/stock'
       preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitevitrine': {
+      id: '/sitevitrine'
+      path: '/sitevitrine'
+      fullPath: '/sitevitrine'
+      preLoaderRoute: typeof SitevitrineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/services': {
@@ -956,13 +963,6 @@ declare module '@tanstack/react-router' {
       path: '/journal'
       fullPath: '/journal'
       preLoaderRoute: typeof JournalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hotel-vitrine': {
-      id: '/hotel-vitrine'
-      path: '/hotel-vitrine'
-      fullPath: '/hotel-vitrine'
-      preLoaderRoute: typeof HotelVitrineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hotel': {
@@ -1056,19 +1056,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitevitrine/': {
+      id: '/sitevitrine/'
+      path: '/'
+      fullPath: '/sitevitrine/'
+      preLoaderRoute: typeof SitevitrineIndexRouteImport
+      parentRoute: typeof SitevitrineRoute
+    }
     '/hotel/': {
       id: '/hotel/'
       path: '/'
       fullPath: '/hotel/'
       preLoaderRoute: typeof HotelIndexRouteImport
       parentRoute: typeof HotelRoute
-    }
-    '/hotel-vitrine/': {
-      id: '/hotel-vitrine/'
-      path: '/'
-      fullPath: '/hotel-vitrine/'
-      preLoaderRoute: typeof HotelVitrineIndexRouteImport
-      parentRoute: typeof HotelVitrineRoute
     }
     '/app/': {
       id: '/app/'
@@ -1111,6 +1111,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/super-admin/analytics'
       preLoaderRoute: typeof SuperAdminAnalyticsRouteImport
       parentRoute: typeof SuperAdminRoute
+    }
+    '/sitevitrine/hotels': {
+      id: '/sitevitrine/hotels'
+      path: '/hotels'
+      fullPath: '/sitevitrine/hotels'
+      preLoaderRoute: typeof SitevitrineHotelsRouteImport
+      parentRoute: typeof SitevitrineRoute
     }
     '/settings/users': {
       id: '/settings/users'
@@ -1245,13 +1252,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HotelCaisseRouteImport
       parentRoute: typeof HotelRoute
     }
-    '/hotel-vitrine/hotels': {
-      id: '/hotel-vitrine/hotels'
-      path: '/hotels'
-      fullPath: '/hotel-vitrine/hotels'
-      preLoaderRoute: typeof HotelVitrineHotelsRouteImport
-      parentRoute: typeof HotelVitrineRoute
-    }
     '/app/assistant-ia': {
       id: '/app/assistant-ia'
       path: '/app/assistant-ia'
@@ -1266,19 +1266,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hotel-vitrine/hotels/': {
-      id: '/hotel-vitrine/hotels/'
+    '/sitevitrine/hotels/': {
+      id: '/sitevitrine/hotels/'
       path: '/'
-      fullPath: '/hotel-vitrine/hotels/'
-      preLoaderRoute: typeof HotelVitrineHotelsIndexRouteImport
-      parentRoute: typeof HotelVitrineHotelsRoute
+      fullPath: '/sitevitrine/hotels/'
+      preLoaderRoute: typeof SitevitrineHotelsIndexRouteImport
+      parentRoute: typeof SitevitrineHotelsRoute
     }
-    '/hotel-vitrine/hotels/$slug': {
-      id: '/hotel-vitrine/hotels/$slug'
+    '/sitevitrine/hotels/$slug': {
+      id: '/sitevitrine/hotels/$slug'
       path: '/$slug'
-      fullPath: '/hotel-vitrine/hotels/$slug'
-      preLoaderRoute: typeof HotelVitrineHotelsSlugRouteImport
-      parentRoute: typeof HotelVitrineHotelsRoute
+      fullPath: '/sitevitrine/hotels/$slug'
+      preLoaderRoute: typeof SitevitrineHotelsSlugRouteImport
+      parentRoute: typeof SitevitrineHotelsRoute
     }
   }
 }
@@ -1323,33 +1323,6 @@ const HotelRouteChildren: HotelRouteChildren = {
 
 const HotelRouteWithChildren = HotelRoute._addFileChildren(HotelRouteChildren)
 
-interface HotelVitrineHotelsRouteChildren {
-  HotelVitrineHotelsSlugRoute: typeof HotelVitrineHotelsSlugRoute
-  HotelVitrineHotelsIndexRoute: typeof HotelVitrineHotelsIndexRoute
-}
-
-const HotelVitrineHotelsRouteChildren: HotelVitrineHotelsRouteChildren = {
-  HotelVitrineHotelsSlugRoute: HotelVitrineHotelsSlugRoute,
-  HotelVitrineHotelsIndexRoute: HotelVitrineHotelsIndexRoute,
-}
-
-const HotelVitrineHotelsRouteWithChildren =
-  HotelVitrineHotelsRoute._addFileChildren(HotelVitrineHotelsRouteChildren)
-
-interface HotelVitrineRouteChildren {
-  HotelVitrineHotelsRoute: typeof HotelVitrineHotelsRouteWithChildren
-  HotelVitrineIndexRoute: typeof HotelVitrineIndexRoute
-}
-
-const HotelVitrineRouteChildren: HotelVitrineRouteChildren = {
-  HotelVitrineHotelsRoute: HotelVitrineHotelsRouteWithChildren,
-  HotelVitrineIndexRoute: HotelVitrineIndexRoute,
-}
-
-const HotelVitrineRouteWithChildren = HotelVitrineRoute._addFileChildren(
-  HotelVitrineRouteChildren,
-)
-
 interface RestaurantRouteChildren {
   RestaurantLoginRoute: typeof RestaurantLoginRoute
 }
@@ -1360,6 +1333,33 @@ const RestaurantRouteChildren: RestaurantRouteChildren = {
 
 const RestaurantRouteWithChildren = RestaurantRoute._addFileChildren(
   RestaurantRouteChildren,
+)
+
+interface SitevitrineHotelsRouteChildren {
+  SitevitrineHotelsSlugRoute: typeof SitevitrineHotelsSlugRoute
+  SitevitrineHotelsIndexRoute: typeof SitevitrineHotelsIndexRoute
+}
+
+const SitevitrineHotelsRouteChildren: SitevitrineHotelsRouteChildren = {
+  SitevitrineHotelsSlugRoute: SitevitrineHotelsSlugRoute,
+  SitevitrineHotelsIndexRoute: SitevitrineHotelsIndexRoute,
+}
+
+const SitevitrineHotelsRouteWithChildren =
+  SitevitrineHotelsRoute._addFileChildren(SitevitrineHotelsRouteChildren)
+
+interface SitevitrineRouteChildren {
+  SitevitrineHotelsRoute: typeof SitevitrineHotelsRouteWithChildren
+  SitevitrineIndexRoute: typeof SitevitrineIndexRoute
+}
+
+const SitevitrineRouteChildren: SitevitrineRouteChildren = {
+  SitevitrineHotelsRoute: SitevitrineHotelsRouteWithChildren,
+  SitevitrineIndexRoute: SitevitrineIndexRoute,
+}
+
+const SitevitrineRouteWithChildren = SitevitrineRoute._addFileChildren(
+  SitevitrineRouteChildren,
 )
 
 interface SuperAdminRouteChildren {
@@ -1396,7 +1396,6 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   FournisseursRoute: FournisseursRoute,
   HotelRoute: HotelRouteWithChildren,
-  HotelVitrineRoute: HotelVitrineRouteWithChildren,
   JournalRoute: JournalRoute,
   LicenceRoute: LicenceRoute,
   LoginRoute: LoginRoute,
@@ -1409,6 +1408,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   RestaurantRoute: RestaurantRouteWithChildren,
   ServicesRoute: ServicesRoute,
+  SitevitrineRoute: SitevitrineRouteWithChildren,
   StockRoute: StockRoute,
   SuperAdminRoute: SuperAdminRouteWithChildren,
   SupportRoute: SupportRoute,

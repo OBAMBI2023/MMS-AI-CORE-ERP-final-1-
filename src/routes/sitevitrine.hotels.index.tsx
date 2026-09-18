@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { HotelCard } from "@/components/hotel-vitrine/HotelCard";
 import { fetchPublicHotels } from "@/integrations/hotel/public-directory";
 
-export const Route = createFileRoute("/hotel-vitrine/hotels/")({
+export const Route = createFileRoute("/sitevitrine/hotels/")({
   validateSearch: (search: Record<string, unknown>): { q?: string } =>
     typeof search.q === "string" ? { q: search.q } : {},
   component: HotelVitrineCatalog,

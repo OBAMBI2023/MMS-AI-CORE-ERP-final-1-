@@ -3,8 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { MarketingLayout } from "@/marketing/layouts/MarketingLayout";
 import { HomePage } from "@/marketing/pages/HomePage";
-import { VitrineHeader, VitrineFooter, VitrinePage } from "@/components/hotel-vitrine/VitrineLayout";
-import { HotelVitrineHome } from "@/components/hotel-vitrine/HotelVitrineHome";
+import { HotelLandingHeader } from "@/components/hotel-landing/HotelLandingHeader";
+import { HotelLandingFooter } from "@/components/hotel-landing/HotelLandingFooter";
+import { HotelLandingPage } from "@/components/hotel-landing/HotelLandingPage";
+import { hotelLandingHeadMeta } from "@/lib/hotel/hotel-seo";
 
 // Doit rester synchronisé avec PRODUCTION_HOTEL_ORIGIN dans
 // src/lib/hotel/public-site-url.ts (dupliqué ici volontairement pour ne pas
@@ -30,6 +32,10 @@ async function isHotelHostRequest(): Promise<boolean> {
 
 export const Route = createFileRoute("/")({
   loader: async () => ({ isHotelHost: await isHotelHostRequest() }),
+  // Le marketing ERP garde ses metadata (PLATFORM_BRANDING, __root.tsx) — ce
+  // head() ne s'applique que lorsque isHotelHost est vrai, où il prend le
+  // dessus (les tags de la route la plus profonde gagnent, cf. headContentUtils).
+  head: ({ loaderData }) => (loaderData?.isHotelHost ? { meta: hotelLandingHeadMeta() } : {}),
   component: RootIndexRoute,
 });
 
@@ -38,11 +44,11 @@ function RootIndexRoute() {
 
   if (isHotelHost) {
     return (
-      <VitrinePage>
-        <VitrineHeader />
-        <HotelVitrineHome />
-        <VitrineFooter />
-      </VitrinePage>
+      <div className="min-h-screen bg-white">
+        <HotelLandingHeader />
+        <HotelLandingPage />
+        <HotelLandingFooter />
+      </div>
     );
   }
 
