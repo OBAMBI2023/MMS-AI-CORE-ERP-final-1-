@@ -58,3 +58,12 @@ export function hotelTrialSignupHeadMeta() {
     description: HOTEL_TRIAL_SIGNUP_OG_DESCRIPTION,
   });
 }
+
+// hotelLoginHeadMeta() → hotel.saovia.net/login (connexion professionnels)
+export const HOTEL_LOGIN_TITLE = "Connexion | SAOVIA HOTEL";
+export const HOTEL_LOGIN_DESCRIPTION =
+  "Connectez-vous à votre espace de gestion SAOVIA HOTEL pour piloter vos chambres, réservations, clients et revenus.";
+
+export function hotelLoginHeadMeta() {
+  return buildHeadMeta(HOTEL_LOGIN_TITLE, HOTEL_LOGIN_DESCRIPTION, "SAOVIA HOTEL");
+}

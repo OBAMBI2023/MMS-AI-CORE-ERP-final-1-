@@ -1,5 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { Building2, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -7,14 +9,33 @@ import { toast } from "sonner";
 import * as z from "zod";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { LoginCard } from "@/components/auth/LoginCard";
+import { HotelLoginPage } from "@/components/hotel-landing/HotelLoginPage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { supabase } from "@/integrations/supabase/client";
+import { hotelLoginHeadMeta } from "@/lib/hotel/hotel-seo";
 import {
   getAuthenticatedDestination,
   getLoginTenantBranding,
 } from "@/lib/partner-admin.server";
 import { profileBelongsToTenant } from "@/lib/tenant-login-access";
+
+// Même détection hostname que src/routes/essai-gratuit.tsx (dupliquée
+// volontairement, voir le commentaire là-bas : un composant 100% client ne
+// peut pas importer @tanstack/react-start/server).
+const HOTEL_HOSTNAME = "hotel.saovia.net";
+
+const getRequestHost = createServerFn({ method: "GET" }).handler(() => {
+  return getRequest()?.headers.get("host") ?? "";
+});
+
+async function isHotelHostRequest(): Promise<boolean> {
+  if (typeof window === "undefined") {
+    const host = await getRequestHost();
+    return host.split(":")[0].toLowerCase() === HOTEL_HOSTNAME;
+  }
+  return window.location.hostname.toLowerCase() === HOTEL_HOSTNAME;
+}
 
 const loginSchema = z.object({
   email: z.string().email("Adresse e-mail invalide"),
@@ -45,14 +66,21 @@ async function logConnectionAttempt(
 }
 
 export const Route = createFileRoute("/login")({
-  component: LoginPage,
+  component: LoginRoute,
   beforeLoad: async () => {
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (session) throw redirect({ to: await getAuthenticatedDestination() });
   },
+  loader: async () => ({ isHotelHost: await isHotelHostRequest() }),
+  head: ({ loaderData }) => (loaderData?.isHotelHost ? { meta: hotelLoginHeadMeta() } : {}),
 });
+
+function LoginRoute() {
+  const { isHotelHost } = Route.useLoaderData();
+  return isHotelHost ? <HotelLoginPage /> : <LoginPage />;
+}
 
 export function LoginPage({ tenantSlug }: { tenantSlug?: string }) {
   const [loading, setLoading] = useState(false);
