@@ -40,7 +40,7 @@ export function HotelAppShell({
   }, []);
 
   return (
-    <div className="hotel-theme flex h-screen w-full bg-background text-foreground">
+    <div className="hotel-theme flex h-screen w-full overflow-x-hidden bg-background text-foreground">
       <HotelSidebar />
       <main className="flex-1 flex flex-col min-w-0">
         <header className="border-b border-border/70 px-4 py-3.5 md:px-8 md:pb-4 md:pt-5">
@@ -65,7 +65,7 @@ export function HotelAppShell({
               </SheetContent>
             </Sheet>
             <div className="min-w-0 flex-1 pt-0.5">
-              <h1 className="whitespace-nowrap text-[1.05rem] font-bold tracking-tight text-foreground">
+              <h1 className="truncate text-[1.05rem] font-bold tracking-tight text-foreground">
                 {title}
               </h1>
               {mobileSubtitle ?? subtitle ? (

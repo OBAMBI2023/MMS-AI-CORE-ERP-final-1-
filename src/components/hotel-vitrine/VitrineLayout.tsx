@@ -180,5 +180,5 @@ export function VitrinePhoneLine({ phone }: { phone: string | null }) {
 }
 
 export function VitrinePage({ children }: { children: ReactNode }) {
-  return <div className="min-h-screen bg-white">{children}</div>;
+  return <div className="min-h-screen overflow-x-hidden bg-white">{children}</div>;
 }

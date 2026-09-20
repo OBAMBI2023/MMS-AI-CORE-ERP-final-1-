@@ -91,7 +91,7 @@ export function HotelLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-white lg:flex-row">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-white lg:flex-row">
       {/* Gauche : photographie hôtel + overlay navy + positionnement */}
       <div className="relative h-[240px] overflow-hidden sm:h-[280px] md:h-[320px] lg:h-auto lg:min-h-screen lg:w-[58%]">
         <picture>
