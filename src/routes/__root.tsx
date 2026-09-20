@@ -10,6 +10,8 @@ import {
   Scripts,
   redirect,
 } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +33,28 @@ import { getPartnerAdminAccess } from "@/lib/partner-admin.server";
 import { PLATFORM_BRANDING } from "@/config/branding";
 import { readEnvVar } from "@/integrations/supabase/env";
 import { handleSupabaseAuthCallback } from "@/integrations/supabase/password-recovery";
+import { hotelBrandingHeadLinks, hotelBrandingHeadMeta } from "@/lib/hotel/hotel-branding";
+
+// Doit rester synchronisé avec PRODUCTION_HOTEL_ORIGIN dans
+// src/lib/hotel/public-site-url.ts (dupliqué ici volontairement — même
+// logique que isHotelHostRequest() dupliquée par fichier ailleurs dans ce
+// projet, cf. src/routes/index.tsx, src/routes/login.tsx). Utilisé
+// uniquement pour choisir le favicon/manifest/PWA à servir dans <head> :
+// erp.saovia.net et hotel.saovia.net partagent le même déploiement mais
+// doivent garder une identité PWA/favicon totalement indépendante.
+const HOTEL_HOSTNAME = "hotel.saovia.net";
+
+const getRequestHost = createServerFn({ method: "GET" }).handler(() => {
+  return getRequest()?.headers.get("host") ?? "";
+});
+
+async function isHotelHostRequest(): Promise<boolean> {
+  if (typeof window === "undefined") {
+    const host = await getRequestHost();
+    return host.split(":")[0].toLowerCase() === HOTEL_HOSTNAME;
+  }
+  return window.location.hostname.toLowerCase() === HOTEL_HOSTNAME;
+}
 
 function getSiteOrigin() {
   const browserOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
@@ -54,6 +78,10 @@ function getSiteOrigin() {
 }
 
 const socialLogoUrl = new URL(PLATFORM_BRANDING.assets.logo, `${getSiteOrigin()}/`).toString();
+const hotelSocialLogoUrl = new URL(
+  "/branding/hotel/saovia-hotel-lockup.png",
+  `${getSiteOrigin()}/`,
+).toString();
 
 function isPlatformRoute(pathname: string) {
   return pathname === "/super-admin" || pathname.startsWith("/super-admin/");
@@ -389,59 +417,72 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       }
     }
   },
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1, viewport-fit=cover",
-      },
-      { title: PLATFORM_BRANDING.name },
-      {
-        name: "description",
-        content: PLATFORM_BRANDING.description,
-      },
-      { property: "og:title", content: PLATFORM_BRANDING.name },
-      {
-        property: "og:description",
-        content: PLATFORM_BRANDING.description,
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      {
-        name: "twitter:title",
-        content: PLATFORM_BRANDING.name,
-      },
-      {
-        name: "twitter:description",
-        content: PLATFORM_BRANDING.description,
-      },
-      {
-        property: "og:image",
-        content: socialLogoUrl,
-      },
-      {
-        name: "twitter:image",
-        content: socialLogoUrl,
-      },
-      { name: "theme-color", content: PLATFORM_BRANDING.primaryColor },
-      { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: PLATFORM_BRANDING.shortName },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: PLATFORM_BRANDING.assets.favicon, type: "image/png", sizes: "32x32" },
-      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
-      },
-    ],
-  }),
+  // Uniquement pour choisir le favicon/manifest/theme-color/OG image dans
+  // head() ci-dessous (isHotelHost) — l'auth/permissions restent entièrement
+  // dans beforeLoad au-dessus, ce loader ne fait rien d'autre.
+  loader: async () => ({ isHotelHost: await isHotelHostRequest() }),
+  head: ({ loaderData }) => {
+    const isHotelHost = loaderData?.isHotelHost ?? false;
+    const ogImageUrl = isHotelHost ? hotelSocialLogoUrl : socialLogoUrl;
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1, viewport-fit=cover",
+        },
+        { title: PLATFORM_BRANDING.name },
+        {
+          name: "description",
+          content: PLATFORM_BRANDING.description,
+        },
+        { property: "og:title", content: PLATFORM_BRANDING.name },
+        {
+          property: "og:description",
+          content: PLATFORM_BRANDING.description,
+        },
+        { property: "og:type", content: "website" },
+        { name: "twitter:card", content: "summary_large_image" },
+        {
+          name: "twitter:title",
+          content: PLATFORM_BRANDING.name,
+        },
+        {
+          name: "twitter:description",
+          content: PLATFORM_BRANDING.description,
+        },
+        { name: "apple-mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+        {
+          name: "apple-mobile-web-app-title",
+          content: isHotelHost ? "SAOVIA HOTEL" : PLATFORM_BRANDING.shortName,
+        },
+        ...(isHotelHost
+          ? hotelBrandingHeadMeta(ogImageUrl)
+          : [
+              { property: "og:image", content: ogImageUrl },
+              { name: "twitter:image", content: ogImageUrl },
+              { name: "theme-color", content: PLATFORM_BRANDING.primaryColor },
+            ]),
+      ],
+      links: [
+        { rel: "stylesheet", href: appCss },
+        ...(isHotelHost
+          ? hotelBrandingHeadLinks()
+          : [
+              { rel: "icon", href: PLATFORM_BRANDING.assets.favicon, type: "image/png", sizes: "32x32" },
+              { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+              { rel: "manifest", href: "/manifest.webmanifest" },
+            ]),
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+        },
+      ],
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -449,13 +490,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const { isHotelHost } = Route.useLoaderData();
   return (
     <html lang="fr">
       <head>
         <HeadContent />
       </head>
       <body>
-        <PwaSplashScreen />
+        <PwaSplashScreen isHotelHost={isHotelHost} />
         {children}
         <Scripts />
       </body>

@@ -18,7 +18,6 @@ import {
   EyeOff,
   Globe2,
   Home,
-  Hotel,
   Info,
   Layers,
   LayoutDashboard,
@@ -256,8 +255,12 @@ export function HotelTrialSignupPage() {
           className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 lg:px-10"
         >
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#D4AF37]/50 bg-[#0B1F4D]">
-              <Hotel className="h-5 w-5 text-[#D4AF37]" />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#D4AF37]/50 bg-white">
+              <img
+                src="/branding/hotel/saovia-hotel-icon.png"
+                alt="SAOVIA HOTEL"
+                className="h-full w-full object-contain p-1"
+              />
             </span>
             <span className="flex flex-col leading-tight">
               <span className="text-lg font-semibold tracking-tight text-[#0B1F4D]">
@@ -706,8 +709,12 @@ function HotelTrialFooter() {
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-4 lg:px-10">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2 text-white">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#D4AF37]/50 bg-[#D4AF37]/10">
-              <Hotel className="h-4 w-4 text-[#D4AF37]" />
+            <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white">
+              <img
+                src="/branding/hotel/saovia-hotel-icon.png"
+                alt="SAOVIA HOTEL"
+                className="h-full w-full object-contain p-1"
+              />
             </span>
             <span className="text-base font-semibold">SAOVIA HOTEL</span>
           </div>

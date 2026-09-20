@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Hotel, MapPin, Phone, Mail, Menu, MessageCircle } from "lucide-react";
+import { MapPin, Phone, Mail, Menu, MessageCircle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -19,8 +19,12 @@ export function VitrineHeader() {
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0B1F4D]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0B1F4D]/80">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/sitevitrine" className="flex shrink-0 items-center gap-2 text-white">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4AF37]/50 bg-[#D4AF37]/10">
-            <Hotel className="h-5 w-5 text-[#D4AF37]" />
+          <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white">
+            <img
+              src="/branding/hotel/saovia-hotel-icon.png"
+              alt="SAOVIA HOTEL"
+              className="h-full w-full object-contain p-1"
+            />
           </span>
           <span className="text-lg font-semibold tracking-tight">
             SAOVIA <span className="text-[#D4AF37]">HOTEL</span>
@@ -107,8 +111,12 @@ export function VitrineFooter() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-4 lg:px-8">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2 text-white">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#D4AF37]/50 bg-[#D4AF37]/10">
-              <Hotel className="h-4 w-4 text-[#D4AF37]" />
+            <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white">
+              <img
+                src="/branding/hotel/saovia-hotel-icon.png"
+                alt="SAOVIA HOTEL"
+                className="h-full w-full object-contain p-1"
+              />
             </span>
             <span className="text-base font-semibold">SAOVIA HOTEL</span>
           </div>

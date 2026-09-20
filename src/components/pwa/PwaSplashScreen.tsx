@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { HOTEL_BACKGROUND_COLOR, HOTEL_BRANDING_ASSETS } from "@/lib/hotel/hotel-branding";
 
 // Minimum time the splash stays visible once shown, purely so the fade-in
 // doesn't get cut off by a fast load — never the reason it disappears.
@@ -17,7 +18,7 @@ type Phase = "visible" | "leaving" | "gone";
 // only an installed/home-screen-launched SAOVIA shows it. It mounts once
 // per full document load (TanStack Router client-side navigations don't
 // remount the root), so it never reappears on a route change.
-export function PwaSplashScreen() {
+export function PwaSplashScreen({ isHotelHost = false }: { isHotelHost?: boolean }) {
   const [phase, setPhase] = useState<Phase>("visible");
 
   useEffect(() => {
@@ -62,7 +63,8 @@ export function PwaSplashScreen() {
 
   return (
     <div
-      className="pwa-splash fixed inset-0 z-[9999] flex-col items-center justify-center bg-[#071B49]"
+      className="pwa-splash fixed inset-0 z-[9999] flex-col items-center justify-center"
+      style={{ backgroundColor: isHotelHost ? HOTEL_BACKGROUND_COLOR : "#071B49" }}
       data-leaving={phase === "leaving" ? "true" : undefined}
       aria-hidden="true"
     >
@@ -75,14 +77,25 @@ export function PwaSplashScreen() {
           paddingRight: "env(safe-area-inset-right)",
         }}
       >
-        <img
-          src="/splash/saovia-splash-logo.png"
-          alt="SAOVIA"
-          className="pwa-splash-logo h-auto w-44 max-w-[60vw] sm:w-56"
-          width={700}
-          height={556}
-          decoding="async"
-        />
+        {isHotelHost ? (
+          <img
+            src={HOTEL_BRANDING_ASSETS.splash}
+            alt="SAOVIA HOTEL"
+            className="pwa-splash-logo h-auto w-44 max-w-[60vw] sm:w-56"
+            width={700}
+            height={688}
+            decoding="async"
+          />
+        ) : (
+          <img
+            src="/splash/saovia-splash-logo.png"
+            alt="SAOVIA"
+            className="pwa-splash-logo h-auto w-44 max-w-[60vw] sm:w-56"
+            width={700}
+            height={556}
+            decoding="async"
+          />
+        )}
       </div>
     </div>
   );

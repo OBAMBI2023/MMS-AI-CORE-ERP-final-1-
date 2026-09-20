@@ -1,0 +1,16 @@
+{
+  "name": "SAOVIA HOTEL",
+  "short_name": "SAOVIA HOTEL",
+  "description": "La plateforme SAOVIA pour gérer vos chambres, logements, réservations, clients, disponibilités et revenus.",
+  "lang": "fr",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0B1F4D",
+  "theme_color": "#0B1F4D",
+  "icons": [
+    { "src": "/icons/hotel/pwa-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/hotel/pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/hotel/pwa-512x512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

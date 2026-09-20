@@ -193,10 +193,11 @@ export function HotelLoginPage() {
 
         <div className="relative z-10 w-full max-w-md">
           <div className="text-center">
-            <span className="text-2xl font-bold tracking-tight text-[#0B1F4D]">
-              SAOVIA <span className="text-[#D4AF37]">HOTEL</span>
-            </span>
-            <span className="mx-auto mt-2 block h-1 w-12 rounded-full bg-[#D4AF37]" aria-hidden="true" />
+            <img
+              src="/branding/hotel/saovia-hotel-lockup.png"
+              alt="SAOVIA HOTEL"
+              className="mx-auto h-14 w-auto sm:h-16"
+            />
           </div>
 
           <h1 className="mt-8 text-center text-3xl font-bold text-[#0B1F4D]">Bienvenue</h1>
