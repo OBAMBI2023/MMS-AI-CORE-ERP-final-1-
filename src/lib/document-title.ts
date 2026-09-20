@@ -77,7 +77,12 @@ export function resolveDocumentTitle(
   const tenant = tenantName?.trim() || null;
 
   if (path === "/login" || path.startsWith("/login/")) {
-    return `Connexion | ${brand}`;
+    // Host-aware: this hook only ever runs client-side, so it must not
+    // override the correct SSR title (hotelLoginHeadMeta()) with the
+    // generic ERP brand on hotel.saovia.net.
+    const isHotelHost =
+      typeof window !== "undefined" && window.location.hostname.toLowerCase() === "hotel.saovia.net";
+    return isHotelHost ? "Connexion | SAOVIA HOTEL" : `Connexion | ${brand}`;
   }
 
   if (path === "/super-admin" || path.startsWith("/super-admin/")) {

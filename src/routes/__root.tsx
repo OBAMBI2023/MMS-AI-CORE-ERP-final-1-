@@ -78,10 +78,11 @@ function getSiteOrigin() {
 }
 
 const socialLogoUrl = new URL(PLATFORM_BRANDING.assets.logo, `${getSiteOrigin()}/`).toString();
-const hotelSocialLogoUrl = new URL(
-  "/branding/hotel/saovia-hotel-lockup.png",
-  `${getSiteOrigin()}/`,
-).toString();
+// Hardcoded to the real hotel domain rather than getSiteOrigin(): that
+// helper resolves to the deployment's primary production domain
+// (erp.saovia.net), which is wrong for a hotel-branded social preview image
+// regardless of which domain served the request.
+const hotelSocialLogoUrl = `https://${HOTEL_HOSTNAME}/branding/hotel/saovia-hotel-lockup.png`;
 
 function isPlatformRoute(pathname: string) {
   return pathname === "/super-admin" || pathname.startsWith("/super-admin/");
