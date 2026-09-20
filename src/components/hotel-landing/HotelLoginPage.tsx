@@ -191,11 +191,6 @@ export function HotelLoginPage() {
           aria-hidden="true"
         />
 
-        <div className="absolute right-6 top-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm">
-          <span aria-hidden="true">🇫🇷</span>
-          Français
-        </div>
-
         <div className="relative z-10 w-full max-w-md">
           <div className="text-center">
             <span className="text-2xl font-bold tracking-tight text-[#0B1F4D]">
