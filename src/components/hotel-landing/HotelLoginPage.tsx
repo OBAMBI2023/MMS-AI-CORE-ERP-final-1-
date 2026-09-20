@@ -19,6 +19,7 @@ import {
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthenticatedDestination } from "@/lib/partner-admin.server";
+import { cn } from "@/lib/utils";
 
 // Page de connexion dédiée SAOVIA HOTEL (hotel.saovia.net/login). Réutilise
 // exactement le même flux d'authentification que /login (ERP générique,
@@ -92,8 +93,13 @@ export function HotelLoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-white lg:flex-row">
-      {/* Gauche : photographie hôtel + overlay navy + positionnement */}
-      <div className="relative h-[240px] overflow-hidden sm:h-[280px] md:h-[320px] lg:h-auto lg:min-h-screen lg:w-[58%]">
+      {/* Gauche : photographie hôtel + overlay navy + positionnement.
+          Mobile/tablette (<lg) : la photo reste le sujet dominant (42-48vh),
+          seuls la marque et l'accroche reposent dessus (haut/bas), le centre
+          — le sujet de la photo — reste dégagé. Les 4 fonctionnalités sont
+          déplacées dans un bandeau SOUS la photo (cf. plus bas) plutôt que
+          de s'empiler dessus. Desktop (lg+) : layout d'origine inchangé. */}
+      <div className="relative h-[44vh] min-h-[300px] overflow-hidden sm:h-[46vh] md:h-[48vh] lg:h-auto lg:min-h-screen lg:w-[58%]">
         <picture>
           {/* Desktop/tablette large : crop portrait dédié, sujet centré, jamais coupé */}
           <source
@@ -107,43 +113,75 @@ export function HotelLoginPage() {
             className="absolute inset-0 h-full w-full object-cover object-center"
           />
         </picture>
+        {/* Mobile/tablette : dégradé léger haut+bas (lisibilité du texte),
+            centre transparent pour garder le sujet de la photo visible. */}
         <div
-          className="absolute inset-0 bg-gradient-to-t from-[#0B1F4D]/90 via-[#0B1F4D]/45 to-[#0B1F4D]/20"
+          className="absolute inset-0 bg-gradient-to-b from-[#0B1F4D]/55 via-transparent to-[#0B1F4D]/70 lg:hidden"
           aria-hidden="true"
         />
-        <div className="relative flex h-full flex-col justify-end p-8 text-white sm:p-12 lg:p-14">
+        {/* Desktop : dégradé d'origine, inchangé. */}
+        <div
+          className="absolute inset-0 hidden bg-gradient-to-t from-[#0B1F4D]/90 via-[#0B1F4D]/45 to-[#0B1F4D]/20 lg:block"
+          aria-hidden="true"
+        />
+        <div className="relative flex h-full flex-col justify-between p-6 pt-[max(1.25rem,env(safe-area-inset-top))] text-white sm:p-8 lg:justify-end lg:p-14 lg:pt-14">
           <div>
-            <span className="text-3xl font-bold tracking-tight sm:text-4xl">
+            <span className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
               SAOVIA <span className="text-[#D4AF37]">HOTEL</span>
             </span>
-            <span className="mt-3 block h-1 w-14 rounded-full bg-[#D4AF37]" aria-hidden="true" />
+            <span className="mt-2 block h-1 w-12 rounded-full bg-[#D4AF37] lg:mt-3 lg:w-14" aria-hidden="true" />
           </div>
 
-          <p className="mt-6 max-w-md text-2xl font-semibold leading-snug sm:text-3xl">
-            L'hospitalité d'aujourd'hui,
-            <br />
-            une gestion plus performante.
-          </p>
-          <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/75 sm:text-base">
-            Pilotez votre établissement avec simplicité.
-          </p>
+          <div>
+            <p className="max-w-md text-xl font-semibold leading-snug sm:text-2xl lg:mt-6 lg:text-3xl">
+              L'hospitalité d'aujourd'hui,
+              <br />
+              une gestion plus performante.
+            </p>
+            <p className="mt-2 max-w-sm text-xs leading-relaxed text-white/80 sm:mt-3 sm:text-sm lg:text-base">
+              Pilotez votre établissement avec simplicité.
+            </p>
 
-          <div className="mt-8 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-            {heroFeatures.map(({ icon: Icon, label }) => (
-              <div
-                key={label}
-                className="flex flex-col items-center gap-2 rounded-xl border border-white/25 bg-white/10 p-2.5 text-center backdrop-blur-sm"
-              >
-                <Icon className="h-4 w-4 text-[#D4AF37]" aria-hidden="true" />
-                <p className="whitespace-nowrap text-[11px] leading-tight text-white/85">{label}</p>
-              </div>
-            ))}
+            {/* Desktop uniquement : les 4 fonctionnalités restent sur la
+                photo (assez d'espace vertical en min-h-screen pour rester
+                élégantes sans masquer le sujet). Sur mobile/tablette, voir
+                le bandeau dédié sous la photo. */}
+            <div className="mt-6 hidden max-w-sm grid-cols-4 gap-3 lg:grid">
+              {heroFeatures.map(({ icon: Icon, label }) => (
+                <div
+                  key={label}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-white/25 bg-white/10 p-2.5 text-center backdrop-blur-sm"
+                >
+                  <Icon className="h-4 w-4 text-[#D4AF37]" aria-hidden="true" />
+                  <p className="truncate text-[11px] leading-tight text-white/85">{label}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Bandeau fonctionnalités mobile/tablette : sous la photo, jamais
+          superposé au sujet. Masqué à partir de lg (les fonctionnalités
+          restent sur la photo en desktop, cf. ci-dessus). */}
+      <div className="grid grid-cols-2 bg-[#0B1F4D] lg:hidden">
+        {heroFeatures.map(({ icon: Icon, label }, index) => (
+          <div
+            key={label}
+            className={cn(
+              "flex min-w-0 items-center justify-center gap-2 px-3 py-3 text-white/90",
+              index % 2 === 0 && "border-r border-white/10",
+              index < 2 && "border-b border-white/10",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 text-[#D4AF37]" aria-hidden="true" />
+            <span className="truncate text-xs font-medium">{label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Droite : panneau clair, formulaire de connexion */}
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-gradient-to-br from-white via-white to-slate-50 px-6 py-12 sm:px-10 lg:px-16">
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-gradient-to-br from-white via-white to-slate-50 px-6 pt-12 pb-[calc(3rem+env(safe-area-inset-bottom))] sm:px-10 lg:px-16">
         <div
           className="pointer-events-none absolute -right-40 -top-40 h-[28rem] w-[28rem] rounded-full border border-[#D4AF37]/15"
           aria-hidden="true"
