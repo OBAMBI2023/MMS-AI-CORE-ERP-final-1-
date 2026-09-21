@@ -26,8 +26,8 @@ const WHITE = { r: 255, g: 255, b: 255, alpha: 1 };
 // the artwork stacks icon mark -> "SAOVIA HOTEL" wordmark -> tagline, top to
 // bottom, with no reliable transparent/alpha boundary to detect
 // programmatically (flat RGB, no alpha channel).
-const ICON_ONLY_FRACTION = 0.555; // icon mark only, no text
-const LOCKUP_FRACTION = 0.815; // icon + "SAOVIA HOTEL" wordmark, no tagline
+const ICON_ONLY_FRACTION = 0.6; // icon mark only, no text
+const LOCKUP_FRACTION = 0.86; // icon + "SAOVIA HOTEL" wordmark, no tagline
 
 function ensureDir(filePath) {
   mkdirSync(path.dirname(filePath), { recursive: true });
