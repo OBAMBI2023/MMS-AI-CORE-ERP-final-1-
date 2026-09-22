@@ -68,25 +68,30 @@ export function PwaSplashScreen({ isHotelHost = false }: { isHotelHost?: boolean
       data-leaving={phase === "leaving" ? "true" : undefined}
       aria-hidden="true"
     >
-      <div
-        className="flex flex-col items-center justify-center px-6"
-        style={{
-          paddingTop: "env(safe-area-inset-top)",
-          paddingBottom: "env(safe-area-inset-bottom)",
-          paddingLeft: "env(safe-area-inset-left)",
-          paddingRight: "env(safe-area-inset-right)",
-        }}
-      >
-        {isHotelHost ? (
-          <img
-            src={HOTEL_BRANDING_ASSETS.splash}
-            alt="SAOVIA HOTEL"
-            className="pwa-splash-logo h-auto w-44 max-w-[60vw] sm:w-56"
-            width={700}
-            height={688}
-            decoding="async"
-          />
-        ) : (
+      {isHotelHost ? (
+        // Full-bleed 1080x1920 splash composition (background, waves,
+        // loading ring and copy are baked into the image itself) — unlike
+        // the generic branch below, this isn't a small logo mark centered
+        // on a plain color, so it's rendered edge-to-edge instead of inside
+        // the padded flex container.
+        <img
+          src={HOTEL_BRANDING_ASSETS.splash}
+          alt="SAOVIA HOTEL"
+          className="pwa-splash-logo absolute inset-0 h-full w-full object-cover"
+          width={1080}
+          height={1920}
+          decoding="async"
+        />
+      ) : (
+        <div
+          className="flex flex-col items-center justify-center px-6"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)",
+          }}
+        >
           <img
             src="/splash/saovia-splash-logo.png"
             alt="SAOVIA"
@@ -95,8 +100,8 @@ export function PwaSplashScreen({ isHotelHost = false }: { isHotelHost?: boolean
             height={556}
             decoding="async"
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -16,7 +16,7 @@ export const HOTEL_BACKGROUND_COLOR = "#0B1F4D";
 export const HOTEL_BRANDING_ASSETS = {
   icon: "/branding/hotel/saovia-hotel-icon.png",
   lockup: "/branding/hotel/saovia-hotel-lockup.png",
-  splash: "/splash/hotel/saovia-hotel-splash-logo.png",
+  splash: "/splash/hotel/saovia-hotel-splash-premium.png",
   favicon16: "/icons/hotel/favicon-16x16.png",
   favicon32: "/icons/hotel/favicon-32x32.png",
   favicon48: "/icons/hotel/favicon-48x48.png",
